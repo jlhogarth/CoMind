@@ -32,11 +32,16 @@ jobs:
           fi
 
       - name: Require NEON_API_KEY secret
-        if: ${{ secrets.NEON_API_KEY == '' }}
         shell: bash
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
         run: |
-          echo "::error title=Missing NEON_API_KEY::Add NEON_API_KEY as a GitHub Actions repository secret."
-          exit 1
+          set -euo pipefail
+
+          if [ -z "${NEON_API_KEY:-}" ]; then
+            echo "::error title=Missing NEON_API_KEY::Add NEON_API_KEY as a GitHub Actions repository secret."
+            exit 1
+          fi
 
       - name: Require NEON_PROJECT_ID variable
         if: ${{ vars.NEON_PROJECT_ID == '' }}

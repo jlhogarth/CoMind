@@ -14,9 +14,6 @@ jobs:
   repository-health:
     name: Repository health and Neon configuration
     runs-on: ubuntu-latest
-    env:
-      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-      NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -34,19 +31,21 @@ jobs:
             exit 1
           fi
 
-      - name: Verify Neon Actions configuration
+      - name: Require NEON_API_KEY secret
+        if: ${{ secrets.NEON_API_KEY == '' }}
         shell: bash
         run: |
-          set -euo pipefail
+          echo "::error title=Missing NEON_API_KEY::Add NEON_API_KEY as a GitHub Actions repository secret."
+          exit 1
 
-          if [ -z "${NEON_API_KEY:-}" ]; then
-            echo "::error title=Missing NEON_API_KEY::Add NEON_API_KEY as a GitHub Actions repository secret."
-            exit 1
-          fi
+      - name: Require NEON_PROJECT_ID variable
+        if: ${{ vars.NEON_PROJECT_ID == '' }}
+        shell: bash
+        run: |
+          echo "::error title=Missing NEON_PROJECT_ID::Add NEON_PROJECT_ID as a GitHub Actions repository variable."
+          exit 1
 
-          if [ -z "${NEON_PROJECT_ID:-}" ]; then
-            echo "::error title=Missing NEON_PROJECT_ID::Add NEON_PROJECT_ID as a GitHub Actions repository variable."
-            exit 1
-          fi
-
+      - name: Confirm required Actions configuration
+        shell: bash
+        run: |
           echo "Required GitHub Actions configuration is present. Values were not printed."

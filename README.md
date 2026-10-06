@@ -64,6 +64,8 @@ OPENAI_MAX_RETRIES=2
 
 Do not commit an OpenAI API key. `OPENAI_API_KEY` is required only when `ASSISTANT_PROVIDER=openai`. The model, reasoning effort, output-token bound, retained-history message count, request timeout, and retry count are validated configuration rather than conversation-schema decisions.
 
+Assistant generation and conversation message writes are serialized per conversation with a PostgreSQL session advisory lock. If another assistant generation already owns that conversation lock, generation and competing message writes return HTTP `409` without invoking the provider or writing a message. A repeated generation request after the latest user turn already has a persisted assistant response returns that existing assistant row with HTTP `200` and does not call the provider again. A newly generated response returns HTTP `201`.
+
 A guarded live-provider smoke verification is available for explicit development use after the isolated database is running and `OPENAI_API_KEY` is present in the environment:
 
 ```bash

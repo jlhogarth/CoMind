@@ -1,6 +1,11 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { QueryFunction, query } from '../db.js';
+import {
+  ConversationLockRunner,
+  QueryFunction,
+  query,
+  withConversationLock,
+} from '../db.js';
 
 const CreateConversationSchema = z
   .object({
@@ -16,7 +21,11 @@ const AppendMessageSchema = z
   })
   .strict();
 
-export function registerConversationRoutes(app: FastifyInstance, queryFn: QueryFunction = query) {
+export function registerConversationRoutes(
+  app: FastifyInstance,
+  queryFn: QueryFunction = query,
+  conversationLock: ConversationLockRunner = withConversationLock
+) {
   app.get('/api/conversations', async () => {
     const { rows } = await queryFn<any>(
       'SELECT conv_id, title, source, created_at FROM comind.cm_conversation ORDER BY created_at DESC'
@@ -64,16 +73,22 @@ export function registerConversationRoutes(app: FastifyInstance, queryFn: QueryF
     }
 
     const { role, content } = parsed.data;
-    const { rows } = await queryFn<any>(
-      `INSERT INTO comind.cm_message (conv_id, role, content)
-       SELECT conv_id, $2, $3
-       FROM comind.cm_conversation
-       WHERE conv_id = $1
-       RETURNING msg_id, conv_id, role, content, created_at, meta`,
-      [id, role, content]
-    );
+    const locked = await conversationLock(id, async (lockedQuery) => {
+      const { rows } = await lockedQuery<any>(
+        `INSERT INTO comind.cm_message (conv_id, role, content)
+         SELECT conv_id, $2, $3
+         FROM comind.cm_conversation
+         WHERE conv_id = $1
+         RETURNING msg_id, conv_id, role, content, created_at, meta`,
+        [id, role, content]
+      );
+      return rows[0] ?? null;
+    });
 
-    if (!rows[0]) return reply.code(404).send({ error: 'Conversation not found' });
-    return reply.code(201).send(rows[0]);
+    if (!locked.acquired) {
+      return reply.code(409).send({ error: 'Conversation is generating an assistant response' });
+    }
+    if (!locked.value) return reply.code(404).send({ error: 'Conversation not found' });
+    return reply.code(201).send(locked.value);
   });
 }

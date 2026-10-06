@@ -14,7 +14,14 @@ import { registerResearchRoutes } from './routes/research.js';
 import { registerChecklistRoutes } from './routes/checklist.js';
 import { registerAssistantRoutes } from './routes/assistant.js';
 import { registerChatRoutes } from './routes/chat.js';
-import { closePool, databaseHealth, query, QueryFunction } from './db.js';
+import {
+  closePool,
+  ConversationLockRunner,
+  databaseHealth,
+  query,
+  QueryFunction,
+  withConversationLock,
+} from './db.js';
 
 type AppDependencies = {
   query: QueryFunction;
@@ -22,6 +29,7 @@ type AppDependencies = {
   closePool: typeof closePool;
   assistantProvider: AssistantProvider | null;
   assistantMaxHistoryMessages: number;
+  conversationLock: ConversationLockRunner;
 };
 
 const defaultDependencies: AppDependencies = {
@@ -30,10 +38,23 @@ const defaultDependencies: AppDependencies = {
   closePool,
   assistantProvider: createConfiguredAssistantProvider(),
   assistantMaxHistoryMessages: env.ASSISTANT_MAX_HISTORY_MESSAGES,
+  conversationLock: withConversationLock,
 };
 
 export async function buildApp(overrides: Partial<AppDependencies> = {}) {
   const dependencies: AppDependencies = { ...defaultDependencies, ...overrides };
+
+  if (overrides.query && overrides.conversationLock === undefined) {
+    const injectedQuery = dependencies.query;
+    dependencies.conversationLock = async <T>(
+      _conversationId: string,
+      work: (queryFn: QueryFunction) => Promise<T>
+    ) => ({
+      acquired: true,
+      value: await work(injectedQuery),
+    });
+  }
+
   const app = Fastify({ logger: true });
   const allowedOrigins = env.CORS_ORIGINS
     .split(',')
@@ -46,7 +67,7 @@ export async function buildApp(overrides: Partial<AppDependencies> = {}) {
   });
   await app.register(multipart);
 
-  registerConversationRoutes(app, dependencies.query);
+  registerConversationRoutes(app, dependencies.query, dependencies.conversationLock);
   registerIngestRoutes(app, dependencies.query);
   registerSearchRoutes(app, dependencies.query);
   registerAnalyticsRoutes(app, dependencies.query);
@@ -56,7 +77,8 @@ export async function buildApp(overrides: Partial<AppDependencies> = {}) {
     app,
     dependencies.query,
     dependencies.assistantProvider,
-    dependencies.assistantMaxHistoryMessages
+    dependencies.assistantMaxHistoryMessages,
+    dependencies.conversationLock
   );
   registerAdminRoutes(app);
   registerChatRoutes(app);

@@ -1,6 +1,11 @@
 import { FastifyInstance } from 'fastify';
 import { AssistantProvider, ConversationMessage, ConversationRole } from '../assistant.js';
-import { QueryFunction, query } from '../db.js';
+import {
+  ConversationLockRunner,
+  QueryFunction,
+  query,
+  withConversationLock,
+} from '../db.js';
 
 const supportedRoles = new Set<ConversationRole>(['user', 'assistant', 'system', 'tool']);
 
@@ -23,7 +28,8 @@ export function registerAssistantRoutes(
   app: FastifyInstance,
   queryFn: QueryFunction = query,
   assistantProvider: AssistantProvider | null = null,
-  maxHistoryMessages = 40
+  maxHistoryMessages = 40,
+  conversationLock: ConversationLockRunner = withConversationLock
 ) {
   app.get('/api/assistant/status', async () => ({
     enabled: assistantProvider !== null,
@@ -46,42 +52,76 @@ export function registerAssistantRoutes(
         return reply.code(404).send({ error: 'Conversation not found' });
       }
 
-      const history = await queryFn<{ role: string; content: string }>(
-        `SELECT role, content
-         FROM comind.cm_message
-         WHERE conv_id=$1
-         ORDER BY created_at ASC, msg_id ASC`,
-        [id]
-      );
-
-      const boundedHistory = retainRecentHistory(
-        history.rows.map(toConversationMessage),
-        maxHistoryMessages
-      );
-
-      let generated;
-      try {
-        generated = await assistantProvider.generateResponse({
-          conversationId: id,
-          messages: boundedHistory,
-        });
-      } catch {
-        req.log.warn(
-          { conversationId: id, provider: assistantProvider.name },
-          'Assistant provider request failed'
+      const locked = await conversationLock(id, async (lockedQuery) => {
+        const history = await lockedQuery<any>(
+          `SELECT role, content, msg_id, conv_id, created_at, meta
+           FROM comind.cm_message
+           WHERE conv_id=$1
+           ORDER BY created_at ASC, msg_id ASC`,
+          [id]
         );
-        return reply.code(502).send({ error: 'Assistant provider request failed' });
+
+        let latestUserIndex = -1;
+        for (let index = history.rows.length - 1; index >= 0; index--) {
+          if (history.rows[index].role === 'user') {
+            latestUserIndex = index;
+            break;
+          }
+        }
+
+        if (latestUserIndex >= 0) {
+          const existingAssistant = history.rows
+            .slice(latestUserIndex + 1)
+            .find((row) => row.role === 'assistant');
+          if (existingAssistant) {
+            return { kind: 'replay' as const, message: existingAssistant };
+          }
+        }
+
+        const boundedHistory = retainRecentHistory(
+          history.rows.map(toConversationMessage),
+          maxHistoryMessages
+        );
+
+        let generated;
+        try {
+          generated = await assistantProvider.generateResponse({
+            conversationId: id,
+            messages: boundedHistory,
+          });
+        } catch {
+          req.log.warn(
+            { conversationId: id, provider: assistantProvider.name },
+            'Assistant provider request failed'
+          );
+          return { kind: 'provider-failed' as const };
+        }
+
+        const metadata = generated.metadata ?? { provider: assistantProvider.name };
+        const persisted = await lockedQuery<any>(
+          `INSERT INTO comind.cm_message (conv_id, role, content, meta)
+           VALUES ($1, 'assistant', $2, $3::jsonb)
+           RETURNING msg_id, conv_id, role, content, created_at, meta`,
+          [id, generated.content, JSON.stringify(metadata)]
+        );
+
+        return { kind: 'created' as const, message: persisted.rows[0] };
+      });
+
+      if (!locked.acquired) {
+        return reply
+          .header('Retry-After', '1')
+          .code(409)
+          .send({ error: 'Assistant response generation is already in progress' });
       }
 
-      const metadata = generated.metadata ?? { provider: assistantProvider.name };
-      const persisted = await queryFn<any>(
-        `INSERT INTO comind.cm_message (conv_id, role, content, meta)
-         VALUES ($1, 'assistant', $2, $3::jsonb)
-         RETURNING msg_id, conv_id, role, content, created_at, meta`,
-        [id, generated.content, JSON.stringify(metadata)]
-      );
-
-      return reply.code(201).send(persisted.rows[0]);
+      if (locked.value.kind === 'provider-failed') {
+        return reply.code(502).send({ error: 'Assistant provider request failed' });
+      }
+      if (locked.value.kind === 'replay') {
+        return reply.code(200).send(locked.value.message);
+      }
+      return reply.code(201).send(locked.value.message);
     }
   );
 }

@@ -41,9 +41,15 @@ bash "${repository_root}/scripts/bootstrap_dev_runtime.sh"
 server_pid=$!
 
 cleanup() {
+  exit_code=$?
   kill "${server_pid}" >/dev/null 2>&1 || true
   wait "${server_pid}" >/dev/null 2>&1 || true
+  if [[ "${exit_code}" -ne 0 ]]; then
+    echo "CoMind server log from failed guarded verification:" >&2
+    cat "${server_log}" >&2 || true
+  fi
   rm -f "${server_log}"
+  return "${exit_code}"
 }
 trap cleanup EXIT
 
@@ -52,7 +58,6 @@ for attempt in $(seq 1 30); do
     break
   fi
   if [[ "${attempt}" -eq 30 ]]; then
-    cat "${server_log}" >&2
     echo "CoMind server did not become ready for live provider verification." >&2
     exit 1
   fi

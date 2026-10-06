@@ -226,7 +226,7 @@ CREATE TABLE IF NOT EXISTS cm_cris_theory (
   theory_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name CITEXT UNIQUE NOT NULL,
   description TEXT,
-  references JSONB,
+  reference_data JSONB,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

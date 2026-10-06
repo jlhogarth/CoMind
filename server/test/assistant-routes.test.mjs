@@ -135,6 +135,71 @@ test('assistant generation passes persisted history to provider and persists ret
   });
 });
 
+test('assistant generation bounds persisted history before provider invocation', async () => {
+  const providerCalls = [];
+  const assistantProvider = {
+    name: 'test-provider',
+    async generateResponse(request) {
+      providerCalls.push(request);
+      return { content: 'Bounded assistant answer' };
+    },
+  };
+
+  const query = async (text, params) => {
+    if (text.includes('SELECT conv_id FROM comind.cm_conversation')) {
+      return { rows: [{ conv_id: conversationId }] };
+    }
+    if (text.includes('SELECT role, content')) {
+      return {
+        rows: [
+          { role: 'system', content: 'Original system guidance' },
+          { role: 'user', content: 'First user turn' },
+          { role: 'assistant', content: 'First assistant turn' },
+          { role: 'user', content: 'Second user turn' },
+        ],
+      };
+    }
+    if (text.includes('INSERT INTO comind.cm_message')) {
+      return {
+        rows: [{
+          msg_id: '55555555-5555-4555-8555-555555555560',
+          conv_id: conversationId,
+          role: 'assistant',
+          content: params[1],
+          created_at: '2026-10-06T09:00:00.000Z',
+          meta: JSON.parse(params[2]),
+        }],
+      };
+    }
+    throw new Error(`Unexpected query: ${text}`);
+  };
+
+  const app = await buildApp({
+    query,
+    closePool: closePoolForTest,
+    assistantProvider,
+    assistantMaxHistoryMessages: 2,
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/conversations/${conversationId}/assistant-response`,
+    });
+
+    assert.equal(response.statusCode, 201);
+    assert.deepEqual(providerCalls, [{
+      conversationId,
+      messages: [
+        { role: 'assistant', content: 'First assistant turn' },
+        { role: 'user', content: 'Second user turn' },
+      ],
+    }]);
+  } finally {
+    await app.close();
+  }
+});
+
 test('assistant provider failure returns 502 without inserting an assistant message', async () => {
   const queries = [];
   const assistantProvider = {

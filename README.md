@@ -57,9 +57,12 @@ OPENAI_API_KEY=<secret supplied through the runtime environment>
 OPENAI_MODEL=gpt-6-luna
 OPENAI_REASONING_EFFORT=low
 OPENAI_MAX_OUTPUT_TOKENS=1024
+ASSISTANT_MAX_HISTORY_MESSAGES=40
+OPENAI_TIMEOUT_MS=30000
+OPENAI_MAX_RETRIES=2
 ```
 
-Do not commit an OpenAI API key. `OPENAI_API_KEY` is required only when `ASSISTANT_PROVIDER=openai`. The model, reasoning effort, and output-token bound are validated configuration rather than conversation-schema decisions.
+Do not commit an OpenAI API key. `OPENAI_API_KEY` is required only when `ASSISTANT_PROVIDER=openai`. The model, reasoning effort, output-token bound, retained-history message count, request timeout, and retry count are validated configuration rather than conversation-schema decisions.
 
 A guarded live-provider smoke verification is available for explicit development use after the isolated database is running and `OPENAI_API_KEY` is present in the environment:
 

@@ -15,10 +15,15 @@ function toConversationMessage(row: { role: string; content: string }): Conversa
   };
 }
 
+function retainRecentHistory(messages: ConversationMessage[], maxHistoryMessages: number) {
+  return messages.slice(Math.max(messages.length - maxHistoryMessages, 0));
+}
+
 export function registerAssistantRoutes(
   app: FastifyInstance,
   queryFn: QueryFunction = query,
-  assistantProvider: AssistantProvider | null = null
+  assistantProvider: AssistantProvider | null = null,
+  maxHistoryMessages = 40
 ) {
   app.get('/api/assistant/status', async () => ({
     enabled: assistantProvider !== null,
@@ -49,11 +54,16 @@ export function registerAssistantRoutes(
         [id]
       );
 
+      const boundedHistory = retainRecentHistory(
+        history.rows.map(toConversationMessage),
+        maxHistoryMessages
+      );
+
       let generated;
       try {
         generated = await assistantProvider.generateResponse({
           conversationId: id,
-          messages: history.rows.map(toConversationMessage),
+          messages: boundedHistory,
         });
       } catch {
         req.log.warn(

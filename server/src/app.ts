@@ -21,6 +21,7 @@ type AppDependencies = {
   databaseHealth: typeof databaseHealth;
   closePool: typeof closePool;
   assistantProvider: AssistantProvider | null;
+  assistantMaxHistoryMessages: number;
 };
 
 const defaultDependencies: AppDependencies = {
@@ -28,6 +29,7 @@ const defaultDependencies: AppDependencies = {
   databaseHealth,
   closePool,
   assistantProvider: createConfiguredAssistantProvider(),
+  assistantMaxHistoryMessages: env.ASSISTANT_MAX_HISTORY_MESSAGES,
 };
 
 export async function buildApp(overrides: Partial<AppDependencies> = {}) {
@@ -50,7 +52,12 @@ export async function buildApp(overrides: Partial<AppDependencies> = {}) {
   registerAnalyticsRoutes(app, dependencies.query);
   registerResearchRoutes(app, dependencies.query);
   registerChecklistRoutes(app, dependencies.query);
-  registerAssistantRoutes(app, dependencies.query, dependencies.assistantProvider);
+  registerAssistantRoutes(
+    app,
+    dependencies.query,
+    dependencies.assistantProvider,
+    dependencies.assistantMaxHistoryMessages
+  );
   registerAdminRoutes(app);
   registerChatRoutes(app);
 

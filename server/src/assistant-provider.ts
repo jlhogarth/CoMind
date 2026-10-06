@@ -9,5 +9,7 @@ export function createConfiguredAssistantProvider(): AssistantProvider | null {
     model: env.OPENAI_MODEL,
     reasoningEffort: env.OPENAI_REASONING_EFFORT,
     maxOutputTokens: env.OPENAI_MAX_OUTPUT_TOKENS,
+    timeoutMs: env.OPENAI_TIMEOUT_MS,
+    maxRetries: env.OPENAI_MAX_RETRIES,
   });
 }

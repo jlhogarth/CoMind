@@ -21,5 +21,5 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$fixture_file"
   cd "$repo_root/server"
   npm ci
   npm run build
-  node --test test/integration/conversation-lifecycle.test.mjs
+  node --test --test-concurrency=1 test/integration/*.test.mjs
 )

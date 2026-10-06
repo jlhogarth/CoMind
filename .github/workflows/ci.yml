@@ -90,3 +90,40 @@ jobs:
           sudo apt-get install --yes postgresql-client
       - name: Verify conversation lifecycle against isolated PostgreSQL
         run: bash ./scripts/test_conversation_lifecycle.sh
+
+  dev-runtime-verification:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.6-pg17-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_runtime
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_runtime"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_runtime
+      PORT: 3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+      - name: Install server dependencies
+        run: |
+          cd server
+          npm ci
+      - name: Bootstrap isolated development runtime
+        run: bash ./scripts/bootstrap_dev_runtime.sh
+      - name: Verify chat over real HTTP and PostgreSQL
+        run: bash ./scripts/verify_chat_runtime.sh

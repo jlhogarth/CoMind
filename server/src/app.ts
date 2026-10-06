@@ -3,6 +3,8 @@ import cors from '@fastify/cors';
 import swagger from '@fastify/swagger';
 import multipart from '@fastify/multipart';
 import { env } from './env.js';
+import { AssistantProvider } from './assistant.js';
+import { createConfiguredAssistantProvider } from './assistant-provider.js';
 import { registerConversationRoutes } from './routes/conversations.js';
 import { registerIngestRoutes } from './routes/ingest.js';
 import { registerSearchRoutes } from './routes/search.js';
@@ -10,6 +12,7 @@ import { registerAnalyticsRoutes } from './routes/analytics.js';
 import { registerAdminRoutes } from './routes/admin.js';
 import { registerResearchRoutes } from './routes/research.js';
 import { registerChecklistRoutes } from './routes/checklist.js';
+import { registerAssistantRoutes } from './routes/assistant.js';
 import { registerChatRoutes } from './routes/chat.js';
 import { closePool, databaseHealth, query, QueryFunction } from './db.js';
 
@@ -17,12 +20,14 @@ type AppDependencies = {
   query: QueryFunction;
   databaseHealth: typeof databaseHealth;
   closePool: typeof closePool;
+  assistantProvider: AssistantProvider | null;
 };
 
 const defaultDependencies: AppDependencies = {
   query,
   databaseHealth,
   closePool,
+  assistantProvider: createConfiguredAssistantProvider(),
 };
 
 export async function buildApp(overrides: Partial<AppDependencies> = {}) {
@@ -45,6 +50,7 @@ export async function buildApp(overrides: Partial<AppDependencies> = {}) {
   registerAnalyticsRoutes(app, dependencies.query);
   registerResearchRoutes(app, dependencies.query);
   registerChecklistRoutes(app, dependencies.query);
+  registerAssistantRoutes(app, dependencies.query, dependencies.assistantProvider);
   registerAdminRoutes(app);
   registerChatRoutes(app);
 

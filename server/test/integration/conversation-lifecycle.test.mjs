@@ -4,6 +4,7 @@ import { after, before, test } from 'node:test';
 process.env.DATABASE_URL = process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@localhost:5432/comind_ci';
 
 const { buildApp } = await import('../../dist/app.js');
+const { query: databaseQuery } = await import('../../dist/db.js');
 
 let app;
 
@@ -117,7 +118,13 @@ test('minimal chat lifecycle persists, reloads, searches, and contributes to ana
   const conversation = createResponse.json();
   assert.equal(conversation.source, 'live');
   assert.equal(conversation.title, 'Issue #10 durable chat verification');
-  assert.equal(conversation.project_id, '33333333-3333-4333-8333-333333333333');
+  assert.ok(conversation.project_id);
+
+  const project = await databaseQuery(
+    'SELECT slug FROM comind.cm_project WHERE project_id=$1',
+    [conversation.project_id]
+  );
+  assert.equal(project.rows[0]?.slug, 'comind');
 
   const userMessage = await app.inject({
     method: 'POST',

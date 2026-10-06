@@ -1,2 +1,7 @@
-# Optional Dockerfile if you prefer building from a base
 FROM mcr.microsoft.com/devcontainers/javascript-node:20
+
+USER root
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+USER node

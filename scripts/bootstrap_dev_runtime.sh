@@ -20,13 +20,14 @@ try {
 }
 
 const allowedProtocols = new Set(['postgres:', 'postgresql:']);
+const allowedHosts = new Set(['db', 'localhost', '127.0.0.1']);
 if (!allowedProtocols.has(parsed.protocol)) {
   console.error('DATABASE_URL must use the postgres or postgresql protocol.');
   process.exit(2);
 }
 
-if (parsed.hostname !== 'db' || parsed.pathname !== '/comind_runtime') {
-  console.error('Refusing database target outside the isolated db/comind_runtime development runtime.');
+if (!allowedHosts.has(parsed.hostname) || parsed.pathname !== '/comind_runtime') {
+  console.error('Refusing database target outside the isolated comind_runtime development database.');
   process.exit(2);
 }
 NODE

@@ -63,7 +63,7 @@ export BASE_URL="${base_url}"
 export VERIFICATION_TITLE="${verification_title}"
 export VERIFICATION_MESSAGE="${verification_message}"
 
-conversation_id="$(node <<'NODE'
+if ! conversation_id="$(node <<'NODE'
 import assert from 'node:assert/strict';
 
 const baseUrl = process.env.BASE_URL;
@@ -112,7 +112,11 @@ assert.equal(reloaded.messages[1].content, assistant.content);
 console.error(`OpenAI live API verification passed for response ${assistant.meta.response_id}.`);
 process.stdout.write(conversation.conv_id);
 NODE
-)"
+)"; then
+  cat "${server_log}" >&2
+  echo "Live OpenAI verification failed; server diagnostics emitted above." >&2
+  exit 1
+fi
 
 persisted_count="$(
   psql "${DATABASE_URL}" \

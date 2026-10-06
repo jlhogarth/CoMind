@@ -6,7 +6,7 @@
   "forwardPorts": [
     3000
   ],
-  "postCreateCommand": "cd server && npm ci",
+  "postCreateCommand": "cd server && npm ci && cd .. && bash scripts/bootstrap_dev_runtime.sh",
   "shutdownAction": "stopCompose",
   "customizations": {
     "vscode": {

@@ -12,13 +12,13 @@ This repository contains the first recoverable CoMind backend application build,
    - PostgreSQL 17 with pgvector in an isolated `comind_runtime` database.
    - PostgreSQL client tools.
    - Server dependencies through `npm ci`.
-3. Initialize the isolated development database:
+3. During Codespace creation, `postCreateCommand` runs `npm ci` and then invokes the single guarded database bootstrap path:
 
    ```bash
    bash scripts/bootstrap_dev_runtime.sh
    ```
 
-   The bootstrap script rejects remote database hosts and refuses any database name other than `comind_runtime`.
+   The bootstrap script rejects remote database hosts and refuses any database name other than `comind_runtime`. It is safe to rerun when the isolated development database needs to be reverified.
 4. Start CoMind:
 
    ```bash
@@ -28,7 +28,7 @@ This repository contains the first recoverable CoMind backend application build,
 
 5. Open forwarded port 3000 and visit `/chat`.
 
-The Codespaces runtime does not require a Supabase connection and must not be used to mutate live Supabase.
+The Codespaces runtime does not require a Supabase connection and must not be used to mutate live Supabase. The compose runtime is a development and verification environment, not a production Docker deployment path.
 
 ## Local server environment
 
@@ -70,7 +70,7 @@ A guarded live-provider smoke verification is available for explicit development
 bash scripts/verify_openai_live.sh
 ```
 
-That script refuses remote database hosts and refuses database names other than `comind_runtime`. It is not part of ordinary CI.
+That script refuses remote database hosts and refuses database names other than `comind_runtime`. It performs a paid live provider request, so it is not part of ordinary CI and must be invoked explicitly.
 
 ## Application endpoints
 
@@ -101,6 +101,7 @@ The API runs on port 3000. Current endpoints include:
 
 - Continuous Integration builds and tests the server on pushes and pull requests.
 - PostgreSQL lifecycle tests run against isolated PostgreSQL 17 services.
+- Devcontainer verification validates the declared Codespaces contract, builds the workspace image, runs the guarded bootstrap against the compose-managed PostgreSQL 17 + pgvector service, and reruns server build/tests inside that workspace.
 - The browser runtime test keeps the assistant provider disabled unless a separate explicit live verification is performed.
 - The no-placeholder gate rejects unresolved development markers.
 - Repository configuration checks confirm that required settings exist without printing secret values.

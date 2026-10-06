@@ -48,11 +48,7 @@ done
   psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f MASTER.sql
 )
 
-for migration in "${repository_root}"/db/migrations/[0-9]*.sql; do
-  psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${migration}"
-done
-
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atc \
   "SELECT current_database(), current_setting('server_version_num')::int >= 170000, EXISTS (SELECT 1 FROM pg_extension WHERE extname='vector');"
 
-echo "Isolated CoMind development database is initialized."
+echo "Isolated CoMind chat development database is initialized."

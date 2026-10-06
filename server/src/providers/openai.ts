@@ -66,6 +66,14 @@ function usageMetadata(usage: OpenAIResponseLike['usage']) {
   return Object.keys(metadata).length > 0 ? metadata : undefined;
 }
 
+function emptyOutputError() {
+  const error = new Error('OpenAI response did not contain assistant text') as Error & {
+    code?: string;
+  };
+  error.code = 'openai_empty_output';
+  return error;
+}
+
 export class OpenAIAssistantProvider implements AssistantProvider {
   readonly name = 'openai';
 
@@ -85,7 +93,7 @@ export class OpenAIAssistantProvider implements AssistantProvider {
 
     const content = response.output_text?.trim();
     if (!content) {
-      throw new Error('OpenAI response did not contain assistant text');
+      throw emptyOutputError();
     }
 
     const usage = usageMetadata(response.usage);

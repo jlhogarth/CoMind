@@ -61,4 +61,4 @@ jobs:
         if: success()
         run: |
           echo "Guarded OpenAI live smoke passed against isolated comind_runtime." >> "${GITHUB_STEP_SUMMARY}"
-          echo "No live Supabase or Neon database was used." >> "${GITHUB_STEP_SUMMARY}"
+          echo "No live Supabase database was used." >> "${GITHUB_STEP_SUMMARY}"

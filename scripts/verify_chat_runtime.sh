@@ -17,7 +17,7 @@ fi
 (
   cd "${repository_root}/server"
   npm run build
-  node dist/index.js >"${server_log}" 2>&1
+  exec node dist/index.js >"${server_log}" 2>&1
 ) &
 server_pid=$!
 

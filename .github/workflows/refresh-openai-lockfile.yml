@@ -1,0 +1,39 @@
+name: Refresh OpenAI lockfile
+
+on:
+  pull_request:
+    paths:
+      - server/package.json
+      - server/package-lock.json
+      - .github/workflows/refresh-openai-lockfile.yml
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feature/openai-assistant-provider'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Generate canonical npm lockfile
+        run: |
+          cd server
+          npm install --package-lock-only --ignore-scripts
+      - name: Commit lockfile when changed
+        shell: bash
+        run: |
+          if git diff --quiet -- server/package-lock.json; then
+            echo "Lockfile already matches package.json."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server/package-lock.json
+          git commit -m "Refresh server lockfile for OpenAI provider"
+          git push origin "HEAD:${GITHUB_HEAD_REF}"

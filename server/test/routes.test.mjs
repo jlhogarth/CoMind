@@ -55,6 +55,121 @@ test('database health endpoint surfaces database failures as HTTP 500', async ()
   });
 });
 
+test('conversation create rejects an empty title before querying the database', async () => {
+  await withApp({}, async (app) => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/conversations',
+      payload: { title: '   ' },
+    });
+    assert.equal(response.statusCode, 400);
+    assert.equal(response.json().error, 'Invalid body');
+  });
+});
+
+test('conversation create persists a live conversation and returns the record', async () => {
+  const calls = [];
+  const queryForCreate = async (text, params) => {
+    calls.push({ text, params });
+    return {
+      rows: [{
+        conv_id: '44444444-4444-4444-8444-444444444449',
+        project_id: '33333333-3333-4333-8333-333333333333',
+        source: 'live',
+        title: 'First live conversation',
+        created_at: '2026-10-06T07:30:00.000Z',
+      }],
+    };
+  };
+
+  await withApp({ query: queryForCreate }, async (app) => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/conversations',
+      payload: { title: 'First live conversation' },
+    });
+    assert.equal(response.statusCode, 201);
+    assert.equal(response.json().source, 'live');
+    assert.equal(response.json().title, 'First live conversation');
+    assert.equal(calls.length, 1);
+    assert.match(calls[0].text, /INSERT INTO comind\.cm_conversation/);
+    assert.deepEqual(calls[0].params, [null, 'First live conversation']);
+  });
+});
+
+test('message append rejects unsupported roles before querying the database', async () => {
+  await withApp({}, async (app) => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/conversations/44444444-4444-4444-8444-444444444449/messages',
+      payload: { role: 'model', content: 'Invalid role' },
+    });
+    assert.equal(response.statusCode, 400);
+    assert.equal(response.json().error, 'Invalid body');
+  });
+});
+
+test('message append returns 404 when the conversation does not exist', async () => {
+  await withApp({ query: async () => ({ rows: [] }) }, async (app) => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/conversations/44444444-4444-4444-8444-444444444449/messages',
+      payload: { role: 'user', content: 'Persist this message' },
+    });
+    assert.equal(response.statusCode, 404);
+    assert.deepEqual(response.json(), { error: 'Conversation not found' });
+  });
+});
+
+test('message append persists a supported role and content', async () => {
+  const calls = [];
+  const queryForAppend = async (text, params) => {
+    calls.push({ text, params });
+    return {
+      rows: [{
+        msg_id: '55555555-5555-4555-8555-555555555559',
+        conv_id: params[0],
+        role: params[1],
+        content: params[2],
+        created_at: '2026-10-06T07:31:00.000Z',
+        meta: null,
+      }],
+    };
+  };
+
+  await withApp({ query: queryForAppend }, async (app) => {
+    const conversationId = '44444444-4444-4444-8444-444444444449';
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/conversations/${conversationId}/messages`,
+      payload: { role: 'user', content: 'Persist this message' },
+    });
+    assert.equal(response.statusCode, 201);
+    assert.equal(response.json().conv_id, conversationId);
+    assert.equal(response.json().role, 'user');
+    assert.equal(response.json().content, 'Persist this message');
+    assert.equal(calls.length, 1);
+    assert.match(calls[0].text, /INSERT INTO comind\.cm_message/);
+  });
+});
+
+test('conversation detail returns 404 without querying messages when conversation is missing', async () => {
+  const calls = [];
+  await withApp({
+    query: async (text, params) => {
+      calls.push({ text, params });
+      return { rows: [] };
+    },
+  }, async (app) => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/conversations/44444444-4444-4444-8444-444444444449',
+    });
+    assert.equal(response.statusCode, 404);
+    assert.equal(calls.length, 1);
+  });
+});
+
 test('search returns an empty list when q is omitted without querying the database', async () => {
   await withApp({}, async (app) => {
     const response = await app.inject({ method: 'GET', url: '/api/messages/search' });
@@ -186,5 +301,18 @@ test('admin endpoint serves the CoMind admin page', async () => {
     assert.equal(response.statusCode, 200);
     assert.match(response.headers['content-type'], /^text\/html/);
     assert.match(response.body, /<h1>CoMind Admin<\/h1>/);
+  });
+});
+
+test('chat endpoint serves the durable CoMind chat surface', async () => {
+  await withApp({}, async (app) => {
+    const response = await app.inject({ method: 'GET', url: '/chat' });
+    assert.equal(response.statusCode, 200);
+    assert.match(response.headers['content-type'], /^text\/html/);
+    assert.match(response.body, /<h1>CoMind Chat<\/h1>/);
+    assert.match(response.body, /Create conversation/);
+    assert.match(response.body, /Assistant provider is not configured yet/);
+    assert.match(response.body, /\/api\/conversations/);
+    assert.match(response.body, /\/messages/);
   });
 });

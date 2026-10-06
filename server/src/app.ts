@@ -10,6 +10,7 @@ import { registerAnalyticsRoutes } from './routes/analytics.js';
 import { registerAdminRoutes } from './routes/admin.js';
 import { registerResearchRoutes } from './routes/research.js';
 import { registerChecklistRoutes } from './routes/checklist.js';
+import { registerChatRoutes } from './routes/chat.js';
 import { closePool, databaseHealth, query, QueryFunction } from './db.js';
 
 type AppDependencies = {
@@ -45,6 +46,7 @@ export async function buildApp(overrides: Partial<AppDependencies> = {}) {
   registerResearchRoutes(app, dependencies.query);
   registerChecklistRoutes(app, dependencies.query);
   registerAdminRoutes(app);
+  registerChatRoutes(app);
 
   app.get('/', async () => ({ ok: true }));
   app.get('/health', async () => ({ ok: true, service: 'comind-api' }));

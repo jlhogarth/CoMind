@@ -34,6 +34,53 @@ jobs:
           cd server
           npm audit --omit=dev --audit-level=high
 
+  devcontainer-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify declared devcontainer contract
+        run: node scripts/verify_devcontainer_contract.mjs
+      - name: Validate compose configuration
+        run: docker compose -f .devcontainer/compose.yaml config
+      - name: Build and verify devcontainer runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          compose=(docker compose -f .devcontainer/compose.yaml)
+          cleanup() {
+            "${compose[@]}" down --volumes --remove-orphans
+          }
+          trap cleanup EXIT
+
+          "${compose[@]}" up --detach --build
+
+          remote_user="$(node -e 'const fs = require("node:fs"); process.stdout.write(JSON.parse(fs.readFileSync(".devcontainer/devcontainer.json", "utf8")).remoteUser);')"
+          workspace_uid="$("${compose[@]}" exec -T workspace id -u "${remote_user}" | tr -d '\r')"
+          workspace_gid="$("${compose[@]}" exec -T workspace id -g "${remote_user}" | tr -d '\r')"
+          sudo chown -R "${workspace_uid}:${workspace_gid}" "${GITHUB_WORKSPACE}/server"
+
+          post_create_command="$(node -e 'const fs = require("node:fs"); process.stdout.write(JSON.parse(fs.readFileSync(".devcontainer/devcontainer.json", "utf8")).postCreateCommand);')"
+          "${compose[@]}" exec -T workspace bash -lc "cd /workspaces/CoMind && ${post_create_command}"
+
+          "${compose[@]}" exec -T workspace bash -lc '
+            set -euo pipefail
+            [[ "$(id -un)" == node ]]
+            node_version="$(node --version)"
+            [[ "${node_version}" == v24.* ]]
+            psql_version="$(psql --version)"
+            [[ "${psql_version}" == *" 17."* ]]
+            cd /workspaces/CoMind/server
+            npm run build
+            npm test
+          '
+
+          database_check="$("${compose[@]}" exec -T db psql -U postgres -d comind_runtime -Atc "SELECT current_database(), current_setting('server_version_num')::int >= 170000, EXISTS (SELECT 1 FROM pg_extension WHERE extname='vector');")"
+          [[ "${database_check}" == "comind_runtime|t|t" ]]
+          printf 'Devcontainer runtime verified: %s\n' "${database_check}"
+
   pm-ledger-migration:
     runs-on: ubuntu-latest
     services:

@@ -1,0 +1,64 @@
+name: Guarded OpenAI Live Smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: guarded-openai-live-smoke
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.6-pg17-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_runtime
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_runtime"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_runtime
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      PORT: 3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+      - name: Install server dependencies
+        run: |
+          cd server
+          npm ci
+      - name: Verify development API key is configured
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${OPENAI_API_KEY:-}" ]]; then
+            echo "OPENAI_API_KEY is not configured for this repository Actions runtime." >&2
+            exit 1
+          fi
+          echo "OPENAI_API_KEY is configured; value remains masked and is not printed."
+      - name: Run guarded live provider verification
+        shell: bash
+        run: bash ./scripts/verify_openai_live.sh
+      - name: Record completion summary
+        if: success()
+        run: |
+          echo "Guarded OpenAI live smoke passed against isolated comind_runtime." >> "${GITHUB_STEP_SUMMARY}"
+          echo "No live Supabase or Neon database was used." >> "${GITHUB_STEP_SUMMARY}"

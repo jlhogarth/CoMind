@@ -100,3 +100,83 @@ test('analytics summary reports fixture totals and conversation message counts',
     ],
   });
 });
+
+test('minimal chat lifecycle persists, reloads, searches, and contributes to analytics', async () => {
+  const chatPage = await app.inject({ method: 'GET', url: '/chat' });
+  assert.equal(chatPage.statusCode, 200);
+  assert.match(chatPage.body, /CoMind Chat/);
+  assert.match(chatPage.body, /messageForm/);
+  assert.match(chatPage.body, /\/messages/);
+
+  const createResponse = await app.inject({
+    method: 'POST',
+    url: '/api/conversations',
+    payload: { title: 'Issue #10 durable chat verification' },
+  });
+  assert.equal(createResponse.statusCode, 201);
+  const conversation = createResponse.json();
+  assert.equal(conversation.source, 'live');
+  assert.equal(conversation.title, 'Issue #10 durable chat verification');
+  assert.equal(conversation.project_id, '33333333-3333-4333-8333-333333333333');
+
+  const userMessage = await app.inject({
+    method: 'POST',
+    url: `/api/conversations/${conversation.conv_id}/messages`,
+    payload: {
+      role: 'user',
+      content: 'CoMind persistence marker: OrchardQuartz',
+    },
+  });
+  assert.equal(userMessage.statusCode, 201);
+  assert.equal(userMessage.json().role, 'user');
+
+  const assistantMessage = await app.inject({
+    method: 'POST',
+    url: `/api/conversations/${conversation.conv_id}/messages`,
+    payload: {
+      role: 'assistant',
+      content: 'Deterministic integration response for OrchardQuartz',
+    },
+  });
+  assert.equal(assistantMessage.statusCode, 201);
+  assert.equal(assistantMessage.json().role, 'assistant');
+
+  const reloadResponse = await app.inject({
+    method: 'GET',
+    url: `/api/conversations/${conversation.conv_id}`,
+  });
+  assert.equal(reloadResponse.statusCode, 200);
+  const reloaded = reloadResponse.json();
+  assert.equal(reloaded.conversation.conv_id, conversation.conv_id);
+  assert.deepEqual(
+    reloaded.messages.map((message) => message.role),
+    ['user', 'assistant']
+  );
+  assert.deepEqual(
+    reloaded.messages.map((message) => message.content),
+    [
+      'CoMind persistence marker: OrchardQuartz',
+      'Deterministic integration response for OrchardQuartz',
+    ]
+  );
+  assert.ok(reloaded.messages.every((message) => message.conv_id === conversation.conv_id));
+
+  const searchResponse = await app.inject({
+    method: 'GET',
+    url: '/api/messages/search?q=OrchardQuartz',
+  });
+  assert.equal(searchResponse.statusCode, 200);
+  const searchMatches = searchResponse.json();
+  assert.equal(searchMatches.length, 2);
+  assert.ok(searchMatches.every((match) => match.conv_id === conversation.conv_id));
+
+  const analyticsResponse = await app.inject({ method: 'GET', url: '/api/analytics/summary' });
+  assert.equal(analyticsResponse.statusCode, 200);
+  const analytics = analyticsResponse.json();
+  assert.equal(analytics.conversations, 4);
+  assert.equal(analytics.messages, 11);
+  assert.equal(
+    analytics.top10.find((row) => row.conv_id === conversation.conv_id)?.messages,
+    2
+  );
+});

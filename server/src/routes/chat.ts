@@ -75,6 +75,8 @@ export function registerChatRoutes(app: FastifyInstance) {
     </div>
     <script>
       let selectedConversationId = null;
+      let assistantEnabled = false;
+      let assistantProvider = null;
 
       const list = document.getElementById('conversationList');
       const messages = document.getElementById('messages');
@@ -93,6 +95,12 @@ export function registerChatRoutes(app: FastifyInstance) {
 
       function setStatus(text) {
         status.textContent = text;
+      }
+
+      async function loadAssistantStatus() {
+        const assistant = await request('/api/assistant/status');
+        assistantEnabled = assistant.enabled === true;
+        assistantProvider = assistant.provider;
       }
 
       function renderConversationButtons(conversations) {
@@ -184,7 +192,24 @@ export function registerChatRoutes(app: FastifyInstance) {
           });
           messageInput.value = '';
           await selectConversation(selectedConversationId, false);
-          setStatus('Message persisted. Assistant provider is not configured yet.');
+
+          if (!assistantEnabled) {
+            setStatus('Message persisted. Assistant provider is not configured.');
+            return;
+          }
+
+          setStatus('Message persisted. Requesting assistant response from ' + assistantProvider + '.');
+          try {
+            await request(
+              '/api/conversations/' + encodeURIComponent(selectedConversationId) + '/assistant-response',
+              { method: 'POST' }
+            );
+            await selectConversation(selectedConversationId, false);
+            setStatus('Assistant response persisted.');
+          } catch (assistantError) {
+            await selectConversation(selectedConversationId, false);
+            setStatus('Message persisted. ' + assistantError.message + '.');
+          }
         } catch (error) {
           setStatus(error.message);
         } finally {
@@ -192,7 +217,8 @@ export function registerChatRoutes(app: FastifyInstance) {
         }
       });
 
-      loadConversations().catch((error) => setStatus(error.message));
+      Promise.all([loadAssistantStatus(), loadConversations()])
+        .catch((error) => setStatus(error.message));
     </script>
   </body>
 </html>`;

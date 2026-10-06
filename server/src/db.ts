@@ -3,6 +3,10 @@ import { env } from './env.js';
 
 export const pool = new Pool({ connectionString: env.DATABASE_URL });
 
+export interface QueryFunction {
+  <T>(text: string, params?: any[]): Promise<{ rows: T[] }>;
+}
+
 export async function query<T>(text: string, params?: any[]): Promise<{ rows: T[] }> {
   const client = await pool.connect();
   try {

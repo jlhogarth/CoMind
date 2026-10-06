@@ -10,9 +10,22 @@ import { registerAnalyticsRoutes } from './routes/analytics.js';
 import { registerAdminRoutes } from './routes/admin.js';
 import { registerResearchRoutes } from './routes/research.js';
 import { registerChecklistRoutes } from './routes/checklist.js';
-import { closePool, databaseHealth } from './db.js';
+import { closePool, databaseHealth, query, QueryFunction } from './db.js';
 
-export async function buildApp() {
+type AppDependencies = {
+  query: QueryFunction;
+  databaseHealth: typeof databaseHealth;
+  closePool: typeof closePool;
+};
+
+const defaultDependencies: AppDependencies = {
+  query,
+  databaseHealth,
+  closePool,
+};
+
+export async function buildApp(overrides: Partial<AppDependencies> = {}) {
+  const dependencies: AppDependencies = { ...defaultDependencies, ...overrides };
   const app = Fastify({ logger: true });
   const allowedOrigins = env.CORS_ORIGINS
     .split(',')
@@ -25,20 +38,20 @@ export async function buildApp() {
   });
   await app.register(multipart);
 
-  registerConversationRoutes(app);
-  registerIngestRoutes(app);
-  registerSearchRoutes(app);
-  registerAnalyticsRoutes(app);
-  registerResearchRoutes(app);
-  registerChecklistRoutes(app);
+  registerConversationRoutes(app, dependencies.query);
+  registerIngestRoutes(app, dependencies.query);
+  registerSearchRoutes(app, dependencies.query);
+  registerAnalyticsRoutes(app, dependencies.query);
+  registerResearchRoutes(app, dependencies.query);
+  registerChecklistRoutes(app, dependencies.query);
   registerAdminRoutes(app);
 
   app.get('/', async () => ({ ok: true }));
   app.get('/health', async () => ({ ok: true, service: 'comind-api' }));
-  app.get('/api/db/health', async () => databaseHealth());
+  app.get('/api/db/health', async () => dependencies.databaseHealth());
 
   app.addHook('onClose', async () => {
-    await closePool();
+    await dependencies.closePool();
   });
 
   await app.ready();

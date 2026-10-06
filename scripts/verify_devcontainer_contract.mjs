@@ -22,6 +22,8 @@ const expectedPostCreate =
 assert.equal(devcontainer.dockerComposeFile, 'compose.yaml');
 assert.equal(devcontainer.service, 'workspace');
 assert.equal(devcontainer.workspaceFolder, '/workspaces/CoMind');
+assert.equal(devcontainer.remoteUser, 'node');
+assert.equal(devcontainer.updateRemoteUserUID, true);
 assert.ok(devcontainer.forwardPorts?.includes(3000), 'port 3000 must be forwarded');
 assert.equal(devcontainer.postCreateCommand, expectedPostCreate);
 

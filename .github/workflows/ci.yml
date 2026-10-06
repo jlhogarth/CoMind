@@ -57,14 +57,21 @@ jobs:
 
           "${compose[@]}" up --detach --build
 
+          remote_user="$(node -e 'const fs = require("node:fs"); process.stdout.write(JSON.parse(fs.readFileSync(".devcontainer/devcontainer.json", "utf8")).remoteUser);')"
+          workspace_uid="$("${compose[@]}" exec -T workspace id -u "${remote_user}" | tr -d '\r')"
+          workspace_gid="$("${compose[@]}" exec -T workspace id -g "${remote_user}" | tr -d '\r')"
+          sudo chown -R "${workspace_uid}:${workspace_gid}" "${GITHUB_WORKSPACE}/server"
+
           post_create_command="$(node -e 'const fs = require("node:fs"); process.stdout.write(JSON.parse(fs.readFileSync(".devcontainer/devcontainer.json", "utf8")).postCreateCommand);')"
           "${compose[@]}" exec -T workspace bash -lc "cd /workspaces/CoMind && ${post_create_command}"
 
           "${compose[@]}" exec -T workspace bash -lc '
             set -euo pipefail
+            [[ "$(id -un)" == node ]]
             node_version="$(node --version)"
             [[ "${node_version}" == v24.* ]]
-            command -v psql >/dev/null
+            psql_version="$(psql --version)"
+            [[ "${psql_version}" == *" 17."* ]]
             cd /workspaces/CoMind/server
             npm run build
             npm test

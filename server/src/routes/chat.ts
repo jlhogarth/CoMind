@@ -194,7 +194,7 @@ export function registerChatRoutes(app: FastifyInstance) {
           await selectConversation(selectedConversationId, false);
 
           if (!assistantEnabled) {
-            setStatus('Message persisted. Assistant provider is not configured.');
+            setStatus('Message persisted. Assistant provider is not configured yet.');
             return;
           }
 

@@ -1,13 +1,13 @@
 {
   "name": "CoMind Codespace",
-  "image": "mcr.microsoft.com/devcontainers/javascript-node:20",
-  "features": {
-    "ghcr.io/devcontainers/features/github-cli:1": {}
-  },
+  "dockerComposeFile": "compose.yaml",
+  "service": "workspace",
+  "workspaceFolder": "/workspaces/CoMind",
   "forwardPorts": [
     3000
   ],
   "postCreateCommand": "cd server && npm ci",
+  "shutdownAction": "stopCompose",
   "customizations": {
     "vscode": {
       "settings": {
@@ -19,8 +19,5 @@
         "humao.rest-client"
       ]
     }
-  },
-  "remoteEnv": {
-    "PORT": "3000"
   }
 }

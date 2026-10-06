@@ -24,6 +24,30 @@ function retainRecentHistory(messages: ConversationMessage[], maxHistoryMessages
   return messages.slice(Math.max(messages.length - maxHistoryMessages, 0));
 }
 
+function providerFailureDetails(error: unknown) {
+  if (!(error instanceof Error)) {
+    return { errorName: 'UnknownProviderError' };
+  }
+
+  const candidate = error as Error & {
+    status?: unknown;
+    code?: unknown;
+    type?: unknown;
+    request_id?: unknown;
+  };
+  const details: Record<string, string | number> = {
+    errorName: error.name,
+    errorMessage: error.message,
+  };
+
+  if (typeof candidate.status === 'number') details.status = candidate.status;
+  if (typeof candidate.code === 'string') details.code = candidate.code;
+  if (typeof candidate.type === 'string') details.type = candidate.type;
+  if (typeof candidate.request_id === 'string') details.requestId = candidate.request_id;
+
+  return details;
+}
+
 export function registerAssistantRoutes(
   app: FastifyInstance,
   queryFn: QueryFunction = query,
@@ -89,9 +113,13 @@ export function registerAssistantRoutes(
             conversationId: id,
             messages: boundedHistory,
           });
-        } catch {
+        } catch (error) {
           req.log.warn(
-            { conversationId: id, provider: assistantProvider.name },
+            {
+              conversationId: id,
+              provider: assistantProvider.name,
+              providerFailure: providerFailureDetails(error),
+            },
             'Assistant provider request failed'
           );
           return { kind: 'provider-failed' as const };

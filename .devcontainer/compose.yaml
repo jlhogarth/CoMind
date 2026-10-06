@@ -1,0 +1,31 @@
+services:
+  workspace:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    command: sleep infinity
+    volumes:
+      - ..:/workspaces/CoMind:cached
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/comind_runtime
+      PORT: "3000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: pgvector/pgvector:0.8.6-pg17-bookworm
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: comind_runtime
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d comind_runtime"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    volumes:
+      - comind_runtime_pgdata:/var/lib/postgresql/data
+
+volumes:
+  comind_runtime_pgdata:

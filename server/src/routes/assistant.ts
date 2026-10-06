@@ -24,6 +24,24 @@ function retainRecentHistory(messages: ConversationMessage[], maxHistoryMessages
   return messages.slice(Math.max(messages.length - maxHistoryMessages, 0));
 }
 
+function providerFailureDiagnostics(error: unknown) {
+  if (!error || typeof error !== 'object') {
+    return { errorName: typeof error };
+  }
+
+  const candidate = error as Record<string, unknown>;
+  const diagnostics: Record<string, string | number> = {};
+
+  if (typeof candidate.name === 'string') diagnostics.errorName = candidate.name;
+  if (typeof candidate.status === 'number') diagnostics.status = candidate.status;
+  if (typeof candidate.code === 'string') diagnostics.code = candidate.code;
+  if (typeof candidate.type === 'string') diagnostics.type = candidate.type;
+  if (typeof candidate.request_id === 'string') diagnostics.requestId = candidate.request_id;
+  if (typeof candidate.requestId === 'string') diagnostics.requestId = candidate.requestId;
+
+  return Object.keys(diagnostics).length > 0 ? diagnostics : { errorName: 'unknown' };
+}
+
 export function registerAssistantRoutes(
   app: FastifyInstance,
   queryFn: QueryFunction = query,
@@ -89,9 +107,13 @@ export function registerAssistantRoutes(
             conversationId: id,
             messages: boundedHistory,
           });
-        } catch {
+        } catch (error) {
           req.log.warn(
-            { conversationId: id, provider: assistantProvider.name },
+            {
+              conversationId: id,
+              provider: assistantProvider.name,
+              ...providerFailureDiagnostics(error),
+            },
             'Assistant provider request failed'
           );
           return { kind: 'provider-failed' as const };

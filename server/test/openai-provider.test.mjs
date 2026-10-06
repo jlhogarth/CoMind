@@ -3,7 +3,7 @@ import test from 'node:test';
 
 process.env.DATABASE_URL = 'postgres://test:test@localhost:5432/comind_test';
 
-const { OpenAIAssistantProvider } = await import('../dist/providers/openai.js');
+const { OpenAIAssistantProvider, openAIClientOptions } = await import('../dist/providers/openai.js');
 
 function createProvider(create) {
   return new OpenAIAssistantProvider(
@@ -12,6 +12,8 @@ function createProvider(create) {
       model: 'gpt-6-luna',
       reasoningEffort: 'low',
       maxOutputTokens: 512,
+      timeoutMs: 30000,
+      maxRetries: 2,
     }
   );
 }
@@ -101,5 +103,22 @@ test('OpenAI provider rejects responses without assistant text', async () => {
       messages: [{ role: 'user', content: 'Respond.' }],
     }),
     /did not contain assistant text/
+  );
+});
+
+test('OpenAI client options carry explicit timeout and retry budgets', () => {
+  assert.deepEqual(
+    openAIClientOptions('test-key-used-only-for-client-option-validation', {
+      model: 'gpt-6-luna',
+      reasoningEffort: 'low',
+      maxOutputTokens: 512,
+      timeoutMs: 15000,
+      maxRetries: 1,
+    }),
+    {
+      apiKey: 'test-key-used-only-for-client-option-validation',
+      timeout: 15000,
+      maxRetries: 1,
+    }
   );
 });

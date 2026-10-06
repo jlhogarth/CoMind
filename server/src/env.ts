@@ -14,10 +14,13 @@ const environmentSchema = z
     CORS_ORIGINS: z.string().default(''),
     PORT: z.coerce.number().int().min(1).max(65535).default(3000),
     ASSISTANT_PROVIDER: z.enum(['disabled', 'openai']).default('disabled'),
+    ASSISTANT_MAX_HISTORY_MESSAGES: z.coerce.number().int().min(1).max(200).default(40),
     OPENAI_API_KEY: optionalNonEmptyString,
     OPENAI_MODEL: z.string().trim().min(1).default('gpt-6-luna'),
     OPENAI_REASONING_EFFORT: z.enum(['none', 'low', 'medium', 'high']).default('low'),
     OPENAI_MAX_OUTPUT_TOKENS: z.coerce.number().int().min(1).max(8192).default(1024),
+    OPENAI_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120000).default(30000),
+    OPENAI_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(2),
   })
   .superRefine((value, context) => {
     if (value.ASSISTANT_PROVIDER === 'openai' && !value.OPENAI_API_KEY) {
@@ -32,7 +35,9 @@ const environmentSchema = z
 const parsed = environmentSchema.safeParse(process.env);
 
 if (!parsed.success) {
-  console.error('Invalid server environment configuration:', parsed.error.flatten().fieldErrors);
+  process.stderr.write(
+    `Invalid server environment configuration: ${JSON.stringify(parsed.error.flatten().fieldErrors)}\n`
+  );
   process.exit(1);
 }
 

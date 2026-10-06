@@ -16,12 +16,16 @@ after(closePool);
 
 function openaiProvider(create) {
   return new OpenAIAssistantProvider({ create }, {
-    model: 'gpt-6-luna', reasoningEffort: 'low', maxOutputTokens: 128,
+    model: 'gpt-6-luna',
+    reasoningEffort: 'low',
+    maxOutputTokens: 128,
+    timeoutMs: 30000,
+    maxRetries: 2,
   });
 }
 
-async function setup(t, assistantProvider) {
-  const app = await buildApp({ assistantProvider, closePool: async () => {} });
+async function setup(t, assistantProvider, overrides = {}) {
+  const app = await buildApp({ assistantProvider, closePool: async () => {}, ...overrides });
   const ids = [];
   const marker = `RecoveryFixture-${process.pid}-${t.name}`;
   t.after(async () => {
@@ -203,4 +207,51 @@ test('recovery and later turns use only the selected persisted chronological his
   const analytics = await f.app.inject({ method: 'GET', url: '/api/analytics/summary' });
   assert.equal(analytics.statusCode, 200);
   assert.equal(analytics.json().top10.find((row) => row.conv_id === id)?.messages, 4);
+});
+
+test('configured history budget retains only the newest chronological messages', async (t) => {
+  const calls = [];
+  const f = await setup(t, openaiProvider(async (request) => {
+    calls.push(request);
+    return {
+      id: 'test-bounded-history',
+      output_text: `Bounded history ${f.marker}`,
+      usage: { input_tokens: 6, output_tokens: 3, total_tokens: 9 },
+    };
+  }), { assistantMaxHistoryMessages: 3 });
+
+  const id = await f.createConversation();
+  const first = await f.append(id, 'system', `System ${f.marker}`);
+  const second = await f.append(id, 'user', `First ${f.marker}`);
+  const third = await f.append(id, 'assistant', `Prior assistant ${f.marker}`);
+  const fourth = await f.append(id, 'user', `Second ${f.marker}`);
+
+  const response = await f.generate(id);
+  assert.equal(response.statusCode, 201);
+  assert.deepEqual(calls, [{
+    model: 'gpt-6-luna',
+    input: [
+      { role: 'user', content: second.content },
+      { role: 'assistant', content: third.content },
+      { role: 'user', content: fourth.content },
+    ],
+    store: false,
+    reasoning: { effort: 'low' },
+    max_output_tokens: 128,
+  }]);
+
+  const stored = await f.stored(id);
+  assert.deepEqual(stored.map((row) => row.msg_id).slice(0, 4), [
+    first.msg_id,
+    second.msg_id,
+    third.msg_id,
+    fourth.msg_id,
+  ]);
+  assert.deepEqual((await f.reload(id)).map((row) => row.role), [
+    'system',
+    'user',
+    'assistant',
+    'user',
+    'assistant',
+  ]);
 });

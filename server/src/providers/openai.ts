@@ -40,6 +40,8 @@ export interface OpenAIAssistantProviderOptions {
   model: string;
   reasoningEffort: OpenAIReasoningEffort;
   maxOutputTokens: number;
+  timeoutMs: number;
+  maxRetries: number;
 }
 
 function mapConversationMessage(message: ConversationMessage) {
@@ -103,9 +105,17 @@ export function createOpenAIAssistantProvider(
   apiKey: string,
   options: OpenAIAssistantProviderOptions
 ): OpenAIAssistantProvider {
-  const client = new OpenAI({ apiKey });
+  const client = new OpenAI(openAIClientOptions(apiKey, options));
   return new OpenAIAssistantProvider(
     client.responses as unknown as OpenAIResponsesClient,
     options
   );
+}
+
+export function openAIClientOptions(apiKey: string, options: OpenAIAssistantProviderOptions) {
+  return {
+    apiKey,
+    timeout: options.timeoutMs,
+    maxRetries: options.maxRetries,
+  };
 }

@@ -12,7 +12,9 @@ This repository contains the first recoverable CoMind backend application build,
    - PostgreSQL 17 with pgvector in an isolated `comind_runtime` database.
    - PostgreSQL client tools.
    - Server dependencies through `npm ci`.
-3. Initialize the isolated development database:
+   - Automatic devcontainer configuration verification.
+   - Automatic isolated database bootstrap through `scripts/bootstrap_dev_runtime.sh`.
+3. If you need to reinitialize the isolated development database after resetting it, run:
 
    ```bash
    bash scripts/bootstrap_dev_runtime.sh

@@ -1,4 +1,4 @@
-name: CoMind CI
+name: CoMind Repository Configuration
 
 on:
   push:
@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   repository-health:
-    name: Repository health and Neon configuration
+    name: Repository health and Supabase configuration
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -25,29 +25,31 @@ jobs:
 
           test -f README.md
           test -d .github/workflows
+          test -d server
+          test -d db
 
           if find . -type f \( -name '*.zip' -o -name '*.tar' -o -name '*.tar.gz' -o -name '*.tgz' -o -name '*.7z' \) | grep -q .; then
             echo "::error title=Source archive committed::Source archives must stay out of the repository."
             exit 1
           fi
 
-      - name: Require NEON_API_KEY secret
+      - name: Require DATABASE_URL secret
         shell: bash
         env:
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           set -euo pipefail
 
-          if [ -z "${NEON_API_KEY:-}" ]; then
-            echo "::error title=Missing NEON_API_KEY::Add NEON_API_KEY as a GitHub Actions repository secret."
+          if [ -z "${DATABASE_URL:-}" ]; then
+            echo "::error title=Missing DATABASE_URL::Add DATABASE_URL as a GitHub Actions repository secret."
             exit 1
           fi
 
-      - name: Require NEON_PROJECT_ID variable
-        if: ${{ vars.NEON_PROJECT_ID == '' }}
+      - name: Require SUPABASE_PROJECT_REF variable
+        if: ${{ vars.SUPABASE_PROJECT_REF == '' }}
         shell: bash
         run: |
-          echo "::error title=Missing NEON_PROJECT_ID::Add NEON_PROJECT_ID as a GitHub Actions repository variable."
+          echo "::error title=Missing SUPABASE_PROJECT_REF::Add SUPABASE_PROJECT_REF as a GitHub Actions repository variable."
           exit 1
 
       - name: Confirm required Actions configuration

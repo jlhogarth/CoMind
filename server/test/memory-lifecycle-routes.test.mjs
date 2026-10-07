@@ -128,9 +128,11 @@ test('metadata update changes only mutable lifecycle fields', async () => {
       'private',
     ]);
     assert.match(calls[0].text, /updated_at = now\(\)/);
-    assert.doesNotMatch(calls[0].text, /SET[\s\S]*content\s*=/);
-    assert.doesNotMatch(calls[0].text, /SET[\s\S]*json_payload\s*=/);
-    assert.doesNotMatch(calls[0].text, /SET[\s\S]*project_id\s*=/);
+    const setClause = calls[0].text.match(/\bSET\b([\s\S]*?)\bWHERE\b/i)?.[1];
+    assert.ok(setClause, 'metadata update SQL must contain a bounded SET clause');
+    assert.doesNotMatch(setClause, /\bcontent\s*=/i);
+    assert.doesNotMatch(setClause, /\bjson_payload\s*=/i);
+    assert.doesNotMatch(setClause, /\bproject_id\s*=/i);
   });
 });
 

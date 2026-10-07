@@ -58,11 +58,16 @@ OPENAI_MODEL=gpt-6-luna
 OPENAI_REASONING_EFFORT=low
 OPENAI_MAX_OUTPUT_TOKENS=1024
 ASSISTANT_MAX_HISTORY_MESSAGES=40
+ASSISTANT_QUALITY_GATE=disabled
+ASSISTANT_QUALITY_VERIFIER_FAILURE_FALLBACK=block
+ASSISTANT_QUALITY_VERIFIER_MAX_OUTPUT_TOKENS=256
 OPENAI_TIMEOUT_MS=30000
 OPENAI_MAX_RETRIES=2
 ```
 
-Do not commit an OpenAI API key. `OPENAI_API_KEY` is required only when `ASSISTANT_PROVIDER=openai`. The model, reasoning effort, output-token bound, retained-history message count, request timeout, and retry count are validated configuration rather than conversation-schema decisions.
+Do not commit an OpenAI API key. `OPENAI_API_KEY` is required only when `ASSISTANT_PROVIDER=openai`. The model, reasoning effort, output-token bound, retained-history message count, request timeout, retry count, and quality-gate controls are validated configuration rather than conversation-schema decisions.
+
+The metered answer quality gate is disabled by default. When `ASSISTANT_QUALITY_GATE=metered`, CoMind first generates a draft, classifies request risk using deterministic signals, and skips the verifier for low-risk requests. Elevated-risk requests receive a separate provider-backed verifier pass. Approved drafts return normally, `revise` verdicts receive a repair pass, and reject, abstain, or fail-closed verifier outcomes persist a controlled blocked assistant response with compact quality telemetry. The verifier uses its own smaller output-token budget, default 256, while repairs use the normal assistant output budget. Every provider-backed quality pass preserves its own usage and estimated-cost metadata.
 
 Assistant generation and conversation message writes are serialized per conversation with a PostgreSQL session advisory lock. If another assistant generation already owns that conversation lock, generation and competing message writes return HTTP `409` without invoking the provider or writing a message. A repeated generation request after the latest user turn already has a persisted assistant response returns that existing assistant row with HTTP `200` and does not call the provider again. A newly generated response returns HTTP `201`.
 
@@ -72,7 +77,7 @@ A guarded live-provider smoke verification is available for explicit development
 bash scripts/verify_openai_live.sh
 ```
 
-That script refuses remote database hosts and refuses database names other than `comind_runtime`. It performs a paid live provider request, so it is not part of ordinary CI and must be invoked explicitly.
+That script refuses remote database hosts and refuses database names other than `comind_runtime`. It performs a paid live provider request, so it is not part of ordinary CI and must be invoked explicitly. The quality gate remains disabled unless `ASSISTANT_QUALITY_GATE=metered` is explicitly configured.
 
 ## Application endpoints
 

@@ -3,7 +3,6 @@ import test from 'node:test';
 
 const {
   MeteredQualityGateProvider,
-  QualityGateBlockedError,
   classifyAnswerRisk,
 } = await import('../dist/assistant-quality-gate.js');
 
@@ -179,7 +178,7 @@ test('high-risk revise verdict repairs before return and meters all provider pas
   assert.equal(response.metadata.quality_gate.passes[2].cost.estimated_cost_usd, 0.000005);
 });
 
-test('reject and abstain verdicts block unsafe return with compact telemetry', async () => {
+test('reject and abstain verdicts return persisted blocked outcomes with compact telemetry', async () => {
   for (const verdict of ['reject', 'abstain']) {
     const provider = new MeteredQualityGateProvider(
       {
@@ -210,17 +209,15 @@ test('reject and abstain verdicts block unsafe return with compact telemetry', a
       }
     );
 
-    await assert.rejects(
-      provider.generateResponse(request('Verify this legal claim.')),
-      (error) => {
-        assert.equal(error instanceof QualityGateBlockedError, true);
-        assert.equal(error.code, 'assistant_quality_gate_blocked');
-        assert.equal(error.providerMetadata.quality_gate.verdict, verdict);
-        assert.equal(error.providerMetadata.quality_gate.outcome, 'blocked');
-        assert.equal(error.providerMetadata.quality_gate.critique, 'Evidence is insufficient.');
-        return true;
-      }
-    );
+    const response = await provider.generateResponse(request('Verify this legal claim.'));
+    assert.match(response.content, /did not pass CoMind answer-quality verification/);
+    assert.equal(response.metadata.quality_gate.verdict, verdict);
+    assert.equal(response.metadata.quality_gate.outcome, 'blocked');
+    assert.equal(response.metadata.quality_gate.critique, 'Evidence is insufficient.');
+    assert.deepEqual(response.metadata.quality_gate.passes.at(-1), {
+      role: 'final',
+      source_role: 'blocked',
+    });
   }
 });
 
@@ -237,7 +234,11 @@ test('verifier failure can fail closed or explicitly return draft as unverified 
   const verifier = {
     name: 'verifier-provider',
     async verify() {
-      throw new Error('Synthetic verifier outage');
+      const error = new Error('Synthetic verifier outage');
+      error.providerMetadata = meteredMetadata(
+        'verifier-provider', 'resp_verify_failed', 12, 0, 0.0000012
+      );
+      throw error;
     },
   };
   const repairer = {
@@ -248,15 +249,14 @@ test('verifier failure can fail closed or explicitly return draft as unverified 
   };
 
   const failClosed = new MeteredQualityGateProvider(draftProvider, verifier, repairer);
-  await assert.rejects(
-    failClosed.generateResponse(request('What is the latest status?')),
-    (error) => {
-      assert.equal(error.providerMetadata.quality_gate.verdict, 'verifier_failed');
-      assert.equal(error.providerMetadata.quality_gate.outcome, 'blocked');
-      assert.deepEqual(error.providerMetadata.quality_gate.issue_categories, ['verifier_failure']);
-      return true;
-    }
-  );
+  const blocked = await failClosed.generateResponse(request('What is the latest status?'));
+  assert.match(blocked.content, /could not complete the required answer-quality verification/);
+  assert.equal(blocked.metadata.quality_gate.verdict, 'verifier_failed');
+  assert.equal(blocked.metadata.quality_gate.outcome, 'blocked');
+  assert.deepEqual(blocked.metadata.quality_gate.issue_categories, ['verifier_failure']);
+  assert.equal(blocked.metadata.quality_gate.passes[1].role, 'verifier');
+  assert.equal(blocked.metadata.quality_gate.passes[1].cost.estimated_cost_usd, 0.0000012);
+  assert.equal(blocked.metadata.quality_gate.passes.at(-1).source_role, 'blocked');
 
   const failOpen = new MeteredQualityGateProvider(
     draftProvider,
@@ -268,6 +268,7 @@ test('verifier failure can fail closed or explicitly return draft as unverified 
   assert.equal(response.content, 'Draft during verifier outage.');
   assert.equal(response.metadata.quality_gate.verdict, 'verifier_failed');
   assert.equal(response.metadata.quality_gate.outcome, 'returned_unverified');
+  assert.equal(response.metadata.quality_gate.passes[1].cost.estimated_cost_usd, 0.0000012);
 });
 
 test('verifier critique is trimmed and bounded before telemetry persistence', async () => {

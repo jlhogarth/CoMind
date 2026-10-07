@@ -13,6 +13,7 @@ import { registerAdminRoutes } from './routes/admin.js';
 import { registerResearchRoutes } from './routes/research.js';
 import { registerChecklistRoutes } from './routes/checklist.js';
 import { registerAssistantRoutes } from './routes/assistant.js';
+import { registerMemoryRoutes } from './routes/memory.js';
 import { registerChatRoutes } from './routes/chat.js';
 import {
   closePool,
@@ -80,6 +81,7 @@ export async function buildApp(overrides: Partial<AppDependencies> = {}) {
     dependencies.assistantMaxHistoryMessages,
     dependencies.conversationLock
   );
+  registerMemoryRoutes(app, dependencies.query, dependencies.conversationLock);
   registerAdminRoutes(app);
   registerChatRoutes(app);
 

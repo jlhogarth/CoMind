@@ -30,7 +30,7 @@ function providerFailureDiagnostics(error: unknown) {
   }
 
   const candidate = error as Record<string, unknown>;
-  const diagnostics: Record<string, string | number> = {};
+  const diagnostics: Record<string, unknown> = {};
 
   if (typeof candidate.name === 'string') diagnostics.errorName = candidate.name;
   if (typeof candidate.status === 'number') diagnostics.status = candidate.status;
@@ -38,6 +38,9 @@ function providerFailureDiagnostics(error: unknown) {
   if (typeof candidate.type === 'string') diagnostics.type = candidate.type;
   if (typeof candidate.request_id === 'string') diagnostics.requestId = candidate.request_id;
   if (typeof candidate.requestId === 'string') diagnostics.requestId = candidate.requestId;
+  if (candidate.providerMetadata && typeof candidate.providerMetadata === 'object') {
+    diagnostics.providerMetadata = candidate.providerMetadata;
+  }
 
   return Object.keys(diagnostics).length > 0 ? diagnostics : { errorName: 'unknown' };
 }

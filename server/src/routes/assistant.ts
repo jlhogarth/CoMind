@@ -6,6 +6,7 @@ import {
   query,
   withConversationLock,
 } from '../db.js';
+import { retrieveProjectMemoryContext } from '../memory-retrieval.js';
 
 const supportedRoles = new Set<ConversationRole>(['user', 'assistant', 'system', 'tool']);
 
@@ -45,6 +46,15 @@ function providerFailureDiagnostics(error: unknown) {
   return Object.keys(diagnostics).length > 0 ? diagnostics : { errorName: 'unknown' };
 }
 
+function retrievalFailureDiagnostics(error: unknown) {
+  if (!error || typeof error !== 'object') return { errorName: typeof error };
+  const candidate = error as Record<string, unknown>;
+  return {
+    errorName: typeof candidate.name === 'string' ? candidate.name : 'unknown',
+    ...(typeof candidate.code === 'string' ? { code: candidate.code } : {}),
+  };
+}
+
 export function registerAssistantRoutes(
   app: FastifyInstance,
   queryFn: QueryFunction = query,
@@ -65,13 +75,14 @@ export function registerAssistantRoutes(
       }
 
       const { id } = req.params;
-      const conversation = await queryFn<{ conv_id: string }>(
-        'SELECT conv_id FROM comind.cm_conversation WHERE conv_id=$1',
+      const conversation = await queryFn<{ conv_id: string; project_id: string | null }>(
+        'SELECT conv_id, project_id FROM comind.cm_conversation WHERE conv_id=$1',
         [id]
       );
       if (!conversation.rows[0]) {
         return reply.code(404).send({ error: 'Conversation not found' });
       }
+      const projectId = conversation.rows[0].project_id ?? null;
 
       const locked = await conversationLock(id, async (lockedQuery) => {
         const history = await lockedQuery<any>(
@@ -104,11 +115,40 @@ export function registerAssistantRoutes(
           maxHistoryMessages
         );
 
+        let providerMessages = boundedHistory;
+        let memoryRetrievalMetadata: Record<string, unknown> | null = null;
+        if (projectId) {
+          try {
+            const retrieval = await retrieveProjectMemoryContext(
+              lockedQuery,
+              projectId,
+              { conversationId: id, messages: boundedHistory }
+            );
+            if (retrieval.contextMessage) {
+              providerMessages = [retrieval.contextMessage, ...boundedHistory];
+            }
+            memoryRetrievalMetadata = retrieval.telemetry;
+          } catch (error) {
+            req.log.warn(
+              {
+                conversationId: id,
+                projectId,
+                ...retrievalFailureDiagnostics(error),
+              },
+              'Assistant memory retrieval failed; continuing without retrieved memory'
+            );
+            memoryRetrievalMetadata = {
+              strategy: 'project_lexical_v1',
+              status: 'failed',
+            };
+          }
+        }
+
         let generated;
         try {
           generated = await assistantProvider.generateResponse({
             conversationId: id,
-            messages: boundedHistory,
+            messages: providerMessages,
           });
         } catch (error) {
           req.log.warn(
@@ -122,7 +162,10 @@ export function registerAssistantRoutes(
           return { kind: 'provider-failed' as const };
         }
 
-        const metadata = generated.metadata ?? { provider: assistantProvider.name };
+        const metadata = {
+          ...(generated.metadata ?? { provider: assistantProvider.name }),
+          ...(memoryRetrievalMetadata ? { memory_retrieval: memoryRetrievalMetadata } : {}),
+        };
         const persisted = await lockedQuery<any>(
           `INSERT INTO comind.cm_message (conv_id, role, content, meta)
            VALUES ($1, 'assistant', $2, $3::jsonb)

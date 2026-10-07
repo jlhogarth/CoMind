@@ -16,6 +16,8 @@ function importEnvironment(overrides) {
         ...process.env,
         DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/comind_test',
         ASSISTANT_PROVIDER: 'disabled',
+        ASSISTANT_QUALITY_GATE: 'disabled',
+        ASSISTANT_QUALITY_VERIFIER_FAILURE_FALLBACK: 'block',
         OPENAI_API_KEY: '',
         ...overrides,
       },
@@ -51,6 +53,33 @@ test('environment accepts enabled OpenAI provider with bounded configuration', (
     OPENAI_MAX_RETRIES: '1',
   });
   assert.equal(result.status, 0, result.stderr);
+});
+
+test('environment accepts metered quality gate only with an enabled provider', () => {
+  const accepted = importEnvironment({
+    ASSISTANT_PROVIDER: 'openai',
+    ASSISTANT_QUALITY_GATE: 'metered',
+    ASSISTANT_QUALITY_VERIFIER_FAILURE_FALLBACK: 'return_draft',
+    OPENAI_API_KEY: 'test-key-used-only-for-environment-validation',
+  });
+  assert.equal(accepted.status, 0, accepted.stderr);
+
+  const rejected = importEnvironment({ ASSISTANT_QUALITY_GATE: 'metered' });
+  assert.notEqual(rejected.status, 0);
+  assert.match(processOutput(rejected), /ASSISTANT_QUALITY_GATE/);
+  assert.match(processOutput(rejected), /requires an enabled assistant provider/);
+});
+
+test('environment rejects unsupported quality gate configuration', () => {
+  const invalidGate = importEnvironment({ ASSISTANT_QUALITY_GATE: 'always_verify' });
+  assert.notEqual(invalidGate.status, 0);
+  assert.match(processOutput(invalidGate), /ASSISTANT_QUALITY_GATE/);
+
+  const invalidFallback = importEnvironment({
+    ASSISTANT_QUALITY_VERIFIER_FAILURE_FALLBACK: 'ignore',
+  });
+  assert.notEqual(invalidFallback.status, 0);
+  assert.match(processOutput(invalidFallback), /ASSISTANT_QUALITY_VERIFIER_FAILURE_FALLBACK/);
 });
 
 test('environment rejects an output-token bound above the configured maximum', () => {

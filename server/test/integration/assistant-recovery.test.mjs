@@ -24,6 +24,33 @@ function openaiProvider(create) {
   });
 }
 
+function expectedOpenAiRecoveryMetadata(responseId) {
+  const usage = {
+    input_tokens: 8,
+    prompt_tokens: 8,
+    output_tokens: 4,
+    completion_tokens: 4,
+    total_tokens: 12,
+  };
+
+  return {
+    provider: 'openai',
+    model: 'gpt-6-luna',
+    endpoint: 'responses.create',
+    response_id: responseId,
+    status: 'succeeded',
+    cost: {
+      estimated_cost_usd: null,
+      currency: 'USD',
+      rate_card_version: 'not_configured',
+      pricing_assumption:
+        'Token usage is captured, but no committed OpenAI rate card is configured for USD estimation.',
+    },
+    usage,
+    raw_provider_usage: usage,
+  };
+}
+
 async function setup(t, assistantProvider, overrides = {}) {
   const app = await buildApp({ assistantProvider, closePool: async () => {}, ...overrides });
   const ids = [];
@@ -191,12 +218,15 @@ test('recovery and later turns use only the selected persisted chronological his
   assert.deepEqual(stored.map((row) => row.role), ['user', 'assistant', 'user', 'assistant']);
   assert.deepEqual((await f.reload(id)).map((row) => row.msg_id), expectedIds);
   assert.deepEqual(await f.stored(otherId), otherBefore);
-  assert.deepEqual(stored.filter((row) => row.role === 'assistant').map((row) => row.meta), [
-    { provider: 'openai', model: 'gpt-6-luna', response_id: 'test-recovery-2',
-      usage: { input_tokens: 8, output_tokens: 4, total_tokens: 12 } },
-    { provider: 'openai', model: 'gpt-6-luna', response_id: 'test-recovery-3',
-      usage: { input_tokens: 8, output_tokens: 4, total_tokens: 12 } },
-  ]);
+  const assistantMetadata = stored.filter((row) => row.role === 'assistant').map((row) => row.meta);
+  assert.equal(assistantMetadata.every((meta) => Number.isInteger(meta.duration_ms)), true);
+  assert.deepEqual(
+    assistantMetadata.map(({ duration_ms, ...meta }) => meta),
+    [
+      expectedOpenAiRecoveryMetadata('test-recovery-2'),
+      expectedOpenAiRecoveryMetadata('test-recovery-3'),
+    ]
+  );
 
   const search = await f.app.inject({
     method: 'GET', url: `/api/messages/search?q=${encodeURIComponent(f.marker)}`,

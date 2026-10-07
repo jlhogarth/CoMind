@@ -18,6 +18,7 @@ function importEnvironment(overrides) {
         ASSISTANT_PROVIDER: 'disabled',
         ASSISTANT_QUALITY_GATE: 'disabled',
         ASSISTANT_QUALITY_VERIFIER_FAILURE_FALLBACK: 'block',
+        ASSISTANT_QUALITY_VERIFIER_MAX_OUTPUT_TOKENS: '256',
         OPENAI_API_KEY: '',
         ...overrides,
       },
@@ -60,6 +61,7 @@ test('environment accepts metered quality gate only with an enabled provider', (
     ASSISTANT_PROVIDER: 'openai',
     ASSISTANT_QUALITY_GATE: 'metered',
     ASSISTANT_QUALITY_VERIFIER_FAILURE_FALLBACK: 'return_draft',
+    ASSISTANT_QUALITY_VERIFIER_MAX_OUTPUT_TOKENS: '128',
     OPENAI_API_KEY: 'test-key-used-only-for-environment-validation',
   });
   assert.equal(accepted.status, 0, accepted.stderr);
@@ -70,7 +72,7 @@ test('environment accepts metered quality gate only with an enabled provider', (
   assert.match(processOutput(rejected), /requires an enabled assistant provider/);
 });
 
-test('environment rejects unsupported quality gate configuration', () => {
+test('environment rejects unsupported quality gate configuration and verifier budgets', () => {
   const invalidGate = importEnvironment({ ASSISTANT_QUALITY_GATE: 'always_verify' });
   assert.notEqual(invalidGate.status, 0);
   assert.match(processOutput(invalidGate), /ASSISTANT_QUALITY_GATE/);
@@ -80,6 +82,14 @@ test('environment rejects unsupported quality gate configuration', () => {
   });
   assert.notEqual(invalidFallback.status, 0);
   assert.match(processOutput(invalidFallback), /ASSISTANT_QUALITY_VERIFIER_FAILURE_FALLBACK/);
+
+  for (const invalidBudget of ['63', '1025']) {
+    const result = importEnvironment({
+      ASSISTANT_QUALITY_VERIFIER_MAX_OUTPUT_TOKENS: invalidBudget,
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(processOutput(result), /ASSISTANT_QUALITY_VERIFIER_MAX_OUTPUT_TOKENS/);
+  }
 });
 
 test('environment rejects an output-token bound above the configured maximum', () => {

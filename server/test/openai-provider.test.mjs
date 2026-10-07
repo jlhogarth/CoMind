@@ -141,9 +141,13 @@ test('OpenAI provider rejects tool-role history while tools are disabled', async
 test('OpenAI provider rejects responses without assistant text', async () => {
   const provider = createProvider(async () => ({
     id: 'resp_empty',
-    model: 'gpt-6-luna',
+    model: 'gpt-6-luna-2026-09-22',
     output_text: '   ',
-    usage: null,
+    usage: {
+      input_tokens: 5,
+      output_tokens: 1,
+      total_tokens: 6,
+    },
   }));
 
   await assert.rejects(
@@ -151,7 +155,28 @@ test('OpenAI provider rejects responses without assistant text', async () => {
       conversationId: '44444444-4444-4444-8444-444444444449',
       messages: [{ role: 'user', content: 'Respond.' }],
     }),
-    /did not contain assistant text/
+    (error) => {
+      assert.match(error.message, /did not contain assistant text/);
+      assert.equal(error.code, 'openai_empty_output');
+      assert.equal(error.providerMetadata.provider, 'openai');
+      assert.equal(error.providerMetadata.model, 'gpt-6-luna-2026-09-22');
+      assert.equal(error.providerMetadata.endpoint, 'responses.create');
+      assert.equal(error.providerMetadata.response_id, 'resp_empty');
+      assert.equal(error.providerMetadata.status, 'failed');
+      assert.equal(error.providerMetadata.error_code, 'openai_empty_output');
+      assert.equal(Number.isInteger(error.providerMetadata.duration_ms), true);
+      assert.equal(error.providerMetadata.duration_ms >= 0, true);
+      assert.deepEqual(error.providerMetadata.usage, {
+        input_tokens: 5,
+        prompt_tokens: 5,
+        output_tokens: 1,
+        completion_tokens: 1,
+        total_tokens: 6,
+      });
+      assert.deepEqual(error.providerMetadata.raw_provider_usage, error.providerMetadata.usage);
+      assert.equal(error.providerMetadata.cost.rate_card_version, 'not_configured');
+      return true;
+    }
   );
 });
 

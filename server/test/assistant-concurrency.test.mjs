@@ -13,8 +13,8 @@ test('assistant generation returns conflict without provider invocation when con
   const app = await buildApp({
     closePool: closePoolForTest,
     query: async (text) => {
-      if (text.includes('SELECT conv_id FROM comind.cm_conversation')) {
-        return { rows: [{ conv_id: conversationId }] };
+      if (text.includes('SELECT conv_id, project_id FROM comind.cm_conversation')) {
+        return { rows: [{ conv_id: conversationId, project_id: null }] };
       }
       throw new Error(`Unexpected query: ${text}`);
     },
@@ -87,8 +87,8 @@ test('assistant replay returns the persisted response without calling the provid
   };
 
   const query = async (text) => {
-    if (text.includes('SELECT conv_id FROM comind.cm_conversation')) {
-      return { rows: [{ conv_id: conversationId }] };
+    if (text.includes('SELECT conv_id, project_id FROM comind.cm_conversation')) {
+      return { rows: [{ conv_id: conversationId, project_id: null }] };
     }
     if (text.includes('SELECT role, content')) {
       return {

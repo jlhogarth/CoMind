@@ -101,6 +101,10 @@ function finiteNonNegativeInteger(value: number | undefined) {
   return value === undefined || (Number.isInteger(value) && value >= 0);
 }
 
+function normalizedUsd(value: number) {
+  return Number(value.toFixed(12));
+}
+
 function unsupportedEstimate(
   model: string,
   processingMode: OpenAIProcessingMode,
@@ -177,12 +181,13 @@ export function estimateOpenAICost(
   const uncachedInput = input - cachedInput - cacheWrite;
   const contextBand = input > OPENAI_LONG_CONTEXT_THRESHOLD_TOKENS ? 'long' : 'short';
   const rates = contextRates[contextBand];
-  const cost =
+  const cost = normalizedUsd(
     (uncachedInput * rates.input +
       cachedInput * rates.cachedInput +
       cacheWrite * rates.cacheWrite +
       output * rates.output) /
-    1_000_000;
+      1_000_000
+  );
 
   return {
     estimated_cost_usd: cost,

@@ -28,8 +28,14 @@ test('OpenAI provider sends CoMind history without provider-side storage', async
       output_text: '  Durable assistant response  ',
       usage: {
         input_tokens: 21,
+        input_tokens_details: {
+          cached_tokens: 6,
+        },
         output_tokens: 7,
-        total_tokens: 28,
+        output_tokens_details: {
+          reasoning_tokens: 2,
+        },
+        total_tokens: 30,
       },
     };
   });
@@ -57,19 +63,62 @@ test('OpenAI provider sends CoMind history without provider-side storage', async
     reasoning: { effort: 'low' },
     max_output_tokens: 512,
   });
-  assert.deepEqual(response, {
-    content: 'Durable assistant response',
-    metadata: {
-      provider: 'openai',
-      model: 'gpt-6-luna-2026-09-22',
-      response_id: 'resp_test_123',
-      usage: {
-        input_tokens: 21,
-        output_tokens: 7,
-        total_tokens: 28,
-      },
-    },
+  assert.equal(response.content, 'Durable assistant response');
+  assert.equal(response.metadata.provider, 'openai');
+  assert.equal(response.metadata.model, 'gpt-6-luna-2026-09-22');
+  assert.equal(response.metadata.endpoint, 'responses.create');
+  assert.equal(response.metadata.response_id, 'resp_test_123');
+  assert.equal(response.metadata.status, 'succeeded');
+  assert.equal(Number.isInteger(response.metadata.duration_ms), true);
+  assert.equal(response.metadata.duration_ms >= 0, true);
+  assert.deepEqual(response.metadata.usage, {
+    input_tokens: 21,
+    prompt_tokens: 21,
+    cached_input_tokens: 6,
+    cache_read_tokens: 6,
+    output_tokens: 7,
+    completion_tokens: 7,
+    reasoning_tokens: 2,
+    total_tokens: 30,
   });
+  assert.deepEqual(response.metadata.raw_provider_usage, response.metadata.usage);
+  assert.deepEqual(response.metadata.cost, {
+    estimated_cost_usd: null,
+    currency: 'USD',
+    rate_card_version: 'not_configured',
+    pricing_assumption:
+      'Token usage is captured, but no committed OpenAI rate card is configured for USD estimation.',
+  });
+});
+
+test('OpenAI provider attaches sanitized usage diagnostics to provider failures', async () => {
+  const provider = createProvider(async () => {
+    const error = new Error('Synthetic provider failure');
+    error.status = 429;
+    error.code = 'credit_balance_exhausted';
+    error.request_id = 'req_test_123';
+    throw error;
+  });
+
+  await assert.rejects(
+    provider.generateResponse({
+      conversationId: '44444444-4444-4444-8444-444444444449',
+      messages: [{ role: 'user', content: 'Respond.' }],
+    }),
+    (error) => {
+      assert.equal(error.providerMetadata.provider, 'openai');
+      assert.equal(error.providerMetadata.model, 'gpt-6-luna');
+      assert.equal(error.providerMetadata.endpoint, 'responses.create');
+      assert.equal(error.providerMetadata.status, 'failed');
+      assert.equal(error.providerMetadata.error_code, 'credit_balance_exhausted');
+      assert.equal(error.providerMetadata.http_status, 429);
+      assert.equal(error.providerMetadata.request_id, 'req_test_123');
+      assert.equal(Number.isInteger(error.providerMetadata.duration_ms), true);
+      assert.equal(error.providerMetadata.duration_ms >= 0, true);
+      assert.equal(error.providerMetadata.retry_attempt, null);
+      return true;
+    },
+  );
 });
 
 test('OpenAI provider rejects tool-role history while tools are disabled', async () => {
@@ -92,9 +141,13 @@ test('OpenAI provider rejects tool-role history while tools are disabled', async
 test('OpenAI provider rejects responses without assistant text', async () => {
   const provider = createProvider(async () => ({
     id: 'resp_empty',
-    model: 'gpt-6-luna',
+    model: 'gpt-6-luna-2026-09-22',
     output_text: '   ',
-    usage: null,
+    usage: {
+      input_tokens: 5,
+      output_tokens: 1,
+      total_tokens: 6,
+    },
   }));
 
   await assert.rejects(
@@ -102,7 +155,28 @@ test('OpenAI provider rejects responses without assistant text', async () => {
       conversationId: '44444444-4444-4444-8444-444444444449',
       messages: [{ role: 'user', content: 'Respond.' }],
     }),
-    /did not contain assistant text/
+    (error) => {
+      assert.match(error.message, /did not contain assistant text/);
+      assert.equal(error.code, 'openai_empty_output');
+      assert.equal(error.providerMetadata.provider, 'openai');
+      assert.equal(error.providerMetadata.model, 'gpt-6-luna-2026-09-22');
+      assert.equal(error.providerMetadata.endpoint, 'responses.create');
+      assert.equal(error.providerMetadata.response_id, 'resp_empty');
+      assert.equal(error.providerMetadata.status, 'failed');
+      assert.equal(error.providerMetadata.error_code, 'openai_empty_output');
+      assert.equal(Number.isInteger(error.providerMetadata.duration_ms), true);
+      assert.equal(error.providerMetadata.duration_ms >= 0, true);
+      assert.deepEqual(error.providerMetadata.usage, {
+        input_tokens: 5,
+        prompt_tokens: 5,
+        output_tokens: 1,
+        completion_tokens: 1,
+        total_tokens: 6,
+      });
+      assert.deepEqual(error.providerMetadata.raw_provider_usage, error.providerMetadata.usage);
+      assert.equal(error.providerMetadata.cost.rate_card_version, 'not_configured');
+      return true;
+    }
   );
 });
 

@@ -108,13 +108,34 @@ assert.ok(assistant.content.length > 0);
 assert.equal(assistant.meta?.provider, 'openai');
 assert.equal(typeof assistant.meta?.model, 'string');
 assert.equal(typeof assistant.meta?.response_id, 'string');
+assert.equal(assistant.meta?.endpoint, 'responses.create');
+assert.equal(assistant.meta?.status, 'succeeded');
+assert.equal(typeof assistant.meta?.duration_ms, 'number');
+assert.equal(typeof assistant.meta?.usage?.input_tokens, 'number');
+assert.equal(typeof assistant.meta?.usage?.output_tokens, 'number');
+assert.equal(typeof assistant.meta?.usage?.total_tokens, 'number');
+assert.equal(assistant.meta?.cost?.currency, 'USD');
+assert.equal(
+  assistant.meta?.cost?.rate_card_version,
+  'not_configured',
+  'Live usage smoke records token usage before USD rate-card calibration'
+);
 
 const reloaded = await request(`/api/conversations/${encodeURIComponent(conversation.conv_id)}`);
 assert.deepEqual(reloaded.messages.map((row) => row.role), ['user', 'assistant']);
 assert.equal(reloaded.messages[1].msg_id, assistant.msg_id);
 assert.equal(reloaded.messages[1].content, assistant.content);
 
-console.error(`OpenAI live API verification passed for response ${assistant.meta.response_id}.`);
+console.error(
+  [
+    `OpenAI live API verification passed for response ${assistant.meta.response_id}.`,
+    `Model: ${assistant.meta.model}.`,
+    `Duration ms: ${assistant.meta.duration_ms}.`,
+    `Tokens: input=${assistant.meta.usage.input_tokens}, output=${assistant.meta.usage.output_tokens}, total=${assistant.meta.usage.total_tokens}.`,
+    `Cost estimate USD: ${assistant.meta.cost.estimated_cost_usd ?? 'not_configured'}.`,
+    `Rate card: ${assistant.meta.cost.rate_card_version}.`,
+  ].join(' ')
+);
 process.stdout.write(conversation.conv_id);
 NODE
 )"

@@ -19,6 +19,12 @@ const environmentSchema = z
     ASSISTANT_QUALITY_VERIFIER_FAILURE_FALLBACK: z
       .enum(['block', 'return_draft'])
       .default('block'),
+    ASSISTANT_QUALITY_VERIFIER_MAX_OUTPUT_TOKENS: z.coerce
+      .number()
+      .int()
+      .min(64)
+      .max(1024)
+      .default(256),
     OPENAI_API_KEY: optionalNonEmptyString,
     OPENAI_MODEL: z.string().trim().min(1).default('gpt-6-luna'),
     OPENAI_REASONING_EFFORT: z.enum(['none', 'low', 'medium', 'high']).default('low'),

@@ -5,6 +5,7 @@ import {
   AssistantResponseRequest,
   ConversationMessage,
 } from '../assistant.js';
+import { estimateOpenAICost } from './openai-rate-card.js';
 
 export type OpenAIReasoningEffort = 'none' | 'low' | 'medium' | 'high';
 
@@ -113,14 +114,13 @@ function firstNumber(...values: Array<number | undefined | null>) {
   return values.find((value): value is number => typeof value === 'number');
 }
 
-function usageCostMetadata() {
-  return {
-    estimated_cost_usd: null,
-    currency: 'USD',
-    rate_card_version: 'not_configured',
-    pricing_assumption:
-      'Token usage is captured, but no committed OpenAI rate card is configured for USD estimation.',
-  };
+function usageCostMetadata(model: string, usage: ReturnType<typeof usageMetadata>) {
+  return estimateOpenAICost(model, 'standard', {
+    input_tokens: usage?.input_tokens,
+    cached_input_tokens: usage?.cached_input_tokens,
+    cache_write_tokens: usage?.cache_write_tokens,
+    output_tokens: usage?.output_tokens,
+  });
 }
 
 function sanitizeRawUsage(usage: OpenAIResponseLike['usage']) {
@@ -168,17 +168,18 @@ function failedResponseMetadata(
 ): Record<string, unknown> {
   const usage = usageMetadata(response.usage);
   const rawProviderUsage = sanitizeRawUsage(response.usage);
+  const responseModel = response.model ?? model;
 
   return {
     provider: 'openai',
-    model: response.model ?? model,
+    model: responseModel,
     endpoint: 'responses.create',
     response_id: response.id,
     status: 'failed',
     duration_ms: durationMs,
     error_code: 'openai_empty_output',
     retry_attempt: null,
-    cost: usageCostMetadata(),
+    cost: usageCostMetadata(responseModel, usage),
     ...(usage ? { usage } : {}),
     ...(rawProviderUsage ? { raw_provider_usage: rawProviderUsage } : {}),
   };
@@ -237,16 +238,17 @@ export class OpenAIAssistantProvider implements AssistantProvider {
 
     const usage = usageMetadata(response.usage);
     const rawProviderUsage = sanitizeRawUsage(response.usage);
+    const responseModel = response.model ?? this.options.model;
     return {
       content,
       metadata: {
         provider: this.name,
-        model: response.model ?? this.options.model,
+        model: responseModel,
         endpoint: 'responses.create',
         response_id: response.id,
         status: 'succeeded',
         duration_ms: Date.now() - startedAt,
-        cost: usageCostMetadata(),
+        cost: usageCostMetadata(responseModel, usage),
         ...(usage ? { usage } : {}),
         ...(rawProviderUsage ? { raw_provider_usage: rawProviderUsage } : {}),
       },

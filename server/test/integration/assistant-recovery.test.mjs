@@ -24,7 +24,21 @@ function openaiProvider(create) {
   });
 }
 
-function expectedOpenAiRecoveryMetadata(responseId) {
+function expectedEmptyMemoryRetrievalMetadata(queryCharacterCount) {
+  return {
+    strategy: 'project_lexical_v1',
+    query_character_count: queryCharacterCount,
+    candidate_limit: 12,
+    selected_count: 0,
+    selected_memory_ids: [],
+    selected_scores: [],
+    context_character_count: 0,
+    max_context_characters: 4000,
+    max_memory_characters: 1200,
+  };
+}
+
+function expectedOpenAiRecoveryMetadata(responseId, queryCharacterCount) {
   const usage = {
     input_tokens: 8,
     prompt_tokens: 8,
@@ -59,6 +73,7 @@ function expectedOpenAiRecoveryMetadata(responseId) {
     },
     usage,
     raw_provider_usage: usage,
+    memory_retrieval: expectedEmptyMemoryRetrievalMetadata(queryCharacterCount),
   };
 }
 
@@ -234,8 +249,8 @@ test('recovery and later turns use only the selected persisted chronological his
   assert.deepEqual(
     assistantMetadata.map(({ duration_ms, ...meta }) => meta),
     [
-      expectedOpenAiRecoveryMetadata('test-recovery-2'),
-      expectedOpenAiRecoveryMetadata('test-recovery-3'),
+      expectedOpenAiRecoveryMetadata('test-recovery-2', firstUser.content.length),
+      expectedOpenAiRecoveryMetadata('test-recovery-3', secondUser.content.length),
     ]
   );
 

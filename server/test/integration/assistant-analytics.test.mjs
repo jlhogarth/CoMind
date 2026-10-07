@@ -43,7 +43,13 @@ test('assistant analytics aggregates PostgreSQL JSONB without double-counting qu
 
   async function createConversation(title) {
     const result = await query(
-      'INSERT INTO comind.cm_conversation (title) VALUES ($1) RETURNING conv_id',
+      `INSERT INTO comind.cm_conversation (project_id, source, title)
+       VALUES (
+         (SELECT project_id FROM comind.cm_project WHERE slug='comind' LIMIT 1),
+         'live',
+         $1
+       )
+       RETURNING conv_id`,
       [title]
     );
     conversationIds.push(result.rows[0].conv_id);

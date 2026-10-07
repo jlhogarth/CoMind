@@ -18,11 +18,11 @@ const ISSUE_CATEGORIES = new Set<QualityIssueCategory>([
   'policy_refusal_mismatch',
 ]);
 
-function serializeConversation(messages: ConversationMessage[]) {
-  return JSON.stringify(messages.map((message) => ({
+function conversationPayload(messages: ConversationMessage[]) {
+  return messages.map((message) => ({
     role: message.role,
     content: message.content,
-  })));
+  }));
 }
 
 function parseVerifierResult(content: string): Omit<QualityVerifierResult, 'metadata'> {
@@ -33,7 +33,7 @@ function parseVerifierResult(content: string): Omit<QualityVerifierResult, 'meta
     throw new Error('Quality verifier returned invalid JSON');
   }
 
-  if (!parsed || typeof parsed !== 'object') {
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
     throw new Error('Quality verifier returned a non-object result');
   }
 
@@ -66,6 +66,12 @@ function parseVerifierResult(content: string): Omit<QualityVerifierResult, 'meta
   };
 }
 
+function attachProviderMetadata(error: unknown, metadata: Record<string, unknown> | undefined) {
+  if (error && typeof error === 'object' && metadata) {
+    (error as Record<string, unknown>).providerMetadata = metadata;
+  }
+}
+
 export class ProviderBackedQualityVerifier implements QualityVerifier {
   constructor(private readonly provider: AssistantProvider) {}
 
@@ -89,17 +95,22 @@ export class ProviderBackedQualityVerifier implements QualityVerifier {
         {
           role: 'user',
           content: JSON.stringify({
-            conversation: serializeConversation(input.messages),
+            conversation: conversationPayload(input.messages),
             draft: input.draft.content,
           }),
         },
       ],
     });
 
-    return {
-      ...parseVerifierResult(response.content),
-      metadata: response.metadata,
-    };
+    try {
+      return {
+        ...parseVerifierResult(response.content),
+        metadata: response.metadata,
+      };
+    } catch (error) {
+      attachProviderMetadata(error, response.metadata);
+      throw error;
+    }
   }
 }
 
@@ -128,7 +139,7 @@ export class ProviderBackedQualityRepairer implements QualityRepairer {
         {
           role: 'user',
           content: JSON.stringify({
-            conversation: serializeConversation(input.messages),
+            conversation: conversationPayload(input.messages),
             draft: input.draft.content,
             critique: input.critique,
             issue_categories: input.issueCategories,

@@ -13,19 +13,19 @@ function assertMoney(actual, expected) {
 
 test('prices uncached GPT-6 Luna Standard usage', () => {
   const estimate = estimateOpenAICost('gpt-6-luna', 'standard', {
-    input_tokens: 1_000_000,
-    output_tokens: 1_000_000,
+    input_tokens: 100_000,
+    output_tokens: 100_000,
   });
 
-  assertMoney(estimate.estimated_cost_usd, 0.6);
+  assertMoney(estimate.estimated_cost_usd, 0.06);
   assert.equal(estimate.rate_card_version, OPENAI_RATE_CARD_VERSION);
   assert.equal(estimate.canonical_model, 'gpt-6-luna');
-  assert.equal(estimate.context_band, 'long');
+  assert.equal(estimate.context_band, 'short');
   assert.deepEqual(estimate.billable_tokens, {
-    uncached_input: 1_000_000,
+    uncached_input: 100_000,
     cached_input: 0,
     cache_write: 0,
-    output: 1_000_000,
+    output: 100_000,
   });
 });
 

@@ -153,7 +153,7 @@ test('bounded selector truncates individual content and never exceeds total cont
 test('bounded selector tracks candidates omitted by the total context budget', () => {
   const options = {
     maxResults: 3,
-    maxContextCharacters: 390,
+    maxContextCharacters: 500,
     maxMemoryCharacters: 120,
     maxQueryCharacters: 2000,
     minimumLexicalScore: 0.12,

@@ -15,6 +15,10 @@ const environmentSchema = z
     PORT: z.coerce.number().int().min(1).max(65535).default(3000),
     ASSISTANT_PROVIDER: z.enum(['disabled', 'openai']).default('disabled'),
     ASSISTANT_MAX_HISTORY_MESSAGES: z.coerce.number().int().min(1).max(200).default(40),
+    ASSISTANT_QUALITY_GATE: z.enum(['disabled', 'metered']).default('disabled'),
+    ASSISTANT_QUALITY_VERIFIER_FAILURE_FALLBACK: z
+      .enum(['block', 'return_draft'])
+      .default('block'),
     OPENAI_API_KEY: optionalNonEmptyString,
     OPENAI_MODEL: z.string().trim().min(1).default('gpt-6-luna'),
     OPENAI_REASONING_EFFORT: z.enum(['none', 'low', 'medium', 'high']).default('low'),
@@ -28,6 +32,13 @@ const environmentSchema = z
         code: z.ZodIssueCode.custom,
         path: ['OPENAI_API_KEY'],
         message: 'OPENAI_API_KEY is required when ASSISTANT_PROVIDER=openai',
+      });
+    }
+    if (value.ASSISTANT_QUALITY_GATE === 'metered' && value.ASSISTANT_PROVIDER === 'disabled') {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['ASSISTANT_QUALITY_GATE'],
+        message: 'ASSISTANT_QUALITY_GATE=metered requires an enabled assistant provider',
       });
     }
   });

@@ -7,6 +7,7 @@ const { buildApp } = await import('../dist/app.js');
 
 const closePoolForTest = async () => {};
 const conversationId = '44444444-4444-4444-8444-444444444449';
+const projectId = '33333333-3333-4333-8333-333333333339';
 
 async function withApp({ query, assistantProvider }, run) {
   const app = await buildApp({
@@ -78,7 +79,7 @@ test('assistant generation passes persisted history to provider and persists ret
 
   const query = async (text, params) => {
     queries.push({ text, params });
-    if (text.includes('SELECT conv_id FROM comind.cm_conversation')) {
+    if (text.includes('FROM comind.cm_conversation WHERE conv_id=$1')) {
       return { rows: [{ conv_id: conversationId }] };
     }
     if (text.includes('SELECT role, content')) {
@@ -135,6 +136,83 @@ test('assistant generation passes persisted history to provider and persists ret
   });
 });
 
+test('assistant generation injects project memory and persists compact retrieval provenance', async () => {
+  const providerCalls = [];
+  let persistedMetadata;
+  const memoryId = '88888888-8888-4888-8888-888888888888';
+  const memoryContent = 'Use reviewed rate cards and record per-call cost telemetry.';
+  const assistantProvider = {
+    name: 'test-provider',
+    async generateResponse(request) {
+      providerCalls.push(request);
+      return {
+        content: 'Memory-aware assistant answer',
+        metadata: { provider: 'test-provider', response_id: 'memory-response-001' },
+      };
+    },
+  };
+
+  const query = async (text, params) => {
+    if (text.includes('FROM comind.cm_conversation WHERE conv_id=$1')) {
+      return { rows: [{ conv_id: conversationId, project_id: projectId }] };
+    }
+    if (text.includes('SELECT role, content')) {
+      return { rows: [{ role: 'user', content: 'What did we decide about cost monitoring?' }] };
+    }
+    if (text.includes('WITH ranked AS')) {
+      assert.equal(params[0], projectId);
+      assert.equal(params[1], 'What did we decide about cost monitoring?');
+      return {
+        rows: [{
+          memory_id: memoryId,
+          title: 'Cost monitoring decision',
+          kind: 'decision',
+          content: memoryContent,
+          score: '0.812345',
+        }],
+      };
+    }
+    if (text.includes('INSERT INTO comind.cm_message')) {
+      persistedMetadata = JSON.parse(params[2]);
+      return {
+        rows: [{
+          msg_id: '99999999-9999-4999-8999-999999999999',
+          conv_id: conversationId,
+          role: 'assistant',
+          content: params[1],
+          created_at: '2026-10-07T20:00:00.000Z',
+          meta: persistedMetadata,
+        }],
+      };
+    }
+    throw new Error(`Unexpected query: ${text}`);
+  };
+
+  await withApp({ query, assistantProvider }, async (app) => {
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/conversations/${conversationId}/assistant-response`,
+    });
+
+    assert.equal(response.statusCode, 201);
+    assert.equal(providerCalls.length, 1);
+    assert.equal(providerCalls[0].messages.length, 2);
+    assert.equal(providerCalls[0].messages[0].role, 'system');
+    assert.match(providerCalls[0].messages[0].content, new RegExp(memoryId));
+    assert.match(providerCalls[0].messages[0].content, /reviewed rate cards/);
+    assert.deepEqual(providerCalls[0].messages[1], {
+      role: 'user',
+      content: 'What did we decide about cost monitoring?',
+    });
+
+    assert.equal(persistedMetadata.memory_retrieval.strategy, 'project_lexical_v1');
+    assert.equal(persistedMetadata.memory_retrieval.selected_count, 1);
+    assert.deepEqual(persistedMetadata.memory_retrieval.selected_memory_ids, [memoryId]);
+    assert.deepEqual(persistedMetadata.memory_retrieval.selected_scores, [0.812345]);
+    assert.equal(JSON.stringify(persistedMetadata).includes(memoryContent), false);
+  });
+});
+
 test('assistant generation bounds persisted history before provider invocation', async () => {
   const providerCalls = [];
   const assistantProvider = {
@@ -146,7 +224,7 @@ test('assistant generation bounds persisted history before provider invocation',
   };
 
   const query = async (text, params) => {
-    if (text.includes('SELECT conv_id FROM comind.cm_conversation')) {
+    if (text.includes('FROM comind.cm_conversation WHERE conv_id=$1')) {
       return { rows: [{ conv_id: conversationId }] };
     }
     if (text.includes('SELECT role, content')) {
@@ -211,7 +289,7 @@ test('assistant provider failure returns 502 without inserting an assistant mess
 
   const query = async (text, params) => {
     queries.push({ text, params });
-    if (text.includes('SELECT conv_id FROM comind.cm_conversation')) {
+    if (text.includes('FROM comind.cm_conversation WHERE conv_id=$1')) {
       return { rows: [{ conv_id: conversationId }] };
     }
     if (text.includes('SELECT role, content')) {

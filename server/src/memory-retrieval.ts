@@ -5,6 +5,7 @@ export interface MemoryRetrievalOptions {
   maxResults: number;
   maxContextCharacters: number;
   maxMemoryCharacters: number;
+  maxQueryCharacters: number;
   minimumLexicalScore: number;
 }
 
@@ -21,10 +22,16 @@ export interface MemoryRetrievalResult {
   memories: RetrievedMemory[];
   telemetry: {
     strategy: 'project_lexical_v1';
+    source: 'cm_memory_node';
     query_character_count: number;
+    query_submitted_character_count: number;
     candidate_limit: number;
+    candidate_count: number;
     selected_count: number;
+    rejected_count: number;
+    omitted_for_context_limit: number;
     selected_memory_ids: string[];
+    selected_kinds: string[];
     selected_scores: number[];
     context_character_count: number;
     max_context_characters: number;
@@ -36,6 +43,7 @@ const DEFAULT_OPTIONS: MemoryRetrievalOptions = {
   maxResults: 4,
   maxContextCharacters: 4000,
   maxMemoryCharacters: 1200,
+  maxQueryCharacters: 2000,
   minimumLexicalScore: 0.12,
 };
 
@@ -62,10 +70,16 @@ function normalizeScore(score: number | string) {
   return Number.isFinite(numeric) ? Number(numeric.toFixed(6)) : 0;
 }
 
+function compareCandidateRows(left: MemoryCandidateRow, right: MemoryCandidateRow) {
+  const scoreDifference = normalizeScore(right.score) - normalizeScore(left.score);
+  if (scoreDifference !== 0) return scoreDifference;
+  return left.memory_id.localeCompare(right.memory_id);
+}
+
 function compactMemoryContent(value: string, maxCharacters: number) {
   const normalized = value.replace(/\s+/g, ' ').trim();
   if (normalized.length <= maxCharacters) return normalized;
-  return `${normalized.slice(0, Math.max(0, maxCharacters - 1)).trimEnd()}…`;
+  return `${normalized.slice(0, Math.max(0, maxCharacters - 3)).trimEnd()}...`;
 }
 
 function formatMemory(memory: RetrievedMemory) {
@@ -86,8 +100,9 @@ export function selectBoundedMemoryContext(
   const blocks: string[] = [];
   const fixedCharacters = CONTEXT_PREAMBLE.length + 2;
   let contextCharacterCount = fixedCharacters;
+  let omittedForContextLimit = 0;
 
-  for (const row of rows) {
+  for (const row of [...rows].sort(compareCandidateRows)) {
     if (memories.length >= options.maxResults) break;
     const content = compactMemoryContent(row.content ?? '', options.maxMemoryCharacters);
     if (!content) continue;
@@ -102,6 +117,7 @@ export function selectBoundedMemoryContext(
     const block = formatMemory(memory);
     const separatorLength = blocks.length > 0 ? 2 : 0;
     if (contextCharacterCount + separatorLength + block.length > options.maxContextCharacters) {
+      omittedForContextLimit++;
       continue;
     }
     blocks.push(block);
@@ -121,10 +137,16 @@ export function selectBoundedMemoryContext(
     memories,
     telemetry: {
       strategy: 'project_lexical_v1',
+      source: 'cm_memory_node',
       query_character_count: queryCharacterCount,
+      query_submitted_character_count: Math.min(queryCharacterCount, options.maxQueryCharacters),
       candidate_limit: options.maxResults * 3,
+      candidate_count: rows.length,
       selected_count: memories.length,
+      rejected_count: rows.length - memories.length,
+      omitted_for_context_limit: omittedForContextLimit,
       selected_memory_ids: memories.map((memory) => memory.memoryId),
+      selected_kinds: memories.map((memory) => memory.kind),
       selected_scores: memories.map((memory) => memory.score),
       context_character_count: contextMessage?.content.length ?? 0,
       max_context_characters: options.maxContextCharacters,
@@ -145,6 +167,7 @@ export async function retrieveProjectMemoryContext(
   }
 
   const candidateLimit = options.maxResults * 3;
+  const submittedQueryText = queryText.slice(0, options.maxQueryCharacters);
   const result = await queryFn<MemoryCandidateRow>(
     `WITH ranked AS (
        SELECT
@@ -183,7 +206,7 @@ export async function retrieveProjectMemoryContext(
      WHERE GREATEST(trigram_score, text_score) >= $3
      ORDER BY score DESC, priority DESC, weight DESC, memory_id ASC
      LIMIT $4`,
-    [projectId, queryText.slice(0, 2000), options.minimumLexicalScore, candidateLimit]
+    [projectId, submittedQueryText, options.minimumLexicalScore, candidateLimit]
   );
 
   return selectBoundedMemoryContext(result.rows, queryText.length, options);

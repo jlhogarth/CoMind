@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+process.env.DATABASE_URL = 'postgres://test:test@localhost:5432/comind_test';
 process.env.ASSISTANT_PROVIDER = 'disabled';
 const { buildApp } = await import('../dist/app.js');
 

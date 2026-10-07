@@ -161,6 +161,29 @@ function failedCallMetadata(
   };
 }
 
+function failedResponseMetadata(
+  response: OpenAIResponseLike,
+  model: string,
+  durationMs: number
+): Record<string, unknown> {
+  const usage = usageMetadata(response.usage);
+  const rawProviderUsage = sanitizeRawUsage(response.usage);
+
+  return {
+    provider: 'openai',
+    model: response.model ?? model,
+    endpoint: 'responses.create',
+    response_id: response.id,
+    status: 'failed',
+    duration_ms: durationMs,
+    error_code: 'openai_empty_output',
+    retry_attempt: null,
+    cost: usageCostMetadata(),
+    ...(usage ? { usage } : {}),
+    ...(rawProviderUsage ? { raw_provider_usage: rawProviderUsage } : {}),
+  };
+}
+
 function attachProviderMetadata(error: unknown, metadata: Record<string, unknown>) {
   if (error && typeof error === 'object') {
     (error as Record<string, unknown>).providerMetadata = metadata;
@@ -204,7 +227,12 @@ export class OpenAIAssistantProvider implements AssistantProvider {
 
     const content = response.output_text?.trim();
     if (!content) {
-      throw emptyOutputError();
+      const error = emptyOutputError();
+      attachProviderMetadata(
+        error,
+        failedResponseMetadata(response, this.options.model, Date.now() - startedAt)
+      );
+      throw error;
     }
 
     const usage = usageMetadata(response.usage);

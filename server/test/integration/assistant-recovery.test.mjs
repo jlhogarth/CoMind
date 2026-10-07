@@ -27,10 +27,16 @@ function openaiProvider(create) {
 function expectedEmptyMemoryRetrievalMetadata(queryCharacterCount) {
   return {
     strategy: 'project_lexical_v1',
+    source: 'cm_memory_node',
     query_character_count: queryCharacterCount,
+    query_submitted_character_count: queryCharacterCount,
     candidate_limit: 12,
+    candidate_count: 0,
     selected_count: 0,
+    rejected_count: 0,
+    omitted_for_context_limit: 0,
     selected_memory_ids: [],
+    selected_kinds: [],
     selected_scores: [],
     context_character_count: 0,
     max_context_characters: 4000,

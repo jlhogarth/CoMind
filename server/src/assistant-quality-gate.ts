@@ -69,7 +69,7 @@ interface QualityPassTelemetry {
   duration_ms?: unknown;
   usage?: unknown;
   cost?: unknown;
-  source_role?: 'draft' | 'repair';
+  source_role?: 'draft' | 'repair' | 'blocked';
 }
 
 const CURRENT_INFORMATION_PATTERN = /\b(latest|current|today|tonight|recent|right now|as of)\b/i;
@@ -121,6 +121,14 @@ function passTelemetry(
   };
 }
 
+function errorMetadata(error: unknown) {
+  if (!error || typeof error !== 'object') return undefined;
+  const metadata = (error as Record<string, unknown>).providerMetadata;
+  return metadata && typeof metadata === 'object'
+    ? metadata as Record<string, unknown>
+    : undefined;
+}
+
 function compactCritique(value: string | undefined) {
   const normalized = value?.trim();
   if (!normalized) return undefined;
@@ -134,7 +142,7 @@ function qualityMetadata(input: {
   issueCategories: QualityIssueCategory[];
   critique?: string;
   passes: QualityPassTelemetry[];
-  finalSource: 'draft' | 'repair';
+  finalSource: 'draft' | 'repair' | 'blocked';
 }) {
   return {
     risk: input.risk,
@@ -149,15 +157,18 @@ function qualityMetadata(input: {
   };
 }
 
-export class QualityGateBlockedError extends Error {
-  readonly code = 'assistant_quality_gate_blocked';
-  readonly providerMetadata: Record<string, unknown>;
-
-  constructor(providerMetadata: Record<string, unknown>) {
-    super('Assistant answer blocked by quality gate');
-    this.name = 'QualityGateBlockedError';
-    this.providerMetadata = providerMetadata;
-  }
+function blockedResponse(
+  content: string,
+  draft: AssistantResponse,
+  qualityGate: ReturnType<typeof qualityMetadata>
+): AssistantResponse {
+  return {
+    content,
+    metadata: {
+      ...draft.metadata,
+      quality_gate: qualityGate,
+    },
+  };
 }
 
 export class MeteredQualityGateProvider implements AssistantProvider {
@@ -201,7 +212,12 @@ export class MeteredQualityGateProvider implements AssistantProvider {
         messages: request.messages,
         draft,
       });
-    } catch {
+    } catch (error) {
+      const failedMetadata = errorMetadata(error);
+      const passes = [draftPass];
+      if (failedMetadata) {
+        passes.push(passTelemetry('verifier', failedMetadata, this.verifier.name));
+      }
       const gate = qualityMetadata({
         risk,
         verdict: 'verifier_failed',
@@ -209,8 +225,8 @@ export class MeteredQualityGateProvider implements AssistantProvider {
           ? 'returned_unverified'
           : 'blocked',
         issueCategories: ['verifier_failure'],
-        passes: [draftPass],
-        finalSource: 'draft',
+        passes,
+        finalSource: this.options.verifierFailureFallback === 'return_draft' ? 'draft' : 'blocked',
       });
 
       if (this.options.verifierFailureFallback === 'return_draft') {
@@ -219,7 +235,11 @@ export class MeteredQualityGateProvider implements AssistantProvider {
           metadata: { ...draft.metadata, quality_gate: gate },
         };
       }
-      throw new QualityGateBlockedError({ ...draft.metadata, quality_gate: gate });
+      return blockedResponse(
+        'I cannot return the draft because CoMind could not complete the required answer-quality verification.',
+        draft,
+        gate
+      );
     }
 
     const verifierPass = passTelemetry('verifier', verification.metadata, this.verifier.name);
@@ -270,15 +290,18 @@ export class MeteredQualityGateProvider implements AssistantProvider {
       };
     }
 
-    const gate = qualityMetadata({
-      risk,
-      verdict: verification.verdict,
-      outcome: 'blocked',
-      issueCategories,
-      critique,
-      passes: [draftPass, verifierPass],
-      finalSource: 'draft',
-    });
-    throw new QualityGateBlockedError({ ...draft.metadata, quality_gate: gate });
+    return blockedResponse(
+      'I cannot return the draft because it did not pass CoMind answer-quality verification.',
+      draft,
+      qualityMetadata({
+        risk,
+        verdict: verification.verdict,
+        outcome: 'blocked',
+        issueCategories,
+        critique,
+        passes: [draftPass, verifierPass],
+        finalSource: 'blocked',
+      })
+    );
   }
 }

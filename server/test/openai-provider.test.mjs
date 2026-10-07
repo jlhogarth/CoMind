@@ -83,11 +83,22 @@ test('OpenAI provider sends CoMind history without provider-side storage', async
   });
   assert.deepEqual(response.metadata.raw_provider_usage, response.metadata.usage);
   assert.deepEqual(response.metadata.cost, {
-    estimated_cost_usd: null,
+    estimated_cost_usd: 0.00000506,
     currency: 'USD',
-    rate_card_version: 'not_configured',
+    rate_card_version: 'openai-2026-10-07',
+    pricing_source: 'https://developers.openai.com/api/docs/pricing',
     pricing_assumption:
-      'Token usage is captured, but no committed OpenAI rate card is configured for USD estimation.',
+      'OpenAI pricing published 2026-10-07: cached input is 10% of uncached input, cache writes are 1.25x input, Batch/Flex are 50% of Standard, Fast is 2x Standard, and requests above 272K input tokens use long-context rates.',
+    model: 'gpt-6-luna-2026-09-22',
+    canonical_model: 'gpt-6-luna',
+    processing_mode: 'standard',
+    context_band: 'short',
+    billable_tokens: {
+      uncached_input: 15,
+      cached_input: 6,
+      cache_write: 0,
+      output: 7,
+    },
   });
 });
 
@@ -174,7 +185,9 @@ test('OpenAI provider rejects responses without assistant text', async () => {
         total_tokens: 6,
       });
       assert.deepEqual(error.providerMetadata.raw_provider_usage, error.providerMetadata.usage);
-      assert.equal(error.providerMetadata.cost.rate_card_version, 'not_configured');
+      assert.equal(error.providerMetadata.cost.rate_card_version, 'openai-2026-10-07');
+      assert.equal(error.providerMetadata.cost.estimated_cost_usd, 0.000001);
+      assert.equal(error.providerMetadata.cost.processing_mode, 'standard');
       return true;
     }
   );

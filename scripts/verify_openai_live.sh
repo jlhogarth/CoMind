@@ -115,16 +115,20 @@ assert.equal(typeof assistant.meta?.usage?.input_tokens, 'number');
 assert.equal(typeof assistant.meta?.usage?.output_tokens, 'number');
 assert.equal(typeof assistant.meta?.usage?.total_tokens, 'number');
 assert.equal(assistant.meta?.cost?.currency, 'USD');
+assert.equal(assistant.meta?.cost?.rate_card_version, 'openai-2026-10-07');
+assert.equal(assistant.meta?.cost?.processing_mode, 'standard');
+assert.equal(typeof assistant.meta?.cost?.estimated_cost_usd, 'number');
+assert.equal(assistant.meta.cost.estimated_cost_usd >= 0, true);
 assert.equal(
-  assistant.meta?.cost?.rate_card_version,
-  'not_configured',
-  'Live usage smoke records token usage before USD rate-card calibration'
+  assistant.meta?.cost?.pricing_source,
+  'https://developers.openai.com/api/docs/pricing'
 );
 
 const reloaded = await request(`/api/conversations/${encodeURIComponent(conversation.conv_id)}`);
 assert.deepEqual(reloaded.messages.map((row) => row.role), ['user', 'assistant']);
 assert.equal(reloaded.messages[1].msg_id, assistant.msg_id);
 assert.equal(reloaded.messages[1].content, assistant.content);
+assert.deepEqual(reloaded.messages[1].meta?.cost, assistant.meta.cost);
 
 console.error(
   [
@@ -132,8 +136,9 @@ console.error(
     `Model: ${assistant.meta.model}.`,
     `Duration ms: ${assistant.meta.duration_ms}.`,
     `Tokens: input=${assistant.meta.usage.input_tokens}, output=${assistant.meta.usage.output_tokens}, total=${assistant.meta.usage.total_tokens}.`,
-    `Cost estimate USD: ${assistant.meta.cost.estimated_cost_usd ?? 'not_configured'}.`,
+    `Cost estimate USD: ${assistant.meta.cost.estimated_cost_usd}.`,
     `Rate card: ${assistant.meta.cost.rate_card_version}.`,
+    `Processing mode: ${assistant.meta.cost.processing_mode}.`,
   ].join(' ')
 );
 process.stdout.write(conversation.conv_id);

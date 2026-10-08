@@ -517,11 +517,11 @@ BEGIN
            AND v_reservation.provider_event_id IS NOT DISTINCT FROM p_provider_event_id
            AND v_reservation.telemetry_identity IS NOT DISTINCT FROM p_telemetry_identity
            AND v_reservation.finalized_cost IS NOT DISTINCT FROM p_actual_cost THEN
-            SELECT id INTO v_usage_event_id
-            FROM public.comind_usage_events
-            WHERE reservation_id = p_reservation_id
-              AND meter_code = 'provider_execution'
-            ORDER BY id
+            SELECT u.id INTO v_usage_event_id
+            FROM public.comind_usage_events AS u
+            WHERE u.reservation_id = p_reservation_id
+              AND u.meter_code = 'provider_execution'
+            ORDER BY u.id
             LIMIT 1;
 
             RETURN QUERY SELECT

@@ -158,6 +158,11 @@ function assertReservation(
   ) {
     throw new Error('Approved provider budget reservation is missing its durable status');
   }
+  if (reservation.idempotent) {
+    throw new Error(
+      `Provider reservation ${reservation.reservation_id} already exists; recovery must resolve the existing attempt before any further provider execution`
+    );
+  }
 }
 
 function frozenReceipt<TQuote extends ProviderExposureQuote>(

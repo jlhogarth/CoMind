@@ -42,10 +42,14 @@ psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
   -f "${repository_root}/db/migrations/20261008_001_paid_provider_budget_authority_hardening.sql"
 psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
   -f "${repository_root}/db/migrations/20261008_002_current_runtime_budget_authority_adapter.sql"
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
+  -f "${repository_root}/db/migrations/20261008_003_current_runtime_budget_authority_adapter_function_hardening.sql"
 
-# Reapply the adapter migration to prove migration idempotency.
+# Reapply the adapter migrations to prove migration idempotency.
 psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
   -f "${repository_root}/db/migrations/20261008_002_current_runtime_budget_authority_adapter.sql"
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
+  -f "${repository_root}/db/migrations/20261008_003_current_runtime_budget_authority_adapter_function_hardening.sql"
 
 psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
   -f "${repository_root}/db/migrations/verify_20261008_002_current_runtime_budget_authority_adapter.sql"

@@ -8,23 +8,29 @@ if [[ -z "${DATABASE_URL:-}" ]]; then
   exit 2
 fi
 
-connection_identity="$(psql "${DATABASE_URL}" -X -Atc "SELECT current_database() || '|' || inet_server_addr()::text;")"
-database_name="${connection_identity%%|*}"
-server_address="${connection_identity#*|}"
+# Validate the configured destination rather than inet_server_addr(). In GitHub Actions,
+# PostgreSQL runs in a service container and legitimately reports its Docker bridge
+# address even though the client connection is explicitly routed through localhost.
+DATABASE_URL="${DATABASE_URL}" python3 <<'PY'
+import os
+import sys
+from urllib.parse import urlparse
 
+parsed = urlparse(os.environ['DATABASE_URL'])
+allowed_hosts = {'localhost', '127.0.0.1', '::1', 'db'}
+if parsed.scheme not in {'postgres', 'postgresql'}:
+    print('Budget-authority verification requires a PostgreSQL URL.', file=sys.stderr)
+    raise SystemExit(2)
+if parsed.hostname not in allowed_hosts or parsed.path != '/comind_ci':
+    print('Refusing budget-authority verification outside local isolated comind_ci.', file=sys.stderr)
+    raise SystemExit(2)
+PY
+
+database_name="$(psql "${DATABASE_URL}" -X -Atc "SELECT current_database();")"
 if [[ "${database_name}" != "comind_ci" ]]; then
   echo "Refusing budget-authority verification outside comind_ci." >&2
   exit 2
 fi
-
-case "${server_address}" in
-  127.0.0.1|::1)
-    ;;
-  *)
-    echo "Refusing budget-authority verification against a non-local PostgreSQL server." >&2
-    exit 2
-    ;;
-esac
 
 psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
   -f "${repository_root}/db/test/finops_budget_authority_prerequisites.sql"

@@ -89,7 +89,13 @@ function canonicalClone(value: unknown, path: string): CanonicalValue {
 }
 
 function canonicalSerialize(value: CanonicalValue): string {
-  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (value === null || typeof value !== 'object') {
+    const serialized = JSON.stringify(value);
+    if (serialized === undefined) {
+      throw new Error('Canonical provider execution value could not be serialized');
+    }
+    return serialized;
+  }
   if (Array.isArray(value)) return `[${value.map(canonicalSerialize).join(',')}]`;
 
   return `{${Object.keys(value)
@@ -99,8 +105,8 @@ function canonicalSerialize(value: CanonicalValue): string {
 }
 
 function deepFreeze<T>(value: T): T {
-  if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
-  Object.freeze(value);
+  if (!value || typeof value !== 'object') return value;
+  if (!Object.isFrozen(value)) Object.freeze(value);
   for (const child of Object.values(value as Record<string, unknown>)) {
     deepFreeze(child);
   }

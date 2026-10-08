@@ -1,7 +1,7 @@
 -- CoMind current-runtime budget-authority adapter hardening
 -- Version: 1.0.1
 -- Date: 2026-10-08
--- Purpose: Fail closed on ambiguous quality telemetry and incomplete known-cost provenance.
+-- Purpose: Fail closed on ambiguous telemetry while preserving reconciliation and unspent closure.
 -- Scope: Database contract only. No live provider wiring or live database deployment.
 
 BEGIN;
@@ -9,8 +9,9 @@ BEGIN;
 DO $$
 BEGIN
     IF to_regclass('comind.cm_budget_authority_telemetry') IS NULL
-       OR to_regprocedure('comind.cm_finalize_paid_provider_message_execution(bigint,uuid,text,text)') IS NULL THEN
-        RAISE EXCEPTION 'Current-runtime budget authority adapter v1.0.0 must be installed first';
+       OR to_regprocedure('comind.cm_finalize_paid_provider_message_execution(bigint,uuid,text,text)') IS NULL
+       OR to_regprocedure('public.comind_close_unspent_paid_provider_reservation(bigint,text,text)') IS NULL THEN
+        RAISE EXCEPTION 'Current-runtime budget authority adapter and hardened Issue #57 authority must be installed first';
     END IF;
 END;
 $$;
@@ -182,9 +183,7 @@ BEGIN
         IF v_existing_telemetry.message_id <> p_message_id
            OR v_existing_telemetry.telemetry_locator <> p_telemetry_locator
            OR v_existing_telemetry.telemetry_identity <> v_telemetry_identity
-           OR v_existing_telemetry.provider_event_id IS DISTINCT FROM v_provider_event_id
-           OR v_existing_telemetry.rate_card_version IS DISTINCT FROM v_rate_card_version
-           OR v_existing_telemetry.pricing_source IS DISTINCT FROM v_pricing_source THEN
+           OR v_existing_telemetry.provider_event_id IS DISTINCT FROM v_provider_event_id THEN
             RAISE EXCEPTION 'Reservation % has conflicting telemetry provenance', p_reservation_id;
         END IF;
     ELSIF v_base.idempotent THEN
@@ -208,12 +207,69 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION comind.cm_close_unspent_paid_provider_execution(
+    p_reservation_id BIGINT,
+    p_terminal_status TEXT,
+    p_reason_code TEXT
+)
+RETURNS TABLE (
+    reservation_id BIGINT,
+    reservation_status TEXT,
+    released_amount NUMERIC,
+    idempotent BOOLEAN
+)
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = comind, public, pg_temp
+AS $$
+DECLARE
+    v_link comind.cm_budget_authority_reservation%ROWTYPE;
+    v_telemetry_count INTEGER;
+    v_base RECORD;
+BEGIN
+    SELECT * INTO v_link
+    FROM comind.cm_budget_authority_reservation
+    WHERE reservation_id = p_reservation_id;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Reservation % lacks current-runtime adapter provenance', p_reservation_id;
+    END IF;
+
+    SELECT COUNT(*)::int INTO v_telemetry_count
+    FROM comind.cm_budget_authority_telemetry
+    WHERE reservation_id = p_reservation_id;
+    IF v_telemetry_count > 0 THEN
+        RAISE EXCEPTION 'Reservation % already has provider telemetry and cannot use the unspent-close path',
+            p_reservation_id;
+    END IF;
+
+    SELECT * INTO v_base
+    FROM public.comind_close_unspent_paid_provider_reservation(
+        p_reservation_id,
+        p_terminal_status,
+        p_reason_code
+    );
+
+    RETURN QUERY SELECT
+        v_base.reservation_id,
+        v_base.reservation_status,
+        v_base.released_amount,
+        v_base.idempotent;
+END;
+$$;
+
 REVOKE ALL ON FUNCTION comind.cm_finalize_paid_provider_message_execution(BIGINT, UUID, TEXT, TEXT)
 FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION comind.cm_close_unspent_paid_provider_execution(BIGINT, TEXT, TEXT)
+FROM PUBLIC, anon, authenticated;
+
 GRANT EXECUTE ON FUNCTION comind.cm_finalize_paid_provider_message_execution(BIGINT, UUID, TEXT, TEXT)
+TO service_role;
+GRANT EXECUTE ON FUNCTION comind.cm_close_unspent_paid_provider_execution(BIGINT, TEXT, TEXT)
 TO service_role;
 
 COMMENT ON FUNCTION comind.cm_finalize_paid_provider_message_execution(BIGINT, UUID, TEXT, TEXT) IS
     'Settles one hardened reservation from exactly one authoritative provider telemetry event in comind.cm_message.meta. Quality-gated messages must settle draft, verifier, or repair passes individually. Known costs require explicit estimator provenance.';
+COMMENT ON FUNCTION comind.cm_close_unspent_paid_provider_execution(BIGINT, TEXT, TEXT) IS
+    'Closes a current-runtime reservation only through the hardened evidence-backed unspent path and only before provider telemetry is linked.';
 
 COMMIT;

@@ -53,18 +53,30 @@ psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
   -f "${repository_root}/db/migrations/20261008_005_current_runtime_budget_authority_adapter_telemetry_role_hardening.sql"
 psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
   -f "${repository_root}/db/migrations/20261008_006_foundry_agent_substrate.sql"
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
+  -f "${repository_root}/db/migrations/20261008_007_foundry_security_prerequisites.sql"
 
-# Reapply the Foundry substrate migration to prove idempotency.
+# Reapply both Foundry migrations to prove idempotency.
 psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
   -f "${repository_root}/db/migrations/20261008_006_foundry_agent_substrate.sql"
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
+  -f "${repository_root}/db/migrations/20261008_007_foundry_security_prerequisites.sql"
 
-verification_output="$(psql "${DATABASE_URL}" -X -q -At -F '|' -v ON_ERROR_STOP=1 \
+substrate_output="$(psql "${DATABASE_URL}" -X -q -At -F '|' -v ON_ERROR_STOP=1 \
   -f "${repository_root}/db/migrations/verify_20261008_006_foundry_agent_substrate.sql")"
-verification_status="${verification_output%%|*}"
-
-if [[ "${verification_status}" != "pass" ]]; then
-  echo "Foundry agent substrate verification failed: ${verification_output}" >&2
+substrate_status="${substrate_output%%|*}"
+if [[ "${substrate_status}" != "pass" ]]; then
+  echo "Foundry agent substrate verification failed: ${substrate_output}" >&2
   exit 1
 fi
 
-printf 'Foundry agent substrate verification passed: %s\n' "${verification_output}"
+security_output="$(psql "${DATABASE_URL}" -X -q -At -F '|' -v ON_ERROR_STOP=1 \
+  -f "${repository_root}/db/migrations/verify_20261008_007_foundry_security_prerequisites.sql")"
+security_status="${security_output%%|*}"
+if [[ "${security_status}" != "pass" ]]; then
+  echo "Foundry security prerequisite verification failed: ${security_output}" >&2
+  exit 1
+fi
+
+printf 'Foundry agent substrate verification passed: %s\n' "${substrate_output}"
+printf 'Foundry security prerequisite verification passed: %s\n' "${security_output}"

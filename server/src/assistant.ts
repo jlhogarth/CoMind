@@ -1,3 +1,5 @@
+import type { ProviderExecutionRole } from './provider-execution.js';
+
 export type ConversationRole = 'user' | 'assistant' | 'system' | 'tool';
 
 export interface ConversationMessage {
@@ -8,6 +10,7 @@ export interface ConversationMessage {
 export interface AssistantResponseRequest {
   conversationId: string;
   messages: ConversationMessage[];
+  executionRole?: ProviderExecutionRole;
 }
 
 export interface AssistantResponse {

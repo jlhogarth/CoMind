@@ -51,7 +51,12 @@ ALTER TABLE public.comind_cost_reservations
     ADD COLUMN IF NOT EXISTS state_reason_code TEXT;
 
 ALTER TABLE public.comind_cost_reservations
-    DROP CONSTRAINT IF EXISTS comind_cost_reservations_status_ck;
+    DROP CONSTRAINT IF EXISTS comind_cost_reservations_status_ck,
+    DROP CONSTRAINT IF EXISTS comind_cost_reservations_finalized_cost_ck,
+    DROP CONSTRAINT IF EXISTS comind_cost_reservations_idempotency_key_ck,
+    DROP CONSTRAINT IF EXISTS comind_cost_reservations_provider_event_ck,
+    DROP CONSTRAINT IF EXISTS comind_cost_reservations_telemetry_identity_ck,
+    DROP CONSTRAINT IF EXISTS comind_cost_reservations_reason_code_ck;
 
 ALTER TABLE public.comind_cost_reservations
     ADD CONSTRAINT comind_cost_reservations_status_ck CHECK (
@@ -85,6 +90,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_comind_cost_reservations_idempotency
 CREATE UNIQUE INDEX IF NOT EXISTS idx_comind_cost_reservations_provider_event
     ON public.comind_cost_reservations (provider_id, provider_event_id)
     WHERE provider_event_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_comind_cost_reservations_telemetry_identity
+    ON public.comind_cost_reservations (provider_id, telemetry_identity)
+    WHERE telemetry_identity IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS public.comind_cost_reservation_events (
     id BIGSERIAL PRIMARY KEY,
@@ -473,6 +482,20 @@ BEGIN
         END IF;
     END IF;
 
+    IF p_telemetry_identity IS NOT NULL THEN
+        SELECT id INTO v_existing_reservation
+        FROM public.comind_cost_reservations
+        WHERE provider_id = v_reservation.provider_id
+          AND telemetry_identity = p_telemetry_identity
+          AND id <> p_reservation_id
+        LIMIT 1;
+
+        IF FOUND THEN
+            RAISE EXCEPTION 'Telemetry identity % is already bound to reservation %',
+                p_telemetry_identity, v_existing_reservation;
+        END IF;
+    END IF;
+
     IF v_reservation.status IN ('finalized', 'failed', 'unknown_cost') THEN
         IF v_reservation.status = p_outcome
            AND v_reservation.provider_event_id IS NOT DISTINCT FROM p_provider_event_id
@@ -682,7 +705,9 @@ BEGIN
     FOR UPDATE;
 
     IF v_reservation.status = p_terminal_status
-       AND v_reservation.finalized_cost = 0 THEN
+       AND v_reservation.finalized_cost = 0
+       AND v_reservation.provider_event_id IS NULL
+       AND v_reservation.telemetry_identity IS NULL THEN
         RETURN QUERY SELECT
             p_reservation_id,
             p_terminal_status,
@@ -694,6 +719,11 @@ BEGIN
     IF v_reservation.status NOT IN ('reserved', 'stale', 'active') THEN
         RAISE EXCEPTION 'Reservation % cannot close unspent from state %',
             p_reservation_id, v_reservation.status;
+    END IF;
+
+    IF v_reservation.provider_event_id IS NOT NULL OR v_reservation.telemetry_identity IS NOT NULL THEN
+        RAISE EXCEPTION 'Reservation % has provider execution identity and cannot be closed as unspent',
+            p_reservation_id;
     END IF;
 
     UPDATE public.comind_cost_reservations

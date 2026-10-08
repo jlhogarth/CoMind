@@ -4,6 +4,7 @@ import {
   AssistantResponse,
   AssistantResponseRequest,
 } from '../assistant.js';
+import { GovernedProviderExecutionReceipt } from './governed-provider-execution.js';
 import {
   OpenAIExecutionOptions,
   OpenAIInputTokenCounter,
@@ -13,7 +14,10 @@ import {
   buildOpenAIProviderExecutionEnvelope,
   executeOpenAIProviderExecutionEnvelope,
 } from './openai-execution.js';
-import { estimateOpenAICost } from './openai-rate-card.js';
+import {
+  OpenAIProviderExposureQuote,
+  estimateOpenAICost,
+} from './openai-rate-card.js';
 
 export type {
   OpenAIReasoningEffort,
@@ -120,6 +124,7 @@ function executionMetadata(envelope: OpenAIProviderExecutionEnvelope) {
     canonical_model: envelope.canonical_model,
     processing_mode: envelope.processing_mode,
     execution_role: envelope.execution_role,
+    attempt_number: envelope.attempt_number,
     request_fingerprint: envelope.fingerprint,
     timeout_ms: envelope.timeout_ms,
     max_retries: envelope.max_retries,
@@ -203,6 +208,31 @@ function emptyOutputError() {
   return error;
 }
 
+export function openAIProviderSuccessMetadata(
+  response: OpenAIResponseLike,
+  envelope: OpenAIProviderExecutionEnvelope,
+  durationMs: number,
+  governedExecution?: GovernedProviderExecutionReceipt<OpenAIProviderExposureQuote>
+): Record<string, unknown> {
+  const usage = usageMetadata(response.usage);
+  const rawProviderUsage = sanitizeRawUsage(response.usage);
+  const responseModel = response.model ?? envelope.requested_model;
+
+  return {
+    provider: 'openai',
+    model: responseModel,
+    endpoint: 'responses.create',
+    response_id: response.id,
+    status: 'succeeded',
+    duration_ms: durationMs,
+    ...executionMetadata(envelope),
+    cost: usageCostMetadata(responseModel, thisProcessingMode(envelope), usage),
+    ...(usage ? { usage } : {}),
+    ...(rawProviderUsage ? { raw_provider_usage: rawProviderUsage } : {}),
+    ...(governedExecution ? { governed_execution: governedExecution } : {}),
+  };
+}
+
 export class OpenAIAssistantProvider implements AssistantProvider {
   readonly name = 'openai';
 
@@ -235,23 +265,13 @@ export class OpenAIAssistantProvider implements AssistantProvider {
       throw error;
     }
 
-    const usage = usageMetadata(response.usage);
-    const rawProviderUsage = sanitizeRawUsage(response.usage);
-    const responseModel = response.model ?? this.options.model;
     return {
       content,
-      metadata: {
-        provider: this.name,
-        model: responseModel,
-        endpoint: 'responses.create',
-        response_id: response.id,
-        status: 'succeeded',
-        duration_ms: Date.now() - startedAt,
-        ...executionMetadata(envelope),
-        cost: usageCostMetadata(responseModel, this.options.processingMode, usage),
-        ...(usage ? { usage } : {}),
-        ...(rawProviderUsage ? { raw_provider_usage: rawProviderUsage } : {}),
-      },
+      metadata: openAIProviderSuccessMetadata(
+        response,
+        envelope,
+        Date.now() - startedAt
+      ),
     };
   }
 }

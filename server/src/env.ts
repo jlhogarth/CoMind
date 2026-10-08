@@ -31,6 +31,12 @@ const environmentSchema = z
     OPENAI_MAX_OUTPUT_TOKENS: z.coerce.number().int().min(1).max(8192).default(1024),
     OPENAI_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120000).default(30000),
     OPENAI_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(2),
+    OPENAI_PAID_TEST_GUARDRAIL_WINDOW_HOURS: z.coerce.number().int().min(1).max(168).default(24),
+    OPENAI_PAID_TEST_BUDGET_USD: z.coerce.number().positive().max(100).default(0.05),
+    OPENAI_PAID_TEST_WARN_RATIO: z.coerce.number().positive().max(0.99).default(0.8),
+    OPENAI_PAID_TEST_WARN_FAILURE_RATE: z.coerce.number().min(0).max(1).default(0.1),
+    OPENAI_PAID_TEST_PAUSE_FAILURE_RATE: z.coerce.number().min(0).max(1).default(0.25),
+    OPENAI_PAID_TEST_MAX_UNKNOWN_COST_CALLS: z.coerce.number().int().min(0).max(100).default(0),
   })
   .superRefine((value, context) => {
     if (value.ASSISTANT_PROVIDER === 'openai' && !value.OPENAI_API_KEY) {
@@ -45,6 +51,13 @@ const environmentSchema = z
         code: z.ZodIssueCode.custom,
         path: ['ASSISTANT_QUALITY_GATE'],
         message: 'ASSISTANT_QUALITY_GATE=metered requires an enabled assistant provider',
+      });
+    }
+    if (value.OPENAI_PAID_TEST_WARN_FAILURE_RATE > value.OPENAI_PAID_TEST_PAUSE_FAILURE_RATE) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['OPENAI_PAID_TEST_WARN_FAILURE_RATE'],
+        message: 'OPENAI paid-test warning failure rate cannot exceed the pause failure rate',
       });
     }
   });

@@ -18,12 +18,16 @@ CREATE TABLE IF NOT EXISTS comind.cm_enterprise_checklist (
 
 -- Trigger to auto-update updated_at
 CREATE OR REPLACE FUNCTION comind.set_updated_at_checklist()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = comind, public, pg_temp
+AS $$
 BEGIN
   NEW.updated_at = now();
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 DROP TRIGGER IF EXISTS trg_cm_enterprise_checklist_updated ON comind.cm_enterprise_checklist;
 CREATE TRIGGER trg_cm_enterprise_checklist_updated

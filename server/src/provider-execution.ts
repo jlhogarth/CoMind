@@ -4,7 +4,7 @@ export const PROVIDER_EXECUTION_ENVELOPE_VERSION = 'provider-execution-envelope-
 
 export type ProviderExecutionRole = 'root' | 'draft' | 'verifier' | 'repair';
 
-export interface ProviderExecutionEnvelope<TRequest extends Record<string, unknown>> {
+export interface ProviderExecutionEnvelope<TRequest extends object> {
   readonly version: typeof PROVIDER_EXECUTION_ENVELOPE_VERSION;
   readonly provider: string;
   readonly requested_model: string;
@@ -17,7 +17,7 @@ export interface ProviderExecutionEnvelope<TRequest extends Record<string, unkno
   readonly fingerprint: string;
 }
 
-export interface ProviderExecutionEnvelopeInput<TRequest extends Record<string, unknown>> {
+export interface ProviderExecutionEnvelopeInput<TRequest extends object> {
   provider: string;
   requestedModel: string;
   canonicalModel: string | null;
@@ -36,13 +36,27 @@ export interface ProviderInputTokenCount {
 }
 
 export interface ProviderInputTokenCounter<
-  TRequest extends Record<string, unknown>,
+  TRequest extends object,
   TEnvelope extends ProviderExecutionEnvelope<TRequest> = ProviderExecutionEnvelope<TRequest>,
 > {
   countInputTokens(envelope: TEnvelope): Promise<ProviderInputTokenCount>;
 }
 
 const EXECUTION_ROLES = new Set<ProviderExecutionRole>(['root', 'draft', 'verifier', 'repair']);
+const SENSITIVE_REQUEST_KEYS = new Set([
+  'api_key',
+  'apikey',
+  'authorization',
+  'password',
+  'client_secret',
+  'clientsecret',
+  'access_token',
+  'accesstoken',
+  'refresh_token',
+  'refreshtoken',
+  'credential',
+  'credentials',
+]);
 
 function requiredString(value: string, field: string) {
   const normalized = value.trim();
@@ -98,6 +112,14 @@ function normalizeJsonValue(value: unknown, path: string): unknown {
   return normalized;
 }
 
+function assertNoTopLevelCredentials(request: object) {
+  for (const key of Object.keys(request)) {
+    if (SENSITIVE_REQUEST_KEYS.has(key.toLowerCase())) {
+      throw new Error(`Provider execution request must not contain credential field ${key}`);
+    }
+  }
+}
+
 function deepFreeze<T>(value: T): T {
   if (value && typeof value === 'object' && !Object.isFrozen(value)) {
     for (const child of Object.values(value as Record<string, unknown>)) deepFreeze(child);
@@ -106,7 +128,7 @@ function deepFreeze<T>(value: T): T {
   return value;
 }
 
-function fingerprintMaterial<TRequest extends Record<string, unknown>>(
+function fingerprintMaterial<TRequest extends object>(
   envelope: Omit<ProviderExecutionEnvelope<TRequest>, 'fingerprint'>
 ) {
   return {
@@ -127,7 +149,7 @@ function fingerprintFromMaterial(material: unknown) {
   return `sha256:${createHash('sha256').update(canonical).digest('hex')}`;
 }
 
-export function createProviderExecutionEnvelope<TRequest extends Record<string, unknown>>(
+export function createProviderExecutionEnvelope<TRequest extends object>(
   input: ProviderExecutionEnvelopeInput<TRequest>
 ): ProviderExecutionEnvelope<TRequest> {
   const provider = requiredString(input.provider, 'provider');
@@ -141,6 +163,7 @@ export function createProviderExecutionEnvelope<TRequest extends Record<string, 
     throw new Error('Provider execution role is unsupported');
   }
 
+  assertNoTopLevelCredentials(input.request);
   const normalizedRequest = normalizeJsonValue(input.request, '$.request') as TRequest;
   const material = {
     version: PROVIDER_EXECUTION_ENVELOPE_VERSION,
@@ -162,16 +185,16 @@ export function createProviderExecutionEnvelope<TRequest extends Record<string, 
   return deepFreeze(envelope);
 }
 
-export function providerExecutionFingerprint<TRequest extends Record<string, unknown>>(
+export function providerExecutionFingerprint<TRequest extends object>(
   envelope: ProviderExecutionEnvelope<TRequest>
 ) {
   const { fingerprint: _fingerprint, ...material } = envelope;
   return fingerprintFromMaterial(fingerprintMaterial(material));
 }
 
-export function assertProviderExecutionEnvelopeIntegrity<
-  TRequest extends Record<string, unknown>,
->(envelope: ProviderExecutionEnvelope<TRequest>) {
+export function assertProviderExecutionEnvelopeIntegrity<TRequest extends object>(
+  envelope: ProviderExecutionEnvelope<TRequest>
+) {
   const expected = providerExecutionFingerprint(envelope);
   if (envelope.fingerprint !== expected) {
     throw new Error('Provider execution envelope fingerprint mismatch');
@@ -179,9 +202,7 @@ export function assertProviderExecutionEnvelopeIntegrity<
   return envelope;
 }
 
-export function validateProviderInputTokenCount<
-  TRequest extends Record<string, unknown>,
->(
+export function validateProviderInputTokenCount<TRequest extends object>(
   envelope: ProviderExecutionEnvelope<TRequest>,
   result: ProviderInputTokenCount
 ): ProviderInputTokenCount {
@@ -202,7 +223,7 @@ export function validateProviderInputTokenCount<
 }
 
 export async function countProviderExecutionInputTokens<
-  TRequest extends Record<string, unknown>,
+  TRequest extends object,
   TEnvelope extends ProviderExecutionEnvelope<TRequest>,
 >(
   envelope: TEnvelope,

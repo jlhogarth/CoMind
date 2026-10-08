@@ -47,6 +47,46 @@ export interface OpenAICostEstimate {
   } | null;
 }
 
+export type OpenAIProviderExposureQuoteFailureReason =
+  | 'unknown_model'
+  | 'unsupported_processing_mode'
+  | 'invalid_max_input_tokens'
+  | 'invalid_max_output_tokens';
+
+export type OpenAIProviderExposureInputRateBasis =
+  | 'uncached_input'
+  | 'cached_input'
+  | 'cache_write';
+
+export interface OpenAIProviderExposureQuoteRequest {
+  model: string;
+  processing_mode: string;
+  max_input_tokens?: number;
+  max_output_tokens?: number;
+}
+
+export interface OpenAIProviderExposureQuote {
+  provider: 'openai';
+  quotable: boolean;
+  maximum_exposure_usd: number | null;
+  currency: 'USD';
+  rate_card_version: string;
+  pricing_source: string;
+  pricing_assumption: string;
+  model: string;
+  canonical_model: string | null;
+  processing_mode: string;
+  context_band: 'short' | 'long' | null;
+  max_input_tokens: number | null;
+  max_output_tokens: number | null;
+  rate_basis: {
+    input_category: OpenAIProviderExposureInputRateBasis;
+    input_per_million_usd: number;
+    output_per_million_usd: number;
+  } | null;
+  failure_reason: OpenAIProviderExposureQuoteFailureReason | null;
+}
+
 const GPT_6_LUNA_STANDARD: ContextRateCard = {
   short: {
     input: 0.1,
@@ -101,6 +141,14 @@ function finiteNonNegativeInteger(value: number | undefined) {
   return value === undefined || (Number.isInteger(value) && value >= 0);
 }
 
+function requiredNonNegativeSafeInteger(value: number | undefined): value is number {
+  return value !== undefined && Number.isSafeInteger(value) && value >= 0;
+}
+
+function requiredPositiveSafeInteger(value: number | undefined): value is number {
+  return value !== undefined && Number.isSafeInteger(value) && value > 0;
+}
+
 function normalizedUsd(value: number) {
   return Number(value.toFixed(12));
 }
@@ -123,6 +171,49 @@ function unsupportedEstimate(
     context_band: null,
     billable_tokens: null,
   };
+}
+
+function unquotableProviderExposure(
+  request: OpenAIProviderExposureQuoteRequest,
+  failureReason: OpenAIProviderExposureQuoteFailureReason,
+  assumption: string,
+  canonical: string | null = null
+): OpenAIProviderExposureQuote {
+  return {
+    provider: 'openai',
+    quotable: false,
+    maximum_exposure_usd: null,
+    currency: 'USD',
+    rate_card_version: OPENAI_RATE_CARD_VERSION,
+    pricing_source: OPENAI_RATE_CARD_SOURCE,
+    pricing_assumption: assumption,
+    model: request.model,
+    canonical_model: canonical,
+    processing_mode: request.processing_mode,
+    context_band: null,
+    max_input_tokens: null,
+    max_output_tokens: null,
+    rate_basis: null,
+    failure_reason: failureReason,
+  };
+}
+
+function maximumInputRate(rates: TokenRatesPerMillion): {
+  category: OpenAIProviderExposureInputRateBasis;
+  rate: number;
+} {
+  const candidates: Array<{
+    category: OpenAIProviderExposureInputRateBasis;
+    rate: number;
+  }> = [
+    { category: 'uncached_input', rate: rates.input },
+    { category: 'cached_input', rate: rates.cachedInput },
+    { category: 'cache_write', rate: rates.cacheWrite },
+  ];
+
+  return candidates.reduce((maximum, candidate) =>
+    candidate.rate > maximum.rate ? candidate : maximum
+  );
 }
 
 export function estimateOpenAICost(
@@ -205,5 +296,82 @@ export function estimateOpenAICost(
       cache_write: cacheWrite,
       output,
     },
+  };
+}
+
+export function quoteOpenAIProviderExposure(
+  request: OpenAIProviderExposureQuoteRequest
+): OpenAIProviderExposureQuote {
+  const canonical = canonicalModel(request.model);
+  if (!canonical) {
+    return unquotableProviderExposure(
+      request,
+      'unknown_model',
+      'No reviewed rate card exists for this model; maximum exposure quotation is disabled rather than guessed.'
+    );
+  }
+
+  const card = RATE_CARDS[canonical];
+  const contextRates = card.modes[request.processing_mode as OpenAIProcessingMode];
+  if (!contextRates) {
+    return unquotableProviderExposure(
+      request,
+      'unsupported_processing_mode',
+      'No reviewed rate card exists for this processing mode; maximum exposure quotation is disabled rather than guessed.',
+      canonical
+    );
+  }
+
+  if (!requiredNonNegativeSafeInteger(request.max_input_tokens)) {
+    return unquotableProviderExposure(
+      request,
+      'invalid_max_input_tokens',
+      'A finite non-negative safe-integer maximum input-token bound is required before provider exposure can be quoted.',
+      canonical
+    );
+  }
+
+  if (!requiredPositiveSafeInteger(request.max_output_tokens)) {
+    return unquotableProviderExposure(
+      request,
+      'invalid_max_output_tokens',
+      'A finite positive safe-integer maximum output-token bound is required before provider exposure can be quoted.',
+      canonical
+    );
+  }
+
+  const maxInputTokens = request.max_input_tokens;
+  const maxOutputTokens = request.max_output_tokens;
+  const contextBand =
+    maxInputTokens > OPENAI_LONG_CONTEXT_THRESHOLD_TOKENS ? 'long' : 'short';
+  const rates = contextRates[contextBand];
+  const maximumInput = maximumInputRate(rates);
+  const maximumExposureUsd = normalizedUsd(
+    (maxInputTokens * maximumInput.rate + maxOutputTokens * rates.output) / 1_000_000
+  );
+
+  return {
+    provider: 'openai',
+    quotable: true,
+    maximum_exposure_usd: maximumExposureUsd,
+    currency: 'USD',
+    rate_card_version: OPENAI_RATE_CARD_VERSION,
+    pricing_source: OPENAI_RATE_CARD_SOURCE,
+    pricing_assumption:
+      `${card.sourceNote} Pre-call maximum exposure assumes no discounted cached-input outcome. ` +
+      `Every bounded input token is conservatively priced at the highest reviewed input-category rate ` +
+      `for the selected context band, and the full bounded output is priced at the reviewed output rate.`,
+    model: request.model,
+    canonical_model: canonical,
+    processing_mode: request.processing_mode,
+    context_band: contextBand,
+    max_input_tokens: maxInputTokens,
+    max_output_tokens: maxOutputTokens,
+    rate_basis: {
+      input_category: maximumInput.category,
+      input_per_million_usd: maximumInput.rate,
+      output_per_million_usd: rates.output,
+    },
+    failure_reason: null,
   };
 }

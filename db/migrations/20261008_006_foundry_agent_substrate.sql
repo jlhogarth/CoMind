@@ -156,9 +156,13 @@ CREATE TABLE IF NOT EXISTS comind.cm_foundry_capability_grant (
     )
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_cm_foundry_capability_grant_active
-    ON comind.cm_foundry_capability_grant (profile_id, capability_id, environment, COALESCE(project_id, '00000000-0000-0000-0000-000000000000'::uuid))
-    WHERE revoked_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_cm_foundry_capability_grant_active_project
+    ON comind.cm_foundry_capability_grant (profile_id, capability_id, environment, project_id)
+    WHERE revoked_at IS NULL AND project_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_cm_foundry_capability_grant_active_global
+    ON comind.cm_foundry_capability_grant (profile_id, capability_id, environment)
+    WHERE revoked_at IS NULL AND project_id IS NULL;
 
 CREATE TABLE IF NOT EXISTS comind.cm_foundry_authorization_request (
     authorization_request_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

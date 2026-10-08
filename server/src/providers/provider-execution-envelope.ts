@@ -9,6 +9,7 @@ export interface ProviderExecutionEnvelope<TRequest extends object> {
   readonly canonical_model: string | null;
   readonly processing_mode: string;
   readonly execution_role: ProviderExecutionRole;
+  readonly attempt_number: number;
   readonly timeout_ms: number;
   readonly max_retries: number;
   readonly request: TRequest;
@@ -21,6 +22,7 @@ export interface ProviderExecutionEnvelopeInput<TRequest extends object> {
   canonicalModel: string | null;
   processingMode: string;
   executionRole: ProviderExecutionRole;
+  attemptNumber?: number;
   timeoutMs: number;
   maxRetries: number;
   request: TRequest;
@@ -128,6 +130,7 @@ function envelopeIdentity<TRequest extends object>(
       canonical_model: envelope.canonical_model,
       processing_mode: envelope.processing_mode,
       execution_role: envelope.execution_role,
+      attempt_number: envelope.attempt_number,
       timeout_ms: envelope.timeout_ms,
       max_retries: envelope.max_retries,
       request: envelope.request,
@@ -146,6 +149,10 @@ export function createProviderExecutionEnvelope<TRequest extends object>(
   if (!EXECUTION_ROLES.has(input.executionRole)) {
     throw new Error('executionRole is unsupported');
   }
+  const attemptNumber = input.attemptNumber ?? 1;
+  if (!Number.isSafeInteger(attemptNumber) || attemptNumber <= 0) {
+    throw new Error('attemptNumber must be a positive safe integer');
+  }
   if (!Number.isSafeInteger(input.timeoutMs) || input.timeoutMs <= 0) {
     throw new Error('timeoutMs must be a positive safe integer');
   }
@@ -161,6 +168,7 @@ export function createProviderExecutionEnvelope<TRequest extends object>(
     canonical_model: input.canonicalModel,
     processing_mode: input.processingMode,
     execution_role: input.executionRole,
+    attempt_number: attemptNumber,
     timeout_ms: input.timeoutMs,
     max_retries: input.maxRetries,
     request,

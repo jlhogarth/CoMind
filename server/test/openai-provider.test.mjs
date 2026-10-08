@@ -5,20 +5,24 @@ process.env.DATABASE_URL = 'postgres://test:test@localhost:5432/comind_test';
 
 const { OpenAIAssistantProvider, openAIClientOptions } = await import('../dist/providers/openai.js');
 
-function createProvider(create) {
-  return new OpenAIAssistantProvider(
-    { create },
-    {
-      model: 'gpt-6-luna',
-      reasoningEffort: 'low',
-      maxOutputTokens: 512,
-      timeoutMs: 30000,
-      maxRetries: 2,
-    }
-  );
+function providerOptions(overrides = {}) {
+  return {
+    model: 'gpt-6-luna',
+    processingMode: 'standard',
+    executionRole: 'root',
+    reasoningEffort: 'low',
+    maxOutputTokens: 512,
+    timeoutMs: 30000,
+    maxRetries: 2,
+    ...overrides,
+  };
 }
 
-test('OpenAI provider sends CoMind history without provider-side storage', async () => {
+function createProvider(create, overrides = {}) {
+  return new OpenAIAssistantProvider({ create }, providerOptions(overrides));
+}
+
+test('OpenAI provider sends the immutable envelope request without provider-side storage', async () => {
   const calls = [];
   const provider = createProvider(async (request) => {
     calls.push(request);
@@ -63,12 +67,22 @@ test('OpenAI provider sends CoMind history without provider-side storage', async
     reasoning: { effort: 'low' },
     max_output_tokens: 512,
   });
+  assert.equal(Object.isFrozen(calls[0]), true);
+  assert.equal(Object.isFrozen(calls[0].input), true);
+  assert.equal(Object.isFrozen(calls[0].reasoning), true);
   assert.equal(response.content, 'Durable assistant response');
   assert.equal(response.metadata.provider, 'openai');
   assert.equal(response.metadata.model, 'gpt-6-luna-2026-09-22');
   assert.equal(response.metadata.endpoint, 'responses.create');
   assert.equal(response.metadata.response_id, 'resp_test_123');
   assert.equal(response.metadata.status, 'succeeded');
+  assert.equal(response.metadata.requested_model, 'gpt-6-luna');
+  assert.equal(response.metadata.canonical_model, 'gpt-6-luna');
+  assert.equal(response.metadata.processing_mode, 'standard');
+  assert.equal(response.metadata.execution_role, 'root');
+  assert.match(response.metadata.request_fingerprint, /^sha256:[0-9a-f]{64}$/);
+  assert.equal(response.metadata.timeout_ms, 30000);
+  assert.equal(response.metadata.max_retries, 2);
   assert.equal(Number.isInteger(response.metadata.duration_ms), true);
   assert.equal(response.metadata.duration_ms >= 0, true);
   assert.deepEqual(response.metadata.usage, {
@@ -102,14 +116,14 @@ test('OpenAI provider sends CoMind history without provider-side storage', async
   });
 });
 
-test('OpenAI provider attaches sanitized usage diagnostics to provider failures', async () => {
+test('OpenAI provider attaches execution-envelope provenance to provider failures', async () => {
   const provider = createProvider(async () => {
     const error = new Error('Synthetic provider failure');
     error.status = 429;
     error.code = 'credit_balance_exhausted';
     error.request_id = 'req_test_123';
     throw error;
-  });
+  }, { executionRole: 'draft' });
 
   await assert.rejects(
     provider.generateResponse({
@@ -124,6 +138,9 @@ test('OpenAI provider attaches sanitized usage diagnostics to provider failures'
       assert.equal(error.providerMetadata.error_code, 'credit_balance_exhausted');
       assert.equal(error.providerMetadata.http_status, 429);
       assert.equal(error.providerMetadata.request_id, 'req_test_123');
+      assert.equal(error.providerMetadata.execution_role, 'draft');
+      assert.equal(error.providerMetadata.processing_mode, 'standard');
+      assert.match(error.providerMetadata.request_fingerprint, /^sha256:[0-9a-f]{64}$/);
       assert.equal(Number.isInteger(error.providerMetadata.duration_ms), true);
       assert.equal(error.providerMetadata.duration_ms >= 0, true);
       assert.equal(error.providerMetadata.retry_attempt, null);
@@ -175,6 +192,8 @@ test('OpenAI provider rejects responses without assistant text', async () => {
       assert.equal(error.providerMetadata.response_id, 'resp_empty');
       assert.equal(error.providerMetadata.status, 'failed');
       assert.equal(error.providerMetadata.error_code, 'openai_empty_output');
+      assert.equal(error.providerMetadata.execution_role, 'root');
+      assert.match(error.providerMetadata.request_fingerprint, /^sha256:[0-9a-f]{64}$/);
       assert.equal(Number.isInteger(error.providerMetadata.duration_ms), true);
       assert.equal(error.providerMetadata.duration_ms >= 0, true);
       assert.deepEqual(error.providerMetadata.usage, {
@@ -195,13 +214,10 @@ test('OpenAI provider rejects responses without assistant text', async () => {
 
 test('OpenAI client options carry explicit timeout and retry budgets', () => {
   assert.deepEqual(
-    openAIClientOptions('test-key-used-only-for-client-option-validation', {
-      model: 'gpt-6-luna',
-      reasoningEffort: 'low',
-      maxOutputTokens: 512,
-      timeoutMs: 15000,
-      maxRetries: 1,
-    }),
+    openAIClientOptions(
+      'test-key-used-only-for-client-option-validation',
+      providerOptions({ timeoutMs: 15000, maxRetries: 1 })
+    ),
     {
       apiKey: 'test-key-used-only-for-client-option-validation',
       timeout: 15000,

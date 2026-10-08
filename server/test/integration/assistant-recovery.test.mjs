@@ -17,6 +17,8 @@ after(closePool);
 function openaiProvider(create) {
   return new OpenAIAssistantProvider({ create }, {
     model: 'gpt-6-luna',
+    processingMode: 'standard',
+    executionRole: 'root',
     reasoningEffort: 'low',
     maxOutputTokens: 128,
     timeoutMs: 30000,
@@ -59,6 +61,12 @@ function expectedOpenAiRecoveryMetadata(responseId, queryCharacterCount) {
     endpoint: 'responses.create',
     response_id: responseId,
     status: 'succeeded',
+    requested_model: 'gpt-6-luna',
+    canonical_model: 'gpt-6-luna',
+    processing_mode: 'standard',
+    execution_role: 'root',
+    timeout_ms: 30000,
+    max_retries: 2,
     cost: {
       estimated_cost_usd: 0.0000028,
       currency: 'USD',
@@ -252,8 +260,12 @@ test('recovery and later turns use only the selected persisted chronological his
   assert.deepEqual(await f.stored(otherId), otherBefore);
   const assistantMetadata = stored.filter((row) => row.role === 'assistant').map((row) => row.meta);
   assert.equal(assistantMetadata.every((meta) => Number.isInteger(meta.duration_ms)), true);
+  assert.equal(
+    assistantMetadata.every((meta) => /^sha256:[0-9a-f]{64}$/.test(meta.request_fingerprint)),
+    true
+  );
   assert.deepEqual(
-    assistantMetadata.map(({ duration_ms, ...meta }) => meta),
+    assistantMetadata.map(({ duration_ms, request_fingerprint, ...meta }) => meta),
     [
       expectedOpenAiRecoveryMetadata('test-recovery-2', firstUser.content.length),
       expectedOpenAiRecoveryMetadata('test-recovery-3', secondUser.content.length),

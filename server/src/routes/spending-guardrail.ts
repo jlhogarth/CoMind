@@ -109,7 +109,7 @@ export function evaluateSpendingGuardrail(
   const knownCost = Number(observed.known_cost_usd || 0);
   const unknownCostCalls = Number(observed.unknown_cost_call_count || 0);
   const unknownStatusCalls = Number(observed.unknown_status_call_count || 0);
-  const warnCostUsd = thresholds.budget_usd * thresholds.warn_ratio;
+  const warnCostUsd = Number((thresholds.budget_usd * thresholds.warn_ratio).toFixed(12));
 
   const pauseReasons: string[] = [];
   const warnReasons: string[] = [];

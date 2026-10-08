@@ -1,5 +1,10 @@
 import { AssistantResponseRequest, ConversationMessage } from '../assistant.js';
 import {
+  GovernedProviderBudgetAuthority,
+  GovernedProviderExecutionResult,
+  executeGovernedProviderExecution,
+} from './governed-provider-execution.js';
+import {
   ProviderExecutionEnvelope,
   ProviderExecutionRole,
   ProviderInputTokenCounter,
@@ -138,6 +143,25 @@ export function quoteOpenAIExecutionEnvelopeExposure(
     throw new Error('OpenAI exposure quote processing-mode identity mismatch');
   }
   return quote;
+}
+
+export function executeGovernedOpenAIProviderExecutionEnvelope<TResponse>(
+  responses: OpenAIResponseCreateClient<TResponse>,
+  envelope: OpenAIProviderExecutionEnvelope,
+  inputTokenCounter: ProviderInputTokenCounter<OpenAIResponseCreateRequest>,
+  budgetAuthority: GovernedProviderBudgetAuthority
+): Promise<GovernedProviderExecutionResult<TResponse, OpenAIProviderExposureQuote>> {
+  return executeGovernedProviderExecution({
+    envelope,
+    inputTokenCounter,
+    exposureQuoter: {
+      quoteExposure: quoteOpenAIExecutionEnvelopeExposure,
+    },
+    budgetAuthority,
+    operationName: 'responses.create',
+    execute: (executionEnvelope) =>
+      executeOpenAIProviderExecutionEnvelope(responses, executionEnvelope),
+  });
 }
 
 export function openAIInputTokenCountRequest(

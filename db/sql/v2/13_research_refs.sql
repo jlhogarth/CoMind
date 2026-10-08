@@ -14,12 +14,16 @@ CREATE TABLE IF NOT EXISTS comind.cm_research_refs (
 
 -- Trigger for updated_at
 CREATE OR REPLACE FUNCTION comind.set_updated_at_research_refs()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = comind, public, pg_temp
+AS $$
 BEGIN
   NEW.updated_at = now();
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 DROP TRIGGER IF EXISTS trg_cm_research_refs_updated ON comind.cm_research_refs;
 CREATE TRIGGER trg_cm_research_refs_updated

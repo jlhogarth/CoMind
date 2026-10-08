@@ -1,30 +1,37 @@
--- CoMind One‑Shot v2 - 10_rls_policies.sql
+-- CoMind One-Shot v2 - 10_rls_policies.sql
 BEGIN;
 SET search_path TO comind, public;
 
--- Enable RLS on user-owned tables
+-- These tables are internal application data. RLS is enabled at schema creation time,
+-- but no broad client policy is granted here. Backend-governed access remains explicit.
 ALTER TABLE cm_conversation ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cm_message ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cm_doc ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cm_doc_chunk ENABLE ROW LEVEL SECURITY;
 
--- Simple policies: actor must belong to the same org as the conversation/project/doc owner
--- For brevity, we allow read-all for now; tighten as needed.
+DROP POLICY IF EXISTS conv_select_all ON cm_conversation;
+DROP POLICY IF EXISTS conv_modify_own ON cm_conversation;
+DROP POLICY IF EXISTS conv_update_own ON cm_conversation;
+DROP POLICY IF EXISTS msg_select_all ON cm_message;
+DROP POLICY IF EXISTS msg_modify_all ON cm_message;
+DROP POLICY IF EXISTS msg_update_all ON cm_message;
+DROP POLICY IF EXISTS doc_select_all ON cm_doc;
+DROP POLICY IF EXISTS doc_modify_all ON cm_doc;
+DROP POLICY IF EXISTS doc_update_all ON cm_doc;
+DROP POLICY IF EXISTS chunk_select_all ON cm_doc_chunk;
+DROP POLICY IF EXISTS chunk_modify_all ON cm_doc_chunk;
+DROP POLICY IF EXISTS chunk_update_all ON cm_doc_chunk;
 
-CREATE POLICY conv_select_all ON cm_conversation FOR SELECT USING (true);
-CREATE POLICY conv_modify_own ON cm_conversation FOR INSERT WITH CHECK (true);
-CREATE POLICY conv_update_own ON cm_conversation FOR UPDATE USING (true);
-
-CREATE POLICY msg_select_all ON cm_message FOR SELECT USING (true);
-CREATE POLICY msg_modify_all ON cm_message FOR INSERT WITH CHECK (true);
-CREATE POLICY msg_update_all ON cm_message FOR UPDATE USING (true);
-
-CREATE POLICY doc_select_all ON cm_doc FOR SELECT USING (true);
-CREATE POLICY doc_modify_all ON cm_doc FOR INSERT WITH CHECK (true);
-CREATE POLICY doc_update_all ON cm_doc FOR UPDATE USING (true);
-
-CREATE POLICY chunk_select_all ON cm_doc_chunk FOR SELECT USING (true);
-CREATE POLICY chunk_modify_all ON cm_doc_chunk FOR INSERT WITH CHECK (true);
-CREATE POLICY chunk_update_all ON cm_doc_chunk FOR UPDATE USING (true);
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+    REVOKE ALL ON TABLE cm_conversation, cm_message, cm_doc, cm_doc_chunk FROM anon;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    REVOKE ALL ON TABLE cm_conversation, cm_message, cm_doc, cm_doc_chunk FROM authenticated;
+  END IF;
+END;
+$$;
+REVOKE ALL ON TABLE cm_conversation, cm_message, cm_doc, cm_doc_chunk FROM PUBLIC;
 
 COMMIT;

@@ -74,6 +74,31 @@ SELECT
 FROM event_facts
 `;
 
+const dashboardGuardrailMarkup = `
+<section id="spending-guardrail">
+  <h2>Paid-test spending guardrail</h2>
+  <div class="cards">
+    <div class="card"><div class="label">Decision</div><div class="value" id="guardrail-decision">loading</div></div>
+    <div class="card"><div class="label">Known cost</div><div class="value" id="guardrail-cost">loading</div></div>
+    <div class="card"><div class="label">Failure rate</div><div class="value" id="guardrail-failure">loading</div></div>
+    <div class="card"><div class="label">Unknown costs</div><div class="value" id="guardrail-unknown">loading</div></div>
+  </div>
+  <p class="subtle" id="guardrail-reasons">Evaluating current persisted telemetry.</p>
+</section>
+<script>
+fetch('/api/analytics/spending-guardrail')
+  .then((response) => { if (!response.ok) throw new Error('Guardrail request failed: ' + response.status); return response.json(); })
+  .then((data) => {
+    document.getElementById('guardrail-decision').textContent = String(data.decision || 'unknown').toUpperCase();
+    document.getElementById('guardrail-cost').textContent = '$' + Number(data.observed.known_cost_usd || 0).toFixed(8).replace(/0+$/, '').replace(/\\.$/, '');
+    document.getElementById('guardrail-failure').textContent = (Number(data.observed.failure_rate || 0) * 100).toFixed(1) + '%';
+    document.getElementById('guardrail-unknown').textContent = String(data.observed.unknown_cost_calls || 0);
+    document.getElementById('guardrail-reasons').textContent = Array.isArray(data.reasons) ? data.reasons.join(' ') : 'Guardrail result unavailable.';
+  })
+  .catch((error) => { document.getElementById('guardrail-reasons').textContent = error.message; });
+</script>
+`;
+
 export function evaluateSpendingGuardrail(
   observed: GuardrailMetrics,
   thresholds: SpendingGuardrailThresholds
@@ -173,6 +198,18 @@ export function registerSpendingGuardrailRoutes(
   app: FastifyInstance,
   queryFn: QueryFunction = query
 ) {
+  app.addHook('onSend', async (request, reply, payload) => {
+    if (
+      request.method === 'GET' &&
+      request.url === '/analytics' &&
+      typeof payload === 'string' &&
+      String(reply.getHeader('content-type') || '').includes('text/html')
+    ) {
+      return payload.replace('</main>', `${dashboardGuardrailMarkup}</main>`);
+    }
+    return payload;
+  });
+
   app.get('/api/analytics/spending-guardrail', async () => {
     const thresholds = configuredThresholds();
     const result = await queryFn<GuardrailMetrics>(spendingGuardrailSql, [thresholds.window_hours]);

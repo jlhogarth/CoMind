@@ -5,11 +5,17 @@ import {
   ProviderBackedQualityVerifier,
 } from './assistant-quality-provider.js';
 import { env } from './env.js';
+import { ProviderExecutionRole } from './providers/provider-execution-envelope.js';
 import { createOpenAIAssistantProvider } from './providers/openai.js';
 
-function openAIProvider(maxOutputTokens = env.OPENAI_MAX_OUTPUT_TOKENS): AssistantProvider {
+function openAIProvider(
+  executionRole: ProviderExecutionRole,
+  maxOutputTokens = env.OPENAI_MAX_OUTPUT_TOKENS
+): AssistantProvider {
   return createOpenAIAssistantProvider(env.OPENAI_API_KEY!, {
     model: env.OPENAI_MODEL,
+    processingMode: 'standard',
+    executionRole,
     reasoningEffort: env.OPENAI_REASONING_EFFORT,
     maxOutputTokens,
     timeoutMs: env.OPENAI_TIMEOUT_MS,
@@ -20,11 +26,14 @@ function openAIProvider(maxOutputTokens = env.OPENAI_MAX_OUTPUT_TOKENS): Assista
 export function createConfiguredAssistantProvider(): AssistantProvider | null {
   if (env.ASSISTANT_PROVIDER === 'disabled') return null;
 
-  const draftProvider = openAIProvider();
-  if (env.ASSISTANT_QUALITY_GATE === 'disabled') return draftProvider;
+  if (env.ASSISTANT_QUALITY_GATE === 'disabled') return openAIProvider('root');
 
-  const verifierProvider = openAIProvider(env.ASSISTANT_QUALITY_VERIFIER_MAX_OUTPUT_TOKENS);
-  const repairProvider = openAIProvider();
+  const draftProvider = openAIProvider('draft');
+  const verifierProvider = openAIProvider(
+    'verifier',
+    env.ASSISTANT_QUALITY_VERIFIER_MAX_OUTPUT_TOKENS
+  );
+  const repairProvider = openAIProvider('repair');
 
   return new MeteredQualityGateProvider(
     draftProvider,

@@ -54,7 +54,9 @@ if [[ -z "${provider_id}" || -z "${agent_id}" ]]; then
   exit 1
 fi
 
-envelope_id="$(psql "${DATABASE_URL}" -X -Atc "
+# Quiet mode is required here because command substitution must capture only the
+# RETURNING scalar, never psql's INSERT command-status tag.
+envelope_id="$(psql "${DATABASE_URL}" -X -Atq -c "
   INSERT INTO public.comind_workflow_cost_envelopes (
     owner_agent_id, objective, environment, capability_level,
     estimated_cost, soft_limit_amount, hard_limit_amount,

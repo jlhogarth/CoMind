@@ -3,24 +3,23 @@ import {
   AssistantProvider,
   AssistantResponse,
   AssistantResponseRequest,
-  ConversationMessage,
 } from '../assistant.js';
+import {
+  OpenAIExecutionOptions,
+  OpenAIInputTokenCounter,
+  OpenAIInputTokensClient,
+  OpenAIProviderExecutionEnvelope,
+  OpenAIResponseCreateRequest,
+  buildOpenAIProviderExecutionEnvelope,
+  executeOpenAIProviderExecutionEnvelope,
+} from './openai-execution.js';
 import { estimateOpenAICost } from './openai-rate-card.js';
 
-export type OpenAIReasoningEffort = 'none' | 'low' | 'medium' | 'high';
-
-export interface OpenAIResponseCreateRequest {
-  model: string;
-  input: Array<{
-    role: 'user' | 'assistant' | 'system';
-    content: string;
-  }>;
-  store: false;
-  reasoning: {
-    effort: OpenAIReasoningEffort;
-  };
-  max_output_tokens: number;
-}
+export type {
+  OpenAIReasoningEffort,
+  OpenAIResponseCreateRequest,
+} from './openai-execution.js';
+export { OpenAIInputTokenCounter } from './openai-execution.js';
 
 export interface OpenAIResponseLike {
   id: string;
@@ -51,24 +50,7 @@ export interface OpenAIResponsesClient {
   create(request: OpenAIResponseCreateRequest): Promise<OpenAIResponseLike>;
 }
 
-export interface OpenAIAssistantProviderOptions {
-  model: string;
-  reasoningEffort: OpenAIReasoningEffort;
-  maxOutputTokens: number;
-  timeoutMs: number;
-  maxRetries: number;
-}
-
-function mapConversationMessage(message: ConversationMessage) {
-  if (message.role === 'tool') {
-    throw new Error('OpenAI assistant provider does not accept tool-role history when tools are disabled');
-  }
-
-  return {
-    role: message.role,
-    content: message.content,
-  } as const;
-}
+export interface OpenAIAssistantProviderOptions extends OpenAIExecutionOptions {}
 
 function usageMetadata(usage: OpenAIResponseLike['usage']) {
   if (!usage) return undefined;
@@ -114,8 +96,12 @@ function firstNumber(...values: Array<number | undefined | null>) {
   return values.find((value): value is number => typeof value === 'number');
 }
 
-function usageCostMetadata(model: string, usage: ReturnType<typeof usageMetadata>) {
-  return estimateOpenAICost(model, 'standard', {
+function usageCostMetadata(
+  model: string,
+  processingMode: OpenAIAssistantProviderOptions['processingMode'],
+  usage: ReturnType<typeof usageMetadata>
+) {
+  return estimateOpenAICost(model, processingMode, {
     input_tokens: usage?.input_tokens,
     cached_input_tokens: usage?.cached_input_tokens,
     cache_write_tokens: usage?.cache_write_tokens,
@@ -128,6 +114,18 @@ function sanitizeRawUsage(usage: OpenAIResponseLike['usage']) {
   return metadata ? { ...metadata } : undefined;
 }
 
+function executionMetadata(envelope: OpenAIProviderExecutionEnvelope) {
+  return {
+    requested_model: envelope.requested_model,
+    canonical_model: envelope.canonical_model,
+    processing_mode: envelope.processing_mode,
+    execution_role: envelope.execution_role,
+    request_fingerprint: envelope.fingerprint,
+    timeout_ms: envelope.timeout_ms,
+    max_retries: envelope.max_retries,
+  };
+}
+
 function errorDiagnosticValue(error: unknown, key: string) {
   if (!error || typeof error !== 'object') return undefined;
   const value = (error as Record<string, unknown>)[key];
@@ -136,7 +134,7 @@ function errorDiagnosticValue(error: unknown, key: string) {
 
 function failedCallMetadata(
   error: unknown,
-  model: string,
+  envelope: OpenAIProviderExecutionEnvelope,
   durationMs: number
 ): Record<string, string | number | null> {
   const status = errorDiagnosticValue(error, 'status');
@@ -150,11 +148,12 @@ function failedCallMetadata(
 
   return {
     provider: 'openai',
-    model,
+    model: envelope.requested_model,
     endpoint: 'responses.create',
     status: 'failed',
     duration_ms: durationMs,
     error_code: String(code),
+    ...executionMetadata(envelope),
     ...(typeof status === 'number' ? { http_status: status } : {}),
     ...(requestId ? { request_id: String(requestId) } : {}),
     retry_attempt: null,
@@ -163,12 +162,12 @@ function failedCallMetadata(
 
 function failedResponseMetadata(
   response: OpenAIResponseLike,
-  model: string,
+  envelope: OpenAIProviderExecutionEnvelope,
   durationMs: number
 ): Record<string, unknown> {
   const usage = usageMetadata(response.usage);
   const rawProviderUsage = sanitizeRawUsage(response.usage);
-  const responseModel = response.model ?? model;
+  const responseModel = response.model ?? envelope.requested_model;
 
   return {
     provider: 'openai',
@@ -179,10 +178,15 @@ function failedResponseMetadata(
     duration_ms: durationMs,
     error_code: 'openai_empty_output',
     retry_attempt: null,
-    cost: usageCostMetadata(responseModel, usage),
+    ...executionMetadata(envelope),
+    cost: usageCostMetadata(responseModel, thisProcessingMode(envelope), usage),
     ...(usage ? { usage } : {}),
     ...(rawProviderUsage ? { raw_provider_usage: rawProviderUsage } : {}),
   };
+}
+
+function thisProcessingMode(envelope: OpenAIProviderExecutionEnvelope) {
+  return envelope.processing_mode as OpenAIAssistantProviderOptions['processingMode'];
 }
 
 function attachProviderMetadata(error: unknown, metadata: Record<string, unknown>) {
@@ -208,20 +212,15 @@ export class OpenAIAssistantProvider implements AssistantProvider {
   ) {}
 
   async generateResponse(request: AssistantResponseRequest): Promise<AssistantResponse> {
+    const envelope = buildOpenAIProviderExecutionEnvelope(request, this.options);
     const startedAt = Date.now();
     let response: OpenAIResponseLike;
     try {
-      response = await this.responses.create({
-        model: this.options.model,
-        input: request.messages.map(mapConversationMessage),
-        store: false,
-        reasoning: { effort: this.options.reasoningEffort },
-        max_output_tokens: this.options.maxOutputTokens,
-      });
+      response = await executeOpenAIProviderExecutionEnvelope(this.responses, envelope);
     } catch (error) {
       attachProviderMetadata(
         error,
-        failedCallMetadata(error, this.options.model, Date.now() - startedAt)
+        failedCallMetadata(error, envelope, Date.now() - startedAt)
       );
       throw error;
     }
@@ -231,7 +230,7 @@ export class OpenAIAssistantProvider implements AssistantProvider {
       const error = emptyOutputError();
       attachProviderMetadata(
         error,
-        failedResponseMetadata(response, this.options.model, Date.now() - startedAt)
+        failedResponseMetadata(response, envelope, Date.now() - startedAt)
       );
       throw error;
     }
@@ -248,7 +247,8 @@ export class OpenAIAssistantProvider implements AssistantProvider {
         response_id: response.id,
         status: 'succeeded',
         duration_ms: Date.now() - startedAt,
-        cost: usageCostMetadata(responseModel, usage),
+        ...executionMetadata(envelope),
+        cost: usageCostMetadata(responseModel, this.options.processingMode, usage),
         ...(usage ? { usage } : {}),
         ...(rawProviderUsage ? { raw_provider_usage: rawProviderUsage } : {}),
       },
@@ -264,6 +264,16 @@ export function createOpenAIAssistantProvider(
   return new OpenAIAssistantProvider(
     client.responses as unknown as OpenAIResponsesClient,
     options
+  );
+}
+
+export function createOpenAIInputTokenCounter(
+  apiKey: string,
+  options: OpenAIAssistantProviderOptions
+): OpenAIInputTokenCounter {
+  const client = new OpenAI(openAIClientOptions(apiKey, options));
+  return new OpenAIInputTokenCounter(
+    client.responses.inputTokens as unknown as OpenAIInputTokensClient
   );
 }
 

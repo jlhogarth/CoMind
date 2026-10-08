@@ -6,6 +6,7 @@ const {
   buildOpenAIProviderExecutionEnvelope,
   executeOpenAIProviderExecutionEnvelope,
   openAIInputTokenCountRequest,
+  quoteOpenAIExecutionEnvelopeExposure,
 } = await import('../dist/providers/openai-execution.js');
 const {
   assertProviderInputTokenPreflight,
@@ -43,6 +44,7 @@ test('OpenAI envelope captures exact provider execution identity and reviewed ca
   assert.equal(envelope.canonical_model, 'gpt-6-luna');
   assert.equal(envelope.processing_mode, 'standard');
   assert.equal(envelope.execution_role, 'draft');
+  assert.equal(envelope.attempt_number, 1);
   assert.equal(envelope.timeout_ms, 30000);
   assert.equal(envelope.max_retries, 2);
   assert.deepEqual(envelope.request, {
@@ -101,6 +103,30 @@ test('OpenAI exact token counter consumes count-relevant fields from the same im
   assert.equal(assertProviderInputTokenPreflight(envelope, preflight), 37);
 });
 
+test('OpenAI exposure quote uses the exact preflight count and immutable output bound', async () => {
+  const envelope = buildOpenAIProviderExecutionEnvelope(
+    request(),
+    options({ maxRetries: 0, maxOutputTokens: 512 })
+  );
+  const preflight = await preflightProviderInputTokens(envelope, {
+    name: 'deterministic-openai-quote-test',
+    async countInputTokens() {
+      return 37;
+    },
+  });
+
+  const quote = quoteOpenAIExecutionEnvelopeExposure(envelope, preflight);
+
+  assert.equal(quote.quotable, true);
+  assert.equal(quote.model, envelope.requested_model);
+  assert.equal(quote.canonical_model, envelope.canonical_model);
+  assert.equal(quote.processing_mode, envelope.processing_mode);
+  assert.equal(quote.max_input_tokens, 37);
+  assert.equal(quote.max_output_tokens, envelope.request.max_output_tokens);
+  assert.equal(quote.maximum_exposure_usd, 0.000260625);
+  assert.equal(quote.currency, 'USD');
+});
+
 test('OpenAI token-count request is itself immutable at the top level', () => {
   const envelope = buildOpenAIProviderExecutionEnvelope(request(), options());
   const countRequest = openAIInputTokenCountRequest(envelope);
@@ -136,4 +162,20 @@ test('OpenAI envelope keeps snapshot requested identity while reusing reviewed c
   assert.equal(envelope.canonical_model, 'gpt-6-luna');
   assert.equal(envelope.request.model, 'gpt-6-luna-2026-09-22');
   assert.equal(envelope.execution_role, 'repair');
+});
+
+test('separately authorized OpenAI attempts have distinct immutable fingerprints', () => {
+  const first = buildOpenAIProviderExecutionEnvelope(
+    request(),
+    options({ maxRetries: 0, attemptNumber: 1 })
+  );
+  const retry = buildOpenAIProviderExecutionEnvelope(
+    request(),
+    options({ maxRetries: 0, attemptNumber: 2 })
+  );
+
+  assert.equal(first.attempt_number, 1);
+  assert.equal(retry.attempt_number, 2);
+  assert.deepEqual(first.request, retry.request);
+  assert.notEqual(first.fingerprint, retry.fingerprint);
 });

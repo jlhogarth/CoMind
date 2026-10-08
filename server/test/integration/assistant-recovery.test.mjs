@@ -65,6 +65,7 @@ function expectedOpenAiRecoveryMetadata(responseId, queryCharacterCount) {
     canonical_model: 'gpt-6-luna',
     processing_mode: 'standard',
     execution_role: 'root',
+    attempt_number: 1,
     timeout_ms: 30000,
     max_retries: 2,
     cost: {

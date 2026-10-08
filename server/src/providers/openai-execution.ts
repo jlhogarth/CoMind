@@ -1,13 +1,21 @@
 import { AssistantResponseRequest, ConversationMessage } from '../assistant.js';
 import {
+  GovernedProviderBudgetAuthority,
+  GovernedProviderExecutionResult,
+  executeGovernedProviderExecution,
+} from './governed-provider-execution.js';
+import {
   ProviderExecutionEnvelope,
   ProviderExecutionRole,
   ProviderInputTokenCounter,
+  ProviderInputTokenPreflight,
   assertProviderExecutionEnvelopeIntegrity,
+  assertProviderInputTokenPreflight,
   createProviderExecutionEnvelope,
 } from './provider-execution-envelope.js';
 import {
   OpenAIProcessingMode,
+  OpenAIProviderExposureQuote,
   quoteOpenAIProviderExposure,
 } from './openai-rate-card.js';
 
@@ -30,6 +38,7 @@ export interface OpenAIExecutionOptions {
   model: string;
   processingMode: OpenAIProcessingMode;
   executionRole: ProviderExecutionRole;
+  attemptNumber?: number;
   reasoningEffort: OpenAIReasoningEffort;
   maxOutputTokens: number;
   timeoutMs: number;
@@ -96,6 +105,7 @@ export function buildOpenAIProviderExecutionEnvelope(
     canonicalModel: canonicalModelIdentity(options.model, options.processingMode),
     processingMode: options.processingMode,
     executionRole: options.executionRole,
+    attemptNumber: options.attemptNumber,
     timeoutMs: options.timeoutMs,
     maxRetries: options.maxRetries,
     request: providerRequest,
@@ -108,6 +118,50 @@ export function executeOpenAIProviderExecutionEnvelope<TResponse>(
 ) {
   assertProviderExecutionEnvelopeIntegrity(envelope);
   return responses.create(envelope.request);
+}
+
+export function quoteOpenAIExecutionEnvelopeExposure(
+  envelope: OpenAIProviderExecutionEnvelope,
+  preflight: ProviderInputTokenPreflight
+): OpenAIProviderExposureQuote {
+  assertProviderExecutionEnvelopeIntegrity(envelope);
+  const inputTokens = assertProviderInputTokenPreflight(envelope, preflight);
+  const quote = quoteOpenAIProviderExposure({
+    model: envelope.requested_model,
+    processing_mode: envelope.processing_mode,
+    max_input_tokens: inputTokens,
+    max_output_tokens: envelope.request.max_output_tokens,
+  });
+
+  if (quote.model !== envelope.requested_model) {
+    throw new Error('OpenAI exposure quote requested-model identity mismatch');
+  }
+  if (quote.canonical_model !== envelope.canonical_model) {
+    throw new Error('OpenAI exposure quote canonical-model identity mismatch');
+  }
+  if (quote.processing_mode !== envelope.processing_mode) {
+    throw new Error('OpenAI exposure quote processing-mode identity mismatch');
+  }
+  return quote;
+}
+
+export function executeGovernedOpenAIProviderExecutionEnvelope<TResponse>(
+  responses: OpenAIResponseCreateClient<TResponse>,
+  envelope: OpenAIProviderExecutionEnvelope,
+  inputTokenCounter: ProviderInputTokenCounter<OpenAIResponseCreateRequest>,
+  budgetAuthority: GovernedProviderBudgetAuthority
+): Promise<GovernedProviderExecutionResult<TResponse, OpenAIProviderExposureQuote>> {
+  return executeGovernedProviderExecution({
+    envelope,
+    inputTokenCounter,
+    exposureQuoter: {
+      quoteExposure: quoteOpenAIExecutionEnvelopeExposure,
+    },
+    budgetAuthority,
+    operationName: 'responses.create',
+    execute: (executionEnvelope) =>
+      executeOpenAIProviderExecutionEnvelope(responses, executionEnvelope),
+  });
 }
 
 export function openAIInputTokenCountRequest(

@@ -13,9 +13,13 @@ server_log="$(mktemp)"
 : "${OPENAI_API_KEY:?OPENAI_API_KEY is required for live OpenAI verification}"
 
 export ASSISTANT_PROVIDER=openai
+export ASSISTANT_QUALITY_GATE="${ASSISTANT_QUALITY_GATE:-disabled}"
 export OPENAI_MODEL="${OPENAI_MODEL:-gpt-6-luna}"
 export OPENAI_REASONING_EFFORT="${OPENAI_REASONING_EFFORT:-low}"
 export OPENAI_MAX_OUTPUT_TOKENS="${OPENAI_MAX_OUTPUT_TOKENS:-128}"
+export OPENAI_TIMEOUT_MS="${OPENAI_TIMEOUT_MS:-30000}"
+export OPENAI_MAX_RETRIES="${OPENAI_MAX_RETRIES:-0}"
+export OPENAI_PAID_TEST_MAX_REQUESTS_PER_DISPATCH="${OPENAI_PAID_TEST_MAX_REQUESTS_PER_DISPATCH:-1}"
 export PORT="${port}"
 
 node <<'NODE'
@@ -65,6 +69,8 @@ for attempt in $(seq 1 30); do
 done
 
 export BASE_URL="${base_url}"
+node "${repository_root}/scripts/openai_paid_test_preflight.mjs"
+
 export VERIFICATION_TITLE="${verification_title}"
 export VERIFICATION_MESSAGE="${verification_message}"
 

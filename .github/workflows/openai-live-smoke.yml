@@ -31,6 +31,13 @@ jobs:
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_runtime
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      ASSISTANT_QUALITY_GATE: disabled
+      OPENAI_MODEL: gpt-6-luna
+      OPENAI_REASONING_EFFORT: low
+      OPENAI_MAX_OUTPUT_TOKENS: 128
+      OPENAI_TIMEOUT_MS: 30000
+      OPENAI_MAX_RETRIES: 0
+      OPENAI_PAID_TEST_MAX_REQUESTS_PER_DISPATCH: 1
       PORT: 3000
     steps:
       - uses: actions/checkout@v4
@@ -61,4 +68,5 @@ jobs:
         if: success()
         run: |
           echo "Guarded OpenAI live smoke passed against isolated comind_runtime." >> "${GITHUB_STEP_SUMMARY}"
+          echo "Paid smoke bounds: one logical request, zero retries, gpt-6-luna, low reasoning, max 128 output tokens." >> "${GITHUB_STEP_SUMMARY}"
           echo "No live Supabase database was used." >> "${GITHUB_STEP_SUMMARY}"

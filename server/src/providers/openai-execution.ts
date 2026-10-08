@@ -8,7 +8,7 @@ import {
 } from './provider-execution-envelope.js';
 import {
   OpenAIProcessingMode,
-  canonicalOpenAIModel,
+  quoteOpenAIProviderExposure,
 } from './openai-rate-card.js';
 
 export type OpenAIReasoningEffort = 'none' | 'low' | 'medium' | 'high';
@@ -69,6 +69,15 @@ function mapConversationMessage(message: ConversationMessage) {
   } as const;
 }
 
+function canonicalModelIdentity(model: string, processingMode: OpenAIProcessingMode) {
+  return quoteOpenAIProviderExposure({
+    model,
+    processing_mode: processingMode,
+    max_input_tokens: 0,
+    max_output_tokens: 1,
+  }).canonical_model;
+}
+
 export function buildOpenAIProviderExecutionEnvelope(
   request: AssistantResponseRequest,
   options: OpenAIExecutionOptions
@@ -84,7 +93,7 @@ export function buildOpenAIProviderExecutionEnvelope(
   return createProviderExecutionEnvelope({
     provider: 'openai',
     requestedModel: options.model,
-    canonicalModel: canonicalOpenAIModel(options.model),
+    canonicalModel: canonicalModelIdentity(options.model, options.processingMode),
     processingMode: options.processingMode,
     executionRole: options.executionRole,
     timeoutMs: options.timeoutMs,

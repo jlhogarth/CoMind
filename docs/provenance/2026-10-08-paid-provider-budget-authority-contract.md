@@ -51,6 +51,7 @@ The hardening migration adds:
 10. Evidence-backed unspent closure for `cancelled` or confirmed pre-provider `failed` reservations. A reservation that already has provider execution identity cannot use the unspent-close path.
 11. Reconciliation from `unknown_cost` to a later known cost while preserving both transition events.
 12. RLS and role restrictions on the new audit ledger. `PUBLIC`, `anon`, and `authenticated` have no direct access; backend execution remains through protected server-side authority.
+13. Consistent lock ordering across reserve, finalize, and close paths. Budget authority operations acquire the workflow envelope lock before the reservation lock, avoiding an unnecessary deadlock class under concurrent reserve and settlement activity.
 
 ## Sensitive-data boundary
 
@@ -68,6 +69,14 @@ Permanent CI adds an isolated PostgreSQL 17 budget-authority job. The test path:
 6. launches two independent PostgreSQL clients concurrently, each attempting to reserve USD 0.60 against the same USD 1.00 hard limit. Exactly one reservation must succeed and one must fail, leaving USD 0.60 reserved and never allowing aggregate exposure above the hard limit.
 
 The authoritative final verification status is the PR #58 check suite and its linked GitHub Actions runs.
+
+## CI-discovered hardening lessons
+
+The first isolated CI attempt failed before exercising accounting SQL because the safety check used PostgreSQL `inet_server_addr()` to decide whether the test database was local. GitHub Actions connects through `localhost` to a PostgreSQL service container, but the server correctly reports its Docker bridge address. The guard was changed to validate the configured `DATABASE_URL` hostname and `/comind_ci` database path, then independently confirm `current_database() = 'comind_ci'`. This retains the isolation boundary without misclassifying container networking.
+
+The next CI attempt reached the hardening migration and PostgreSQL rejected widening `comind_workflow_cost_envelopes.estimated_cost` because the existing `comind_workflow_cost_summary` view depends on that column. The migration now drops the summary view inside its transaction, widens the monetary columns, recreates the exact security-invoker summary contract before commit, and reapplies its backend-only grants. A failure anywhere in that transaction therefore restores the prior view and schema together.
+
+Review of concurrent authority paths during that correction also identified inconsistent lock ordering in the first draft: reservation acquired envelope then reservation, while settlement and unspent closure acquired reservation then envelope. Finalization and closure now resolve the envelope identity first without a row lock, acquire the envelope row lock, and then lock the reservation. This gives all budget-authority mutations the same lock order and removes that avoidable deadlock pattern.
 
 ## Deferred runtime integration
 

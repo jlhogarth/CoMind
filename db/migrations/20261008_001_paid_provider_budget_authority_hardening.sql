@@ -28,6 +28,11 @@ BEGIN
 END;
 $$;
 
+-- The v1 summary view depends on envelope monetary columns. PostgreSQL correctly
+-- blocks changing a referenced column typmod, so preserve the view contract by
+-- dropping and recreating it inside this same transaction.
+DROP VIEW IF EXISTS public.comind_workflow_cost_summary;
+
 -- Preserve sub-micro-dollar provider cost precision used by the reviewed rate-card estimator.
 ALTER TABLE public.comind_workflow_cost_envelopes
     ALTER COLUMN estimated_cost TYPE NUMERIC(24,12),
@@ -61,9 +66,7 @@ ALTER TABLE public.comind_cost_reservations
 ALTER TABLE public.comind_cost_reservations
     ADD CONSTRAINT comind_cost_reservations_status_ck CHECK (
         status IN (
-            -- Legacy v1 states remain readable for backward compatibility.
             'active', 'consumed', 'released', 'expired',
-            -- Canonical v1.1 paid-provider states.
             'reserved', 'finalized', 'cancelled', 'failed', 'stale', 'unknown_cost'
         )
     ),
@@ -231,8 +234,6 @@ BEGIN
     )
     SELECT COUNT(*)::int INTO v_count FROM inserted;
 
-    -- Stale exposure remains held. It is released only after explicit evidence-backed
-    -- cancellation or reconciliation, preventing silent budget reuse after uncertainty.
     PERFORM public.comind_sync_envelope_reserved_cost(p_envelope_id);
     RETURN v_count;
 END;
@@ -423,6 +424,7 @@ SECURITY INVOKER
 SET search_path = public, pg_temp
 AS $$
 DECLARE
+    v_envelope_id BIGINT;
     v_reservation public.comind_cost_reservations%ROWTYPE;
     v_envelope public.comind_workflow_cost_envelopes%ROWTYPE;
     v_usage_event_id BIGINT;
@@ -454,10 +456,10 @@ BEGIN
         RAISE EXCEPTION 'Known-cost settlement requires a nonnegative actual cost';
     END IF;
 
-    SELECT * INTO v_reservation
+    -- All authority paths lock envelope first, then reservation, to avoid lock-order deadlocks.
+    SELECT envelope_id INTO v_envelope_id
     FROM public.comind_cost_reservations
-    WHERE id = p_reservation_id
-    FOR UPDATE;
+    WHERE id = p_reservation_id;
 
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Cost reservation % does not exist', p_reservation_id;
@@ -465,8 +467,22 @@ BEGIN
 
     SELECT * INTO v_envelope
     FROM public.comind_workflow_cost_envelopes
-    WHERE id = v_reservation.envelope_id
+    WHERE id = v_envelope_id
     FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Cost envelope % does not exist', v_envelope_id;
+    END IF;
+
+    SELECT * INTO v_reservation
+    FROM public.comind_cost_reservations
+    WHERE id = p_reservation_id
+      AND envelope_id = v_envelope_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Reservation % changed while acquiring budget authority locks', p_reservation_id;
+    END IF;
 
     IF p_provider_event_id IS NOT NULL THEN
         SELECT id INTO v_existing_reservation
@@ -517,7 +533,6 @@ BEGIN
             RETURN;
         END IF;
 
-        -- An unknown-cost reservation may later reconcile to a known final state.
         IF v_reservation.status <> 'unknown_cost' OR p_outcome = 'unknown_cost' THEN
             RAISE EXCEPTION 'Reservation % already has conflicting settlement state %',
                 p_reservation_id, v_reservation.status;
@@ -681,6 +696,7 @@ SECURITY INVOKER
 SET search_path = public, pg_temp
 AS $$
 DECLARE
+    v_envelope_id BIGINT;
     v_reservation public.comind_cost_reservations%ROWTYPE;
 BEGIN
     IF p_terminal_status NOT IN ('cancelled', 'failed') THEN
@@ -690,10 +706,9 @@ BEGIN
         RAISE EXCEPTION 'A bounded machine-readable reason code is required';
     END IF;
 
-    SELECT * INTO v_reservation
+    SELECT envelope_id INTO v_envelope_id
     FROM public.comind_cost_reservations
-    WHERE id = p_reservation_id
-    FOR UPDATE;
+    WHERE id = p_reservation_id;
 
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Cost reservation % does not exist', p_reservation_id;
@@ -701,8 +716,22 @@ BEGIN
 
     PERFORM 1
     FROM public.comind_workflow_cost_envelopes
-    WHERE id = v_reservation.envelope_id
+    WHERE id = v_envelope_id
     FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Cost envelope % does not exist', v_envelope_id;
+    END IF;
+
+    SELECT * INTO v_reservation
+    FROM public.comind_cost_reservations
+    WHERE id = p_reservation_id
+      AND envelope_id = v_envelope_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Reservation % changed while acquiring budget authority locks', p_reservation_id;
+    END IF;
 
     IF v_reservation.status = p_terminal_status
        AND v_reservation.finalized_cost = 0
@@ -753,10 +782,43 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE VIEW public.comind_workflow_cost_summary
+WITH (security_invoker = TRUE)
+AS
+SELECT
+    e.id AS envelope_id,
+    e.workflow_run_id,
+    e.project_id,
+    e.owner_agent_id,
+    e.objective,
+    e.environment,
+    e.status,
+    e.currency,
+    e.estimated_cost,
+    e.soft_limit_amount,
+    e.hard_limit_amount,
+    e.actual_cost,
+    e.reserved_cost,
+    GREATEST(e.hard_limit_amount - e.actual_cost - e.reserved_cost, 0) AS available_budget,
+    CASE
+        WHEN e.hard_limit_amount = 0 THEN 0
+        ELSE ROUND((e.actual_cost / e.hard_limit_amount) * 100, 2)
+    END AS hard_limit_percent_used,
+    COUNT(u.id) AS usage_event_count,
+    e.created_at,
+    e.started_at,
+    e.completed_at
+FROM public.comind_workflow_cost_envelopes e
+LEFT JOIN public.comind_usage_events u ON u.envelope_id = e.id
+GROUP BY e.id;
+
 ALTER TABLE public.comind_cost_reservation_events ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.comind_cost_reservation_events FROM PUBLIC, anon, authenticated;
 GRANT SELECT, INSERT ON TABLE public.comind_cost_reservation_events TO service_role;
 GRANT USAGE, SELECT ON SEQUENCE public.comind_cost_reservation_events_id_seq TO service_role;
+
+REVOKE ALL ON TABLE public.comind_workflow_cost_summary FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON TABLE public.comind_workflow_cost_summary TO service_role;
 
 REVOKE ALL ON FUNCTION public.comind_reject_cost_reservation_event_mutation() FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.comind_sync_envelope_reserved_cost(BIGINT) FROM PUBLIC, anon, authenticated;

@@ -86,7 +86,6 @@ export class ProviderBackedQualityVerifier implements QualityVerifier {
   }): Promise<QualityVerifierResult> {
     const response = await this.provider.generateResponse({
       conversationId: input.conversationId,
-      executionRole: 'verifier',
       messages: [
         {
           role: 'system',
@@ -131,7 +130,6 @@ export class ProviderBackedQualityRepairer implements QualityRepairer {
   }) {
     return this.provider.generateResponse({
       conversationId: input.conversationId,
-      executionRole: 'repair',
       messages: [
         {
           role: 'system',

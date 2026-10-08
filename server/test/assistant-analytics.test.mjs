@@ -8,6 +8,9 @@ const { buildApp } = await import('../dist/app.js');
 const analyticsRow = {
   response_count: 2,
   metered_call_count: 4,
+  succeeded_call_count: 3,
+  failed_call_count: 1,
+  unknown_status_call_count: 0,
   input_tokens: 120,
   cached_input_tokens: 30,
   cache_write_tokens: 0,
@@ -35,6 +38,27 @@ const analyticsRow = {
   quality_outcomes: [
     { risk: 'high', verdict: 'approve', outcome: 'returned', responses: 1 },
   ],
+  recent_calls: [
+    {
+      message_id: 'msg-2',
+      conversation_id: 'conv-1',
+      created_at: '2026-10-07T23:45:00.000Z',
+      call_role: 'response',
+      provider: 'openai',
+      model: 'gpt-6-luna',
+      status: 'succeeded',
+      response_id: 'resp-2',
+      duration_ms: 200,
+      input_tokens: 30,
+      cached_input_tokens: 10,
+      cache_write_tokens: 0,
+      output_tokens: 8,
+      reasoning_tokens: 2,
+      total_tokens: 38,
+      estimated_cost_usd: 0.000004,
+      cost_known: true,
+    },
+  ],
 };
 
 async function withApp(query) {
@@ -54,10 +78,17 @@ test('assistant analytics endpoint exposes read-only aggregate telemetry', async
   assert.match(observedSql, /jsonb_array_elements/);
   assert.match(observedSql, /pass_role IN \('verifier', 'repair'\)/);
   assert.match(observedSql, /cached_input_tokens/);
+  assert.match(observedSql, /event_facts/);
+  assert.match(observedSql, /recent_calls/);
 
   const body = response.json();
   assert.deepEqual(body.responses, { count: 2 });
-  assert.deepEqual(body.metered_calls, { count: 4 });
+  assert.deepEqual(body.metered_calls, {
+    count: 4,
+    succeeded: 3,
+    failed: 1,
+    unknown_status: 0,
+  });
   assert.equal(body.usage.cached_input_tokens, 30);
   assert.equal(body.cost.base_generation.known_usd, 0.00001);
   assert.equal(body.cost.quality_overhead.known_usd, 0.000004);
@@ -65,6 +96,9 @@ test('assistant analytics endpoint exposes read-only aggregate telemetry', async
   assert.equal(body.cost.combined.unknown_call_count, 1);
   assert.equal(body.latency.average_workflow_ms, 125.5);
   assert.equal(body.provider_models[0].model, 'gpt-6-luna');
+  assert.equal(body.recent_calls[0].message_id, 'msg-2');
+  assert.equal(body.recent_calls[0].status, 'succeeded');
+  assert.equal(body.recent_calls[0].estimated_cost_usd, 0.000004);
   assert.equal(body.quality_outcomes[0].outcome, 'returned');
   assert.equal(JSON.stringify(body).includes('prompt'), false);
   assert.equal(JSON.stringify(body).includes('response content'), false);
@@ -81,6 +115,7 @@ test('analytics browser surface is read-only and loads the assistant aggregate A
   assert.match(response.headers['content-type'], /text\/html/);
   assert.match(response.body, /Assistant Observability/);
   assert.match(response.body, /\/api\/analytics\/assistant-responses/);
+  assert.match(response.body, /Recent provider calls/);
   assert.match(response.body, /Quality overhead/);
   assert.equal(response.body.includes('DELETE'), false);
   assert.equal(response.body.includes('POST'), false);

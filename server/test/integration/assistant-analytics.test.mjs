@@ -67,6 +67,7 @@ test('assistant analytics aggregates PostgreSQL JSONB without double-counting qu
   const suffix = `${process.pid}-${Date.now()}`;
   const ungatedId = await createConversation(`Observability ungated ${suffix}`);
   const gatedId = await createConversation(`Observability gated ${suffix}`);
+  const ignoredId = await createConversation(`Observability ignored ${suffix}`);
 
   await insertAssistant(
     ungatedId,
@@ -91,7 +92,7 @@ test('assistant analytics aggregates PostgreSQL JSONB without double-counting qu
     provider: `obs-verifier-${suffix}`,
     model: `obs-verify-model-${suffix}`,
     endpoint: 'responses.create',
-    status: 'succeeded',
+    status: 'failed',
     duration_ms: 30,
     usage: { input_tokens: 8, output_tokens: 2, total_tokens: 10 },
     cost: {
@@ -122,6 +123,23 @@ test('assistant analytics aggregates PostgreSQL JSONB without double-counting qu
         { role: 'final', source_role: 'repair' },
       ],
     },
+  });
+
+  await query(
+    `INSERT INTO comind.cm_message (conv_id, role, content, meta)
+     VALUES ($1, 'user', $2, $3::jsonb)`,
+    [ignoredId, `Ignored user telemetry ${suffix}`, JSON.stringify(metered(
+      `obs-ignored-user-${suffix}`,
+      `obs-ignored-model-${suffix}`,
+      1,
+      { input_tokens: 999, output_tokens: 999, total_tokens: 1998 },
+      9.99
+    ))]
+  );
+  await insertAssistant(ignoredId, `Ignored assistant telemetry ${suffix}`, {
+    status: 'succeeded',
+    usage: { input_tokens: 999, output_tokens: 999, total_tokens: 1998 },
+    cost: { estimated_cost_usd: 9.99 },
   });
 
   const response = await app.inject({ method: 'GET', url: '/api/analytics/assistant-responses' });
@@ -166,6 +184,8 @@ test('assistant analytics aggregates PostgreSQL JSONB without double-counting qu
 
   assert.ok(body.responses.count >= 2);
   assert.ok(body.metered_calls.count >= 4);
+  assert.ok(body.metered_calls.succeeded >= 3);
+  assert.ok(body.metered_calls.failed >= 1);
   assert.ok(body.usage.total_tokens >= 80);
   assert.ok(body.cost.base_generation.known_usd >= 0.0000164);
   assert.ok(body.cost.quality_overhead.known_usd >= 0.000005);
@@ -175,4 +195,23 @@ test('assistant analytics aggregates PostgreSQL JSONB without double-counting qu
   // If the gated row's duplicated top-level repair metadata were counted again,
   // the unique repair provider would report two calls rather than one.
   assert.equal(repairModel.calls, 1);
+
+  assert.equal(
+    body.provider_models.some((item) => item.provider === `obs-ignored-user-${suffix}`),
+    false
+  );
+  assert.equal(
+    body.provider_models.some((item) => item.model === `obs-ignored-model-${suffix}`),
+    false
+  );
+
+  const recentVerifier = body.recent_calls.find(
+    (item) => item.provider === `obs-verifier-${suffix}`
+  );
+  assert.ok(recentVerifier);
+  assert.equal(recentVerifier.status, 'failed');
+  assert.equal(recentVerifier.call_role, 'verifier');
+  assert.equal(recentVerifier.conversation_id, gatedId);
+  assert.equal(recentVerifier.total_tokens, 10);
+  assert.equal(recentVerifier.cost_known, false);
 });

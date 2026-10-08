@@ -4,16 +4,24 @@ SET search_path TO comind, public;
 
 -- Updated-at trigger helper
 CREATE OR REPLACE FUNCTION set_updated_at()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = comind, public, pg_temp
+AS $$
 BEGIN
   NEW.updated_at = now();
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- Beta-Bernoulli belief update
 CREATE OR REPLACE FUNCTION fn_belief_update_beta(p_belief_id UUID, p_obs_bool BOOLEAN, p_evidence JSONB DEFAULT '{}')
-RETURNS TABLE (belief_id UUID, params JSONB, mean REAL) AS $$
+RETURNS TABLE (belief_id UUID, params JSONB, mean REAL)
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = comind, public, pg_temp
+AS $$
 DECLARE
   v_alpha NUMERIC;
   v_beta  NUMERIC;
@@ -53,11 +61,15 @@ BEGIN
            v_new_params,
            (v_alpha::REAL) / (v_alpha::REAL + v_beta::REAL) AS mean;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- Convenience: create causal node from memory
 CREATE OR REPLACE FUNCTION fn_create_causal_node_from_memory(p_memory_id UUID, p_kind TEXT, p_title TEXT DEFAULT NULL)
-RETURNS UUID AS $$
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = comind, public, pg_temp
+AS $$
 DECLARE
   v_node_id UUID := gen_random_uuid();
   v_title TEXT;
@@ -74,19 +86,30 @@ BEGIN
 
   RETURN v_node_id;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- Session-scoped current actor for RLS
-CREATE OR REPLACE FUNCTION set_current_actor(p_actor UUID) RETURNS VOID AS $$
+CREATE OR REPLACE FUNCTION set_current_actor(p_actor UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = comind, public, pg_temp
+AS $$
 BEGIN
   PERFORM set_config('comind.current_actor', p_actor::text, true);
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
-CREATE OR REPLACE FUNCTION current_actor() RETURNS UUID AS $$
+CREATE OR REPLACE FUNCTION current_actor()
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY INVOKER
+STABLE
+SET search_path = comind, public, pg_temp
+AS $$
 BEGIN
   RETURN NULLIF(current_setting('comind.current_actor', true), '')::uuid;
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$;
 
 COMMIT;

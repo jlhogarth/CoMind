@@ -72,8 +72,8 @@ export async function buildApp(overrides: Partial<AppDependencies> = {}) {
   registerConversationRoutes(app, dependencies.query, dependencies.conversationLock);
   registerIngestRoutes(app, dependencies.query);
   registerSearchRoutes(app, dependencies.query);
-  registerAnalyticsRoutes(app, dependencies.query);
   registerSpendingGuardrailRoutes(app, dependencies.query);
+  registerAnalyticsRoutes(app, dependencies.query);
   registerResearchRoutes(app, dependencies.query);
   registerChecklistRoutes(app, dependencies.query);
   registerAssistantRoutes(

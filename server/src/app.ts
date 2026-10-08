@@ -9,6 +9,7 @@ import { registerConversationRoutes } from './routes/conversations.js';
 import { registerIngestRoutes } from './routes/ingest.js';
 import { registerSearchRoutes } from './routes/search.js';
 import { registerAnalyticsRoutes } from './routes/analytics.js';
+import { registerSpendingGuardrailRoutes } from './routes/spending-guardrail.js';
 import { registerAdminRoutes } from './routes/admin.js';
 import { registerResearchRoutes } from './routes/research.js';
 import { registerChecklistRoutes } from './routes/checklist.js';
@@ -72,6 +73,7 @@ export async function buildApp(overrides: Partial<AppDependencies> = {}) {
   registerIngestRoutes(app, dependencies.query);
   registerSearchRoutes(app, dependencies.query);
   registerAnalyticsRoutes(app, dependencies.query);
+  registerSpendingGuardrailRoutes(app, dependencies.query);
   registerResearchRoutes(app, dependencies.query);
   registerChecklistRoutes(app, dependencies.query);
   registerAssistantRoutes(

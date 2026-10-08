@@ -69,6 +69,13 @@ interface QualityPassTelemetry {
   duration_ms?: unknown;
   usage?: unknown;
   cost?: unknown;
+  requested_model?: unknown;
+  canonical_model?: unknown;
+  processing_mode?: unknown;
+  execution_role?: unknown;
+  request_fingerprint?: unknown;
+  timeout_ms?: unknown;
+  max_retries?: unknown;
   source_role?: 'draft' | 'repair' | 'blocked';
 }
 
@@ -118,6 +125,15 @@ function passTelemetry(
     ...(source.duration_ms !== undefined ? { duration_ms: source.duration_ms } : {}),
     ...(source.usage !== undefined ? { usage: source.usage } : {}),
     ...(source.cost !== undefined ? { cost: source.cost } : {}),
+    ...(source.requested_model !== undefined ? { requested_model: source.requested_model } : {}),
+    ...(source.canonical_model !== undefined ? { canonical_model: source.canonical_model } : {}),
+    ...(source.processing_mode !== undefined ? { processing_mode: source.processing_mode } : {}),
+    ...(source.execution_role !== undefined ? { execution_role: source.execution_role } : {}),
+    ...(source.request_fingerprint !== undefined
+      ? { request_fingerprint: source.request_fingerprint }
+      : {}),
+    ...(source.timeout_ms !== undefined ? { timeout_ms: source.timeout_ms } : {}),
+    ...(source.max_retries !== undefined ? { max_retries: source.max_retries } : {}),
   };
 }
 

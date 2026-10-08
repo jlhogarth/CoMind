@@ -4,6 +4,9 @@ import { QueryFunction, query } from '../db.js';
 type AssistantAnalyticsRow = {
   response_count: number;
   metered_call_count: number;
+  succeeded_call_count: number;
+  failed_call_count: number;
+  unknown_status_call_count: number;
   input_tokens: number;
   cached_input_tokens: number;
   cache_write_tokens: number;
@@ -20,11 +23,12 @@ type AssistantAnalyticsRow = {
   max_workflow_duration_ms: number | null;
   provider_models: Array<Record<string, unknown>>;
   quality_outcomes: Array<Record<string, unknown>>;
+  recent_calls: Array<Record<string, unknown>>;
 };
 
 const assistantAnalyticsSql = `
 WITH assistant AS (
-  SELECT msg_id, meta
+  SELECT msg_id, conv_id, created_at, meta
   FROM comind.cm_message
   WHERE role = 'assistant'
     AND jsonb_typeof(meta) = 'object'
@@ -33,6 +37,8 @@ WITH assistant AS (
 quality_passes AS (
   SELECT
     assistant.msg_id,
+    assistant.conv_id,
+    assistant.created_at,
     pass->>'role' AS pass_role,
     pass AS event_meta
   FROM assistant
@@ -46,51 +52,59 @@ quality_passes AS (
   WHERE pass->>'role' IN ('draft', 'verifier', 'repair')
 ),
 metered_events AS (
-  SELECT msg_id, 'response'::text AS pass_role, meta AS event_meta
+  SELECT msg_id, conv_id, created_at, 'response'::text AS pass_role, meta AS event_meta
   FROM assistant
   WHERE jsonb_typeof(meta->'quality_gate') IS DISTINCT FROM 'object'
 
   UNION ALL
 
-  SELECT msg_id, pass_role, event_meta
+  SELECT msg_id, conv_id, created_at, pass_role, event_meta
   FROM quality_passes
+),
+event_facts AS (
+  SELECT
+    msg_id,
+    conv_id,
+    created_at,
+    pass_role,
+    COALESCE(NULLIF(event_meta->>'provider', ''), 'unknown') AS provider,
+    COALESCE(NULLIF(event_meta->>'model', ''), 'unknown') AS model,
+    COALESCE(NULLIF(event_meta->>'status', ''), 'unknown') AS status,
+    NULLIF(event_meta->>'response_id', '') AS response_id,
+    CASE WHEN jsonb_typeof(event_meta->'duration_ms') = 'number'
+      THEN (event_meta->>'duration_ms')::double precision ELSE NULL END AS duration_ms,
+    CASE WHEN jsonb_typeof(event_meta#>'{usage,input_tokens}') = 'number'
+      THEN (event_meta#>>'{usage,input_tokens}')::double precision ELSE 0 END AS input_tokens,
+    CASE WHEN jsonb_typeof(event_meta#>'{usage,cached_input_tokens}') = 'number'
+      THEN (event_meta#>>'{usage,cached_input_tokens}')::double precision ELSE 0 END AS cached_input_tokens,
+    CASE WHEN jsonb_typeof(event_meta#>'{usage,cache_write_tokens}') = 'number'
+      THEN (event_meta#>>'{usage,cache_write_tokens}')::double precision ELSE 0 END AS cache_write_tokens,
+    CASE WHEN jsonb_typeof(event_meta#>'{usage,output_tokens}') = 'number'
+      THEN (event_meta#>>'{usage,output_tokens}')::double precision ELSE 0 END AS output_tokens,
+    CASE WHEN jsonb_typeof(event_meta#>'{usage,reasoning_tokens}') = 'number'
+      THEN (event_meta#>>'{usage,reasoning_tokens}')::double precision ELSE 0 END AS reasoning_tokens,
+    CASE WHEN jsonb_typeof(event_meta#>'{usage,total_tokens}') = 'number'
+      THEN (event_meta#>>'{usage,total_tokens}')::double precision ELSE 0 END AS total_tokens,
+    CASE WHEN jsonb_typeof(event_meta#>'{cost,estimated_cost_usd}') = 'number'
+      THEN (event_meta#>>'{cost,estimated_cost_usd}')::double precision ELSE NULL END AS estimated_cost_usd
+  FROM metered_events
 ),
 workflow_durations AS (
   SELECT
     msg_id,
-    SUM(
-      CASE
-        WHEN jsonb_typeof(event_meta->'duration_ms') = 'number'
-          THEN (event_meta->>'duration_ms')::double precision
-        ELSE 0
-      END
-    ) AS duration_ms
-  FROM metered_events
+    SUM(COALESCE(duration_ms, 0)) AS duration_ms
+  FROM event_facts
   GROUP BY msg_id
 ),
 provider_model AS (
   SELECT
-    COALESCE(NULLIF(event_meta->>'provider', ''), 'unknown') AS provider,
-    COALESCE(NULLIF(event_meta->>'model', ''), 'unknown') AS model,
+    provider,
+    model,
     COUNT(*)::int AS calls,
-    COALESCE(SUM(
-      CASE
-        WHEN jsonb_typeof(event_meta#>'{usage,total_tokens}') = 'number'
-          THEN (event_meta#>>'{usage,total_tokens}')::double precision
-        ELSE 0
-      END
-    ), 0)::double precision AS total_tokens,
-    COALESCE(SUM(
-      CASE
-        WHEN jsonb_typeof(event_meta#>'{cost,estimated_cost_usd}') = 'number'
-          THEN (event_meta#>>'{cost,estimated_cost_usd}')::double precision
-        ELSE 0
-      END
-    ), 0)::double precision AS known_cost_usd,
-    COUNT(*) FILTER (
-      WHERE jsonb_typeof(event_meta#>'{cost,estimated_cost_usd}') IS DISTINCT FROM 'number'
-    )::int AS unknown_cost_calls
-  FROM metered_events
+    COALESCE(SUM(total_tokens), 0)::double precision AS total_tokens,
+    COALESCE(SUM(COALESCE(estimated_cost_usd, 0)), 0)::double precision AS known_cost_usd,
+    COUNT(*) FILTER (WHERE estimated_cost_usd IS NULL)::int AS unknown_cost_calls
+  FROM event_facts
   GROUP BY 1, 2
 ),
 quality_summary AS (
@@ -102,59 +116,55 @@ quality_summary AS (
   FROM assistant
   WHERE jsonb_typeof(meta->'quality_gate') = 'object'
   GROUP BY 1, 2, 3
+),
+recent_calls AS (
+  SELECT
+    msg_id,
+    conv_id,
+    created_at,
+    pass_role,
+    provider,
+    model,
+    status,
+    response_id,
+    duration_ms,
+    input_tokens,
+    cached_input_tokens,
+    cache_write_tokens,
+    output_tokens,
+    reasoning_tokens,
+    total_tokens,
+    estimated_cost_usd
+  FROM event_facts
+  ORDER BY created_at DESC, msg_id DESC, pass_role ASC
+  LIMIT 25
 )
 SELECT
   (SELECT COUNT(*)::int FROM assistant) AS response_count,
-  (SELECT COUNT(*)::int FROM metered_events) AS metered_call_count,
-  COALESCE((SELECT SUM(
-    CASE WHEN jsonb_typeof(event_meta#>'{usage,input_tokens}') = 'number'
-      THEN (event_meta#>>'{usage,input_tokens}')::double precision ELSE 0 END
-  ) FROM metered_events), 0)::double precision AS input_tokens,
-  COALESCE((SELECT SUM(
-    CASE WHEN jsonb_typeof(event_meta#>'{usage,cached_input_tokens}') = 'number'
-      THEN (event_meta#>>'{usage,cached_input_tokens}')::double precision ELSE 0 END
-  ) FROM metered_events), 0)::double precision AS cached_input_tokens,
-  COALESCE((SELECT SUM(
-    CASE WHEN jsonb_typeof(event_meta#>'{usage,cache_write_tokens}') = 'number'
-      THEN (event_meta#>>'{usage,cache_write_tokens}')::double precision ELSE 0 END
-  ) FROM metered_events), 0)::double precision AS cache_write_tokens,
-  COALESCE((SELECT SUM(
-    CASE WHEN jsonb_typeof(event_meta#>'{usage,output_tokens}') = 'number'
-      THEN (event_meta#>>'{usage,output_tokens}')::double precision ELSE 0 END
-  ) FROM metered_events), 0)::double precision AS output_tokens,
-  COALESCE((SELECT SUM(
-    CASE WHEN jsonb_typeof(event_meta#>'{usage,reasoning_tokens}') = 'number'
-      THEN (event_meta#>>'{usage,reasoning_tokens}')::double precision ELSE 0 END
-  ) FROM metered_events), 0)::double precision AS reasoning_tokens,
-  COALESCE((SELECT SUM(
-    CASE WHEN jsonb_typeof(event_meta#>'{usage,total_tokens}') = 'number'
-      THEN (event_meta#>>'{usage,total_tokens}')::double precision ELSE 0 END
-  ) FROM metered_events), 0)::double precision AS total_tokens,
-  COALESCE((SELECT SUM(
-    CASE WHEN pass_role IN ('response', 'draft')
-      AND jsonb_typeof(event_meta#>'{cost,estimated_cost_usd}') = 'number'
-      THEN (event_meta#>>'{cost,estimated_cost_usd}')::double precision ELSE 0 END
-  ) FROM metered_events), 0)::double precision AS base_cost_usd,
+  (SELECT COUNT(*)::int FROM event_facts) AS metered_call_count,
+  COALESCE((SELECT COUNT(*) FILTER (WHERE status = 'succeeded') FROM event_facts), 0)::int AS succeeded_call_count,
+  COALESCE((SELECT COUNT(*) FILTER (WHERE status = 'failed') FROM event_facts), 0)::int AS failed_call_count,
+  COALESCE((SELECT COUNT(*) FILTER (WHERE status NOT IN ('succeeded', 'failed')) FROM event_facts), 0)::int AS unknown_status_call_count,
+  COALESCE((SELECT SUM(input_tokens) FROM event_facts), 0)::double precision AS input_tokens,
+  COALESCE((SELECT SUM(cached_input_tokens) FROM event_facts), 0)::double precision AS cached_input_tokens,
+  COALESCE((SELECT SUM(cache_write_tokens) FROM event_facts), 0)::double precision AS cache_write_tokens,
+  COALESCE((SELECT SUM(output_tokens) FROM event_facts), 0)::double precision AS output_tokens,
+  COALESCE((SELECT SUM(reasoning_tokens) FROM event_facts), 0)::double precision AS reasoning_tokens,
+  COALESCE((SELECT SUM(total_tokens) FROM event_facts), 0)::double precision AS total_tokens,
+  COALESCE((SELECT SUM(COALESCE(estimated_cost_usd, 0))
+    FROM event_facts WHERE pass_role IN ('response', 'draft')), 0)::double precision AS base_cost_usd,
   COALESCE((SELECT COUNT(*) FILTER (
     WHERE pass_role IN ('response', 'draft')
-      AND jsonb_typeof(event_meta#>'{cost,estimated_cost_usd}') IS DISTINCT FROM 'number'
-  ) FROM metered_events), 0)::int AS base_unknown_cost_calls,
-  COALESCE((SELECT SUM(
-    CASE WHEN pass_role IN ('verifier', 'repair')
-      AND jsonb_typeof(event_meta#>'{cost,estimated_cost_usd}') = 'number'
-      THEN (event_meta#>>'{cost,estimated_cost_usd}')::double precision ELSE 0 END
-  ) FROM metered_events), 0)::double precision AS quality_overhead_cost_usd,
+      AND estimated_cost_usd IS NULL
+  ) FROM event_facts), 0)::int AS base_unknown_cost_calls,
+  COALESCE((SELECT SUM(COALESCE(estimated_cost_usd, 0))
+    FROM event_facts WHERE pass_role IN ('verifier', 'repair')), 0)::double precision AS quality_overhead_cost_usd,
   COALESCE((SELECT COUNT(*) FILTER (
     WHERE pass_role IN ('verifier', 'repair')
-      AND jsonb_typeof(event_meta#>'{cost,estimated_cost_usd}') IS DISTINCT FROM 'number'
-  ) FROM metered_events), 0)::int AS quality_unknown_cost_calls,
-  COALESCE((SELECT SUM(
-    CASE WHEN jsonb_typeof(event_meta#>'{cost,estimated_cost_usd}') = 'number'
-      THEN (event_meta#>>'{cost,estimated_cost_usd}')::double precision ELSE 0 END
-  ) FROM metered_events), 0)::double precision AS combined_known_cost_usd,
-  COALESCE((SELECT COUNT(*) FILTER (
-    WHERE jsonb_typeof(event_meta#>'{cost,estimated_cost_usd}') IS DISTINCT FROM 'number'
-  ) FROM metered_events), 0)::int AS combined_unknown_cost_calls,
+      AND estimated_cost_usd IS NULL
+  ) FROM event_facts), 0)::int AS quality_unknown_cost_calls,
+  COALESCE((SELECT SUM(COALESCE(estimated_cost_usd, 0)) FROM event_facts), 0)::double precision AS combined_known_cost_usd,
+  COALESCE((SELECT COUNT(*) FILTER (WHERE estimated_cost_usd IS NULL) FROM event_facts), 0)::int AS combined_unknown_cost_calls,
   (SELECT AVG(duration_ms)::double precision FROM workflow_durations) AS average_workflow_duration_ms,
   (SELECT MAX(duration_ms)::double precision FROM workflow_durations) AS max_workflow_duration_ms,
   COALESCE((SELECT json_agg(
@@ -174,7 +184,28 @@ SELECT
       'outcome', outcome,
       'responses', responses
     ) ORDER BY responses DESC, risk, verdict, outcome
-  ) FROM quality_summary), '[]'::json) AS quality_outcomes
+  ) FROM quality_summary), '[]'::json) AS quality_outcomes,
+  COALESCE((SELECT json_agg(
+    json_build_object(
+      'message_id', msg_id,
+      'conversation_id', conv_id,
+      'created_at', created_at,
+      'call_role', pass_role,
+      'provider', provider,
+      'model', model,
+      'status', status,
+      'response_id', response_id,
+      'duration_ms', duration_ms,
+      'input_tokens', input_tokens,
+      'cached_input_tokens', cached_input_tokens,
+      'cache_write_tokens', cache_write_tokens,
+      'output_tokens', output_tokens,
+      'reasoning_tokens', reasoning_tokens,
+      'total_tokens', total_tokens,
+      'estimated_cost_usd', estimated_cost_usd,
+      'cost_known', estimated_cost_usd IS NOT NULL
+    ) ORDER BY created_at DESC, msg_id DESC, pass_role ASC
+  ) FROM recent_calls), '[]'::json) AS recent_calls
 `;
 
 function assistantAnalyticsPage() {
@@ -214,6 +245,10 @@ function assistantAnalyticsPage() {
     <table><thead><tr><th>Provider</th><th>Model</th><th>Calls</th><th>Tokens</th><th>Known cost</th><th>Unknown costs</th></tr></thead><tbody id="models"></tbody></table>
   </section>
   <section>
+    <h2>Recent provider calls</h2>
+    <table><thead><tr><th>Created</th><th>Role</th><th>Provider</th><th>Model</th><th>Status</th><th>Tokens</th><th>Cost</th><th>Duration</th></tr></thead><tbody id="recent"></tbody></table>
+  </section>
+  <section>
     <h2>Quality-gate outcomes</h2>
     <table><thead><tr><th>Risk</th><th>Verdict</th><th>Outcome</th><th>Responses</th></tr></thead><tbody id="quality"></tbody></table>
   </section>
@@ -233,6 +268,8 @@ fetch('/api/analytics/assistant-responses')
   .then((data) => {
     addCard('Persisted responses', formatNumber(data.responses.count));
     addCard('Metered provider calls', formatNumber(data.metered_calls.count));
+    addCard('Succeeded calls', formatNumber(data.metered_calls.succeeded));
+    addCard('Failed calls', formatNumber(data.metered_calls.failed));
     addCard('Total tokens', formatNumber(data.usage.total_tokens));
     addCard('Cached input tokens', formatNumber(data.usage.cached_input_tokens));
     addCard('Base generation cost', formatUsd(data.cost.base_generation.known_usd));
@@ -247,6 +284,15 @@ fetch('/api/analytics/assistant-responses')
       addCell(row, item.provider); addCell(row, item.model); addCell(row, formatNumber(item.calls));
       addCell(row, formatNumber(item.total_tokens)); addCell(row, formatUsd(item.known_cost_usd)); addCell(row, formatNumber(item.unknown_cost_calls));
       document.getElementById('models').appendChild(row);
+    }
+    for (const item of data.recent_calls) {
+      const row = document.createElement('tr');
+      addCell(row, item.created_at ? new Date(item.created_at).toLocaleString() : 'unknown');
+      addCell(row, item.call_role); addCell(row, item.provider); addCell(row, item.model); addCell(row, item.status);
+      addCell(row, formatNumber(item.total_tokens));
+      addCell(row, item.cost_known ? formatUsd(item.estimated_cost_usd) : 'unknown');
+      addCell(row, item.duration_ms == null ? 'n/a' : formatNumber(Math.round(item.duration_ms)) + ' ms');
+      document.getElementById('recent').appendChild(row);
     }
     for (const item of data.quality_outcomes) {
       const row = document.createElement('tr');
@@ -273,7 +319,12 @@ export function registerAnalyticsRoutes(app: FastifyInstance, queryFn: QueryFunc
     const row = result.rows[0];
     return {
       responses: { count: row.response_count },
-      metered_calls: { count: row.metered_call_count },
+      metered_calls: {
+        count: row.metered_call_count,
+        succeeded: row.succeeded_call_count,
+        failed: row.failed_call_count,
+        unknown_status: row.unknown_status_call_count,
+      },
       usage: {
         input_tokens: row.input_tokens,
         cached_input_tokens: row.cached_input_tokens,
@@ -302,6 +353,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance, queryFn: QueryFunc
       },
       provider_models: row.provider_models,
       quality_outcomes: row.quality_outcomes,
+      recent_calls: row.recent_calls,
     };
   });
 

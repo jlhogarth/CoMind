@@ -46,6 +46,8 @@ psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
   -f "${repository_root}/db/migrations/20261008_003_current_runtime_budget_authority_adapter_function_hardening.sql"
 psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
   -f "${repository_root}/db/migrations/20261008_004_current_runtime_budget_authority_adapter_lifecycle_hardening.sql"
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
+  -f "${repository_root}/db/migrations/20261008_005_current_runtime_budget_authority_adapter_telemetry_role_hardening.sql"
 
 # Reapply the adapter migrations in order to prove migration idempotency.
 psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
@@ -54,11 +56,15 @@ psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
   -f "${repository_root}/db/migrations/20261008_003_current_runtime_budget_authority_adapter_function_hardening.sql"
 psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
   -f "${repository_root}/db/migrations/20261008_004_current_runtime_budget_authority_adapter_lifecycle_hardening.sql"
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
+  -f "${repository_root}/db/migrations/20261008_005_current_runtime_budget_authority_adapter_telemetry_role_hardening.sql"
 
 psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
   -f "${repository_root}/db/migrations/verify_20261008_002_current_runtime_budget_authority_adapter.sql"
 psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
   -f "${repository_root}/db/migrations/verify_20261008_004_current_runtime_budget_authority_adapter_lifecycle_hardening.sql"
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
+  -f "${repository_root}/db/migrations/verify_20261008_005_current_runtime_budget_authority_adapter_telemetry_role_hardening.sql"
 
 org_id="$(psql "${DATABASE_URL}" -X -Atq -v ON_ERROR_STOP=1 -c "
   INSERT INTO comind.cm_org (name, slug)

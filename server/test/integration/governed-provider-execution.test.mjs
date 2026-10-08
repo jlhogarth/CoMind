@@ -9,10 +9,10 @@ const {
   buildOpenAIProviderExecutionEnvelope,
   executeGovernedOpenAIProviderExecutionEnvelope,
 } = await import('../../dist/providers/openai-execution.js');
+const { openAIProviderSuccessMetadata } = await import('../../dist/providers/openai.js');
 const {
   DeterministicProviderInputTokenCounter,
 } = await import('../../dist/providers/provider-execution-envelope.js');
-const { estimateOpenAICost } = await import('../../dist/providers/openai-rate-card.js');
 
 const bindingId = process.env.COMIND_TEST_BINDING_ID;
 const conversationId = process.env.COMIND_TEST_CONVERSATION_ID;
@@ -48,35 +48,6 @@ function options(executionRole, attemptNumber = 1) {
   };
 }
 
-function telemetry(envelope, result) {
-  const usage = {
-    input_tokens: 100,
-    prompt_tokens: 100,
-    output_tokens: 20,
-    completion_tokens: 20,
-    total_tokens: 120,
-  };
-  return {
-    provider: 'openai',
-    model: result.response.model,
-    endpoint: 'responses.create',
-    response_id: result.response.id,
-    status: 'succeeded',
-    duration_ms: 1,
-    usage,
-    requested_model: envelope.requested_model,
-    canonical_model: envelope.canonical_model,
-    processing_mode: envelope.processing_mode,
-    execution_role: envelope.execution_role,
-    attempt_number: envelope.attempt_number,
-    request_fingerprint: envelope.fingerprint,
-    timeout_ms: envelope.timeout_ms,
-    max_retries: envelope.max_retries,
-    cost: estimateOpenAICost(result.response.model, 'standard', usage),
-    governed_execution: result.receipt,
-  };
-}
-
 async function executeRole(role, providerCalls) {
   const envelope = buildOpenAIProviderExecutionEnvelope(
     assistantRequest(),
@@ -91,6 +62,11 @@ async function executeRole(role, providerCalls) {
         return {
           id: `resp-issue68-${role}-attempt-1`,
           model: 'gpt-6-luna',
+          usage: {
+            input_tokens: 100,
+            output_tokens: 20,
+            total_tokens: 120,
+          },
         };
       },
     },
@@ -106,7 +82,12 @@ async function executeRole(role, providerCalls) {
     envelope,
     budgetAuthority,
     result,
-    telemetry: telemetry(envelope, result),
+    telemetry: openAIProviderSuccessMetadata(
+      result.response,
+      envelope,
+      1,
+      result.receipt
+    ),
   };
 }
 
@@ -126,6 +107,14 @@ test('isolated runtime proves count quote reserve execute persist settle and rep
     assert.equal(value.result.receipt.exposure_quote.maximum_exposure_usd, 0.0002685);
     assert.equal(value.result.receipt.reservation.reservation_status, 'reserved');
     assert.equal(value.result.receipt.reservation.idempotent, false);
+    assert.equal(value.telemetry.request_fingerprint, value.envelope.fingerprint);
+    assert.equal(value.telemetry.attempt_number, 1);
+    assert.equal(value.telemetry.max_retries, 0);
+    assert.equal(value.telemetry.cost.estimated_cost_usd, 0.00002);
+    assert.equal(
+      value.telemetry.governed_execution.reservation.reservation_id,
+      value.result.receipt.reservation.reservation_id
+    );
   }
 
   const rootMessage = await query(
@@ -167,6 +156,7 @@ test('isolated runtime proves count quote reserve execute persist settle and rep
   for (const role of ['draft', 'verifier', 'repair']) {
     const persisted = persistedPasses.find((item) => item.role === role);
     assert.ok(persisted);
+    assert.equal(persisted.attempt_number, 1);
     assert.equal(
       persisted.governed_execution.envelope_fingerprint,
       roles[role].envelope.fingerprint

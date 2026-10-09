@@ -25,9 +25,9 @@ CREATE INDEX IF NOT EXISTS idx_msg_content_trgm ON cm_message USING gin (content
 CREATE UNIQUE INDEX IF NOT EXISTS uq_assistant_generation_active_conv
   ON cm_assistant_generation(conv_id)
   WHERE status = 'active';
-CREATE UNIQUE INDEX IF NOT EXISTS uq_assistant_generation_completed_user
+CREATE UNIQUE INDEX IF NOT EXISTS uq_assistant_generation_claimed_user
   ON cm_assistant_generation(user_msg_id)
-  WHERE status = 'completed';
+  WHERE status IN ('active','completed');
 CREATE INDEX IF NOT EXISTS idx_assistant_generation_conv_user_status
   ON cm_assistant_generation(conv_id, user_msg_id, status);
 

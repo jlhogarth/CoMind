@@ -194,21 +194,23 @@ export function registerChatRoutes(app: FastifyInstance) {
         }
       }
 
+      function appendMessage(row) {
+        const article = document.createElement('article');
+        article.className = 'message ' + row.role;
+        const role = document.createElement('div');
+        role.className = 'role';
+        role.textContent = row.role;
+        const content = document.createElement('div');
+        content.className = 'content';
+        content.textContent = row.content;
+        article.append(role, content);
+        messages.appendChild(article);
+        messages.scrollTop = messages.scrollHeight;
+      }
+
       function renderMessages(rows) {
         messages.replaceChildren();
-        for (const row of rows) {
-          const article = document.createElement('article');
-          article.className = 'message ' + row.role;
-          const role = document.createElement('div');
-          role.className = 'role';
-          role.textContent = row.role;
-          const content = document.createElement('div');
-          content.className = 'content';
-          content.textContent = row.content;
-          article.append(role, content);
-          messages.appendChild(article);
-        }
-        messages.scrollTop = messages.scrollHeight;
+        for (const row of rows) appendMessage(row);
       }
 
       function renderMemoryButtons(rows) {
@@ -414,13 +416,13 @@ export function registerChatRoutes(app: FastifyInstance) {
         if (!selectedConversationId || !content) return;
         sendButton.disabled = true;
         try {
-          await request('/api/conversations/' + encodeURIComponent(selectedConversationId) + '/messages', {
+          const persistedUser = await request('/api/conversations/' + encodeURIComponent(selectedConversationId) + '/messages', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ role: 'user', content })
           });
           messageInput.value = '';
-          await selectConversation(selectedConversationId, false);
+          appendMessage(persistedUser);
 
           if (!assistantEnabled) {
             setStatus('Message persisted. Assistant provider is not configured yet.');
@@ -429,14 +431,13 @@ export function registerChatRoutes(app: FastifyInstance) {
 
           setStatus('Message persisted. Requesting assistant response from ' + assistantProvider + '.');
           try {
-            await request(
+            const persistedAssistant = await request(
               '/api/conversations/' + encodeURIComponent(selectedConversationId) + '/assistant-response',
               { method: 'POST' }
             );
-            await selectConversation(selectedConversationId, false);
+            appendMessage(persistedAssistant);
             setStatus('Assistant response persisted.');
           } catch (assistantError) {
-            await selectConversation(selectedConversationId, false);
             setStatus('Message persisted. ' + assistantError.message + '.');
           }
         } catch (error) {

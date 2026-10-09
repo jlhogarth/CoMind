@@ -13,4 +13,4 @@ db_name="$(psql "${DATABASE_URL}" -X -Atc 'SELECT current_database()')"
 [[ "${db_name}" == "comind_ci" ]] || { echo 'Refusing non-isolated database' >&2; exit 2; }
 psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f "${root}/db/migrations/20261009_acp_continuity_checkpoints.sql"
 psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f "${root}/db/migrations/20261009_acp_continuity_checkpoints.sql"
-(cd "${root}/server" && npm run build && ACP_ISOLATED_DB_TEST=1 node --test test/continuity-checkpoint.test.mjs test/continuity-confidence.test.mjs test/continuity-repository.integration.test.mjs)
+(cd "${root}/server" && npm run build && ACP_ISOLATED_DB_TEST=1 node --test test/continuity-checkpoint.test.mjs test/continuity-confidence.test.mjs test/continuity-recovery.test.mjs test/continuity-scheduler.test.mjs test/continuity-benchmark.test.mjs test/continuity-repository.integration.test.mjs)

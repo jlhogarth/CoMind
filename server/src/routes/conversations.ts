@@ -21,6 +21,16 @@ const AppendMessageSchema = z
   })
   .strict();
 
+interface AppendMessageResultRow {
+  generation_active: boolean;
+  msg_id: string | null;
+  conv_id: string;
+  role: string | null;
+  content: string | null;
+  created_at: string | null;
+  meta: Record<string, unknown> | null;
+}
+
 export function registerConversationRoutes(
   app: FastifyInstance,
   queryFn: QueryFunction = query,
@@ -74,12 +84,34 @@ export function registerConversationRoutes(
 
     const { role, content } = parsed.data;
     const locked = await conversationLock(id, async (lockedQuery) => {
-      const { rows } = await lockedQuery<any>(
-        `INSERT INTO comind.cm_message (conv_id, role, content)
-         SELECT conv_id, $2, $3
-         FROM comind.cm_conversation
-         WHERE conv_id = $1
-         RETURNING msg_id, conv_id, role, content, created_at, meta`,
+      const { rows } = await lockedQuery<AppendMessageResultRow>(
+        `WITH conversation_state AS (
+           SELECT
+             c.conv_id,
+             EXISTS (
+               SELECT 1
+               FROM comind.cm_assistant_generation AS g
+               WHERE g.conv_id=c.conv_id AND g.status='active'
+             ) AS generation_active
+           FROM comind.cm_conversation AS c
+           WHERE c.conv_id=$1
+         ), inserted AS (
+           INSERT INTO comind.cm_message (conv_id, role, content)
+           SELECT conv_id, $2, $3
+           FROM conversation_state
+           WHERE generation_active=false
+           RETURNING msg_id, conv_id, role, content, created_at, meta
+         )
+         SELECT
+           state.generation_active,
+           inserted.msg_id,
+           state.conv_id,
+           inserted.role,
+           inserted.content,
+           inserted.created_at,
+           inserted.meta
+         FROM conversation_state AS state
+         LEFT JOIN inserted ON TRUE`,
         [id, role, content]
       );
       return rows[0] ?? null;
@@ -88,7 +120,19 @@ export function registerConversationRoutes(
     if (!locked.acquired) {
       return reply.code(409).send({ error: 'Conversation is generating an assistant response' });
     }
-    if (!locked.value) return reply.code(404).send({ error: 'Conversation not found' });
-    return reply.code(201).send(locked.value);
+    if (!locked.value) {
+      return reply.code(404).send({ error: 'Conversation not found' });
+    }
+    if (locked.value.generation_active || !locked.value.msg_id) {
+      return reply.code(409).send({ error: 'Conversation is generating an assistant response' });
+    }
+    return reply.code(201).send({
+      msg_id: locked.value.msg_id,
+      conv_id: locked.value.conv_id,
+      role: locked.value.role,
+      content: locked.value.content,
+      created_at: locked.value.created_at,
+      meta: locked.value.meta,
+    });
   });
 }

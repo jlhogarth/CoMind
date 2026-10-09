@@ -50,3 +50,25 @@ test('chat exposes governed project-scoped durable-memory lifecycle controls', a
     assert.doesNotMatch(response.body, /method: 'DELETE'/);
   });
 });
+
+test('chat send path appends persisted rows without reloading the conversation', async () => {
+  await withApp(async (app) => {
+    const response = await app.inject({ method: 'GET', url: '/chat' });
+    assert.equal(response.statusCode, 200);
+
+    assert.match(response.body, /function appendMessage\(row\)/);
+    assert.match(response.body, /const persistedUser = await request/);
+    assert.match(response.body, /appendMessage\(persistedUser\)/);
+    assert.match(response.body, /const persistedAssistant = await request/);
+    assert.match(response.body, /appendMessage\(persistedAssistant\)/);
+
+    assert.doesNotMatch(
+      response.body,
+      /await selectConversation\(selectedConversationId, false\);\s*\n\s*if \(!assistantEnabled\)/
+    );
+    assert.doesNotMatch(
+      response.body,
+      /await selectConversation\(selectedConversationId, false\);\s*\n\s*setStatus\('Assistant response persisted\.'/
+    );
+  });
+});

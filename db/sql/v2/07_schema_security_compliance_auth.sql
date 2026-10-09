@@ -95,6 +95,38 @@ CREATE TABLE IF NOT EXISTS cm_message (
   meta JSONB
 );
 
+CREATE TABLE IF NOT EXISTS cm_assistant_generation (
+  generation_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  conv_id UUID NOT NULL REFERENCES cm_conversation(conv_id) ON DELETE CASCADE,
+  user_msg_id UUID NOT NULL REFERENCES cm_message(msg_id) ON DELETE CASCADE,
+  claim_token UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','completed','failed')),
+  assistant_msg_id UUID REFERENCES cm_message(msg_id) ON DELETE SET NULL,
+  failure_code TEXT CHECK (failure_code IN ('provider_failure')),
+  claimed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  completed_at TIMESTAMPTZ,
+  failed_at TIMESTAMPTZ,
+  CONSTRAINT cm_assistant_generation_terminal_state_check CHECK (
+    (status = 'active'
+      AND assistant_msg_id IS NULL
+      AND completed_at IS NULL
+      AND failed_at IS NULL
+      AND failure_code IS NULL)
+    OR
+    (status = 'completed'
+      AND assistant_msg_id IS NOT NULL
+      AND completed_at IS NOT NULL
+      AND failed_at IS NULL
+      AND failure_code IS NULL)
+    OR
+    (status = 'failed'
+      AND assistant_msg_id IS NULL
+      AND completed_at IS NULL
+      AND failed_at IS NOT NULL
+      AND failure_code IS NOT NULL)
+  )
+);
+
 CREATE TABLE IF NOT EXISTS cm_message_attachment (
   attach_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   msg_id UUID REFERENCES cm_message(msg_id) ON DELETE CASCADE,

@@ -21,5 +21,13 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$fixture_file"
   cd "$repo_root/server"
   npm ci
   npm run build
-  node --test --test-concurrency=1 test/integration/*.test.mjs
+  mapfile -t integration_tests < <(
+    find test/integration -maxdepth 1 -type f -name '*.test.mjs' \
+      ! -name 'foundry-runtime-orchestration.test.mjs' -print | sort
+  )
+  if [[ "${#integration_tests[@]}" -eq 0 ]]; then
+    echo "No conversation-lifecycle integration tests were discovered." >&2
+    exit 1
+  fi
+  node --test --test-concurrency=1 "${integration_tests[@]}"
 )

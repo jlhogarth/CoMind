@@ -74,21 +74,43 @@ export function registerConversationRoutes(
 
     const { role, content } = parsed.data;
     const locked = await conversationLock(id, async (lockedQuery) => {
+      const state = await lockedQuery<{ conversation_exists: boolean; generation_active: boolean }>(
+        `SELECT
+           EXISTS (
+             SELECT 1
+             FROM comind.cm_conversation
+             WHERE conv_id=$1
+           ) AS conversation_exists,
+           EXISTS (
+             SELECT 1
+             FROM comind.cm_assistant_generation
+             WHERE conv_id=$1 AND status='active'
+           ) AS generation_active`,
+        [id]
+      );
+
+      if (state.rows[0]?.conversation_exists !== true) {
+        return { kind: 'not-found' as const };
+      }
+      if (state.rows[0].generation_active) {
+        return { kind: 'busy' as const };
+      }
+
       const { rows } = await lockedQuery<any>(
         `INSERT INTO comind.cm_message (conv_id, role, content)
-         SELECT conv_id, $2, $3
-         FROM comind.cm_conversation
-         WHERE conv_id = $1
+         VALUES ($1, $2, $3)
          RETURNING msg_id, conv_id, role, content, created_at, meta`,
         [id, role, content]
       );
-      return rows[0] ?? null;
+      return { kind: 'created' as const, message: rows[0] };
     });
 
-    if (!locked.acquired) {
+    if (!locked.acquired || locked.value.kind === 'busy') {
       return reply.code(409).send({ error: 'Conversation is generating an assistant response' });
     }
-    if (!locked.value) return reply.code(404).send({ error: 'Conversation not found' });
-    return reply.code(201).send(locked.value);
+    if (locked.value.kind === 'not-found') {
+      return reply.code(404).send({ error: 'Conversation not found' });
+    }
+    return reply.code(201).send(locked.value.message);
   });
 }

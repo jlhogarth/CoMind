@@ -13,7 +13,7 @@ const state = () => ({
   context: { objective: 'Recover safely', decisions: ['bounded'], references: [] },
   pending: [{ operationId: 'op-1', idempotencyKey: 'idem-1', status: 'uncertain' }]
 });
-test('isolated PostgreSQL checkpoint repository', async () => {
+test('isolated PostgreSQL checkpoint repository', { skip: !process.env.DATABASE_URL }, async () => {
   try {
     const s = state();
     const first = await saveCheckpoint(query, s, time);

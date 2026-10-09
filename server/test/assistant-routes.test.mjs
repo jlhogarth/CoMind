@@ -8,12 +8,17 @@ const { buildApp } = await import('../dist/app.js');
 const closePoolForTest = async () => {};
 const conversationId = '44444444-4444-4444-8444-444444444449';
 const projectId = '33333333-3333-4333-8333-333333333339';
+const userMessageId = '55555555-5555-4555-8555-555555555558';
+const assistantMessageId = '55555555-5555-4555-8555-555555555559';
+const generationId = '66666666-6666-4666-8666-666666666669';
+const claimToken = '77777777-7777-4777-8777-777777777779';
 
-async function withApp({ query, assistantProvider }, run) {
+async function withApp({ query, assistantProvider, assistantMaxHistoryMessages }, run) {
   const app = await buildApp({
     query,
     closePool: closePoolForTest,
     assistantProvider,
+    ...(assistantMaxHistoryMessages === undefined ? {} : { assistantMaxHistoryMessages }),
   });
 
   try {
@@ -21,6 +26,76 @@ async function withApp({ query, assistantProvider }, run) {
   } finally {
     await app.close();
   }
+}
+
+function createFastPathQuery({
+  project = null,
+  history = [{
+    role: 'user',
+    content: 'Latest persisted message',
+    msg_id: userMessageId,
+    conv_id: conversationId,
+    created_at: '2026-10-06T08:59:00.000Z',
+    meta: {},
+  }],
+  memoryRows = [],
+  calls = [],
+  metadataSink = null,
+} = {}) {
+  return async (text, params = []) => {
+    calls.push({ text, params });
+
+    if (text.includes('SELECT conv_id, project_id FROM comind.cm_conversation WHERE conv_id=$1')) {
+      return { rows: [{ conv_id: conversationId, project_id: project }] };
+    }
+    if (text.includes('FROM LATERAL (')) {
+      return {
+        rows: [{
+          user_msg_id: userMessageId,
+          assistant_msg_id: null,
+          assistant_conv_id: null,
+          assistant_role: null,
+          assistant_content: null,
+          assistant_created_at: null,
+          assistant_meta: null,
+        }],
+      };
+    }
+    if (text.includes('AS recent') && text.includes('LIMIT $2')) {
+      return { rows: history };
+    }
+    if (text.includes('INSERT INTO comind.cm_assistant_generation')) {
+      return {
+        rows: [{
+          generation_id: generationId,
+          claim_token: claimToken,
+          user_msg_id: userMessageId,
+        }],
+      };
+    }
+    if (text.includes('WITH ranked AS')) {
+      return { rows: memoryRows };
+    }
+    if (text.includes("SET status='failed'")) {
+      return { rows: [{ generation_id: generationId }] };
+    }
+    if (text.includes('WITH inserted AS (') && text.includes("SET status='completed'")) {
+      const metadata = JSON.parse(params[3]);
+      if (metadataSink) metadataSink(metadata);
+      return {
+        rows: [{
+          msg_id: assistantMessageId,
+          conv_id: conversationId,
+          role: 'assistant',
+          content: params[2],
+          created_at: '2026-10-06T09:00:00.000Z',
+          meta: metadata,
+        }],
+      };
+    }
+
+    throw new Error(`Unexpected query: ${text}`);
+  };
 }
 
 test('assistant status reports disabled without touching the database', async () => {
@@ -58,9 +133,10 @@ test('assistant generation returns 503 when no provider is configured', async ()
   });
 });
 
-test('assistant generation passes persisted history to provider and persists returned metadata', async () => {
-  const queries = [];
+test('assistant generation uses a durable claim, preserves metadata, and exposes phase timing', async () => {
+  const calls = [];
   const providerCalls = [];
+  let persistedMetadata;
   const assistantProvider = {
     name: 'test-provider',
     async generateResponse(request) {
@@ -76,40 +152,39 @@ test('assistant generation passes persisted history to provider and persists ret
       };
     },
   };
-
-  const query = async (text, params) => {
-    queries.push({ text, params });
-    if (text.includes('FROM comind.cm_conversation WHERE conv_id=$1')) {
-      return { rows: [{ conv_id: conversationId }] };
-    }
-    if (text.includes('SELECT role, content')) {
-      return {
-        rows: [
-          { role: 'user', content: 'First persisted message' },
-          { role: 'assistant', content: 'Earlier persisted answer' },
-          { role: 'user', content: 'Latest persisted message' },
-        ],
-      };
-    }
-    if (text.includes('INSERT INTO comind.cm_message')) {
-      return {
-        rows: [{
-          msg_id: '55555555-5555-4555-8555-555555555559',
-          conv_id: conversationId,
-          role: 'assistant',
-          content: params[1],
-          created_at: '2026-10-06T09:00:00.000Z',
-          meta: JSON.parse(params[2]),
-        }],
-      };
-    }
-    throw new Error(`Unexpected query: ${text}`);
-  };
+  const history = [
+    {
+      role: 'user',
+      content: 'First persisted message',
+      msg_id: '55555555-5555-4555-8555-555555555556',
+      conv_id: conversationId,
+      created_at: '2026-10-06T08:57:00.000Z',
+      meta: {},
+    },
+    {
+      role: 'assistant',
+      content: 'Earlier persisted answer',
+      msg_id: '55555555-5555-4555-8555-555555555557',
+      conv_id: conversationId,
+      created_at: '2026-10-06T08:58:00.000Z',
+      meta: {},
+    },
+    {
+      role: 'user',
+      content: 'Latest persisted message',
+      msg_id: userMessageId,
+      conv_id: conversationId,
+      created_at: '2026-10-06T08:59:00.000Z',
+      meta: {},
+    },
+  ];
+  const query = createFastPathQuery({
+    calls,
+    history,
+    metadataSink: (metadata) => { persistedMetadata = metadata; },
+  });
 
   await withApp({ query, assistantProvider }, async (app) => {
-    const status = await app.inject({ method: 'GET', url: '/api/assistant/status' });
-    assert.deepEqual(status.json(), { enabled: true, provider: 'test-provider' });
-
     const response = await app.inject({
       method: 'POST',
       url: `/api/conversations/${conversationId}/assistant-response`,
@@ -120,19 +195,33 @@ test('assistant generation passes persisted history to provider and persists ret
     assert.equal(response.json().content, 'Persisted assistant answer');
     assert.deepEqual(providerCalls, [{
       conversationId,
-      messages: [
-        { role: 'user', content: 'First persisted message' },
-        { role: 'assistant', content: 'Earlier persisted answer' },
-        { role: 'user', content: 'Latest persisted message' },
-      ],
+      messages: history.map(({ role, content }) => ({ role, content })),
     }]);
-    assert.equal(queries.length, 3);
-    assert.deepEqual(JSON.parse(queries[2].params[2]), {
-      provider: 'test-provider',
-      model: 'deterministic-test-model',
-      response_id: 'test-response-001',
-      usage: { input_tokens: 12, output_tokens: 4, total_tokens: 16 },
+
+    const historyQuery = calls.find((call) => call.text.includes('AS recent'));
+    assert.ok(historyQuery);
+    assert.match(historyQuery.text, /ORDER BY created_at DESC, msg_id DESC\s+LIMIT \$2/);
+    assert.deepEqual(historyQuery.params, [conversationId, 40]);
+    assert.ok(calls.some((call) => call.text.includes('INSERT INTO comind.cm_assistant_generation')));
+    assert.ok(calls.some((call) => call.text.includes("SET status='completed'")));
+
+    assert.equal(persistedMetadata.provider, 'test-provider');
+    assert.equal(persistedMetadata.model, 'deterministic-test-model');
+    assert.equal(persistedMetadata.response_id, 'test-response-001');
+    assert.deepEqual(persistedMetadata.usage, {
+      input_tokens: 12,
+      output_tokens: 4,
+      total_tokens: 16,
     });
+    assert.equal(persistedMetadata.conversation_fast_path.strategy, 'durable_generation_claim_v1');
+    assert.equal(persistedMetadata.conversation_fast_path.history_limit, 40);
+    assert.equal(persistedMetadata.conversation_fast_path.history_message_count, 3);
+    assert.ok(persistedMetadata.conversation_fast_path.claim_ms >= 0);
+    assert.ok(persistedMetadata.conversation_fast_path.provider_ms >= 0);
+    assert.match(response.headers['server-timing'], /claim;dur=/);
+    assert.match(response.headers['server-timing'], /memory;dur=/);
+    assert.match(response.headers['server-timing'], /provider;dur=/);
+    assert.match(response.headers['server-timing'], /persistence;dur=/);
   });
 });
 
@@ -151,42 +240,17 @@ test('assistant generation injects project memory and persists compact retrieval
       };
     },
   };
-
-  const query = async (text, params) => {
-    if (text.includes('FROM comind.cm_conversation WHERE conv_id=$1')) {
-      return { rows: [{ conv_id: conversationId, project_id: projectId }] };
-    }
-    if (text.includes('SELECT role, content')) {
-      return { rows: [{ role: 'user', content: 'What did we decide about cost monitoring?' }] };
-    }
-    if (text.includes('WITH ranked AS')) {
-      assert.equal(params[0], projectId);
-      assert.equal(params[1], 'What did we decide about cost monitoring?');
-      return {
-        rows: [{
-          memory_id: memoryId,
-          title: 'Cost monitoring decision',
-          kind: 'decision',
-          content: memoryContent,
-          score: '0.812345',
-        }],
-      };
-    }
-    if (text.includes('INSERT INTO comind.cm_message')) {
-      persistedMetadata = JSON.parse(params[2]);
-      return {
-        rows: [{
-          msg_id: '99999999-9999-4999-8999-999999999999',
-          conv_id: conversationId,
-          role: 'assistant',
-          content: params[1],
-          created_at: '2026-10-07T20:00:00.000Z',
-          meta: persistedMetadata,
-        }],
-      };
-    }
-    throw new Error(`Unexpected query: ${text}`);
-  };
+  const query = createFastPathQuery({
+    project: projectId,
+    memoryRows: [{
+      memory_id: memoryId,
+      title: 'Cost monitoring decision',
+      kind: 'decision',
+      content: memoryContent,
+      score: '0.812345',
+    }],
+    metadataSink: (metadata) => { persistedMetadata = metadata; },
+  });
 
   await withApp({ query, assistantProvider }, async (app) => {
     const response = await app.inject({
@@ -202,7 +266,7 @@ test('assistant generation injects project memory and persists compact retrieval
     assert.match(providerCalls[0].messages[0].content, /reviewed rate cards/);
     assert.deepEqual(providerCalls[0].messages[1], {
       role: 'user',
-      content: 'What did we decide about cost monitoring?',
+      content: 'Latest persisted message',
     });
 
     assert.equal(persistedMetadata.memory_retrieval.strategy, 'project_lexical_v1');
@@ -213,7 +277,8 @@ test('assistant generation injects project memory and persists compact retrieval
   });
 });
 
-test('assistant generation bounds persisted history before provider invocation', async () => {
+test('assistant history is bounded by PostgreSQL before provider invocation', async () => {
+  const calls = [];
   const providerCalls = [];
   const assistantProvider = {
     name: 'test-provider',
@@ -222,49 +287,31 @@ test('assistant generation bounds persisted history before provider invocation',
       return { content: 'Bounded assistant answer' };
     },
   };
+  const history = [
+    {
+      role: 'assistant',
+      content: 'First assistant turn',
+      msg_id: '55555555-5555-4555-8555-555555555557',
+      conv_id: conversationId,
+      created_at: '2026-10-06T08:58:00.000Z',
+      meta: {},
+    },
+    {
+      role: 'user',
+      content: 'Second user turn',
+      msg_id: userMessageId,
+      conv_id: conversationId,
+      created_at: '2026-10-06T08:59:00.000Z',
+      meta: {},
+    },
+  ];
+  const query = createFastPathQuery({ calls, history });
 
-  const query = async (text, params) => {
-    if (text.includes('FROM comind.cm_conversation WHERE conv_id=$1')) {
-      return { rows: [{ conv_id: conversationId }] };
-    }
-    if (text.includes('SELECT role, content')) {
-      return {
-        rows: [
-          { role: 'system', content: 'Original system guidance' },
-          { role: 'user', content: 'First user turn' },
-          { role: 'assistant', content: 'First assistant turn' },
-          { role: 'user', content: 'Second user turn' },
-        ],
-      };
-    }
-    if (text.includes('INSERT INTO comind.cm_message')) {
-      return {
-        rows: [{
-          msg_id: '55555555-5555-4555-8555-555555555560',
-          conv_id: conversationId,
-          role: 'assistant',
-          content: params[1],
-          created_at: '2026-10-06T09:00:00.000Z',
-          meta: JSON.parse(params[2]),
-        }],
-      };
-    }
-    throw new Error(`Unexpected query: ${text}`);
-  };
-
-  const app = await buildApp({
-    query,
-    closePool: closePoolForTest,
-    assistantProvider,
-    assistantMaxHistoryMessages: 2,
-  });
-
-  try {
+  await withApp({ query, assistantProvider, assistantMaxHistoryMessages: 2 }, async (app) => {
     const response = await app.inject({
       method: 'POST',
       url: `/api/conversations/${conversationId}/assistant-response`,
     });
-
     assert.equal(response.statusCode, 201);
     assert.deepEqual(providerCalls, [{
       conversationId,
@@ -273,30 +320,22 @@ test('assistant generation bounds persisted history before provider invocation',
         { role: 'user', content: 'Second user turn' },
       ],
     }]);
-  } finally {
-    await app.close();
-  }
+
+    const historyQuery = calls.find((call) => call.text.includes('AS recent'));
+    assert.deepEqual(historyQuery.params, [conversationId, 2]);
+    assert.match(historyQuery.text, /LIMIT \$2/);
+  });
 });
 
-test('assistant provider failure returns 502 without inserting an assistant message', async () => {
-  const queries = [];
+test('assistant provider failure marks the durable claim failed and allows explicit retry', async () => {
+  const calls = [];
   const assistantProvider = {
     name: 'test-provider',
     async generateResponse() {
       throw new Error('Upstream secret-bearing failure details must not escape');
     },
   };
-
-  const query = async (text, params) => {
-    queries.push({ text, params });
-    if (text.includes('FROM comind.cm_conversation WHERE conv_id=$1')) {
-      return { rows: [{ conv_id: conversationId }] };
-    }
-    if (text.includes('SELECT role, content')) {
-      return { rows: [{ role: 'user', content: 'Durable before provider failure' }] };
-    }
-    throw new Error(`Unexpected write after provider failure: ${text}`);
-  };
+  const query = createFastPathQuery({ calls });
 
   await withApp({ query, assistantProvider }, async (app) => {
     const response = await app.inject({
@@ -305,9 +344,12 @@ test('assistant provider failure returns 502 without inserting an assistant mess
     });
     assert.equal(response.statusCode, 502);
     assert.deepEqual(response.json(), { error: 'Assistant provider request failed' });
-    assert.equal(queries.length, 2);
-    assert.ok(queries.every((call) => !call.text.includes('INSERT INTO comind.cm_message')));
     assert.doesNotMatch(response.body, /secret-bearing/);
+
+    const failedClaim = calls.find((call) => call.text.includes("SET status='failed'"));
+    assert.ok(failedClaim);
+    assert.deepEqual(failedClaim.params, [generationId, claimToken]);
+    assert.equal(calls.some((call) => call.text.includes('WITH inserted AS (')), false);
   });
 });
 

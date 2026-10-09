@@ -90,19 +90,17 @@ test('assistant replay returns the persisted response without calling the provid
     if (text.includes('SELECT conv_id, project_id FROM comind.cm_conversation')) {
       return { rows: [{ conv_id: conversationId, project_id: null }] };
     }
-    if (text.includes('SELECT role, content')) {
+    if (text.includes('FROM LATERAL (')) {
       return {
-        rows: [
-          {
-            role: 'user',
-            content: 'Persisted user turn',
-            msg_id: '55555555-5555-4555-8555-555555555558',
-            conv_id: conversationId,
-            created_at: '2026-10-06T08:59:00.000Z',
-            meta: {},
-          },
-          existingAssistant,
-        ],
+        rows: [{
+          user_msg_id: '55555555-5555-4555-8555-555555555558',
+          assistant_msg_id: existingAssistant.msg_id,
+          assistant_conv_id: existingAssistant.conv_id,
+          assistant_role: existingAssistant.role,
+          assistant_content: existingAssistant.content,
+          assistant_created_at: existingAssistant.created_at,
+          assistant_meta: existingAssistant.meta,
+        }],
       };
     }
     if (text.includes('INSERT INTO comind.cm_message')) {

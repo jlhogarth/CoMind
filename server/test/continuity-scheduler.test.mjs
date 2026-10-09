@@ -33,3 +33,22 @@ test('scheduler isolates write failures', async () => {
   await scheduler.drain();
   assert.deepEqual(failures, ['checkpoint_write_failed']);
 });
+
+test('scheduler coalesces repeated conversation snapshots', async () => {
+  const calls = [];
+  const scheduler = createCheckpointScheduler(async (sql, params) => {
+    calls.push(params); return { rows: [{ checkpoint_id: '1' }] };
+  }, { enabled: true });
+  const first = state('a');
+  const second = { ...state('a'), executionId: 'generation-2' };
+  assert.equal(scheduler.schedule(first), true);
+  assert.equal(scheduler.schedule(second), true);
+  await scheduler.drain();
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][1], 'generation-2');
+});
+test('scheduler refuses new work after close', async () => {
+  const scheduler = createCheckpointScheduler(async () => ({ rows: [{ checkpoint_id: '1' }] }), { enabled: true });
+  await scheduler.close();
+  assert.equal(scheduler.schedule(state('a')), false);
+});

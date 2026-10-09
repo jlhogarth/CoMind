@@ -14,6 +14,7 @@ const environmentSchema = z
     CORS_ORIGINS: z.string().default(''),
     PORT: z.coerce.number().int().min(1).max(65535).default(3000),
     ASSISTANT_PROVIDER: z.enum(['disabled', 'openai']).default('disabled'),
+    ACP_CHECKPOINTS_ENABLED: z.enum(['true', 'false']).default('false').transform(value => value === 'true'),
     ASSISTANT_MAX_HISTORY_MESSAGES: z.coerce.number().int().min(1).max(200).default(40),
     ASSISTANT_QUALITY_GATE: z.enum(['disabled', 'metered']).default('disabled'),
     ASSISTANT_QUALITY_VERIFIER_FAILURE_FALLBACK: z

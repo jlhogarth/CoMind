@@ -1,4 +1,5 @@
 import Fastify from 'fastify';
+import { createCheckpointScheduler } from './continuity/scheduler.js';
 import cors from '@fastify/cors';
 import swagger from '@fastify/swagger';
 import multipart from '@fastify/multipart';
@@ -58,6 +59,30 @@ export async function buildApp(overrides: Partial<AppDependencies> = {}) {
   }
 
   const app = Fastify({ logger: true });
+  const checkpointScheduler = createCheckpointScheduler(dependencies.query, {
+    enabled: env.ACP_CHECKPOINTS_ENABLED && !overrides.query,
+    onFailure: (reason) => app.log.warn({ reason }, 'ACP checkpoint scheduling failed'),
+  });
+  app.addHook('onResponse', (request, reply, done) => {
+    if (reply.statusCode === 201
+      && request.method === 'POST'
+      && /^\/api\/conversations\/[^/]+\/assistant-response$/.test(request.url.split('?')[0])) {
+      const conversationId = request.url.split('/')[3];
+      checkpointScheduler.schedule({
+        conversationId,
+        executionId: request.id,
+        parentCheckpointId: null,
+        authority: { subjectId: 'system', capabilityIds: [], policyVersion: 'system-observation-v1' },
+        context: {
+          objective: 'Assistant response persisted',
+          decisions: [],
+          references: ['conversation:' + conversationId],
+        },
+        pending: [],
+      });
+    }
+    done();
+  });
   const allowedOrigins = env.CORS_ORIGINS
     .split(',')
     .map((origin) => origin.trim())
@@ -92,6 +117,7 @@ export async function buildApp(overrides: Partial<AppDependencies> = {}) {
   app.get('/api/db/health', async () => dependencies.databaseHealth());
 
   app.addHook('onClose', async () => {
+    await checkpointScheduler.close();
     await dependencies.closePool();
   });
 

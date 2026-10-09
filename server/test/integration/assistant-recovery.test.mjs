@@ -265,8 +265,30 @@ test('recovery and later turns use only the selected persisted chronological his
     assistantMetadata.every((meta) => /^sha256:[0-9a-f]{64}$/.test(meta.request_fingerprint)),
     true
   );
+  assert.equal(
+    assistantMetadata.every((meta) => meta.conversation_fast_path?.strategy === 'durable_generation_claim_v1'),
+    true
+  );
+  assert.equal(
+    assistantMetadata.every((meta) => meta.conversation_fast_path?.history_limit === 40),
+    true
+  );
   assert.deepEqual(
-    assistantMetadata.map(({ duration_ms, request_fingerprint, ...meta }) => meta),
+    assistantMetadata.map((meta) => meta.conversation_fast_path?.history_message_count),
+    [1, 3]
+  );
+  for (const meta of assistantMetadata) {
+    assert.equal(typeof meta.conversation_fast_path?.claim_ms, 'number');
+    assert.equal(typeof meta.conversation_fast_path?.memory_retrieval_ms, 'number');
+    assert.equal(typeof meta.conversation_fast_path?.provider_ms, 'number');
+  }
+  assert.deepEqual(
+    assistantMetadata.map(({
+      duration_ms,
+      request_fingerprint,
+      conversation_fast_path,
+      ...meta
+    }) => meta),
     [
       expectedOpenAiRecoveryMetadata('test-recovery-2', firstUser.content.length),
       expectedOpenAiRecoveryMetadata('test-recovery-3', secondUser.content.length),

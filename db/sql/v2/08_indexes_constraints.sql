@@ -20,7 +20,16 @@ CREATE INDEX IF NOT EXISTS idx_embedding_vec ON cm_embedding USING ivfflat (vec 
 -- Conversations
 CREATE INDEX IF NOT EXISTS idx_conv_project ON cm_conversation(project_id);
 CREATE INDEX IF NOT EXISTS idx_msg_conv ON cm_message(conv_id);
+CREATE INDEX IF NOT EXISTS idx_msg_conv_created_desc ON cm_message(conv_id, created_at DESC, msg_id DESC);
 CREATE INDEX IF NOT EXISTS idx_msg_content_trgm ON cm_message USING gin (content gin_trgm_ops);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_assistant_generation_active_conv
+  ON cm_assistant_generation(conv_id)
+  WHERE status = 'active';
+CREATE UNIQUE INDEX IF NOT EXISTS uq_assistant_generation_completed_user
+  ON cm_assistant_generation(user_msg_id)
+  WHERE status = 'completed';
+CREATE INDEX IF NOT EXISTS idx_assistant_generation_conv_user_status
+  ON cm_assistant_generation(conv_id, user_msg_id, status);
 
 -- Agents / tasks
 CREATE INDEX IF NOT EXISTS idx_agent_org ON cm_agent(org_id);

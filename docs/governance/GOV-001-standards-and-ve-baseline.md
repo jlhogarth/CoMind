@@ -41,6 +41,20 @@ Decision 2026-10-10: retain all established CoMind agent names and conventions. 
 5. Introduce automated tier checks at PR acceptance and runtime policy enforcement, with latency and cost budgets measured against the Interactive Runtime Performance baseline.
 6. Exercise multi-agent conflict, prompt injection, revoked delegation, audit failure, and recovery cases in isolated tests.
 
+
+## Parallel-work protection and deferred module registry
+
+Active parallel pull requests inspected on 2026-10-10: #88 interactive runtime performance, #86 Foundry work-lease kernel, and #84 ACP durable continuity. GOV-001 owns documentation and compliance planning only until integration dependencies are reviewed; do not edit their code, schema, workflow, or shared runtime contracts in this lane. The VE Management Dashboard is registered as a deferred module in `docs/roadmap/virtual-employee-management-dashboard.md`, with the full Agent Directory, operations, human approvals, governance, performance, and continuity backlog. It is not a current GOV-001 blocker.
+
+### ISO implementation next steps without shared runtime changes
+
+1. Define draft AI management-system scope, accountable human roles, exclusions and certification boundary for approval.
+2. Build a standards applicability register using exact editions and authoritative licensed sources. Mark all clause mappings unverified until examined.
+3. Create a control-to-evidence matrix referencing existing repository controls and explicitly marking design-only, tested-in-isolation, deployed and independently assessed states.
+4. Identify evidence retention, exceptions, internal-audit independence, management-review cadence, supplier and model-provider obligations, and risk acceptance authority.
+5. Prepare a read-only ISO shadow-mode role contract; defer actual profile/grants/runtime activation to a separately authorized isolated implementation issue.
+6. Gate any future runtime policy hooks on merge coordination with #86/#84/#88 and latency/cost baseline checks.
+
 ## Acceptance boundary
 
 GOV-001 may close only when its inventory and standards applicability evidence are verified and the next implementation backlog is explicit. No live Supabase changes, paid provider requests, autonomous agent activation, or certification claims are authorized by this document. A PR must be tested at its final head before merge.

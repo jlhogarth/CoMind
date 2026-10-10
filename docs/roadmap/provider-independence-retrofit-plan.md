@@ -24,6 +24,7 @@ The retrofit is intentionally incremental. Existing OpenAI behavior remains vali
 10. Treat external gateways as replaceable adapters.
 11. Preserve explicit governed-attempt semantics: no hidden automatic retries or fallback calls behind one provider execution identity.
 12. Register material providers/gateways and consequential model/provider changes through the existing AIMS supplier, system, risk, approval, and reassessment controls.
+13. Distinguish independent parallel review from critique. A reviewer that sees the primary answer before forming its own opinion is performing critique, not producing an independent second opinion.
 
 ## 3. Current coupling inventory
 
@@ -90,6 +91,7 @@ Every result must be classified as one of:
 One registry resolves:
 
 - provider adapter
+- provider organization / independence domain
 - model descriptor
 - model family
 - requested and resolved model identity/version where exposed
@@ -117,6 +119,8 @@ Callers should express intent such as:
 - latency preference
 - privacy constraints
 - required/forbidden model families
+- required provider-organization diversity where applicable
+- arbitration mode
 - arbitration role
 
 They should not need to know a raw API key or provider SDK object.
@@ -128,6 +132,7 @@ Every provider adapter should support the subset of capabilities it advertises a
 - request normalization
 - requested/canonical/resolved model identity
 - model revision/version/build identity where exposed
+- upstream provider organization where known
 - usage normalization
 - result normalization
 - error normalization
@@ -148,7 +153,9 @@ Provider credentials are opaque references from the caller perspective. Resoluti
 
 ### 5.5 Arbitration contract
 
-Model arbitration should be a first-class execution plan rather than an ad hoc loop over provider clients. It must record participant role, actual model family, and resolved identity information available from the provider and produce bounded comparison/contradiction outcomes.
+Model arbitration should be a first-class execution plan rather than an ad hoc loop over provider clients. It must record participant role, arbitration mode, actual model family, provider organization where known, resolved identity information available from the provider, and cross-model visibility policy.
+
+A strict independent second opinion requires independent-parallel execution: participants receive materially equivalent authorized task/evidence context but do not receive another participant's answer until their own output is sealed. Critique mode deliberately exposes another model's answer and must not be counted as an independent vote. Synthesis/adjudication occurs only after the relevant independent outputs are sealed.
 
 ## 6. Retrofit execution phases
 
@@ -166,6 +173,7 @@ Exit criterion: current behavior is reproducible, provider-neutral test expectat
 
 - Add provider and model descriptors.
 - Add explicit model-family identity.
+- Add provider-organization / independence-domain identity.
 - Record requested/canonical/resolved model identity and model revision/version where exposed.
 - Add acquisition-mode enum/contract: BYOK, BYOM, BYOP, managed.
 - Register fixture and OpenAI through the same registry.
@@ -229,14 +237,18 @@ Exit criterion: at least two distinct model families can pass deterministic conf
 - Add arbitration-plan object.
 - Require model-family identity.
 - Support excluding primary family.
-- Add compare/contrast normalization.
+- Support provider-organization diversity requirements for higher-consequence policy.
+- Implement independent-parallel, critique, and synthesis/adjudication modes.
+- Prevent independent-parallel participants from receiving another participant's answer before their own output is sealed.
+- Preserve materially equivalent task/evidence context or record deliberate asymmetry.
+- Add compare/contrast normalization only after independent outputs are sealed.
 - Add Assumption Validator/contradiction integration.
 - Add abstain/unresolved/escalation outcomes.
 - Add budget-bounded participant selection.
 - Add provenance linking primary and reviewer executions.
 - Record model revision/version or identity-observation time where available so later re-evaluation can detect model drift.
 
-Exit criterion: CoMind can demonstrate a deterministic two-family arbitration flow with fixtures and can prove that same-family routing fails a strict-independence requirement.
+Exit criterion: CoMind can demonstrate a deterministic independent-parallel two-family arbitration flow, can prove that same-family routing fails a strict-independence requirement, can prove that critique mode is not counted as an independent vote, and can fail closed when a required independence dimension cannot be verified.
 
 ### Phase G: PTSD/private/local modernization
 
@@ -262,13 +274,14 @@ Exit criterion: the PTSD subsystem no longer needs a private provider architectu
 - add static/repository checks for unauthorized direct provider SDK construction where practical;
 - maintain an exception registry for intentional direct adapter code;
 - add architecture test preventing fallback from weakening constraints;
-- add architecture test or policy check preventing hidden multi-attempt retry/failover where the governed wrapper requires explicit attempts.
+- add architecture test or policy check preventing hidden multi-attempt retry/failover where the governed wrapper requires explicit attempts;
+- add arbitration tests preventing cross-model answer leakage before sealing in independent-parallel mode.
 
 Exit criterion: provider-specific coupling is bounded to adapters/tests/approved exceptions.
 
 ## 7. Model arbitration migration priorities
 
-Not every subsystem needs multiple models. The first useful targets are those where independent critique materially improves reliability.
+Not every subsystem needs multiple models. The first useful targets are those where independent critique or independent parallel review materially improves reliability.
 
 Priority candidates:
 
@@ -305,8 +318,9 @@ Before adopting MyApps/Machine, OpenRouter, or another gateway as a CoMind adapt
 
 - API availability and authentication model
 - exact upstream model identity availability
+- upstream provider organization identity availability
 - resolved model revision/version identity availability where exposed
-- ability to pin/exclude model families
+- ability to pin/exclude model families and provider organizations where required
 - privacy/data retention terms
 - training/use-of-data terms
 - regional/residency controls
@@ -314,6 +328,7 @@ Before adopting MyApps/Machine, OpenRouter, or another gateway as a CoMind adapt
 - whether retries/failover are visible and controllable per external attempt
 - request/response logging behavior
 - prompt/context retention
+- ability to prevent cross-model answer sharing during independent-parallel review
 - usage/cost precision
 - latency and rate limits
 - outage/fallback semantics
@@ -326,7 +341,7 @@ Before adopting MyApps/Machine, OpenRouter, or another gateway as a CoMind adapt
 - AIMS supplier identifier, owner, approval state, linked risk records, and reassessment triggers
 - upstream/subsupplier visibility where a gateway fronts other model providers
 
-A gateway that cannot prove upstream identity may be useful for inference but must not satisfy strict independent-family verification. A gateway that hides retries or upstream fallback may be unsuitable for governed cost-bearing execution unless CoMind can preserve distinct attempt, budget, telemetry, and settlement evidence.
+A gateway that cannot prove an identity dimension required by the arbitration policy may be useful for inference but must not satisfy that strict independence requirement. A gateway that hides retries or upstream fallback may be unsuitable for governed cost-bearing execution unless CoMind can preserve distinct attempt, budget, telemetry, and settlement evidence.
 
 ## 10. Acceptance evidence for each retrofit PR
 
@@ -339,6 +354,8 @@ Every implementation PR should include:
 - evidence that budget/provenance controls remain in path
 - evidence that governed attempt/retry/fallback semantics remain in path
 - AIMS system/supplier/risk impact and whether reassessment is required
+- arbitration mode and independence dimensions when multi-model behavior changes
+- evidence that independent-parallel participants do not receive another model's answer before sealing
 - migration/compatibility impact
 - live-call status: none, bounded, or explicitly authorized
 - evidence state: repository, isolated, deployed, operating, or other explicitly supported state
@@ -351,7 +368,7 @@ Paid provider calls remain unnecessary unless the implementation specifically re
 Do not open all of these simultaneously. Create each only when its dependency is accepted to avoid parallel competing provider foundations.
 
 1. Provider behavior baseline and network-free adapter conformance harness
-2. Provider/model descriptors, model-family identity, acquisition mode, and canonical registry with fixture/OpenAI registration
+2. Provider/model descriptors, model-family and provider-organization identity, acquisition mode, and canonical registry with fixture/OpenAI registration
 3. Credential-reference and BYOK/BYOM/BYOP policy boundary
 4. First caller migrations and convergence toward governed provider execution
 5. Independent second-opinion/model-arbitration runtime
@@ -367,7 +384,8 @@ The Greater CoMind retrofit is complete when:
 - every model-backed execution has provider/model-family provenance and the best available resolved model identity;
 - Virtual Employees receive inference capabilities rather than credentials;
 - user/provider choice is governed through BYOK/BYOM/BYOP/managed modes;
-- strict second-opinion requests enforce genuine model-family independence;
+- strict second-opinion requests enforce independent-parallel formation before synthesis, genuine model-family independence, and any additional provider-organization independence required by policy;
+- critique is recorded as critique rather than miscounted as an independent vote;
 - sensitive/private routing can require private or local inference;
 - external gateways remain replaceable;
 - material providers/gateways and consequential changes are governed through the existing AIMS supplier/system/risk process;

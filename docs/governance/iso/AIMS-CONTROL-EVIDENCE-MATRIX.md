@@ -10,6 +10,7 @@ Use one of these states for every control assertion:
 - **PROPOSED:** desired control exists only as a plan or decision.
 - **REPOSITORY_IMPLEMENTED:** code/policy/migration exists in source control; execution effectiveness is not yet proven.
 - **ISOLATED_VERIFIED:** deterministic test or disposable-database evidence demonstrates the control in an isolated environment.
+- **VERIFIED_NOT_DEPLOYED:** read-only observation proves the intended control/schema is absent from the live target.
 - **DEPLOYED_UNVERIFIED:** deployment is believed or recorded, but current effectiveness has not been independently rechecked.
 - **OPERATING_EVIDENCE:** repeated real operation produces retained evidence against defined acceptance criteria.
 - **INDEPENDENTLY_ASSESSED:** an appropriately independent review/audit has evaluated the control.
@@ -21,35 +22,40 @@ Never promote a state based on confidence, documentation volume, or intent.
 
 | Control objective | CoMind implementation/evidence reference | Current evidence state | Gap / next proof |
 | --- | --- | --- | --- |
-| Governance policy and evidence-before-success rule | `AGENTS.md` no-placeholder and evidence requirements | REPOSITORY_IMPLEMENTED | Prove systematic PR/runtime enforcement and exception handling |
+| Governance policy and evidence-before-success rule | `AGENTS.md`; `AIMS-AI-POLICY-DRAFT.md` | REPOSITORY_IMPLEMENTED; management policy not yet approved | Formal policy approval; prove systematic PR/runtime enforcement and exception handling |
 | Engineering risk classification | `AGENTS.md` T0-T3 provisional governance policy | REPOSITORY_IMPLEMENTED | Automated checks and historical operating evidence absent |
-| Human authority boundary | Existing C0-C4 conventions; `cm_foundry_capability_grant`, authorization request/decision substrate | ISOLATED_VERIFIED for Foundry substrate | Verify deployed adoption; prove production deny-by-default before consequential use |
-| Agent/actor identity lineage | `cm_agent`, `cm_actor`, `cm_foundry_agent_profile` in Foundry substrate migration | ISOLATED_VERIFIED | Read-only live inventory and uniqueness/effective-state verification |
-| Least-privilege capability grants | Foundry capability/grant schema and runtime broker contract | ISOLATED_VERIFIED | Prove adapter coverage, revocation propagation and production scope enforcement |
-| Separation of request and decision provenance | `cm_foundry_authorization_request` and `cm_foundry_authorization_decision` | ISOLATED_VERIFIED | Define human approval/separation-of-duties policy by risk tier |
-| Fail-closed runtime authorization | `server/src/foundry-runtime.ts`; Foundry orchestration integration tests | ISOLATED_VERIFIED | Production adapter integration not established; C3/C4 runtime deliberately unsupported |
-| Recovery and checkpoint provenance | Foundry recovery checkpoint substrate plus ACP-001 PR #84 in parallel | PARTIAL / parallel work | Do not map #84 as accepted evidence until merged and final-head verified |
+| Human authority boundary | Existing C0-C4 conventions; repository Foundry grant/authorization substrate | ISOLATED_VERIFIED; live Foundry substrate VERIFIED_NOT_DEPLOYED | Production deny-by-default requires separate deployment/hardening milestone |
+| Agent/actor identity lineage | `cm_agent`, `cm_actor`, repository `cm_foundry_agent_profile`; live evidence snapshot | Repository Foundry identity ISOLATED_VERIFIED; live Foundry profile VERIFIED_NOT_DEPLOYED; live `cm_agent` count 0 | Deploy only after security readiness and separate authorization |
+| Least-privilege capability grants | Repository Foundry capability/grant schema and runtime broker | ISOLATED_VERIFIED; live capability table VERIFIED_NOT_DEPLOYED | Prove deployment, adapter coverage, revocation propagation and scope enforcement |
+| Separation of request and decision provenance | Repository Foundry authorization request/decision | ISOLATED_VERIFIED; live tables VERIFIED_NOT_DEPLOYED | Apply approved separation-of-duties model after deployment |
+| Fail-closed runtime authorization | `server/src/foundry-runtime.ts`; Foundry orchestration integration tests | ISOLATED_VERIFIED; not a live production control | Production adapter integration absent; C3/C4 runtime deliberately unsupported |
+| Recovery and checkpoint provenance | Foundry recovery substrate plus ACP-001 PR #84 in parallel | PARTIAL / parallel work | Do not map #84 as accepted evidence until merged and final-head verified |
 | Durable work ownership / no silent delegated work | Policy in `AGENTS.md`; Foundry work-lease PR #86 in parallel | PROPOSED + parallel implementation | Do not claim work-lease control until #86 is merged and independently verified |
 | Performance impact of governance | Interactive runtime performance PR #88 in parallel | PROPOSED + parallel implementation | Establish stable baseline and thresholds before runtime compliance hooks |
-| Budget authority / AI cost governance | FinOps migration/specification and budget authority binding reused by Foundry | REPOSITORY_IMPLEMENTED / prior isolated verification documented | Recheck current deployment, provider-price/version accuracy and operating evidence |
+| Budget authority / AI cost governance | FinOps migration/specification and repository budget authority binding | REPOSITORY_IMPLEMENTED / prior isolated verification documented; live `cm_budget_authority_binding` VERIFIED_NOT_DEPLOYED | Reconcile migration delta before any production paid-provider autonomy |
 | Provider call governance | Governed provider execution wrapper/provenance docs and tests | ISOLATED_VERIFIED based on repository evidence | Verify exact live integration path and supplier/model change controls |
-| Database row-level security | `20261008_007_foundry_security_prerequisites.sql` repository hardening | REPOSITORY_IMPLEMENTED; live posture UNVERIFIED | Prior read-only evidence found 75/79 live tables without RLS; recheck before any claim |
-| Broad database access prevention | Security prerequisite migration revokes PUBLIC/anon/authenticated where applicable | ISOLATED_VERIFIED in migration harness | Verify actual deployed roles/policies and intended Data API exposure |
-| Database function search-path hardening | Security prerequisite migration addresses seven previously flagged functions | REPOSITORY_IMPLEMENTED / isolated verified | Re-run current Supabase advisor/read-only inspection before closure |
-| Append-only authorization/execution provenance | Foundry substrate mutation guards and terminal result/outcome model | ISOLATED_VERIFIED | Validate retention, legal/privacy constraints, backup integrity and long-term queryability |
-| Inter-agent deliberation integrity | Foundry deliberation events/outcomes, dissent-aware closure, silence-not-agreement tests | ISOLATED_VERIFIED | Real multi-agent operating drill, adversarial conflict and compromised-agent scenarios absent |
-| Prompt/output and agentic security | Existing fail-closed broker patterns; OWASP/MITRE framework adoption in this register | PARTIAL | Threat-model coverage, red-team tests and traceable mitigations not yet complete |
-| AI supplier management | Provider wrappers and cost governance provide technical observations | GAP at AIMS process level | Supplier inventory, due diligence, terms/data-flow assessment, change notification and contingency process needed |
-| AI system inventory | Agent substrate and project artifacts contain partial inventory data | GAP at AIMS process level | Establish controlled inventory for models, providers, agents, datasets, RAG stores, tools and material versions |
-| AI risk register | No authoritative AIMS risk register verified | GAP | Define scoring, owner, treatment, residual risk, acceptance authority, review and evidence links |
-| Incident and corrective action | Technical recovery structures exist | GAP at management-system level | Establish AI/security incident record, root cause, corrective/preventive action and effectiveness review |
-| Internal audit | No AIMS internal-audit process verified | GAP | Define scope, competence, independence, schedule, findings and closure evidence |
-| Management review | No AIMS management-review cadence/evidence verified | GAP | Define required inputs, decisions, resource actions and retained minutes/records |
-| Objectives and measurement | Performance/FinOps metrics exist in parts | PARTIAL | Define AIMS objectives, owner, target, measurement source, frequency and escalation |
-| Training/competence | No controlled AIMS competence/training record verified | GAP | Define role competencies and retained evidence for humans with AIMS responsibilities |
-| Evidence retention | Append-only provenance exists for selected runtime records | PARTIAL | Define retention schedule, evidence classification, legal holds, minimization and disposal |
-| Standards surveillance | `STANDARDS-APPLICABILITY-REGISTER.md` | REPOSITORY_IMPLEMENTED | Define cadence and change-approval workflow; ISO VE later supports shadow monitoring |
-| Certification claims control | `AIMS-SCOPE-DRAFT.md` prohibits unsupported certification/conformity claims | REPOSITORY_IMPLEMENTED | Incorporate into communications/release review if certification program proceeds |
+| Database row-level security | `20261008_007_foundry_security_prerequisites.sql`; `LIVE-READ-ONLY-EVIDENCE-2026-10-10.md` | VERIFIED_NOT_DEPLOYED live: 75/79 `comind` tables have RLS disabled | Dedicated migration-readiness/hardening issue, then post-deployment advisor/catalog proof |
+| Broad database access prevention | Repository security prerequisite migration; live policy inspection | GAP live: unconditional `true` policy expressions remain on conversation/document/message tables | Redesign/verify intended Data API access and least-privilege policies before autonomy |
+| Database function search-path hardening | Repository security prerequisite migration; live Security Advisor | VERIFIED_NOT_DEPLOYED: same 7 mutable-search-path findings observed live | Deploy hardening separately and re-run advisor/catalog verification |
+| Append-only authorization/execution provenance | Repository Foundry substrate mutation guards and terminal result/outcome model | ISOLATED_VERIFIED; live substrate VERIFIED_NOT_DEPLOYED | Validate deployment, retention, backup integrity and long-term queryability later |
+| Inter-agent deliberation integrity | Repository Foundry deliberation events/outcomes and dissent-aware tests | ISOLATED_VERIFIED; no live agent instances observed | Real multi-agent drill and adversarial conflict/compromised-agent scenarios absent |
+| Prompt/output and agentic security | Fail-closed broker patterns; standards register includes OWASP Agentic Top 10 and MITRE ATLAS | PARTIAL | Threat-model coverage, red-team tests and traceable mitigations not yet complete |
+| AI supplier management | `AIMS-AI-SYSTEM-AND-SUPPLIER-INVENTORY.md` defines required record | REPOSITORY_IMPLEMENTED as process design; operating inventory GAP | Populate supplier inventory, due diligence, data-flow, contingency and reassessment evidence |
+| AI system inventory | Live module inventory shows 5 registered modules and 0 `cm_agent` rows; inventory contract exists | PARTIAL / operating inventory GAP | Reconcile repository modules/agents/models/providers/tools/data flows into controlled inventory |
+| AI risk register | `AIMS-RISK-AND-IMPACT-REGISTER.md` | REPOSITORY_IMPLEMENTED as record contract; operating risk register not yet populated | Create first evidence-backed risks, owners/treatments and review dates |
+| Incident and corrective action | `AIMS-AUDIT-REVIEW-CORRECTIVE-ACTION.md` | REPOSITORY_IMPLEMENTED as process design | Establish actual incident/nonconformity records and effectiveness evidence when operating |
+| Internal audit | `AIMS-AUDIT-REVIEW-CORRECTIVE-ACTION.md` | REPOSITORY_IMPLEMENTED as process design | Assign sufficiently independent human reviewer and conduct first audit after AIMS operates |
+| Management review | `AIMS-AUDIT-REVIEW-CORRECTIVE-ACTION.md` | REPOSITORY_IMPLEMENTED as process design | Formal management owner, first review package, decisions and retained record needed |
+| Objectives and measurement | `AIMS-OBJECTIVES-AND-METRICS.md` | REPOSITORY_IMPLEMENTED as measurement design | Approve targets only after relevant baselines are verified; PR #88 supplies performance dependency |
+| Human responsibility/separation | `AIMS-RESPONSIBILITY-MATRIX.md` | REPOSITORY_IMPLEMENTED as design | Assign named accountable humans and resolve role conflicts before operating AIMS |
+| Training/competence | Responsibility model identifies competence need | GAP | Define role competencies and retained evidence for humans with AIMS responsibilities |
+| Evidence retention | Append-only provenance exists for selected repository runtime records; AIMS process requires retention design | PARTIAL | Define legal/contractual retention, classification, minimization, legal hold and disposal |
+| Standards surveillance | `STANDARDS-APPLICABILITY-REGISTER.md`; audit/review cadence | REPOSITORY_IMPLEMENTED | Activate surveillance only with approved cadence/source access; ISO VE later supports shadow monitoring |
+| Certification claims control | `AIMS-SCOPE-DRAFT.md` and `AIMS-AI-POLICY-DRAFT.md` prohibit unsupported claims | REPOSITORY_IMPLEMENTED | Add communications/release review if certification program proceeds |
+
+## Verified live baseline reference
+
+`LIVE-READ-ONLY-EVIDENCE-2026-10-10.md` records the current Supabase observation. It is the authoritative GOV-001 evidence for live schema/security assertions made in this matrix until superseded by a newer controlled observation.
 
 ## Initial control families for the AIMS backlog
 

@@ -70,6 +70,8 @@ The ACP persistence table now includes a database-assigned monotonic `persistenc
 
 The isolated PostgreSQL repository integration test now persists a successor checkpoint with the exact same `createdAt` timestamp as its parent and requires restoration to return the successor. It also verifies that the successor has a strictly greater persistence sequence.
 
+Migration 010 also adds the persistence sequence with `ADD COLUMN IF NOT EXISTS` and recreates the recent-checkpoint index, so a developer database that previously applied an earlier repository-only draft of migration 010 can converge to the reconciled schema without requiring a separate competing migration lane.
+
 This repair changes repository implementation and verification evidence only. It does not imply live migration, production deployment, operating control effectiveness, or certification conformity.
 
 ## Verification boundary

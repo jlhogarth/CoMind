@@ -9,6 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "docs" / "governance" / "iso" / "aims-provisional-crosswalk.csv"
+SOA = ROOT / "docs" / "governance" / "iso" / "AIMS-STATEMENT-OF-APPLICABILITY-PROVISIONAL.md"
 
 EXPECTED_IDS = {
     "A.2.2", "A.2.3", "A.2.4",
@@ -45,6 +46,23 @@ EXPECTED_SOURCE_CLASS = "SECONDARY_SOURCE_UNVERIFIED"
 
 def fail(message: str) -> None:
     raise AssertionError(message)
+
+
+def split_refs(raw: str) -> list[str]:
+    return [item.strip() for item in raw.split(";") if item.strip()]
+
+
+def parse_soa() -> dict[str, tuple[str, str, str, str]]:
+    rows: dict[str, tuple[str, str, str, str]] = {}
+    for line in SOA.read_text(encoding="utf-8").splitlines():
+        if not line.startswith("| `A."):
+            continue
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if len(cells) != 5:
+            fail(f"SoA row has unexpected column count: {line}")
+        cid = cells[0].strip("`")
+        rows[cid] = (cells[1], cells[2], cells[3], cells[4])
+    return rows
 
 
 def main() -> int:
@@ -88,12 +106,30 @@ def main() -> int:
             fail(f"{cid}: source must remain pinned to {EXPECTED_COMMIT}")
         if row["normative_verification"] != EXPECTED_NORMATIVE:
             fail(f"{cid}: GOV-002 may not promote ISO normative verification")
+        for field in ("implementation_refs", "evidence_refs"):
+            for ref in split_refs(row[field]):
+                if not (ROOT / ref).exists():
+                    fail(f"{cid}: cited {field} path does not exist: {ref}")
+
+    soa_rows = parse_soa()
+    if set(soa_rows) != EXPECTED_IDS:
+        fail("human-readable SoA control set does not match machine-readable source")
+    for row in rows:
+        cid = row["control_id"]
+        objective, applicability, tier, evidence = soa_rows[cid]
+        expected = (
+            row["control_objective"], row["applicability"],
+            row["engineering_tier"], row["evidence_state"],
+        )
+        if (objective, applicability, tier, evidence) != expected:
+            fail(f"{cid}: human-readable SoA differs from CSV source")
 
     undetermined = [r["control_id"] for r in rows if r["applicability"] == "UNDETERMINED"]
     print(
         f"OK: {len(rows)} provisional controls validated; "
         f"source={EXPECTED_REPO}@{EXPECTED_COMMIT[:12]}; "
-        f"undetermined={undetermined}; normative={EXPECTED_NORMATIVE}."
+        f"undetermined={undetermined}; normative={EXPECTED_NORMATIVE}; "
+        "SoA and evidence paths verified."
     )
     return 0
 

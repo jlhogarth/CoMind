@@ -24,10 +24,12 @@ The following rules are normative for future CoMind provider work.
 4. Provider and model selection must remain replaceable, auditable, cost-governed, policy-governed, and provenance-preserving.
 5. Provider credentials, API keys, tokens, and service secrets must never enter prompts, model-visible context, durable memory, ordinary application logs, or model arbitration transcripts.
 6. Provider fallback must never silently weaken privacy, data-classification, authority, residency, cost, safety, or model-family-independence requirements.
-7. Actual upstream provider, model, and model-family identity must be preserved whenever they are known and material to provenance.
+7. Actual upstream provider, model, model-family, and available model revision/version identity must be preserved whenever known and material to provenance.
 8. A second opinion is not independent when it resolves to the same model family as the primary execution.
 9. Consensus is evidence, not truth. Dissent, abstention, unresolved contradiction, insufficient evidence, and human escalation are first-class outcomes.
 10. Provider-specific implementation may exist only behind provider-neutral CoMind contracts or as a documented temporary exception with a migration plan.
+11. Every retry, fallback, or reroute that can create another provider request is a distinct governed execution attempt. Governed cost-bearing operations must not hide multiple external attempts behind automatic SDK retry behavior.
+12. Material provider, model, gateway, supplier, data-use, region, or subprocessor changes must flow through CoMind's existing AIMS inventory, risk, approval, and reassessment controls before consequential use.
 
 ## 3. Supported acquisition modes
 
@@ -94,7 +96,11 @@ The existing provider-neutral immutable execution envelope remains the canonical
 
 ### 5.2 Governed provider execution
 
-The existing governed provider execution wrapper remains the common execution boundary for paid or otherwise controlled provider calls. New adapters must inherit the same retry, fingerprint, role, attempt, provenance, and fail-closed properties.
+The existing governed provider execution wrapper remains the target common execution boundary for paid or otherwise controlled provider calls. New adapters must inherit the same retry, fingerprint, role, attempt, provenance, and fail-closed properties.
+
+Current evidence does not establish that ordinary configured assistant traffic is already routed through this wrapper in production. Convergence of current provider paths into the governed execution boundary remains implementation work and must not be represented as an operating control before deployment evidence exists.
+
+For governed provider work, automatic SDK retry authority remains disabled. A legitimate retry, provider failover, or fallback that causes another external request must receive a new immutable attempt identity and, where applicable, a new preflight, quote, reservation, telemetry identity, and settlement identity.
 
 ### 5.3 Budget authority and FinOps
 
@@ -104,9 +110,21 @@ The existing durable budget authority, provider telemetry, quotation, settlement
 
 Virtual Employees and agents must obtain provider use as a governed capability through the existing Foundry authorization model. They do not receive API keys or unrestricted provider clients.
 
+Current Foundry capability and broker evidence is repository/isolated verification, not proof of live deployment or production autonomy. Provider-independent architecture must reuse that authority model without overstating its operating state.
+
 ### 5.5 Memory and provenance
 
 Provider replacement must not fragment durable CoMind memory or create provider-owned continuity. Provider execution provenance must remain linked to CoMind conversation, agent-run, workflow, project, and decision lineage as applicable.
+
+### 5.6 AIMS system and supplier governance
+
+Provider independence does not remove supplier governance. Each material direct provider, gateway, managed inference service, or other external model supplier must be represented through the existing AIMS system/supplier inventory and linked risk controls before consequential use.
+
+The provider registry should expose machine-readable identifiers that can support the AIMS governance view without creating a competing manual runtime registry. Governance records may retain management-only fields such as supplier approval, contractual evidence, risk acceptance, review dates, and reassessment triggers.
+
+When a gateway fronts an upstream model provider, both the gateway and material upstream supplier relationship must remain visible where known. Subprocessor/subsupplier opacity is itself a governance fact and may restrict sensitive or high-consequence routing.
+
+Material changes to model/version, terms, data use, training policy, subprocessors, region, availability, security posture, cost exposure, or regulatory applicability must trigger reassessment under the existing AIMS boundary before consequential production use continues.
 
 ## 6. Canonical provider-neutral contracts
 
@@ -131,6 +149,7 @@ Required characteristics include:
 - region or residency constraints where applicable
 - health and availability metadata
 - gateway upstream-identity transparency capability
+- AIMS supplier identifier or governance reference where applicable
 
 ### 6.2 ModelDescriptor
 
@@ -138,6 +157,8 @@ Required characteristics include:
 
 - requested model identifier
 - canonical model identifier when resolvable
+- resolved model revision/version/build identifier when the provider exposes one
+- model identity observation timestamp when aliases may drift
 - model family
 - provider
 - upstream provider when a gateway is used
@@ -179,6 +200,7 @@ The policy binds permitted execution to:
 - locality/residency requirements
 - capability/tool permissions
 - human approval requirements
+- supplier approval/risk state where consequential use requires it
 
 ### 6.5 ModelArbitrationPlan
 
@@ -214,9 +236,12 @@ Routing inputs may include:
 - geographic/data residency requirements
 - external tool requirements
 - required model-family independence
+- supplier approval/risk state
 - prior empirical performance for the task class
 
 Routing output must preserve the decision basis as bounded provenance.
+
+A routing decision that falls back, retries, or reroutes to another provider/model does not authorize a hidden second external call. Each external attempt must be independently represented by the existing governed attempt identity and its applicable authorization, budget, telemetry, and settlement evidence.
 
 ## 8. Model arbitration and independent second opinion
 
@@ -277,8 +302,11 @@ A gateway may provide model routing, billing aggregation, comparison, managed cr
 - provenance
 - audit
 - evidence and contradiction resolution
+- AIMS supplier inventory and risk ownership
 
 For an independence claim, CoMind must record the actual upstream model and family when available. If the gateway cannot reveal or guarantee upstream identity, that execution may still be useful for ordinary inference but cannot satisfy a strict independent-second-opinion requirement.
+
+A gateway's own retry or fallback behavior must not bypass CoMind attempt identity, budget, provenance, or policy. Hidden multi-provider retries are unacceptable for governed cost-bearing or high-consequence execution unless the gateway can expose each attempt sufficiently for CoMind to preserve its existing controls.
 
 ## 10. Credential and capability security
 
@@ -317,12 +345,13 @@ Required controls include:
 
 Provider routing must evaluate whether a provider is allowed to receive the proposed data before execution.
 
-For sensitive modules, including PTSD or other future health-related deployments, policy may require local/private models, approved enterprise endpoints, zero-retention agreements, reduced context, or explicit user consent.
+For sensitive modules, including PTSD or other future health-related deployments, policy may require local/private models, approved enterprise endpoints, zero-retention agreements, reduced context, explicit user consent, and any required contractual/legal authorization for the data class involved.
 
 Audit records should store bounded execution metadata rather than automatically copying full prompt context. Appropriate records include:
 
 - CoMind execution identity
 - provider/model/model-family identity
+- model revision/version/build when exposed
 - acquisition mode
 - policy version
 - data classification
@@ -359,13 +388,13 @@ The key generalization is that these capabilities now belong to CoMind core infr
 
 Document doctrine, current coupling, prior PTSD lineage, migration sequence, and acceptance rules. Issue #104 owns this phase.
 
-### Phase 1: Provider-neutral descriptors and registry
+### Phase 1: Behavior baseline, conformance contract, descriptors, and registry
 
-Introduce or generalize provider/model descriptors, model-family identity, acquisition mode, health/capability metadata, credential references, and adapter registration. Preserve existing OpenAI behavior.
+Freeze current fixture/OpenAI behavior in deterministic tests and establish the provider-neutral adapter conformance expectations before changing observable routing behavior. Introduce or generalize provider/model descriptors, model-family identity, acquisition mode, health/capability metadata, credential-reference shape, and adapter registration. Preserve existing OpenAI behavior while fixture and OpenAI become the first adapters evaluated against the shared contract.
 
 ### Phase 2: Canonical adapter migration
 
-Move current OpenAI behavior fully behind the canonical provider registry/execution surface. Preserve deterministic fixture support. Add network-free contract tests for provider interchangeability.
+Move current OpenAI behavior fully behind the canonical provider registry/execution surface while preserving deterministic fixture support and the shared network-free contract suite. Do not represent convergence through the governed execution wrapper as deployed until deployment evidence exists.
 
 ### Phase 3: BYOK/BYOM/BYOP secret and policy boundary
 
@@ -385,7 +414,7 @@ Restore prior PTSD design goals on the shared Greater CoMind architecture, inclu
 
 ### Phase 7: External gateways and live validation
 
-Evaluate gateway adapters such as MyApps/Machine, direct provider APIs, OpenRouter, local inference servers, and other compatible services. Only perform live paid validation after deterministic tests, privacy review, FinOps controls, and explicit authorization are green.
+Evaluate gateway adapters such as MyApps/Machine, direct provider APIs, OpenRouter, local inference servers, and other compatible services. Only perform live paid validation after deterministic tests, privacy review, AIMS supplier/risk review, FinOps controls, and explicit authorization are green.
 
 ## 14. Verification strategy
 
@@ -394,10 +423,11 @@ Provider expansion must follow CoMind's existing evidence hierarchy.
 1. deterministic unit/contract tests with no network;
 2. isolated PostgreSQL and runtime integration where persistence is involved;
 3. security/privacy validation;
-4. cost and budget validation;
-5. provider-adapter conformance with fixtures/mocks;
-6. smallest deliberately bounded live provider test only when required;
-7. production/live deployment only through a separately authorized lane.
+4. AIMS system/supplier inventory and risk/change assessment where applicable;
+5. cost and budget validation;
+6. provider-adapter conformance with fixtures/mocks;
+7. smallest deliberately bounded live provider test only when required;
+8. production/live deployment only through a separately authorized lane.
 
 Provider adapters should pass one shared conformance suite so behavior is evaluated against CoMind contracts rather than provider-specific convenience.
 
@@ -413,7 +443,8 @@ Issue #104 does not:
 - activate MyApps/Machine or another gateway;
 - claim that prior PTSD concepts were fully production implemented;
 - merge or alter ACP-001 / PR #84;
-- create a competing identity, financial, authorization, provider-execution, memory, or provenance authority.
+- create a competing identity, financial, authorization, provider-execution, memory, provenance, supplier-governance, or risk authority;
+- claim deployed, operating, compliant, certification-ready, or certified provider independence from architecture documentation alone.
 
 ## 16. Long-term target
 
@@ -438,6 +469,7 @@ high-consequence decision
 
 provider outage
     -> policy-approved fallback only if all original constraints still hold
+    -> new governed attempt identity for each external request
 ```
 
 The user should be able to change the cognitive resource without losing CoMind's memory, identity, provenance, governance, or relationship continuity.

@@ -39,7 +39,13 @@ ALLOWED_EVIDENCE = {
     "INDEPENDENTLY_ASSESSED", "GAP",
 }
 EXPECTED_REPO = "Ankit-Uniyal/iso-42001-ai-governance-toolkit"
-EXPECTED_COMMIT = "803b62da4c66f6b6ab601c87cb298597a497eebd"
+EXPECTED_COMMIT = "".join((
+    "803b62da",
+    "4c66f6b6",
+    "ab601c87",
+    "cb298597",
+    "a497eebd",
+))
 EXPECTED_NORMATIVE = "PENDING_LICENSED_SOURCE"
 EXPECTED_SOURCE_CLASS = "SECONDARY_SOURCE_UNVERIFIED"
 
@@ -56,6 +62,10 @@ def normalize(value: str | None) -> str:
 
 def split_refs(raw: str) -> list[str]:
     return [item.strip() for item in raw.split(";") if item.strip()]
+
+
+def codepoints(value: str) -> str:
+    return " ".join(f"U+{ord(char):04X}" for char in value)
 
 
 def parse_soa() -> dict[str, tuple[str, str, str, str]]:
@@ -122,7 +132,10 @@ def main() -> int:
         if row["source_commit"] != EXPECTED_COMMIT:
             fail(
                 f"{cid}: source commit mismatch: "
-                f"observed={row['source_commit']!r} expected={EXPECTED_COMMIT!r}"
+                f"observed={row['source_commit']!r} len={len(row['source_commit'])} "
+                f"codes=[{codepoints(row['source_commit'])}] "
+                f"expected={EXPECTED_COMMIT!r} len={len(EXPECTED_COMMIT)} "
+                f"codes=[{codepoints(EXPECTED_COMMIT)}]"
             )
         if row["normative_verification"] != EXPECTED_NORMATIVE:
             fail(

@@ -6,12 +6,15 @@ Status: GOV-001 foundation. Documentation/evidence architecture only.
 ## Current artifacts
 
 1. `AIMS-SCOPE-DRAFT.md` — proposed organizational/technical AIMS boundary, exclusions, objectives and approval gates.
-2. `STANDARDS-APPLICABILITY-REGISTER.md` — exact framework/version metadata, authoritative public sources, applicability and change-control rules.
-3. `AIMS-CONTROL-EVIDENCE-MATRIX.md` — evidence-state vocabulary and initial control/gap inventory.
-4. `ISO-VE-SHADOW-MODE-CONTRACT.md` — proposed read-only Compliance and Standards Officer operating contract.
-5. `AIMS-RISK-AND-IMPACT-REGISTER.md` — minimum risk/impact record and assessment triggers.
-6. `AIMS-AI-SYSTEM-AND-SUPPLIER-INVENTORY.md` — AI system, model/tool and supplier inventory contract.
-7. `AIMS-AUDIT-REVIEW-CORRECTIVE-ACTION.md` — internal audit, corrective action, management review and operating cadence.
+2. `AIMS-AI-POLICY-DRAFT.md` — draft responsible AI management policy for formal management approval.
+3. `STANDARDS-APPLICABILITY-REGISTER.md` — exact framework/version metadata, authoritative public sources, applicability and change-control rules.
+4. `AIMS-CONTROL-EVIDENCE-MATRIX.md` — evidence-state vocabulary and initial control/gap inventory.
+5. `AIMS-RESPONSIBILITY-MATRIX.md` — human accountability, delegated execution and ISO VE separation-of-duties boundaries.
+6. `ISO-VE-SHADOW-MODE-CONTRACT.md` — proposed read-only Compliance and Standards Officer operating contract.
+7. `AIMS-RISK-AND-IMPACT-REGISTER.md` — minimum risk/impact record and assessment triggers.
+8. `AIMS-AI-SYSTEM-AND-SUPPLIER-INVENTORY.md` — AI system, model/tool and supplier inventory contract.
+9. `AIMS-OBJECTIVES-AND-METRICS.md` — initial measurable AIMS objectives and anti-gaming rules.
+10. `AIMS-AUDIT-REVIEW-CORRECTIVE-ACTION.md` — internal audit, corrective action, management review and operating cadence.
 
 Related artifacts:
 
@@ -49,9 +52,9 @@ The following require management decisions before later stages but do not preven
 
 1. Validate the current live/read-only security and AI-system inventory without production mutation.
 2. Obtain lawful access to normative ISO text and build a clause-level applicability/control crosswalk without copying prohibited text.
-3. Assign human management, risk, control and audit responsibilities.
+3. Formally assign human management, risk, control and audit responsibilities.
 4. Populate the initial AI system/supplier inventory and risk register.
-5. Define AIMS objectives/metrics and first management-review baseline.
+5. Approve measurable AIMS objectives/targets after baselines are available and conduct the first management review.
 6. Create a separate isolated implementation issue for ISO shadow VE identity/grants/read-only evidence access.
 7. Add automated governance checks only after compatibility and performance review with Foundry/ACP/runtime-performance work.
 8. Accumulate operating evidence before any certification-readiness claim.

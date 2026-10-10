@@ -1,7 +1,7 @@
 # CoMind Artificial Intelligence Management System (AIMS) Scope Draft
 
 Date: 2026-10-10
-Status: Draft for management approval. Not a certification claim.
+Status: Management-approved foundation; certification boundary remains provisional. Not a certification claim.
 Primary framework: ISO/IEC 42001:2023
 
 ## Purpose
@@ -44,11 +44,12 @@ An exclusion never removes the obligation to assess dependency risk, supplier co
 
 ## Management accountability
 
-A human management owner remains accountable for the AIMS. Virtual Employees may prepare evidence, identify gaps, and propose corrective actions but may not self-certify CoMind, approve their own exceptions, or expand their own authority.
+Management decision, 2026-10-10: the CoMind Founder/CEO is the interim accountable human AIMS management owner.
 
-Proposed responsibilities:
+The accountable human owner approves AIMS scope, policy, risk appetite, material risk acceptance, objectives, resources, management review, and any certification decision. Virtual Employees may prepare evidence, identify gaps, and propose corrective actions but may not self-certify CoMind, approve their own exceptions, or expand their own authority.
 
-- Management owner: approve AIMS scope, policy, risk appetite, material risk acceptance, objectives, resources, management review, and certification decision.
+Supporting responsibilities:
+
 - Control owners: implement and maintain assigned controls and evidence.
 - Risk owners: assess treatment, residual risk, and acceptance within delegated authority.
 - Internal audit: evaluate AIMS operation independently of the work being audited to the degree practical for organizational size.
@@ -84,19 +85,21 @@ AIMS controls may be stricter than an existing development convention. The stric
 
 ## Certification boundary
 
+Management decision, 2026-10-10: ISO/IEC 42001 is the active certification-readiness direction for the AIMS. ISO/IEC 27001 is currently a supporting information-security framework only, not a separate certification objective. That decision may be revisited later.
+
 ISO/IEC 42001 certification is not assumed. Certification readiness requires an operating management system, objective evidence over time, internal audit, management review, corrective-action handling, and an external conformity-assessment process if management elects to pursue certification.
 
 No CoMind artifact may use terms such as "ISO certified", "ISO/IEC 42001 compliant", or equivalent unqualified claims until the claim is supported by an appropriate assessment and authorized by management.
 
-## Approval gates
+## Remaining approval / evidence gates
 
-Before this scope becomes controlled policy:
+The following remain open and do not invalidate the management-approved AIMS foundation:
 
-- Confirm legal organizational name and management owner.
-- Confirm products/services included in any intended certification boundary.
+- Confirm final legal organizational name for any external certification boundary.
+- Confirm products/services included in the intended certification boundary.
 - Confirm applicable legal, contractual, privacy, accessibility, sector, and geographic obligations.
 - Confirm supplier inventory and material data flows.
-- Confirm whether ISO/IEC 27001 certification is an independent objective or supporting control framework only.
-- Obtain the licensed ISO/IEC 42001 standard before clause-level completeness is asserted.
+- Obtain lawful licensed access to ISO/IEC 42001:2023 before clause-level completeness is asserted.
+- Obtain lawful licensed access to ISO/IEC 23894:2023 if detailed normative/guidance mapping is pursued.
 
-Until those gates are complete, this document is an architecture and management-system scope draft.
+Until those gates are complete, this document remains the approved architectural and management-system scope foundation, not a certification or conformity statement.

@@ -1,0 +1,106 @@
+#!/usr/bin/env python3
+"""Validate GOV-002 provisional AIMS crosswalk without network access."""
+
+from __future__ import annotations
+
+import csv
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+DATA = ROOT / "docs" / "governance" / "iso" / "aims-provisional-crosswalk.csv"
+
+EXPECTED_IDS = {
+    "A.2.2", "A.2.3", "A.2.4",
+    "A.3.2", "A.3.3",
+    "A.4.2", "A.4.3", "A.4.4", "A.4.5", "A.4.6",
+    "A.5.2", "A.5.3", "A.5.4", "A.5.5",
+    "A.6.1.2", "A.6.1.3", "A.6.2.2", "A.6.2.3", "A.6.2.4",
+    "A.6.2.5", "A.6.2.6", "A.6.2.7", "A.6.2.8",
+    "A.7.2", "A.7.3", "A.7.4", "A.7.5", "A.7.6",
+    "A.8.2", "A.8.3", "A.8.4", "A.8.5",
+    "A.9.2", "A.9.3", "A.9.4",
+    "A.10.2", "A.10.3", "A.10.4",
+}
+
+REQUIRED_FIELDS = {
+    "control_id", "domain", "control_objective", "applicability", "rationale",
+    "owner", "engineering_tier", "nist_ai_rmf", "eu_ai_act", "iso_27001",
+    "evidence_state", "implementation_refs", "evidence_refs",
+    "source_classification", "source_repo", "source_commit",
+    "normative_verification",
+}
+ALLOWED_APPLICABILITY = {"APPLICABLE", "NOT_APPLICABLE", "UNDETERMINED"}
+ALLOWED_TIERS = {"T0", "T1", "T2", "T3"}
+ALLOWED_EVIDENCE = {
+    "PROPOSED", "REPOSITORY_IMPLEMENTED", "ISOLATED_VERIFIED",
+    "VERIFIED_NOT_DEPLOYED", "DEPLOYED_UNVERIFIED", "OPERATING_EVIDENCE",
+    "INDEPENDENTLY_ASSESSED", "GAP",
+}
+EXPECTED_REPO = "Ankit-Uniyal/iso-42001-ai-governance-toolkit"
+EXPECTED_COMMIT = "803b62da4c66f6b6ab601c87cb298597a497eebd"
+EXPECTED_NORMATIVE = "PENDING_LICENSED_SOURCE"
+EXPECTED_SOURCE_CLASS = "SECONDARY_SOURCE_UNVERIFIED"
+
+
+def fail(message: str) -> None:
+    raise AssertionError(message)
+
+
+def main() -> int:
+    with DATA.open(newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        fields = set(reader.fieldnames or [])
+        missing_columns = REQUIRED_FIELDS - fields
+        if missing_columns:
+            fail(f"missing CSV columns: {sorted(missing_columns)}")
+        rows = list(reader)
+
+    if len(rows) != 38:
+        fail(f"expected 38 control rows, found {len(rows)}")
+
+    ids = [row["control_id"] for row in rows]
+    if len(ids) != len(set(ids)):
+        fail("duplicate control_id found")
+    if set(ids) != EXPECTED_IDS:
+        fail(
+            "control set mismatch; "
+            f"missing={sorted(EXPECTED_IDS - set(ids))}, "
+            f"extra={sorted(set(ids) - EXPECTED_IDS)}"
+        )
+
+    for row in rows:
+        cid = row["control_id"]
+        for field in REQUIRED_FIELDS - {"iso_27001"}:
+            if not row[field].strip():
+                fail(f"{cid}: blank required field {field}")
+        if row["applicability"] not in ALLOWED_APPLICABILITY:
+            fail(f"{cid}: invalid applicability {row['applicability']!r}")
+        if row["engineering_tier"] not in ALLOWED_TIERS:
+            fail(f"{cid}: invalid tier {row['engineering_tier']!r}")
+        if row["evidence_state"] not in ALLOWED_EVIDENCE:
+            fail(f"{cid}: invalid evidence state {row['evidence_state']!r}")
+        if row["source_classification"] != EXPECTED_SOURCE_CLASS:
+            fail(f"{cid}: source classification must remain secondary/unverified")
+        if row["source_repo"] != EXPECTED_REPO:
+            fail(f"{cid}: unexpected secondary source repository")
+        if row["source_commit"] != EXPECTED_COMMIT:
+            fail(f"{cid}: source must remain pinned to {EXPECTED_COMMIT}")
+        if row["normative_verification"] != EXPECTED_NORMATIVE:
+            fail(f"{cid}: GOV-002 may not promote ISO normative verification")
+
+    undetermined = [r["control_id"] for r in rows if r["applicability"] == "UNDETERMINED"]
+    print(
+        f"OK: {len(rows)} provisional controls validated; "
+        f"source={EXPECTED_REPO}@{EXPECTED_COMMIT[:12]}; "
+        f"undetermined={undetermined}; normative={EXPECTED_NORMATIVE}."
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except (AssertionError, csv.Error, OSError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        raise SystemExit(1)

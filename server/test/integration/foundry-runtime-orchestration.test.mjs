@@ -26,7 +26,7 @@ const checkpointWriteMs = [];
 const checkpointPayloadBytes = [];
 let checkpointWriteCount = 0;
 const query = async (text, params = []) => {
-  const checkpointWrite = /INSERT INTO comind\\.cm_foundry_recovery_checkpoint\\b/i.test(text);
+  const checkpointWrite = /INSERT INTO comind\.cm_foundry_recovery_checkpoint\b/i.test(text);
   const start = checkpointWrite ? performance.now() : 0;
   const result = await pool.query(text, params);
   if (checkpointWrite) {
@@ -628,7 +628,7 @@ try {
     warnings: [],
   };
   mkdirSync('../artifacts', { recursive: true });
-  writeFileSync('../artifacts/foundry-checkpoint-postgres-baseline.json', JSON.stringify(baseline) + '\\n');
+  writeFileSync('../artifacts/foundry-checkpoint-postgres-baseline.json', JSON.stringify(baseline) + '\n');
   console.log(JSON.stringify(baseline));
   console.log('Foundry runtime orchestration integration passed');
 } finally {

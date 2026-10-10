@@ -12,11 +12,11 @@ const state = () => ({
   provenance: { sourceRefs: [], evidenceRefs: [] }, pending: [],
 });
 
-test('confidence READY for validated state without unresolved work', () => {
+test('confidence READY for validated state without recorded side effects', () => {
   assert.equal(evaluateRecovery(createCheckpoint(state(), time), authority, time, true).status, 'READY');
 });
 
-test('confidence DEGRADED for unresolved work and unavailable dependencies', () => {
+test('confidence DEGRADED for recorded work and unavailable dependencies', () => {
   const candidate = state();
   candidate.pending.push({
     operationId: 'op-1', idempotencyKey: 'id-1', status: 'uncertain',
@@ -24,7 +24,18 @@ test('confidence DEGRADED for unresolved work and unavailable dependencies', () 
   });
   const result = evaluateRecovery(createCheckpoint(candidate, time), authority, time, false);
   assert.equal(result.status, 'DEGRADED');
-  assert.deepEqual(result.reasons, ['dependency_unavailable', 'unreconciled_operation']);
+  assert.deepEqual(result.reasons, ['dependency_unavailable', 'operation_reconciliation_required']);
+});
+
+test('confidence never trusts checkpoint-local completed status as canonical outcome evidence', () => {
+  const candidate = state();
+  candidate.pending.push({
+    operationId: 'op-1', idempotencyKey: 'id-1', status: 'completed',
+    taskId: null, fencingEpoch: null, adapterOperationId: null,
+  });
+  const result = evaluateRecovery(createCheckpoint(candidate, time), authority, time, true);
+  assert.equal(result.status, 'DEGRADED');
+  assert.deepEqual(result.reasons, ['operation_reconciliation_required']);
 });
 
 test('confidence BLOCKED for invalid authority', () => {

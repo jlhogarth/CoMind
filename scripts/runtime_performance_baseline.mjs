@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { performance } from 'node:perf_hooks';
-import { buildApp } from '../server/dist/app.js';
+
 
 process.env.DATABASE_URL ??= 'postgres://test:test@localhost:5432/comind_test';
+const { buildApp } = await import('../server/dist/app.js');
 const id = '44444444-4444-4444-8444-444444444449';
 const uid = '55555555-5555-4555-8555-555555555558';
 const samples = 40;

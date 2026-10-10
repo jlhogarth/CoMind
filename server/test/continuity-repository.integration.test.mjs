@@ -15,7 +15,7 @@ const state = (conversationId) => ({
   pending: [{ operationId: 'op-1', idempotencyKey: 'idem-1', status: 'uncertain', taskId: null, fencingEpoch: null, adapterOperationId: null }],
 });
 
-test('isolated PostgreSQL checkpoint repository preserves immutability, lineage, and idempotency', { skip: process.env.ACP_ISOLATED_DB_TEST !== '1' }, async () => {
+test('isolated PostgreSQL checkpoint repository preserves immutability, deterministic persistence order, lineage, and idempotency', { skip: process.env.ACP_ISOLATED_DB_TEST !== '1' }, async () => {
   try {
     const conversationId = 'acp-repository-' + process.pid;
     const createdAt = new Date().toISOString();
@@ -33,11 +33,21 @@ test('isolated PostgreSQL checkpoint repository preserves immutability, lineage,
     await assert.rejects(() => saveCheckpoint(query, changed, createdAt), /different state/);
 
     const successor = createSuccessorState(restored.state, first.checkpointId, 'execution-2', 'successor-ready');
-    const second = await saveCheckpoint(query, successor, new Date(Date.parse(createdAt) + 1).toISOString());
+    const second = await saveCheckpoint(query, successor, createdAt);
     assert.notEqual(second.checkpointId, first.checkpointId);
     const latest = await restoreLatestCheckpoint(query, conversationId, authority, new Date(Date.parse(createdAt) + 2).toISOString());
     assert.equal(latest.state.executionId, 'execution-2');
     assert.equal(latest.state.parentCheckpointId, first.checkpointId);
+
+    const persistenceOrder = await query(
+      `SELECT execution_id, persistence_seq::text
+       FROM comind.cm_continuity_checkpoint
+       WHERE conversation_id=$1
+       ORDER BY persistence_seq ASC`,
+      [conversationId]
+    );
+    assert.deepEqual(persistenceOrder.rows.map(row => row.execution_id), ['execution-1', 'execution-2']);
+    assert.ok(BigInt(persistenceOrder.rows[1].persistence_seq) > BigInt(persistenceOrder.rows[0].persistence_seq));
 
     await assert.rejects(
       () => query('UPDATE comind.cm_continuity_checkpoint SET digest=digest WHERE checkpoint_id=$1::uuid', [first.checkpointId]),

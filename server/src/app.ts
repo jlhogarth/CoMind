@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import swagger from '@fastify/swagger';
@@ -75,7 +76,7 @@ export async function buildApp(overrides: Partial<AppDependencies> = {}) {
       checkpointScheduler.schedule({
         conversationId,
         workflowId: 'conversation.assistant-response',
-        executionId: String(request.id),
+        executionId: randomUUID(),
         parentCheckpointId: null,
         executionCursor: 'assistant_response_persisted',
         authority: {

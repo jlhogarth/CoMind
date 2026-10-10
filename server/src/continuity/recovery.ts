@@ -113,14 +113,17 @@ export async function coordinateRecovery(
     return { status: 'BLOCKED', reasons: ['checkpoint_integrity_freshness_or_authority_invalid'] };
   }
 
-  const unresolved = state.pending.filter(operation => operation.status !== 'completed');
-  if (!unresolved.length) {
+  if (!state.pending.length) {
     return dependenciesAvailable
       ? { status: 'READY', state, reasons: [] }
       : { status: 'DEGRADED', state, reasons: ['dependency_unavailable'] };
   }
   if (!dependenciesAvailable) {
-    return { status: 'DEGRADED', state, reasons: ['dependency_unavailable', 'unreconciled_operation'] };
+    return {
+      status: 'DEGRADED',
+      state,
+      reasons: ['dependency_unavailable', 'operation_reconciliation_required'],
+    };
   }
 
   try {
@@ -140,7 +143,6 @@ export async function coordinateRecovery(
     const reconciled = structuredClone(state);
     const reasons: string[] = [];
     for (let index = 0; index < reconciled.pending.length; index++) {
-      if (reconciled.pending[index].status === 'completed') continue;
       const result = await reconcileOperation(query, reconciled.pending[index], now);
       reconciled.pending[index] = result.operation;
       if (result.reason) reasons.push(result.reason);

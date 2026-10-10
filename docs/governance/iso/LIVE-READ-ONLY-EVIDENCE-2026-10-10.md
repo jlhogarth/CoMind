@@ -105,7 +105,7 @@ Based on this observation:
 
 ## Non-interference boundary
 
-This evidence record does not alter PR #84, #86, or #88 and does not authorize a new migration. It exists to prevent false assumptions while those parallel lanes continue.
+This evidence record does not alter PR #84 or #86 and does not authorize a new migration. Interactive Runtime Performance baseline 008 has since merged and remains a monitoring reference rather than an active schema/runtime change lane. This record exists to prevent false assumptions while independent lanes continue.
 
 ## Required follow-on milestone
 

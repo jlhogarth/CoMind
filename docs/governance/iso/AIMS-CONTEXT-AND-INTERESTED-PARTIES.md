@@ -14,7 +14,7 @@ The AIMS must therefore integrate with software engineering, database/security c
 Material internal factors include:
 
 - early-stage architecture with significant capability still in isolated/repository state rather than live production;
-- parallel development streams for Foundry autonomy, durable continuity and runtime performance;
+- parallel development streams for Foundry autonomy and durable continuity, with runtime performance held as accepted baseline 008 monitoring;
 - reliance on persistent memory/provenance and future agentic execution;
 - explicit C0-C4 authority and T0-T3 engineering governance concepts;
 - requirement that delegated work not disappear silently;

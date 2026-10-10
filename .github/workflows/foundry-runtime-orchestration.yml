@@ -39,3 +39,11 @@ jobs:
           sudo apt-get install --yes postgresql-client
       - name: Verify governed Foundry runtime orchestration
         run: bash ./scripts/test_foundry_runtime_orchestration.sh
+      - name: Upload isolated checkpoint performance baseline
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: foundry-checkpoint-postgres-baseline
+          path: artifacts/foundry-checkpoint-postgres-baseline.json
+          if-no-files-found: warn
+          retention-days: 14

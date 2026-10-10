@@ -42,8 +42,9 @@ This does **not** authorize remediation in GOV-001. It establishes a controlled 
 GOV-001 intentionally avoids modifying the active parallel implementation files in:
 
 - PR #84, ACP durable continuity;
-- PR #86, Foundry work-lease kernel;
-- PR #88, interactive runtime performance.
+- PR #86, Foundry work-lease kernel.
+
+Interactive Runtime Performance baseline 008 has merged through PR #96 and is now trigger-driven monitoring, not an active GOV-001 dependency or a reason to add more instrumentation.
 
 Runtime hooks, database schema for AIMS records, instantiated ISO agent identity/grants, scheduled surveillance, production evidence ingestion and connector integrations are deferred until those dependencies are reconciled and separately authorized.
 

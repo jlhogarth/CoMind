@@ -6,17 +6,20 @@ Status: GOV-001 foundation. Documentation/evidence architecture only.
 ## Current artifacts
 
 1. `AIMS-SCOPE-DRAFT.md` — proposed organizational/technical AIMS boundary, exclusions, objectives and approval gates.
-2. `AIMS-AI-POLICY-DRAFT.md` — draft responsible AI management policy for formal management approval.
-3. `STANDARDS-APPLICABILITY-REGISTER.md` — exact framework/version metadata, authoritative public sources, applicability and change-control rules.
-4. `AIMS-CONTROL-EVIDENCE-MATRIX.md` — evidence-state vocabulary and initial control/gap inventory.
-5. `AIMS-RESPONSIBILITY-MATRIX.md` — human accountability, delegated execution and ISO VE separation-of-duties boundaries.
-6. `ISO-VE-SHADOW-MODE-CONTRACT.md` — proposed read-only Compliance and Standards Officer operating contract.
-7. `AIMS-RISK-AND-IMPACT-REGISTER.md` — minimum risk/impact record and assessment triggers.
-8. `AIMS-INITIAL-RISK-REGISTER-2026-10-10.md` — initial evidence-backed AIMS risks and treatment sequencing.
-9. `AIMS-AI-SYSTEM-AND-SUPPLIER-INVENTORY.md` — AI system, model/tool and supplier inventory contract.
-10. `AIMS-OBJECTIVES-AND-METRICS.md` — initial measurable AIMS objectives and anti-gaming rules.
-11. `AIMS-AUDIT-REVIEW-CORRECTIVE-ACTION.md` — internal audit, corrective action, management review and operating cadence.
-12. `LIVE-READ-ONLY-EVIDENCE-2026-10-10.md` — verified live Supabase baseline captured without mutation.
+2. `AIMS-CONTEXT-AND-INTERESTED-PARTIES.md` — internal/external context, interested parties and applicability triggers.
+3. `AIMS-AI-POLICY-DRAFT.md` — draft responsible AI management policy for formal management approval.
+4. `STANDARDS-APPLICABILITY-REGISTER.md` — exact framework/version metadata, authoritative public sources, applicability and change-control rules.
+5. `AIMS-CONTROL-EVIDENCE-MATRIX.md` — evidence-state vocabulary and initial control/gap inventory.
+6. `AIMS-RESPONSIBILITY-MATRIX.md` — human accountability, delegated execution and ISO VE separation-of-duties boundaries.
+7. `AIMS-DECISION-REGISTER.md` — open management decisions, safe containment assumptions and hard-stop boundaries.
+8. `ISO-VE-SHADOW-MODE-CONTRACT.md` — proposed read-only Compliance and Standards Officer operating contract.
+9. `AIMS-RISK-AND-IMPACT-REGISTER.md` — minimum risk/impact record and assessment triggers.
+10. `AIMS-INITIAL-RISK-REGISTER-2026-10-10.md` — initial evidence-backed AIMS risks and treatment sequencing.
+11. `AIMS-AI-SYSTEM-AND-SUPPLIER-INVENTORY.md` — AI system, model/tool and supplier inventory contract.
+12. `AIMS-OBJECTIVES-AND-METRICS.md` — initial measurable AIMS objectives and anti-gaming rules.
+13. `AIMS-AUDIT-REVIEW-CORRECTIVE-ACTION.md` — internal audit, corrective action, management review and operating cadence.
+14. `AIMS-COMPETENCE-COMMUNICATION-AND-DOCUMENT-CONTROL.md` — competence, awareness, communication, document states and evidence integrity.
+15. `LIVE-READ-ONLY-EVIDENCE-2026-10-10.md` — verified live Supabase baseline captured without mutation.
 
 Related artifacts:
 
@@ -44,23 +47,15 @@ GOV-001 intentionally avoids modifying the active parallel implementation files 
 
 Runtime hooks, database schema for AIMS records, instantiated ISO agent identity/grants, scheduled surveillance, production evidence ingestion and connector integrations are deferred until those dependencies are reconciled and separately authorized.
 
-## Decisions that do not block the present documentation lane
+## Open management decisions
 
-The following require management decisions before later stages but do not prevent GOV-001 from establishing the foundation:
-
-- final legal entity wording and accountable AIMS management owner;
-- whether ISO/IEC 27001 certification is a separate objective or supporting framework only;
-- target certification boundary/products/services;
-- exact markets/geographies and resulting legal/regulatory obligations;
-- licensed ISO normative-text access for clause-level mapping;
-- future ISO VE connector/data-source permissions;
-- retention periods based on legal/contractual requirements.
+`AIMS-DECISION-REGISTER.md` is the authoritative GOV-001 list of management decisions. The key current decisions are: designate the accountable AIMS management owner; confirm legal/certification scope; decide ISO/IEC 27001's role; obtain lawful ISO/IEC 42001 normative-text access; approve the AI policy/objectives; assign human risk/control/audit owners; and later separately authorize ISO VE activation and live database hardening.
 
 ## Next implementation sequence after GOV-001 foundation
 
 1. **Completed for baseline:** validate current live/read-only security and initial agent/module state without production mutation. Re-run after any authorized hardening.
 2. Obtain lawful access to normative ISO text and build a clause-level applicability/control crosswalk without copying prohibited text.
-3. Formally assign human management, risk, control and audit responsibilities.
+3. Formally assign human management, risk, control and audit responsibilities and approve policy/scope.
 4. **Started:** initial evidence-backed risk register exists; populate complete AI system/supplier inventory and assign owners/treatments.
 5. Approve measurable AIMS objectives/targets after baselines are available and conduct the first management review.
 6. Create a separate isolated implementation issue for ISO shadow VE identity/grants/read-only evidence access.

@@ -14,7 +14,13 @@ Pre-reconciliation ACP head:
 
 `daafeec31a4cbc33a52f46e82dc7ef3f1f62fc07`
 
-The ACP branch was 22 commits ahead and 70 commits behind current main. Its successful ACP workflow had run against the earlier merge base `1e47dd1c61e9f6f91bc50ba8bad8a19bee8fab4f`, so those checks were historical evidence only and were not accepted as current-main verification.
+The ACP branch was 22 commits ahead and 70 commits behind that main state. Its successful ACP workflow had run against the earlier merge base `1e47dd1c61e9f6f91bc50ba8bad8a19bee8fab4f`, so those checks were historical evidence only and were not accepted as current-main verification.
+
+During reconciliation, main advanced again through GOV-003 to:
+
+`8d6bead77ab5064f070b6eb7b2a7abed60ac93c9`
+
+The ACP branch was then reconciled onto that exact main state before the final acceptance checks. This record therefore preserves both the initial reconciliation input and the later authoritative-main advancement rather than silently replacing history.
 
 ## Material findings
 
@@ -28,7 +34,9 @@ Main had also gained Foundry capabilities after ACP branched:
 - `comind.cm_foundry_adapter_operation` and `comind.cm_foundry_adapter_operation_result` for durable operation identity and terminal outcome evidence
 - `comind.cm_foundry_recovery_checkpoint` for governance and provenance summaries
 - runtime performance baseline work
-- GOV-001 and GOV-002 governance evidence discipline
+- GOV-001, GOV-002, and subsequently GOV-003 governance evidence discipline
+
+A later fail-closed review found one additional trust boundary: a checkpoint-local operation status of `completed` could not be accepted as canonical outcome evidence solely because the checkpoint was integrity-valid. ACP recovery was tightened so every recorded side-effect obligation requires read-only reconciliation against canonical Foundry outcome data before recovery can become `READY`.
 
 ## Reconciliation decision
 
@@ -38,12 +46,16 @@ The old unsequenced public-schema ACP migration is not carried into the reconcil
 
 ACP does not duplicate Foundry work ownership or operation outcomes. Recovery reads the canonical Foundry lease fencing epoch and durable adapter result when those references are present. Lease ownership tokens are never stored in the ACP checkpoint.
 
+Checkpoint-local operation status is observational only. It cannot independently authorize replay or establish a durable terminal outcome. Canonical Foundry records remain authoritative for side-effect reconciliation.
+
 Foundry provenance summary checkpoints and ACP machine-restorable checkpoints remain separate artifacts with separate purposes.
+
+The ACP isolated workflow uses the same PostgreSQL 17 plus pgvector service image as the canonical Foundry work-lease verification path so the ACP gate tests against the current Foundry database prerequisites rather than a reduced database environment.
 
 ## Verification boundary
 
 No live Supabase mutation, paid provider execution, credential exposure, production rollout, or external authorization is part of this reconciliation.
 
-Repository implementation is not deployment. Dedicated exact-head CI and isolated PostgreSQL verification must pass after the reconciliation commit before ACP-001 can be considered accepted for merge review.
+Repository implementation is not deployment. Dedicated exact-head CI and isolated PostgreSQL verification must pass after the final reconciliation commit before ACP-001 can be considered accepted for merge review.
 
 Production operation, production control effectiveness, compliance, certification readiness, and certified conformity are not asserted by this record.

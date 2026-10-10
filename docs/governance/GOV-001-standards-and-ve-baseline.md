@@ -44,7 +44,7 @@ Decision 2026-10-10: retain all established CoMind agent names and conventions. 
 
 ## Parallel-work protection and deferred module registry
 
-Active parallel pull requests inspected on 2026-10-10: #88 interactive runtime performance, #86 Foundry work-lease kernel, and #84 ACP durable continuity. GOV-001 owns documentation and compliance planning only until integration dependencies are reviewed; do not edit their code, schema, workflow, or shared runtime contracts in this lane. The VE Management Dashboard is registered as a deferred module in `docs/roadmap/virtual-employee-management-dashboard.md`, with the full Agent Directory, operations, human approvals, governance, performance, and continuity backlog. It is not a current GOV-001 blocker.
+Parallel state inspected on 2026-10-10: #84 ACP durable continuity remains open and separately evaluated; #86 Foundry work-lease kernel has merged as repository/isolated evidence; Interactive Runtime Performance baseline 008 has merged through #96 and is held in trigger-driven monitoring. GOV-001 owns documentation and compliance planning only until integration dependencies are reviewed; do not edit active parallel code, schema, workflow, or shared runtime contracts in this lane. The VE Management Dashboard is registered as a deferred module in `docs/roadmap/virtual-employee-management-dashboard.md`, with the full Agent Directory, operations, human approvals, governance, performance, and continuity backlog. It is not a current GOV-001 blocker.
 
 ### ISO implementation next steps without shared runtime changes
 
@@ -53,7 +53,7 @@ Active parallel pull requests inspected on 2026-10-10: #88 interactive runtime p
 3. Create a control-to-evidence matrix referencing existing repository controls and explicitly marking design-only, tested-in-isolation, deployed and independently assessed states.
 4. Identify evidence retention, exceptions, internal-audit independence, management-review cadence, supplier and model-provider obligations, and risk acceptance authority.
 5. Prepare a read-only ISO shadow-mode role contract; defer actual profile/grants/runtime activation to a separately authorized isolated implementation issue.
-6. Gate any future runtime policy hooks on merge coordination with #86/#84/#88 and latency/cost baseline checks.
+6. Gate any future runtime policy hooks on merge coordination with #84, work-lease operating-state review, and latency/cost checks against baseline 008.
 
 ## Acceptance boundary
 

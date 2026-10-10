@@ -15,6 +15,7 @@ $$;
 
 CREATE TABLE IF NOT EXISTS comind.cm_continuity_checkpoint (
   checkpoint_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  persistence_seq bigint GENERATED ALWAYS AS IDENTITY,
   conversation_id text NOT NULL,
   workflow_id text NOT NULL,
   execution_id text NOT NULL,
@@ -38,7 +39,7 @@ CREATE TABLE IF NOT EXISTS comind.cm_continuity_checkpoint (
 );
 
 CREATE INDEX IF NOT EXISTS idx_cm_continuity_checkpoint_recent
-  ON comind.cm_continuity_checkpoint (conversation_id, created_at DESC, checkpoint_id DESC);
+  ON comind.cm_continuity_checkpoint (conversation_id, persistence_seq DESC);
 
 DROP TRIGGER IF EXISTS trg_cm_continuity_checkpoint_immutable
   ON comind.cm_continuity_checkpoint;
@@ -52,6 +53,8 @@ GRANT SELECT, INSERT ON TABLE comind.cm_continuity_checkpoint TO service_role;
 REVOKE ALL ON FUNCTION comind.cm_reject_continuity_checkpoint_mutation() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION comind.cm_reject_continuity_checkpoint_mutation() TO service_role;
 
+COMMENT ON COLUMN comind.cm_continuity_checkpoint.persistence_seq IS
+  'Database-assigned monotonic persistence order used to select the latest checkpoint independently of client timestamps or UUID ordering.';
 COMMENT ON TABLE comind.cm_continuity_checkpoint IS
   'Immutable ACP machine-restorable continuity state. This is distinct from Foundry provenance summary checkpoints and stores no lease ownership token or raw credential material.';
 

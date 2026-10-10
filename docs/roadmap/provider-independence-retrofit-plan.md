@@ -1,0 +1,348 @@
+# CoMind Provider Independence Retrofit Plan
+
+Status: Issue #104 retrofit inventory and execution plan
+Date: 2026-10-10
+Base main: `8d6bead77ab5064f070b6eb7b2a7abed60ac93c9`
+
+## 1. Objective
+
+Migrate historical and current provider-specific CoMind code toward the canonical provider-neutral architecture without breaking current behavior, duplicating existing authorities, or weakening governance.
+
+The retrofit is intentionally incremental. Existing OpenAI behavior remains valid until a verified replacement path reaches acceptance. Provider-specific code is technical debt to be retired through controlled slices, not deleted merely because a new abstraction exists.
+
+## 2. Migration principles
+
+1. Preserve working behavior before generalizing it.
+2. Reuse the immutable provider execution envelope, governed provider execution wrapper, Foundry capability broker, budget authority, telemetry, and provenance systems.
+3. Introduce one canonical provider/model registry rather than subsystem-specific registries.
+4. Keep secrets behind credential references and a broker boundary.
+5. Make model family explicit wherever independent second opinions are claimed.
+6. Add deterministic adapter-conformance tests before live provider tests.
+7. Do not introduce a second financial ledger, execution identity, authorization authority, memory store, or provenance system.
+8. Migrate callers toward capabilities and provider-neutral requests rather than giving them direct provider SDK clients.
+9. Preserve the PTSD/private/local requirements as first-class acceptance criteria.
+10. Treat external gateways as replaceable adapters.
+
+## 3. Current coupling inventory
+
+This inventory is based on repository inspection at the Issue #104 base and is not claimed to be exhaustive until the implementation slice performs repository-wide exact searches.
+
+| Area | Current coupling | Target state | Priority |
+| --- | --- | --- | --- |
+| `server/src/assistant-provider.ts` | Explicit provider selection currently limited to fixture/OpenAI | Provider registry resolves approved adapters from provider-neutral descriptors and policy | P0 |
+| `server/src/providers/openai.ts` | OpenAI-specific provider adapter | Retain as first canonical adapter behind shared conformance contract | P0 |
+| `server/src/env.ts` | OpenAI/provider-specific environment settings | Preserve compatibility while moving provider configuration into scoped provider descriptors and credential references | P0 |
+| Existing provider execution envelope/wrapper | Provider-neutral execution foundation already exists | Extend, do not duplicate | P0 |
+| Existing budget/FinOps/rate-card paths | Current provider accounting has OpenAI-specific assumptions in places | Introduce provider-specific rate sources behind one canonical financial authority | P0 |
+| Provider-specific smoke/CI workflows | OpenAI-specific live smoke and configuration | Keep as adapter-specific validation while adding network-free shared conformance suite | P0 |
+| `apps/comind-sovereign-api/main.py` | Direct OpenAI coupling observed | Route through canonical provider capability/request layer | P1 |
+| `src/api/agents/ceo/bot.ts` | Direct provider coupling observed | Agent requests governed inference capability, not provider SDK | P1 |
+| `src/api/ve/bot.ts` | Direct provider coupling observed | VE requests governed inference capability, not provider SDK | P1 |
+| `backend/app/services/chatgpt_service.py` | Provider named in service boundary | Replace provider-specific service contract with provider-neutral inference service or adapter | P2 |
+| `src/services/enhanced_assistant/llm_provider.py` | LLM/provider-specific logic | Reconcile with canonical registry rather than maintain parallel provider authority | P2 |
+| `src/assumption_engine/evaluator.py` | Direct provider coupling observed | Use provider-neutral evaluator request with optional independent-family policy | P1 |
+| PTSD/private/local historical paths | Earlier BYOK/local/private design concepts may be distributed or historical | Reconcile surviving code/docs to common BYOK/BYOM/BYOP contracts | P1 |
+| Documentation, examples, install scripts | OpenAI-specific names likely remain | Classify intentional adapter docs versus architectural coupling; update only where provider-neutral behavior is intended | P3 |
+
+## 4. Required repository-wide discovery before code migration
+
+Each implementation slice must search current authoritative main, not rely only on this initial inventory.
+
+Required search classes include:
+
+- `OPENAI_API_KEY`
+- `OPENAI_MODEL`
+- `openai`
+- `OpenAI`
+- `chatgpt`
+- provider-name constants
+- provider-specific base URLs
+- provider-specific rate-card entries
+- provider-specific retry/error types
+- direct SDK construction
+- Anthropic/Claude references
+- Gemini/Google AI references
+- Grok/xAI references
+- Mistral references
+- Llama/local inference references
+- TogetherAI references
+- Groq references
+- BYOK/BYOM/BYOP/provider-routing references
+
+Every result must be classified as one of:
+
+- canonical adapter implementation
+- configuration compatibility surface
+- provider-neutral code that needs migration
+- test fixture
+- provider-specific acceptance test
+- documentation/example
+- historical/dead code
+- approved exception
+
+## 5. Target contracts for the retrofit
+
+### 5.1 Provider registry
+
+One registry resolves:
+
+- provider adapter
+- model descriptor
+- model family
+- acquisition mode
+- credential reference
+- capability metadata
+- policy compatibility
+- provider health
+
+Subsystems must not create private competing provider registries.
+
+### 5.2 Inference request
+
+Callers should express intent such as:
+
+- task class
+- input/context reference
+- required capabilities
+- risk class
+- data classification
+- budget ceiling
+- latency preference
+- privacy constraints
+- required/forbidden model families
+- arbitration role
+
+They should not need to know a raw API key or provider SDK object.
+
+### 5.3 Provider adapter contract
+
+Every provider adapter should support the subset of capabilities it advertises and pass a shared deterministic conformance suite covering at minimum:
+
+- request normalization
+- model identity
+- usage normalization
+- result normalization
+- error normalization
+- timeout handling
+- retry policy integration
+- cancellation behavior where supported
+- provenance emission
+- cost/usage emission
+- structured output handling where advertised
+- tool/function support where advertised
+
+### 5.4 Credential boundary
+
+Provider credentials are opaque references from the caller perspective. Resolution occurs only inside an authorized provider execution boundary.
+
+### 5.5 Arbitration contract
+
+Model arbitration should be a first-class execution plan rather than an ad hoc loop over provider clients. It must record participant role and actual model family and produce bounded comparison/contradiction outcomes.
+
+## 6. Retrofit execution phases
+
+### Phase A: Baseline and tests
+
+- Freeze current provider behavior in deterministic tests.
+- Capture current fixture/OpenAI provider contract.
+- Establish adapter-conformance test harness with no paid calls.
+- Confirm current execution-envelope/budget/provenance integration points.
+
+Exit criterion: current behavior is reproducible and provider-neutral test expectations exist.
+
+### Phase B: Provider/model descriptors and registry
+
+- Add provider and model descriptors.
+- Add explicit model-family identity.
+- Add acquisition-mode enum/contract: BYOK, BYOM, BYOP, managed.
+- Register fixture and OpenAI through the same registry.
+- Keep current environment settings as compatibility inputs.
+
+Exit criterion: existing server behavior works through registry resolution without changing observable behavior.
+
+### Phase C: Canonical credential references
+
+- Define scoped credential-reference contract.
+- Integrate with existing capability/authority model.
+- Add revocation/rotation/state metadata.
+- Prohibit raw credential propagation into model-visible context.
+- Add tests for secret non-disclosure.
+
+Exit criterion: an adapter can request a credential by reference while callers cannot read the secret.
+
+### Phase D: Migrate first-party callers
+
+Suggested order:
+
+1. canonical server assistant path;
+2. Assumption Engine evaluator;
+3. VE bot/runtime paths;
+4. CEO/agent bot paths;
+5. Sovereign API;
+6. enhanced assistant service;
+7. legacy ChatGPT-named backend service.
+
+For each caller:
+
+- remove direct SDK construction;
+- express provider needs through canonical inference/capability request;
+- preserve existing tests;
+- add provider-substitution test using fixture/fake adapters;
+- verify no financial/provenance bypass.
+
+Exit criterion: direct provider SDK use remains only inside approved adapters or explicit transitional exceptions.
+
+### Phase E: Multi-provider adapter expansion
+
+Add adapters one at a time after the registry is stable. Candidate classes include:
+
+- Anthropic direct
+- Google Gemini direct
+- xAI direct
+- Mistral direct
+- local/private OpenAI-compatible endpoint
+- MyApps/Machine gateway
+- OpenRouter gateway
+
+Adapter acceptance must be based on CoMind contracts rather than the provider marketing surface.
+
+Exit criterion: at least two distinct model families can pass deterministic conformance, with live validation separately gated.
+
+### Phase F: Independent second opinion and arbitration
+
+- Add arbitration-plan object.
+- Require model-family identity.
+- Support excluding primary family.
+- Add compare/contrast normalization.
+- Add Assumption Validator/contradiction integration.
+- Add abstain/unresolved/escalation outcomes.
+- Add budget-bounded participant selection.
+- Add provenance linking primary and reviewer executions.
+
+Exit criterion: CoMind can demonstrate a deterministic two-family arbitration flow with fixtures and can prove that same-family routing fails a strict-independence requirement.
+
+### Phase G: PTSD/private/local modernization
+
+Reconcile surviving PTSD artifacts and restore the strongest prior provider-independence concepts on the common architecture:
+
+- per-session provider/model selection
+- private/BYOK mode
+- user-funded versus CoMind-funded accounting
+- team-scoped provider selection
+- local/offline models
+- private inference endpoints
+- policy restrictions for sensitive context
+- provider test/validation without secret exposure
+
+Exit criterion: the PTSD subsystem no longer needs a private provider architecture to achieve these capabilities.
+
+### Phase H: Cleanup and enforcement
+
+- remove obsolete duplicated provider routing;
+- remove retired direct SDK clients from callers;
+- update documentation and examples;
+- add static/repository checks for unauthorized direct provider SDK construction where practical;
+- maintain an exception registry for intentional direct adapter code;
+- add architecture test preventing fallback from weakening constraints.
+
+Exit criterion: provider-specific coupling is bounded to adapters/tests/approved exceptions.
+
+## 7. Model arbitration migration priorities
+
+Not every subsystem needs multiple models. The first useful targets are those where independent critique materially improves reliability.
+
+Priority candidates:
+
+1. Assumption Validator and contradiction resolution
+2. governance/control review
+3. code/architecture review
+4. research verification
+5. high-consequence Virtual Employee decisions
+6. sensitive-domain review where policy permits external processing
+
+Ordinary low-risk chat should remain eligible for a single model to avoid unnecessary cost and latency.
+
+## 8. PTSD lineage preservation checklist
+
+Before declaring the retrofit complete, search historical repository and durable documentation for evidence of the earlier PTSD provider design and map each surviving requirement to the Greater CoMind implementation.
+
+Required concepts to preserve if still desired and policy-compatible:
+
+- `/settings/llm-provider` or successor UX
+- `llm_session_routing` or successor data contract
+- `user_llm_selections` or successor data contract
+- `admin_overrides` or successor policy control
+- CoMind Default / Research / Creative / Private / Team-scoped routing concepts
+- user-key validation
+- managed versus user-funded usage accounting
+- local Llama/Mixtral or equivalent private model support
+- offline/private execution pathway
+
+Historical names do not have to survive. The capabilities and governance intent do.
+
+## 9. External gateway evaluation checklist
+
+Before adopting MyApps/Machine, OpenRouter, or another gateway as a CoMind adapter, verify:
+
+- API availability and authentication model
+- exact upstream model identity availability
+- ability to pin/exclude model families
+- privacy/data retention terms
+- training/use-of-data terms
+- regional/residency controls
+- provider failover behavior
+- request/response logging behavior
+- prompt/context retention
+- usage/cost precision
+- latency and rate limits
+- outage/fallback semantics
+- service-account support
+- revocation/rotation support
+- audit/export capability
+- OpenAI-compatible behavior differences
+- model deprecation policy
+- vendor lock-in and direct-provider escape path
+
+A gateway that cannot prove upstream identity may be useful for inference but must not satisfy strict independent-family verification.
+
+## 10. Acceptance evidence for each retrofit PR
+
+Every implementation PR should include:
+
+- exact base and head commit
+- changed provider-coupling inventory
+- deterministic tests
+- evidence that raw credentials were not introduced
+- evidence that budget/provenance controls remain in path
+- migration/compatibility impact
+- live-call status: none, bounded, or explicitly authorized
+- known exceptions and next retirement step
+
+Paid provider calls remain unnecessary unless the implementation specifically reaches a live adapter acceptance milestone.
+
+## 11. Proposed follow-on issue sequence
+
+Do not open all of these simultaneously. Create each only when its dependency is accepted to avoid parallel competing provider foundations.
+
+1. Provider descriptors, model-family identity, and canonical registry
+2. Adapter conformance suite and OpenAI/fixture migration
+3. Credential-reference and BYOK/BYOM/BYOP policy boundary
+4. First caller migrations
+5. Independent second-opinion/model-arbitration runtime
+6. PTSD/private/local modernization
+7. External gateway adapter evaluation and bounded live validation
+8. Remaining legacy cleanup and architecture enforcement
+
+## 12. Completion definition
+
+The Greater CoMind retrofit is complete when:
+
+- CoMind can change providers/models without losing durable cognitive continuity;
+- every model-backed execution has provider/model-family provenance;
+- Virtual Employees receive inference capabilities rather than credentials;
+- user/provider choice is governed through BYOK/BYOM/BYOP/managed modes;
+- strict second-opinion requests enforce genuine model-family independence;
+- sensitive/private routing can require private or local inference;
+- external gateways remain replaceable;
+- direct provider coupling is confined to adapters, tests, or documented exceptions;
+- all existing budget, authorization, provenance, and recovery authorities remain singular and canonical.

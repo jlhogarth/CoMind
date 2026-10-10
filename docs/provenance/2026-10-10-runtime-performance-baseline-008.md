@@ -33,7 +33,11 @@ Two compact CI artifacts cover the baseline:
 - `runtime-performance-baseline.json` is a deterministic in-process smoke fixture. It reports interactive request p50/p95, checkpoint payload size, five query-stub calls per request, synchronous checkpoint-fixture bookkeeping, and a paired control comparison for the local measurement overhead. This is instrumentation evidence only, not PostgreSQL or production latency.
 - `foundry-checkpoint-postgres-baseline.json` is emitted by the existing isolated `comind_ci` PostgreSQL Foundry integration workflow. It measures real `cm_foundry_recovery_checkpoint` INSERT roundtrips in that disposable CI database and reports sample count, p50/p95, serialized parameter bytes, Node version, limitations and warnings.
 
-The first verified isolated PostgreSQL artifact on 2026-10-10 recorded 3 checkpoint INSERT samples, p50 `0.619 ms`, p95 `0.663 ms`, parameter payload range `260-282` bytes, and no warnings. These values include connection-pool acquisition and PostgreSQL roundtrip on a GitHub-hosted CI runner. They must not be represented as production latency or as a service-level objective.
+The final accepted baseline on 2026-10-10 recorded:
+- Deterministic interactive fixture: 40 samples, interactive request p50 `0.349 ms`, p95 `0.822 ms`, measurement-overhead p50 delta `0.001 ms`, p95 delta `0 ms`, checkpoint payload `260` bytes, five query-stub calls per request, and no warnings.
+- Isolated PostgreSQL checkpoint fixture: 3 real checkpoint INSERT samples, p50 `0.677 ms`, p95 `0.752 ms`, parameter payload range `260-282` bytes, and no warnings.
+
+The isolated PostgreSQL values include connection-pool acquisition and PostgreSQL roundtrip on a GitHub-hosted CI runner. These measurements must not be represented as production latency or as a service-level objective.
 
 Regression reporting remains warning-only. No new database schema, agent, service, external dependency, paid provider call, or production database mutation was introduced for this baseline.
 

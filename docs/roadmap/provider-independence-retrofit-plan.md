@@ -18,10 +18,12 @@ The retrofit is intentionally incremental. Existing OpenAI behavior remains vali
 4. Keep secrets behind credential references and a broker boundary.
 5. Make model family explicit wherever independent second opinions are claimed.
 6. Add deterministic adapter-conformance tests before live provider tests.
-7. Do not introduce a second financial ledger, execution identity, authorization authority, memory store, or provenance system.
+7. Do not introduce a second financial ledger, execution identity, authorization authority, memory store, provenance system, supplier inventory, or risk authority.
 8. Migrate callers toward capabilities and provider-neutral requests rather than giving them direct provider SDK clients.
 9. Preserve the PTSD/private/local requirements as first-class acceptance criteria.
 10. Treat external gateways as replaceable adapters.
+11. Preserve explicit governed-attempt semantics: no hidden automatic retries or fallback calls behind one provider execution identity.
+12. Register material providers/gateways and consequential model/provider changes through the existing AIMS supplier, system, risk, approval, and reassessment controls.
 
 ## 3. Current coupling inventory
 
@@ -32,9 +34,10 @@ This inventory is based on repository inspection at the Issue #104 base and is n
 | `server/src/assistant-provider.ts` | Explicit provider selection currently limited to fixture/OpenAI | Provider registry resolves approved adapters from provider-neutral descriptors and policy | P0 |
 | `server/src/providers/openai.ts` | OpenAI-specific provider adapter | Retain as first canonical adapter behind shared conformance contract | P0 |
 | `server/src/env.ts` | OpenAI/provider-specific environment settings | Preserve compatibility while moving provider configuration into scoped provider descriptors and credential references | P0 |
-| Existing provider execution envelope/wrapper | Provider-neutral execution foundation already exists | Extend, do not duplicate | P0 |
+| Existing provider execution envelope/wrapper | Provider-neutral execution foundation already exists | Extend, do not duplicate; current ordinary assistant traffic is not yet proven converged through the governed wrapper | P0 |
 | Existing budget/FinOps/rate-card paths | Current provider accounting has OpenAI-specific assumptions in places | Introduce provider-specific rate sources behind one canonical financial authority | P0 |
 | Provider-specific smoke/CI workflows | OpenAI-specific live smoke and configuration | Keep as adapter-specific validation while adding network-free shared conformance suite | P0 |
+| AIMS system/supplier/risk inventory | Current governance authority already tracks provider/model/supplier dependencies and change triggers | Provider registry supplies machine-readable identities while AIMS remains the management/governance view | P0 |
 | `apps/comind-sovereign-api/main.py` | Direct OpenAI coupling observed | Route through canonical provider capability/request layer | P1 |
 | `src/api/agents/ceo/bot.ts` | Direct provider coupling observed | Agent requests governed inference capability, not provider SDK | P1 |
 | `src/api/ve/bot.ts` | Direct provider coupling observed | VE requests governed inference capability, not provider SDK | P1 |
@@ -89,13 +92,17 @@ One registry resolves:
 - provider adapter
 - model descriptor
 - model family
+- requested and resolved model identity/version where exposed
 - acquisition mode
 - credential reference
 - capability metadata
 - policy compatibility
 - provider health
+- AIMS supplier/governance reference where applicable
 
 Subsystems must not create private competing provider registries.
+
+The runtime registry is not a replacement for the AIMS management view. Machine-readable provider/model identity should feed or reconcile with AIMS supplier/system inventory rather than creating a shadow governance database.
 
 ### 5.2 Inference request
 
@@ -119,17 +126,21 @@ They should not need to know a raw API key or provider SDK object.
 Every provider adapter should support the subset of capabilities it advertises and pass a shared deterministic conformance suite covering at minimum:
 
 - request normalization
-- model identity
+- requested/canonical/resolved model identity
+- model revision/version/build identity where exposed
 - usage normalization
 - result normalization
 - error normalization
 - timeout handling
-- retry policy integration
+- explicit retry and fallback attempt semantics
+- rejection or disabling of hidden automatic retries for governed cost-bearing execution
 - cancellation behavior where supported
 - provenance emission
 - cost/usage emission
 - structured output handling where advertised
 - tool/function support where advertised
+
+A fallback that creates another external request is another governed attempt. It must not silently share the first attempt's execution identity, monetary authorization, or settlement evidence.
 
 ### 5.4 Credential boundary
 
@@ -137,7 +148,7 @@ Provider credentials are opaque references from the caller perspective. Resoluti
 
 ### 5.5 Arbitration contract
 
-Model arbitration should be a first-class execution plan rather than an ad hoc loop over provider clients. It must record participant role and actual model family and produce bounded comparison/contradiction outcomes.
+Model arbitration should be a first-class execution plan rather than an ad hoc loop over provider clients. It must record participant role, actual model family, and resolved identity information available from the provider and produce bounded comparison/contradiction outcomes.
 
 ## 6. Retrofit execution phases
 
@@ -147,18 +158,21 @@ Model arbitration should be a first-class execution plan rather than an ad hoc l
 - Capture current fixture/OpenAI provider contract.
 - Establish adapter-conformance test harness with no paid calls.
 - Confirm current execution-envelope/budget/provenance integration points.
+- Confirm current AIMS provider/supplier/risk records and change-control boundaries that the provider registry must integrate with rather than replace.
 
-Exit criterion: current behavior is reproducible and provider-neutral test expectations exist.
+Exit criterion: current behavior is reproducible, provider-neutral test expectations exist, and governance integration points are identified.
 
 ### Phase B: Provider/model descriptors and registry
 
 - Add provider and model descriptors.
 - Add explicit model-family identity.
+- Record requested/canonical/resolved model identity and model revision/version where exposed.
 - Add acquisition-mode enum/contract: BYOK, BYOM, BYOP, managed.
 - Register fixture and OpenAI through the same registry.
 - Keep current environment settings as compatibility inputs.
+- Add AIMS supplier/governance references without duplicating management-only risk/approval records into the runtime registry.
 
-Exit criterion: existing server behavior works through registry resolution without changing observable behavior.
+Exit criterion: existing server behavior works through registry resolution without changing observable behavior, and registry identities can reconcile to current governance records.
 
 ### Phase C: Canonical credential references
 
@@ -188,7 +202,9 @@ For each caller:
 - express provider needs through canonical inference/capability request;
 - preserve existing tests;
 - add provider-substitution test using fixture/fake adapters;
-- verify no financial/provenance bypass.
+- verify no financial/provenance bypass;
+- verify no hidden retry/fallback bypass;
+- preserve evidence-state distinctions between repository implementation, isolated verification, deployed controls, and operating controls.
 
 Exit criterion: direct provider SDK use remains only inside approved adapters or explicit transitional exceptions.
 
@@ -204,9 +220,9 @@ Add adapters one at a time after the registry is stable. Candidate classes inclu
 - MyApps/Machine gateway
 - OpenRouter gateway
 
-Adapter acceptance must be based on CoMind contracts rather than the provider marketing surface.
+Adapter acceptance must be based on CoMind contracts rather than the provider marketing surface. Before consequential or live use, material external providers/gateways must have the required AIMS supplier/system references, risk assessment, approval state, and reassessment triggers.
 
-Exit criterion: at least two distinct model families can pass deterministic conformance, with live validation separately gated.
+Exit criterion: at least two distinct model families can pass deterministic conformance, with live validation separately gated and governance state explicit.
 
 ### Phase F: Independent second opinion and arbitration
 
@@ -218,6 +234,7 @@ Exit criterion: at least two distinct model families can pass deterministic conf
 - Add abstain/unresolved/escalation outcomes.
 - Add budget-bounded participant selection.
 - Add provenance linking primary and reviewer executions.
+- Record model revision/version or identity-observation time where available so later re-evaluation can detect model drift.
 
 Exit criterion: CoMind can demonstrate a deterministic two-family arbitration flow with fixtures and can prove that same-family routing fails a strict-independence requirement.
 
@@ -233,6 +250,7 @@ Reconcile surviving PTSD artifacts and restore the strongest prior provider-inde
 - private inference endpoints
 - policy restrictions for sensitive context
 - provider test/validation without secret exposure
+- supplier/data-processing approval for any sensitive external provider path
 
 Exit criterion: the PTSD subsystem no longer needs a private provider architecture to achieve these capabilities.
 
@@ -243,7 +261,8 @@ Exit criterion: the PTSD subsystem no longer needs a private provider architectu
 - update documentation and examples;
 - add static/repository checks for unauthorized direct provider SDK construction where practical;
 - maintain an exception registry for intentional direct adapter code;
-- add architecture test preventing fallback from weakening constraints.
+- add architecture test preventing fallback from weakening constraints;
+- add architecture test or policy check preventing hidden multi-attempt retry/failover where the governed wrapper requires explicit attempts.
 
 Exit criterion: provider-specific coupling is bounded to adapters/tests/approved exceptions.
 
@@ -286,11 +305,13 @@ Before adopting MyApps/Machine, OpenRouter, or another gateway as a CoMind adapt
 
 - API availability and authentication model
 - exact upstream model identity availability
+- resolved model revision/version identity availability where exposed
 - ability to pin/exclude model families
 - privacy/data retention terms
 - training/use-of-data terms
 - regional/residency controls
 - provider failover behavior
+- whether retries/failover are visible and controllable per external attempt
 - request/response logging behavior
 - prompt/context retention
 - usage/cost precision
@@ -300,10 +321,12 @@ Before adopting MyApps/Machine, OpenRouter, or another gateway as a CoMind adapt
 - revocation/rotation support
 - audit/export capability
 - OpenAI-compatible behavior differences
-- model deprecation policy
+- model deprecation/change-notification policy
 - vendor lock-in and direct-provider escape path
+- AIMS supplier identifier, owner, approval state, linked risk records, and reassessment triggers
+- upstream/subsupplier visibility where a gateway fronts other model providers
 
-A gateway that cannot prove upstream identity may be useful for inference but must not satisfy strict independent-family verification.
+A gateway that cannot prove upstream identity may be useful for inference but must not satisfy strict independent-family verification. A gateway that hides retries or upstream fallback may be unsuitable for governed cost-bearing execution unless CoMind can preserve distinct attempt, budget, telemetry, and settlement evidence.
 
 ## 10. Acceptance evidence for each retrofit PR
 
@@ -314,8 +337,11 @@ Every implementation PR should include:
 - deterministic tests
 - evidence that raw credentials were not introduced
 - evidence that budget/provenance controls remain in path
+- evidence that governed attempt/retry/fallback semantics remain in path
+- AIMS system/supplier/risk impact and whether reassessment is required
 - migration/compatibility impact
 - live-call status: none, bounded, or explicitly authorized
+- evidence state: repository, isolated, deployed, operating, or other explicitly supported state
 - known exceptions and next retirement step
 
 Paid provider calls remain unnecessary unless the implementation specifically reaches a live adapter acceptance milestone.
@@ -324,10 +350,10 @@ Paid provider calls remain unnecessary unless the implementation specifically re
 
 Do not open all of these simultaneously. Create each only when its dependency is accepted to avoid parallel competing provider foundations.
 
-1. Provider descriptors, model-family identity, and canonical registry
-2. Adapter conformance suite and OpenAI/fixture migration
+1. Provider behavior baseline and network-free adapter conformance harness
+2. Provider/model descriptors, model-family identity, acquisition mode, and canonical registry with fixture/OpenAI registration
 3. Credential-reference and BYOK/BYOM/BYOP policy boundary
-4. First caller migrations
+4. First caller migrations and convergence toward governed provider execution
 5. Independent second-opinion/model-arbitration runtime
 6. PTSD/private/local modernization
 7. External gateway adapter evaluation and bounded live validation
@@ -338,11 +364,13 @@ Do not open all of these simultaneously. Create each only when its dependency is
 The Greater CoMind retrofit is complete when:
 
 - CoMind can change providers/models without losing durable cognitive continuity;
-- every model-backed execution has provider/model-family provenance;
+- every model-backed execution has provider/model-family provenance and the best available resolved model identity;
 - Virtual Employees receive inference capabilities rather than credentials;
 - user/provider choice is governed through BYOK/BYOM/BYOP/managed modes;
 - strict second-opinion requests enforce genuine model-family independence;
 - sensitive/private routing can require private or local inference;
 - external gateways remain replaceable;
+- material providers/gateways and consequential changes are governed through the existing AIMS supplier/system/risk process;
+- retries and provider failovers cannot silently create untracked external attempts;
 - direct provider coupling is confined to adapters, tests, or documented exceptions;
-- all existing budget, authorization, provenance, and recovery authorities remain singular and canonical.
+- all existing budget, authorization, provenance, recovery, supplier-governance, and risk authorities remain singular and canonical.

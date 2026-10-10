@@ -105,7 +105,7 @@ Based on this observation:
 
 ## Non-interference boundary
 
-This evidence record does not alter PR #84, #86, or #88 and does not authorize a new migration. It exists to prevent false assumptions while those parallel lanes continue.
+This evidence record does not alter PR #84 and does not authorize a new migration. PR #86 has since merged as repository/isolated work-lease evidence, and Interactive Runtime Performance baseline 008 has since merged as a monitoring reference. Neither change converts this live Supabase snapshot into deployed Foundry/security evidence.
 
 ## Required follow-on milestone
 

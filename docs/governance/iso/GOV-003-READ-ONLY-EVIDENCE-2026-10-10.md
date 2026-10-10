@@ -30,6 +30,17 @@ A read-only catalog query on 2026-10-10 observed:
   - `20261006051527` — `comind_pm_ledger_maintenance_package_v0_1`;
   - `20261006051627` — `comind_pm_ledger_hardening_v0_1_1`.
 
+A second read-only aggregate query confirmed the live knowledge/memory schema exists but currently has **zero rows** in each of:
+
+- `comind.cm_memory_node`;
+- `comind.cm_embedding`;
+- `comind.cm_kg_node`;
+- `comind.cm_kg_edge`;
+- `comind.cm_doc`;
+- `comind.cm_doc_chunk`.
+
+The `vector` extension is installed, but this observation does not establish an operating populated RAG/vector-memory corpus. GOV-003 therefore distinguishes **deployed schema capability** from **active memory/RAG operation**.
+
 No DDL, DML, migration, function execution with side effects, Edge Function deployment, provider call, secret read, or production configuration change was performed.
 
 This refreshed observation is consistent with `LIVE-READ-ONLY-EVIDENCE-2026-10-10.md`: later repository Foundry/security/runtime-budget migrations are not represented in live migration history and must not be described as deployed merely because their repository/isolated tests are green.
@@ -108,5 +119,6 @@ GOV-003 records this control subsystem as **isolated verified / verified not dep
 - A real provider smoke against isolated infrastructure does not equal production provider activation.
 - Enabled rows in `cm_module_registry` do not mean Virtual Employees or autonomous agents are active.
 - `cm_agent` contained zero rows at observation time.
+- Empty live memory/vector/knowledge tables do not support a claim of active persistent-memory or RAG operation.
 
 The GOV-003 inventory must preserve these distinctions row by row.

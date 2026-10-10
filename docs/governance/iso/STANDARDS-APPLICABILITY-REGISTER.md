@@ -9,9 +9,9 @@ Each entry must preserve: framework, exact edition/version, authoritative source
 
 | ID | Framework / version | Role in CoMind | Applicability | Current state | Review trigger |
 | --- | --- | --- | --- | --- | --- |
-| STD-ISO-42001 | ISO/IEC 42001:2023, Edition 1, published 2023-12 | Primary AI management-system requirements and proposed certification backbone | Core | Public edition metadata verified; clause mapping pending licensed standard | ISO amendment/revision, certification planning, scope change |
+| STD-ISO-42001 | ISO/IEC 42001:2023, Edition 1, published 2023-12 | Primary AI management-system requirements and active certification-readiness backbone | Core | Public edition metadata verified; clause mapping pending licensed standard | ISO amendment/revision, certification planning, scope change |
 | STD-ISO-23894 | ISO/IEC 23894:2023, Edition 1, published 2023-02 | AI-specific risk-management guidance supporting AIMS risk process | Core guidance | Public edition metadata verified; detailed mapping pending licensed standard | ISO amendment/revision, risk-method change |
-| STD-ISO-27001 | ISO/IEC 27001:2022, Edition 3, published 2022-10 | Information-security management requirements; possible separate certification objective | Supporting / decision pending | Public edition metadata verified; certification objective not approved | Security strategy decision, audit planning, ISO revision |
+| STD-ISO-27001 | ISO/IEC 27001:2022, Edition 3, published 2022-10 | Information-security management requirements used as a supporting security crosswalk | Supporting only | Management decision 2026-10-10: not a separate certification objective at this stage | Security strategy change, audit planning, ISO revision |
 | STD-NIST-AIRMF | NIST AI RMF 1.0, NIST AI 100-1, 2023-01-26 | Voluntary trustworthy-AI risk structure and operational crosswalk | Core supporting | Current public version; NIST states revision is in progress as of 2026 | NIST publishes successor/revision |
 | STD-NIST-GENAI | NIST AI 600-1, Generative AI Profile, 2024-07-26 | Generative-AI risk profile for provider/model and application risks | Core supporting | Final public profile | NIST update or successor |
 | STD-NIST-80053 | NIST SP 800-53 Rev. 5, 2020 with published errata | Security/privacy control catalog for technical and organizational crosswalk | Supporting | Public catalog available | NIST revision or CoMind control-baseline change |
@@ -39,7 +39,7 @@ Each entry must preserve: framework, exact edition/version, authoritative source
 - **Primary requirement framework:** ISO/IEC 42001:2023.
 - **Risk-method support:** ISO/IEC 23894 and NIST AI RMF.
 - **GenAI/agentic threat coverage:** NIST AI 600-1, OWASP LLM/GenAI Top 10, OWASP Agentic Top 10, MITRE ATLAS.
-- **Security/privacy crosswalk:** NIST SP 800-53 and, if management chooses an ISMS/certification objective, ISO/IEC 27001:2022.
+- **Security/privacy crosswalk:** NIST SP 800-53 plus ISO/IEC 27001:2022 as a supporting framework. ISO/IEC 27001 certification is not currently in scope.
 - **Secure development:** existing CoMind SDLC controls plus NIST SP 800-218A.
 
 Framework inclusion does not mean every requirement is applicable or satisfied. Applicability must be documented with rationale, owner, implementation reference, verification method, observed evidence, gap/exception status, and review date.
@@ -57,9 +57,16 @@ Living or revisable frameworks must never silently change CoMind's acceptance cr
 - OWASP's 2026 Agentic Applications Top 10 is a distinct resource from the LLM/GenAI Top 10 and is directly relevant to the Virtual Employee Foundry.
 - MITRE ATLAS is a living knowledge base; evidence should record retrieval date and selected threat identifiers rather than imply a static edition.
 
-## Open decisions
+## Management decisions recorded 2026-10-10
 
-1. Purchase/access the licensed ISO/IEC 42001:2023 and ISO/IEC 23894:2023 text for clause-level mapping.
-2. Decide whether ISO/IEC 27001 certification is a separate organizational objective or only a supporting crosswalk.
+1. ISO/IEC 42001 is the active AIMS certification-readiness direction.
+2. ISO/IEC 27001 is supporting-only for now and is not a separate certification objective.
+3. Clause-level ISO/IEC 42001 implementation mapping is authorized once lawful licensed access to the normative standard is available.
+4. No purchase, paid standards access, or new paid connection is authorized implicitly by this decision; cost-bearing access still requires explicit approval.
+
+## Open items
+
+1. Locate existing lawful licensed ISO/IEC 42001:2023 access, if any, or obtain explicit approval before any purchase/paid access.
+2. Locate lawful ISO/IEC 23894:2023 access if detailed clause-level risk mapping is desired.
 3. Define the cadence for standards surveillance and management approval of version changes.
-4. Identify legal/regulatory frameworks applicable to the eventual markets, geographies, and health-related use cases before those products enter scope.
+4. Identify legal/regulatory frameworks applicable to eventual markets, geographies, and health-related use cases before those products enter scope.

@@ -52,7 +52,7 @@ Foundry provenance summary checkpoints and ACP machine-restorable checkpoints re
 
 The ACP isolated workflow uses the same PostgreSQL 17 plus pgvector service image as the canonical Foundry work-lease verification path so the ACP gate tests against the current Foundry database prerequisites rather than a reduced database environment.
 
-## Independent review finding and repair
+## Independent review finding and repair: restart-safe execution identity
 
 A fresh acceptance review after reconciliation identified a restart-safety defect in the runtime checkpoint identity. The assistant-response lifecycle used Fastify `request.id` as the durable ACP `executionId`. Fastify request identifiers are runtime-local and can repeat after an application restart, so the same conversation could reuse a previously persisted `(conversation_id, execution_id)` pair and fail closed instead of writing a new checkpoint.
 
@@ -61,6 +61,16 @@ The existing ACP branch was repaired in place rather than creating a competing l
 The first implementation commit for this repair was `4ce0bf8f079036696b558d6725d070395dd31382`. The restart-boundary integration test commit was `98a0c57328416fc4972e239ffeaf3ccb2f64abfe`.
 
 Because these commits changed the PR head, all earlier exact-head CI evidence became historical. Fresh exact-head verification is required before merge eligibility can be reconsidered.
+
+## Independent review finding and repair: deterministic latest-state ordering
+
+The same acceptance review found that repository restoration and recovery selected the latest checkpoint by checkpoint-local `created_at`, then by random UUID. Two valid checkpoints can share the same checkpoint timestamp. In that case a UUID tie-breaker does not encode persistence order, so latest-state restoration could select an older checkpoint nondeterministically.
+
+The ACP persistence table now includes a database-assigned monotonic `persistence_seq` identity column. Parent resolution, latest checkpoint restoration, and recovery coordination select by `persistence_seq DESC` rather than by client timestamp or UUID ordering. The recent-checkpoint index was aligned with that persistence order.
+
+The isolated PostgreSQL repository integration test now persists a successor checkpoint with the exact same `createdAt` timestamp as its parent and requires restoration to return the successor. It also verifies that the successor has a strictly greater persistence sequence.
+
+This repair changes repository implementation and verification evidence only. It does not imply live migration, production deployment, operating control effectiveness, or certification conformity.
 
 ## Verification boundary
 

@@ -7,7 +7,7 @@ DO $$ BEGIN
  END IF;
 END $$;
 
-CREATE TABLE comind.cm_foundry_work_lease (
+CREATE TABLE IF NOT EXISTS comind.cm_foundry_work_lease (
  task_id uuid PRIMARY KEY REFERENCES comind.cm_task(task_id) ON DELETE RESTRICT,
  state text NOT NULL DEFAULT 'ready' CHECK (state IN ('ready','leased','completed','exhausted')),
  not_before timestamptz NOT NULL DEFAULT now(),
@@ -23,9 +23,9 @@ CREATE TABLE comind.cm_foundry_work_lease (
  CHECK ((state = 'leased') = (worker_instance_id IS NOT NULL AND lease_token IS NOT NULL AND lease_expires_at IS NOT NULL)),
  CHECK (worker_instance_id IS NULL OR char_length(worker_instance_id) BETWEEN 1 AND 128)
 );
-CREATE INDEX idx_cm_foundry_work_dispatch ON comind.cm_foundry_work_lease
+CREATE INDEX IF NOT EXISTS idx_cm_foundry_work_dispatch ON comind.cm_foundry_work_lease
  (not_before, task_id) WHERE state IN ('ready','leased');
-CREATE TABLE comind.cm_foundry_work_lease_event (
+CREATE TABLE IF NOT EXISTS comind.cm_foundry_work_lease_event (
  event_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
  task_id uuid NOT NULL REFERENCES comind.cm_foundry_work_lease(task_id) ON DELETE RESTRICT,
  event_type text NOT NULL CHECK (event_type IN ('claimed','reclaimed','released','completed','exhausted')),
@@ -33,12 +33,14 @@ CREATE TABLE comind.cm_foundry_work_lease_event (
  worker_instance_id text,
  occurred_at timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_cm_foundry_work_lease_event_task ON comind.cm_foundry_work_lease_event(task_id, occurred_at);
+CREATE INDEX IF NOT EXISTS idx_cm_foundry_work_lease_event_task ON comind.cm_foundry_work_lease_event(task_id, occurred_at);
+DROP TRIGGER IF EXISTS trg_cm_foundry_work_lease_event_immutable
+ ON comind.cm_foundry_work_lease_event;
 CREATE TRIGGER trg_cm_foundry_work_lease_event_immutable
  BEFORE UPDATE OR DELETE ON comind.cm_foundry_work_lease_event
  FOR EACH ROW EXECUTE FUNCTION comind.cm_reject_foundry_substrate_mutation();
 
-CREATE FUNCTION comind.cm_foundry_claim_work(p_worker text, p_lease_seconds integer DEFAULT 60)
+CREATE OR REPLACE FUNCTION comind.cm_foundry_claim_work(p_worker text, p_lease_seconds integer DEFAULT 60)
 RETURNS TABLE(task_id uuid, lease_token uuid, fencing_epoch bigint, lease_expires_at timestamptz)
 LANGUAGE plpgsql SECURITY INVOKER AS $$
 DECLARE v_task uuid; v_prior text; v_epoch bigint; v_token uuid; v_expiry timestamptz;
@@ -68,7 +70,7 @@ BEGIN
  RETURN QUERY SELECT v_task,v_token,v_epoch,v_expiry;
 END $$;
 
-CREATE FUNCTION comind.cm_foundry_renew_work(p_task uuid,p_worker text,p_token uuid,p_epoch bigint,p_seconds integer DEFAULT 60)
+CREATE OR REPLACE FUNCTION comind.cm_foundry_renew_work(p_task uuid,p_worker text,p_token uuid,p_epoch bigint,p_seconds integer DEFAULT 60)
 RETURNS boolean LANGUAGE plpgsql SECURITY INVOKER AS $$
 DECLARE v_count integer;
 BEGIN
@@ -81,7 +83,7 @@ BEGIN
  RETURN v_count=1;
 END $$;
 
-CREATE FUNCTION comind.cm_foundry_finish_work(p_task uuid,p_worker text,p_token uuid,p_epoch bigint,p_complete boolean DEFAULT true)
+CREATE OR REPLACE FUNCTION comind.cm_foundry_finish_work(p_task uuid,p_worker text,p_token uuid,p_epoch bigint,p_complete boolean DEFAULT true)
 RETURNS boolean LANGUAGE plpgsql SECURITY INVOKER AS $$
 DECLARE v_count integer; v_state text;
 BEGIN

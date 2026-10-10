@@ -48,6 +48,12 @@ def fail(message: str) -> None:
     raise AssertionError(message)
 
 
+def normalize(value: str | None) -> str:
+    if value is None:
+        return ""
+    return value.strip().lstrip("\ufeff")
+
+
 def split_refs(raw: str) -> list[str]:
     return [item.strip() for item in raw.split(";") if item.strip()]
 
@@ -68,11 +74,16 @@ def parse_soa() -> dict[str, tuple[str, str, str, str]]:
 def main() -> int:
     with DATA.open(newline="", encoding="utf-8") as handle:
         reader = csv.DictReader(handle)
-        fields = set(reader.fieldnames or [])
+        fields = {normalize(field) for field in (reader.fieldnames or [])}
         missing_columns = REQUIRED_FIELDS - fields
         if missing_columns:
             fail(f"missing CSV columns: {sorted(missing_columns)}")
-        rows = list(reader)
+        raw_rows = list(reader)
+
+    rows = [
+        {normalize(key): normalize(value) for key, value in raw.items() if key is not None}
+        for raw in raw_rows
+    ]
 
     if len(rows) != 38:
         fail(f"expected 38 control rows, found {len(rows)}")
@@ -90,7 +101,7 @@ def main() -> int:
     for row in rows:
         cid = row["control_id"]
         for field in REQUIRED_FIELDS - {"iso_27001"}:
-            if not row[field].strip():
+            if not row[field]:
                 fail(f"{cid}: blank required field {field}")
         if row["applicability"] not in ALLOWED_APPLICABILITY:
             fail(f"{cid}: invalid applicability {row['applicability']!r}")
@@ -99,13 +110,25 @@ def main() -> int:
         if row["evidence_state"] not in ALLOWED_EVIDENCE:
             fail(f"{cid}: invalid evidence state {row['evidence_state']!r}")
         if row["source_classification"] != EXPECTED_SOURCE_CLASS:
-            fail(f"{cid}: source classification must remain secondary/unverified")
+            fail(
+                f"{cid}: source classification mismatch: "
+                f"observed={row['source_classification']!r} expected={EXPECTED_SOURCE_CLASS!r}"
+            )
         if row["source_repo"] != EXPECTED_REPO:
-            fail(f"{cid}: unexpected secondary source repository")
+            fail(
+                f"{cid}: source repository mismatch: "
+                f"observed={row['source_repo']!r} expected={EXPECTED_REPO!r}"
+            )
         if row["source_commit"] != EXPECTED_COMMIT:
-            fail(f"{cid}: source must remain pinned to {EXPECTED_COMMIT}")
+            fail(
+                f"{cid}: source commit mismatch: "
+                f"observed={row['source_commit']!r} expected={EXPECTED_COMMIT!r}"
+            )
         if row["normative_verification"] != EXPECTED_NORMATIVE:
-            fail(f"{cid}: GOV-002 may not promote ISO normative verification")
+            fail(
+                f"{cid}: normative verification mismatch: "
+                f"observed={row['normative_verification']!r} expected={EXPECTED_NORMATIVE!r}"
+            )
         for field in ("implementation_refs", "evidence_refs"):
             for ref in split_refs(row[field]):
                 if not (ROOT / ref).exists():

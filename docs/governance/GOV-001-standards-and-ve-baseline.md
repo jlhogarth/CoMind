@@ -28,33 +28,15 @@ Initial AIMS artifacts required: scope statement and exclusions; AI policy; orga
 
 Registry record contract (proposed, not deployed): `control_id, framework, edition, source_reference, applicability, rationale, owner, tier, risk, implementation_reference, verification_method, evidence_reference, observed_status, assessed_at, exception_owner, exception_expiry`. Preserve source licensing. Evidence must refer to observed tests, not aspirational designs.
 
-## Virtual Employee naming migration
+## Virtual Employee identity directory: naming decision
 
-Canonical identity is immutable; human-friendly display names and aliases are mutable. The schema already distinguishes `role_code` from `display_name`. Do not change role codes, `agent_id`, `actor_id`, database foreign keys, GitHub workflows or provenance references in this milestone.
-
-### Existing role documents observed in connected Drive (documentation, not deployed agents)
-
-| Existing document persona | Proposed understandable display name |
-| --- | --- |
-| RADAR, Principal Technical Program Architect | Program Architect |
-| SYNAPSE, Principal AI Systems Architect | AI Systems Architect |
-| VAULT, Principal Database Architect | Database Architect |
-| FORGE, Principal Software Engineer | Software Engineer |
-| ATLAS, Principal Systems Architect | Systems Architect |
-| SENTRY, Principal DevSecOps and SRE | Security and Reliability Engineer |
-| PROOF, Principal Verification Engineer | Verification Engineer |
-
-Other legacy names including ARIS, CRIS, SEAL and SOAP require repository and document mapping before migration. These rows are proposals only and do not prove any persona is instantiated in Supabase or running. Resolve duplicate architect roles and the complete agent population before approving names.
-
-### Proposed new role
-
-`ISO | Compliance and Standards Officer`: shadow-mode, read-only standards registry steward; reports gaps and proposed corrective actions; no production mutations, certification assertions, self-approval or authority escalation. Creation of an actual VE profile, its grants, database migration and runtime activation is a separate approved milestone.
+Decision 2026-10-10: retain all established CoMind agent names and conventions. The founder withdrew the renaming proposal. GOV-001 must not change existing agent display names, role codes, identities, aliases, or references. Instead, create a descriptive agent role directory and inspect instantiated profiles separately from design-document personas. The proposed new ISO compliance role remains in scope, initially read-only and in shadow mode, subject to separate authorization before activation.
 
 ## Immediate execution order
 
 1. Finish repository and read-only live inventory, including current branches, actual `cm_agent` and Foundry profiles, policies and deployed schema. Never assume repository migrations have been applied live.
 2. Confirm applicable standards editions and establish the first control crosswalk with verified evidence and human owners.
-3. Review all proposed display names with the founder, then implement alias-safe changes and regression tests separately.
+3. Build a clear directory mapping existing canonical agent names to verified responsibilities, deployment state, and authority. Do not rename agents.
 4. Build ISO AIMS artifacts and evidence registry, preferably using existing database authorities rather than parallel ledgers.
 5. Introduce automated tier checks at PR acceptance and runtime policy enforcement, with latency and cost budgets measured against the Interactive Runtime Performance baseline.
 6. Exercise multi-agent conflict, prompt injection, revoked delegation, audit failure, and recovery cases in isolated tests.

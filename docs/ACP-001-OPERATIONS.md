@@ -32,7 +32,7 @@ ACP does not create a second work dispatcher or a second operation-outcome autho
 
 The canonical Foundry work ownership substrate remains `comind.cm_foundry_work_lease` from migration `20261009_009_foundry_work_lease_kernel.sql`. Recovery reads its fencing epoch and state when an ACP checkpoint references a task. ACP never stores the lease token.
 
-The canonical external-operation records remain `comind.cm_foundry_adapter_operation` and `comind.cm_foundry_adapter_operation_result`. ACP reads those records to determine whether an uncertain operation has a durable terminal result. Recovery does not invoke or replay the operation.
+The canonical external-operation records remain `comind.cm_foundry_adapter_operation` and `comind.cm_foundry_adapter_operation_result`. ACP reads those records to determine whether a recorded operation has a durable terminal result. Recovery does not invoke or replay the operation.
 
 `comind.cm_foundry_recovery_checkpoint` has a different purpose. It is an append-only governance and provenance summary record. `comind.cm_continuity_checkpoint` is the bounded machine-restorable ACP state envelope. Neither is represented as replacing the other.
 
@@ -52,10 +52,10 @@ Possible results are:
 
 - `ABSENT`: no checkpoint exists for the conversation.
 - `BLOCKED`: integrity, identity, freshness, schema, secret screening, or authority validation failed.
-- `DEGRADED`: the state is readable, but a dependency or operation outcome remains unresolved.
-- `READY`: the state is valid under current authority and no unresolved operation remains.
+- `DEGRADED`: the state is readable, but a dependency or recorded operation still requires authoritative reconciliation.
+- `READY`: the state is valid under current authority and every recorded side-effect obligation has either been absent or independently reconciled against canonical outcome evidence.
 
-For unresolved operations, ACP performs read-only reconciliation against the canonical Foundry tables. A terminal adapter result may convert that operation to completed only in the recovered in-memory state. A newer work-lease fencing epoch, active lease, exhausted lease, missing lease, missing terminal result, unavailable substrate, or reconciliation query failure remains `DEGRADED`.
+For every recorded operation, ACP performs read-only reconciliation against the canonical Foundry tables before recovery can become `READY`. A checkpoint-local `completed` status is observational and is not accepted as canonical outcome evidence by itself. A terminal adapter result may mark that operation completed only in the recovered in-memory state. A newer work-lease fencing epoch, active lease, exhausted lease, missing lease, missing terminal result, unavailable substrate, or reconciliation query failure remains `DEGRADED`.
 
 ACP recovery never claims a lease, renews a lease, finishes work, retries an adapter operation, or performs another external side effect.
 
@@ -91,7 +91,8 @@ The integration suite includes:
 - deterministic checkpoint roundtrip, tamper, expiration, authority, credential, size, and successor tests
 - PostgreSQL persistence, immutability, lineage, and idempotency tests
 - actual Fastify assistant-response lifecycle checkpointing against isolated PostgreSQL with a fixture provider
-- read-only recovery reconciliation against the canonical Foundry work-lease kernel
+- read-only recovery reconciliation against the canonical Foundry work-lease and adapter-outcome substrate
+- explicit proof that checkpoint-local completed status cannot replace canonical outcome evidence
 - PostgreSQL-backed write latency, scheduler enqueue latency, payload size, and query-count measurements
 
 The workflow publishes `artifacts/acp-continuity-baseline.json` as exact-run performance evidence. These measurements are CI and isolated-development evidence only. They are not production latency claims.

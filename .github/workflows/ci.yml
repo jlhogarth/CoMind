@@ -29,6 +29,17 @@ jobs:
         run: |
           cd server
           npm test
+      - name: Capture nonblocking runtime performance fixture
+        continue-on-error: true
+        run: node scripts/runtime_performance_baseline.mjs
+      - name: Upload runtime performance JSON
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-performance-baseline
+          path: artifacts/runtime-performance-baseline.json
+          if-no-files-found: warn
+          retention-days: 14
       - name: Audit production dependencies
         run: |
           cd server

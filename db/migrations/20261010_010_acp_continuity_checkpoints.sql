@@ -38,7 +38,11 @@ CREATE TABLE IF NOT EXISTS comind.cm_continuity_checkpoint (
   CONSTRAINT cm_continuity_checkpoint_digest CHECK ((checkpoint->>'digest') = digest)
 );
 
-CREATE INDEX IF NOT EXISTS idx_cm_continuity_checkpoint_recent
+ALTER TABLE comind.cm_continuity_checkpoint
+  ADD COLUMN IF NOT EXISTS persistence_seq bigint GENERATED ALWAYS AS IDENTITY;
+
+DROP INDEX IF EXISTS comind.idx_cm_continuity_checkpoint_recent;
+CREATE INDEX idx_cm_continuity_checkpoint_recent
   ON comind.cm_continuity_checkpoint (conversation_id, persistence_seq DESC);
 
 DROP TRIGGER IF EXISTS trg_cm_continuity_checkpoint_immutable

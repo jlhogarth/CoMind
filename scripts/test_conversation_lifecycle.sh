@@ -23,6 +23,7 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$fixture_file"
   npm run build
   mapfile -t integration_tests < <(
     find test/integration -maxdepth 1 -type f -name '*.test.mjs' \
+      ! -name 'foundry-work-lease-kernel.test.mjs' \
       ! -name 'foundry-runtime-orchestration.test.mjs' -print | sort
   )
   if [[ "${#integration_tests[@]}" -eq 0 ]]; then

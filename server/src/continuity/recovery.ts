@@ -96,7 +96,7 @@ export async function coordinateRecovery(
     `SELECT checkpoint_id::text, checkpoint
      FROM comind.cm_continuity_checkpoint
      WHERE conversation_id=$1
-     ORDER BY created_at DESC, checkpoint_id DESC
+     ORDER BY persistence_seq DESC
      LIMIT 1`,
     [conversationId]
   );

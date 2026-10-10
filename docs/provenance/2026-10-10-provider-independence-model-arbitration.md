@@ -18,7 +18,8 @@ Supporting rules:
 - Agents never own credentials. Agents receive governed capabilities.
 - No externally consequential action bypasses the Capability Control Plane.
 - BYOK, BYOM, BYOP, and CoMind Managed are first-class provider acquisition modes.
-- A strict second opinion requires model-family independence, not merely a different endpoint or account.
+- A strict second opinion requires independent-parallel opinion formation, at least model-family independence, and any additional provider-organization independence required by policy.
+- A critique that sees the primary answer before forming its own position is not counted as an independent vote.
 - Consensus is evidence, not truth.
 - External gateways are replaceable adapters, not CoMind governance authorities.
 - Every provider retry, fallback, or reroute that causes another external request is a distinct governed attempt and must not hide behind automatic SDK retry behavior.
@@ -52,12 +53,13 @@ Architecture language therefore describes target authority reuse without upgradi
 
 ## Acceptance review reconciliation
 
-The Issue #104 acceptance review identified and corrected four material ambiguities before approval:
+The Issue #104 acceptance review identified and corrected five material ambiguities before approval:
 
 1. **Supplier governance integration.** New direct providers, gateways, upstream model suppliers, and material provider/model changes are explicitly bound to the existing AIMS inventory, risk, approval, and reassessment process. The runtime provider registry must not become a shadow governance database.
 2. **Fallback and retry authority.** Multi-provider retry/fallback is explicitly required to preserve the existing one-governed-attempt semantics. Hidden SDK retries or gateway failovers cannot silently create additional cost-bearing attempts under one execution identity.
 3. **Evidence-state precision.** The architecture now states that ordinary assistant convergence through the governed wrapper and live Foundry capability operation remain future/deployment work rather than current operating controls.
 4. **Implementation sequencing.** The follow-on plan is test-first: freeze current fixture/OpenAI behavior and establish the network-free conformance contract before provider registry migration changes observable routing behavior.
+5. **Independent opinion semantics.** Strict second opinions now require independent-parallel opinion formation before compare/contrast or synthesis. Critique mode is explicitly useful but dependent. Higher-consequence policy may additionally require provider-organization independence beyond model-family independence.
 
 The review also strengthens model provenance by recording resolved model revision/version/build identity when exposed and an observation time when aliases may drift.
 
@@ -80,4 +82,4 @@ It does not claim deployed, operating, compliant, certification-ready, or certif
 
 ## Next implementation dependency
 
-After architecture acceptance, the first implementation slice should freeze current fixture/OpenAI behavior, establish the deterministic network-free provider adapter conformance harness, and confirm existing governed-execution, budget, provenance, and AIMS integration points. The next dependent slice should then introduce provider/model descriptors, explicit model-family identity, acquisition mode, and the canonical provider registry while preserving current observable behavior.
+After architecture acceptance, the first implementation slice should freeze current fixture/OpenAI behavior, establish the deterministic network-free provider adapter conformance harness, and confirm existing governed-execution, budget, provenance, and AIMS integration points. The next dependent slice should then introduce provider/model descriptors, explicit model-family and provider-organization identity, acquisition mode, and the canonical provider registry while preserving current observable behavior.

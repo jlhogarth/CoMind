@@ -1,0 +1,36 @@
+name: GOV-003 AIMS Operating Inventory
+
+on:
+  pull_request:
+    paths:
+      - "docs/governance/iso/aims-system-inventory.csv"
+      - "docs/governance/iso/aims-supplier-inventory.csv"
+      - "docs/governance/iso/aims-system-risk-baseline.csv"
+      - "docs/governance/iso/AIMS-INTENDED-USE-AND-OVERSIGHT-BASELINE.md"
+      - "docs/governance/iso/GOV-003-READ-ONLY-EVIDENCE-2026-10-10.md"
+      - "scripts/validate_aims_operating_inventory.py"
+      - ".github/workflows/gov-003-aims-inventory.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "docs/governance/iso/aims-system-inventory.csv"
+      - "docs/governance/iso/aims-supplier-inventory.csv"
+      - "docs/governance/iso/aims-system-risk-baseline.csv"
+      - "docs/governance/iso/AIMS-INTENDED-USE-AND-OVERSIGHT-BASELINE.md"
+      - "docs/governance/iso/GOV-003-READ-ONLY-EVIDENCE-2026-10-10.md"
+      - "scripts/validate_aims_operating_inventory.py"
+      - ".github/workflows/gov-003-aims-inventory.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate AIMS operating inventory
+        run: python3 scripts/validate_aims_operating_inventory.py

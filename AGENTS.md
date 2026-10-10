@@ -50,7 +50,7 @@ For each applicable control preserve the chain: source/edition -> requirement ->
 
 ## Agent naming and continuity
 
-Use a descriptive role-first **display name** for future Virtual Employees. Do not rename immutable identifiers, database keys, role codes, historical provenance, external references, or routing contracts merely to improve readability. First produce an inventory of actual agents, code references, display names, and aliases; review proposed mappings and collision risks; then migrate in separately tested work. Never imply a design document's agent is already deployed.
+Preserve established CoMind agent names and their canonical identifiers. Do not introduce a naming migration or change role codes, display names, aliases, routing contracts, database keys, or historical provenance as part of GOV-001. Provide a role directory for discoverability instead. Any future renaming requires a separate explicit decision and migration review.
 
 ## No silent delegated work
 

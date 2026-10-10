@@ -1,0 +1,30 @@
+name: GOV-002 Provisional AIMS Crosswalk
+
+on:
+  pull_request:
+    paths:
+      - "docs/governance/iso/aims-provisional-crosswalk.csv"
+      - "docs/governance/iso/AIMS-STATEMENT-OF-APPLICABILITY-PROVISIONAL.md"
+      - "scripts/validate_aims_provisional_crosswalk.py"
+      - ".github/workflows/gov-002-provisional-crosswalk.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "docs/governance/iso/aims-provisional-crosswalk.csv"
+      - "docs/governance/iso/AIMS-STATEMENT-OF-APPLICABILITY-PROVISIONAL.md"
+      - "scripts/validate_aims_provisional_crosswalk.py"
+      - ".github/workflows/gov-002-provisional-crosswalk.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate provisional AIMS crosswalk
+        run: python3 scripts/validate_aims_provisional_crosswalk.py

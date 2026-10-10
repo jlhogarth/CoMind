@@ -30,7 +30,7 @@ test('coordinator returns ABSENT without a checkpoint', async () => {
   assert.equal((await coordinateRecovery(checkpointQuery(null), 'conv', authority, now, true)).status, 'ABSENT');
 });
 
-test('coordinator permits verified read-only recovery without unresolved work', async () => {
+test('coordinator permits verified read-only recovery without recorded side effects', async () => {
   const result = await coordinateRecovery(checkpointQuery(createCheckpoint(baseState(), now)), 'conv', authority, now, true);
   assert.equal(result.status, 'READY');
   assert.equal(result.state.executionId, 'exec');
@@ -55,6 +55,20 @@ test('terminal canonical adapter result reconciles uncertain operation without r
   );
   assert.equal(result.status, 'READY');
   assert.equal(result.state.pending[0].status, 'completed');
+});
+
+test('checkpoint-local completed status still requires canonical outcome evidence', async () => {
+  const candidate = baseState();
+  candidate.pending = [{
+    operationId: 'op', idempotencyKey: 'key', status: 'completed', taskId: null,
+    fencingEpoch: null, adapterOperationId: null,
+  }];
+  const result = await coordinateRecovery(
+    checkpointQuery(createCheckpoint(candidate, now), { adapter: [] }),
+    'conv', authority, now, true
+  );
+  assert.equal(result.status, 'DEGRADED');
+  assert.deepEqual(result.reasons, ['adapter_outcome_unresolved']);
 });
 
 test('newer canonical work-lease fencing epoch keeps recovery degraded', async () => {

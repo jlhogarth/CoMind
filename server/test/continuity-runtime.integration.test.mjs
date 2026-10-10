@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 
 const enabled = process.env.ACP_ISOLATED_DB_TEST === '1';
 
-test('successful assistant-response schedules a durable checkpoint off the response hot path', { skip: !enabled }, async () => {
+test('successful assistant-response schedules restart-safe durable checkpoints off the response hot path', { skip: !enabled }, async () => {
   const { buildApp } = await import('../dist/app.js');
   const { query, closePool } = await import('../dist/db.js');
   let app;
@@ -24,28 +24,53 @@ test('successful assistant-response schedules a durable checkpoint off the respo
       ]
     );
 
+    const assistantProvider = {
+      name: 'acp-fixture',
+      async generateResponse() { return { content: 'fixture continuity response' }; },
+    };
+
     app = await buildApp({
       checkpointingEnabled: true,
       closePool: async () => {},
-      assistantProvider: {
-        name: 'acp-fixture',
-        async generateResponse() { return { content: 'fixture continuity response' }; },
-      },
+      assistantProvider,
     });
 
-    const user = await app.inject({
+    const firstUser = await app.inject({
       method: 'POST',
       url: `/api/conversations/${conversationId}/messages`,
       payload: { role: 'user', content: 'Persist a compact continuity checkpoint.' },
     });
-    assert.equal(user.statusCode, 201);
+    assert.equal(firstUser.statusCode, 201);
 
-    const assistant = await app.inject({
+    const firstAssistant = await app.inject({
       method: 'POST',
       url: `/api/conversations/${conversationId}/assistant-response`,
     });
-    assert.equal(assistant.statusCode, 201);
-    assert.match(assistant.headers['server-timing'], /persistence;dur=/);
+    assert.equal(firstAssistant.statusCode, 201);
+    assert.match(firstAssistant.headers['server-timing'], /persistence;dur=/);
+
+    await app.close();
+    app = undefined;
+
+    app = await buildApp({
+      checkpointingEnabled: true,
+      closePool: async () => {},
+      assistantProvider,
+    });
+
+    const secondUser = await app.inject({
+      method: 'POST',
+      url: `/api/conversations/${conversationId}/messages`,
+      payload: { role: 'user', content: 'Persist another checkpoint after restart.' },
+    });
+    assert.equal(secondUser.statusCode, 201);
+
+    const secondAssistant = await app.inject({
+      method: 'POST',
+      url: `/api/conversations/${conversationId}/assistant-response`,
+    });
+    assert.equal(secondAssistant.statusCode, 201);
+    assert.match(secondAssistant.headers['server-timing'], /persistence;dur=/);
 
     await app.close();
     app = undefined;
@@ -54,14 +79,22 @@ test('successful assistant-response schedules a durable checkpoint off the respo
       `SELECT checkpoint_id::text, checkpoint
        FROM comind.cm_continuity_checkpoint
        WHERE conversation_id=$1
-       ORDER BY created_at DESC, checkpoint_id DESC`,
+       ORDER BY created_at ASC, checkpoint_id ASC`,
       [conversationId]
     );
-    assert.equal(stored.rows.length, 1);
-    assert.equal(stored.rows[0].checkpoint.state.workflowId, 'conversation.assistant-response');
-    assert.equal(stored.rows[0].checkpoint.state.executionCursor, 'assistant_response_persisted');
-    assert.deepEqual(stored.rows[0].checkpoint.state.pending, []);
-    assert.deepEqual(stored.rows[0].checkpoint.state.provenance.sourceRefs, ['route:POST /api/conversations/:id/assistant-response']);
+    assert.equal(stored.rows.length, 2);
+    const executionIds = new Set(stored.rows.map(row => row.checkpoint.state.executionId));
+    assert.equal(executionIds.size, 2);
+
+    const root = stored.rows.find(row => row.checkpoint.state.parentCheckpointId === null);
+    const successor = stored.rows.find(row => row.checkpoint.state.parentCheckpointId !== null);
+    assert.ok(root);
+    assert.ok(successor);
+    assert.equal(successor.checkpoint.state.parentCheckpointId, root.checkpoint_id);
+    assert.equal(successor.checkpoint.state.workflowId, 'conversation.assistant-response');
+    assert.equal(successor.checkpoint.state.executionCursor, 'assistant_response_persisted');
+    assert.deepEqual(successor.checkpoint.state.pending, []);
+    assert.deepEqual(successor.checkpoint.state.provenance.sourceRefs, ['route:POST /api/conversations/:id/assistant-response']);
   } finally {
     if (app) await app.close();
     await closePool();

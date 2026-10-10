@@ -1,44 +1,118 @@
 # ACP-001: Durable Checkpoint Operations and Recovery
 
-## Scope and current guarantees
+## Evidence state
 
-ACP-001 provides immutable PostgreSQL checkpoint persistence, deterministic integrity checks, authority revalidation, an opt-in asynchronous scheduler, and read-only recovery classification. It does **not** provide autonomous task resumption, cross-provider conversation creation, external side-effect reconciliation, or a production-ready delegation mechanism. The observational runtime checkpoint contains only conversation identifiers and bounded references; it is not a complete conversation snapshot.
+ACP-001 is repository implementation with isolated PostgreSQL verification when its dedicated workflow passes on the exact pull-request head. It is not a live Supabase deployment, an operating production control, or evidence of certification conformity.
 
-## Deployment and feature flag
+The default remains `ACP_CHECKPOINTS_ENABLED=false`. No live database migration, production enablement, paid provider call, or external authorization is performed by ACP-001.
 
-The default is `ACP_CHECKPOINTS_ENABLED=false`. Keep it disabled until the migration is applied by an explicitly authorized operator and the environment has passed isolated and staging tests. No live database migration is authorized by this document.
+## Purpose
 
-For local isolated verification, set `DATABASE_URL` to PostgreSQL on localhost with database name `comind_ci` and run `bash scripts/test_acp_continuity.sh`. The script refuses remote hosts or any other database name. It applies the migration twice and runs the deterministic unit, integration and benchmark tests.
+ACP-001 preserves compact, bounded, verified institutional state so a successor execution can recover governed context without replaying an entire conversation. The checkpoint is a machine-restorable continuity envelope, not a transcript copy and not a source of new authority.
+
+The envelope records:
+
+- conversation and workflow identity
+- execution identity and execution cursor
+- parent checkpoint lineage
+- authority subject, policy version, and capability identifiers
+- bounded objective, decisions, and references
+- provenance source and evidence references
+- outstanding operation identifiers and idempotency keys
+- optional canonical Foundry task and fencing-epoch references
+- optional canonical Foundry adapter-operation reference
+- creation and expiration timestamps
+- deterministic state and envelope SHA-256 digests
+
+The serialized checkpoint is limited to 64 KiB. Raw credentials and common credential forms are rejected before persistence and again during restoration.
+
+## Relationship to Foundry
+
+ACP does not create a second work dispatcher or a second operation-outcome authority.
+
+The canonical Foundry work ownership substrate remains `comind.cm_foundry_work_lease` from migration `20261009_009_foundry_work_lease_kernel.sql`. Recovery reads its fencing epoch and state when an ACP checkpoint references a task. ACP never stores the lease token.
+
+The canonical external-operation records remain `comind.cm_foundry_adapter_operation` and `comind.cm_foundry_adapter_operation_result`. ACP reads those records to determine whether an uncertain operation has a durable terminal result. Recovery does not invoke or replay the operation.
+
+`comind.cm_foundry_recovery_checkpoint` has a different purpose. It is an append-only governance and provenance summary record. `comind.cm_continuity_checkpoint` is the bounded machine-restorable ACP state envelope. Neither is represented as replacing the other.
 
 ## Runtime behavior
 
-After a successful 201 response from `POST /api/conversations/:id/assistant-response`, the Fastify response hook queues an observational checkpoint if the flag is enabled. Queueing is bounded (32 distinct conversations by default); a full queue emits a warning and does not block the response. Same-conversation queued state is coalesced. Database writes run asynchronously. Shutdown drains queued work before closing the pool. Failed writes emit a warning; they are not silently treated as durable. There is no retry mechanism in ACP-001.
+After a successful `201` from `POST /api/conversations/:id/assistant-response`, the Fastify response hook may enqueue a continuity checkpoint when ACP is enabled. The response is not blocked on the PostgreSQL checkpoint write.
 
-## Recovery procedure
+The scheduler is bounded. It coalesces repeated queued states for the same conversation, performs persistence asynchronously, reports queue saturation or write failure, and drains accepted work during application shutdown. A failed checkpoint write is never treated as durable.
 
-1. Verify the operator identity, conversation identifier, policy version, capabilities, and current time from independent trusted sources.
-2. Fetch the latest checkpoint for that conversation. Check the digest, schema version, freshness, identity and current authority.
-3. Classify with `coordinateRecovery`: ABSENT means no checkpoint; BLOCKED means integrity/identity/authority invalid; DEGRADED means dependencies unavailable or unresolved operations; READY means state can be read under the verified authority.
-4. **Do not** automatically execute any pending, uncertain, or previously completed operation. Reconcile side effects with the authoritative external system and its idempotency records before any separately authorized retry.
-5. Record the checkpoint ID, recovery decision, reason codes, actor and time in the governed audit system when that integration exists. ACP-001 does not yet write those audit events.
+Persistence resolves the previous checkpoint as lineage, then inserts the immutable successor. Repeating the same conversation and execution identity with the same state is idempotent. Reusing that execution identity with materially different state fails closed.
+
+## Recovery confidence gate
+
+Recovery begins with an independently supplied current authority envelope. The checkpoint never grants authority by itself.
+
+Possible results are:
+
+- `ABSENT`: no checkpoint exists for the conversation.
+- `BLOCKED`: integrity, identity, freshness, schema, secret screening, or authority validation failed.
+- `DEGRADED`: the state is readable, but a dependency or operation outcome remains unresolved.
+- `READY`: the state is valid under current authority and no unresolved operation remains.
+
+For unresolved operations, ACP performs read-only reconciliation against the canonical Foundry tables. A terminal adapter result may convert that operation to completed only in the recovered in-memory state. A newer work-lease fencing epoch, active lease, exhausted lease, missing lease, missing terminal result, unavailable substrate, or reconciliation query failure remains `DEGRADED`.
+
+ACP recovery never claims a lease, renews a lease, finishes work, retries an adapter operation, or performs another external side effect.
+
+## Successor restoration
+
+A validated recovered state can be transformed deterministically into a successor state by supplying:
+
+- the verified parent checkpoint identifier
+- a new execution identifier
+- a new execution cursor
+
+The successor preserves authority, provenance, context, and unresolved obligations. This transformation does not persist the successor, grant authority, or execute work.
+
+## Expiration and retention
+
+Version 1 checkpoints carry their own expiration timestamp. The current default logical lifetime is 24 hours and creation rejects a lifetime beyond 30 days.
+
+Logical expiration and physical retention are deliberately separate. ACP-001 does not delete immutable checkpoints. A future physical-retention policy requires a separately governed migration because evidence deletion is consequential and can affect recovery and audit history.
+
+## Isolated verification
+
+Run only against a disposable local PostgreSQL database named `comind_ci`:
+
+```bash
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/comind_ci \
+  bash scripts/test_acp_continuity.sh
+```
+
+The script refuses nonlocal or differently named databases. It builds the current Foundry substrate, applies runtime orchestration and the canonical work-lease kernel, loads conversation fixtures, applies the ACP migration twice, builds the server, and runs deterministic unit and integration tests.
+
+The integration suite includes:
+
+- deterministic checkpoint roundtrip, tamper, expiration, authority, credential, size, and successor tests
+- PostgreSQL persistence, immutability, lineage, and idempotency tests
+- actual Fastify assistant-response lifecycle checkpointing against isolated PostgreSQL with a fixture provider
+- read-only recovery reconciliation against the canonical Foundry work-lease kernel
+- PostgreSQL-backed write latency, scheduler enqueue latency, payload size, and query-count measurements
+
+The workflow publishes `artifacts/acp-continuity-baseline.json` as exact-run performance evidence. These measurements are CI and isolated-development evidence only. They are not production latency claims.
 
 ## Failure handling
 
-- Missing migration: leave the feature flag off and apply only through an authorized deployment.
-- Queue saturation: inspect `checkpoint_queue_full` warnings and reduce load; no claim of persistence is made.
-- Persistence failure: inspect `checkpoint_write_failed`; verify database health and schema before enabling again.
-- Invalid or stale checkpoint: BLOCKED, investigate source and authority, never bypass verification.
-- Unknown external outcome: DEGRADED, reconcile independently; do not replay automatically.
-- Expired policy or capability: BLOCKED until independent authorization is re-established.
-
-## Verification and performance evidence
-
-The isolated CI job `ACP-001 Isolated PostgreSQL` is the authoritative free deterministic migration/integration gate. The benchmark test emits measured enqueue and drain times for 1,000 in-memory mock-query operations; it explicitly excludes network and PostgreSQL latency. Do not interpret that figure as end-to-end production response overhead. Record GitHub workflow URLs and commit SHA before merging.
+- Missing ACP migration: keep the feature flag disabled.
+- Queue saturation: treat the rejected checkpoint request as not durable and investigate load or capacity.
+- Persistence failure: treat the checkpoint as not durable and inspect database health and schema state.
+- Invalid or expired checkpoint: `BLOCKED`; do not bypass validation.
+- Unavailable reconciliation substrate: `DEGRADED`; do not replay work.
+- Newer fencing epoch: `DEGRADED`; the saved worker ownership is stale.
+- Unknown adapter outcome: `DEGRADED`; reconcile against the authoritative system before any separately authorized retry.
+- Reduced or changed authority: `BLOCKED` until current authority is independently established.
 
 ## Rollback
 
-Disable `ACP_CHECKPOINTS_ENABLED` and restart the application. Do not delete immutable checkpoints to roll back application behavior. A schema rollback requires separate review and authorization because it can destroy recovery evidence.
+Disable `ACP_CHECKPOINTS_ENABLED` and restart the application to stop new runtime checkpoint scheduling. Do not delete immutable checkpoints as an application rollback mechanism.
 
-## Outstanding before production
+Schema removal, evidence deletion, live deployment, and production enablement require separate review and authorization.
 
-Validate a true runtime HTTP integration test with a migrated isolated database; test concurrent shutdown and queue saturation; establish PostgreSQL-backed p50/p95/p99 scheduling latency; integrate audit events, lineage and authoritative operation reconciliation; define retention and privilege-separated checkpoint readers. Require explicit authorization for live migration and enablement.
+## Remaining production gates
+
+ACP-001 does not establish production readiness. Before production use, CoMind still needs authorized live migration, deployed privilege and RLS verification, retention governance, operating audit integration, production performance evidence, operational alerting, recovery exercises, and an approved production authority model.

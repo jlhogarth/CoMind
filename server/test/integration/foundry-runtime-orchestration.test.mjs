@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
+import { performance } from 'node:perf_hooks';
+import { mkdirSync, writeFileSync } from 'node:fs';
 
 const {
   FoundryAdapterRegistry,
@@ -20,8 +22,18 @@ if (!['localhost', '127.0.0.1', 'db'].includes(parsed.hostname) || parsed.pathna
 }
 
 const pool = new Pool({ connectionString: databaseUrl });
+const checkpointWriteMs = [];
+const checkpointPayloadBytes = [];
+let checkpointWriteCount = 0;
 const query = async (text, params = []) => {
+  const checkpointWrite = /INSERT INTO comind\.cm_foundry_recovery_checkpoint\b/i.test(text);
+  const start = checkpointWrite ? performance.now() : 0;
   const result = await pool.query(text, params);
+  if (checkpointWrite) {
+    checkpointWriteMs.push(performance.now() - start);
+    checkpointPayloadBytes.push(Buffer.byteLength(JSON.stringify(params), 'utf8'));
+    checkpointWriteCount++;
+  }
   return { rows: result.rows };
 };
 const one = async (text, params = []) => {
@@ -600,6 +612,24 @@ try {
   }), 'deliberation_terminal');
 
   assert.equal(adapterCalls, 1, 'all rejected cases must fail before fake adapter execution');
+  assert.ok(checkpointWriteCount >= 1, 'Expected at least one real checkpoint INSERT');
+  const percentile = (values, p) => {
+    const sorted = [...values].sort((a, b) => a - b);
+    return Number(sorted[Math.ceil(sorted.length * p / 100) - 1].toFixed(3));
+  };
+  const baseline = {
+    schema_version: 1,
+    kind: 'isolated_postgresql_checkpoint_write',
+    sample_count: checkpointWriteCount,
+    checkpoint_insert_ms: { p50: percentile(checkpointWriteMs, 50), p95: percentile(checkpointWriteMs, 95) },
+    checkpoint_parameter_bytes: { min: Math.min(...checkpointPayloadBytes), max: Math.max(...checkpointPayloadBytes) },
+    node: process.version,
+    limitations: ['Includes pool acquisition and PostgreSQL roundtrip', 'CI host variability', 'Small opportunistic sample from existing integration assertions', 'Not production latency or an instrumented-vs-uninstrumented comparison'],
+    warnings: [],
+  };
+  mkdirSync('../artifacts', { recursive: true });
+  writeFileSync('../artifacts/foundry-checkpoint-postgres-baseline.json', JSON.stringify(baseline) + '\n');
+  console.log(JSON.stringify(baseline));
   console.log('Foundry runtime orchestration integration passed');
 } finally {
   await pool.end();

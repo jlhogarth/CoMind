@@ -1,4 +1,4 @@
-name: Foundry Runtime Orchestration
+name: Foundry Work Lease Kernel
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  foundry-runtime-orchestration:
+  foundry-work-lease-kernel:
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -37,13 +37,5 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes postgresql-client
-      - name: Verify governed Foundry runtime orchestration
-        run: bash ./scripts/test_foundry_runtime_orchestration.sh
-      - name: Upload isolated checkpoint performance baseline
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: foundry-checkpoint-postgres-baseline
-          path: artifacts/foundry-checkpoint-postgres-baseline.json
-          if-no-files-found: warn
-          retention-days: 14
+      - name: Verify Foundry work lease kernel
+        run: bash ./scripts/test_foundry_work_lease_kernel.sh

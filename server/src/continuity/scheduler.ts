@@ -1,6 +1,6 @@
 import type { QueryFunction } from '../db.js';
-import { saveCheckpoint } from './repository.js';
 import type { ContinuityState } from './checkpoint.js';
+import { saveCheckpoint } from './repository.js';
 
 export interface CheckpointScheduler {
   schedule(state: ContinuityState): boolean;
@@ -13,12 +13,14 @@ export function createCheckpointScheduler(
   options: { enabled: boolean; capacity?: number; onFailure?: (reason: string) => void }
 ): CheckpointScheduler {
   const capacity = options.capacity ?? 32;
-  if (!Number.isSafeInteger(capacity) || capacity < 1 || capacity > 1024)
+  if (!Number.isSafeInteger(capacity) || capacity < 1 || capacity > 1024) {
     throw new Error('Invalid checkpoint queue capacity');
+  }
   const pending = new Map<string, ContinuityState>();
   let scheduled = false;
   let running: Promise<void> | null = null;
   let closed = false;
+
   const flush = async () => {
     while (pending.size) {
       const first = pending.entries().next().value as [string, ContinuityState];
@@ -30,6 +32,7 @@ export function createCheckpointScheduler(
       }
     }
   };
+
   const start = () => {
     scheduled = false;
     if (running) return;
@@ -38,12 +41,14 @@ export function createCheckpointScheduler(
       if (pending.size) enqueue();
     });
   };
+
   const enqueue = () => {
     if (!scheduled && !running) {
       scheduled = true;
       setImmediate(start);
     }
   };
+
   return {
     schedule(state) {
       if (!options.enabled || closed) return false;
@@ -51,7 +56,6 @@ export function createCheckpointScheduler(
         options.onFailure?.('checkpoint_queue_full');
         return false;
       }
-      // Latest state supersedes earlier queued snapshots for the same conversation.
       pending.set(state.conversationId, structuredClone(state));
       enqueue();
       return true;
@@ -65,6 +69,6 @@ export function createCheckpointScheduler(
     async close() {
       closed = true;
       await this.drain();
-    }
+    },
   };
 }

@@ -52,6 +52,16 @@ Foundry provenance summary checkpoints and ACP machine-restorable checkpoints re
 
 The ACP isolated workflow uses the same PostgreSQL 17 plus pgvector service image as the canonical Foundry work-lease verification path so the ACP gate tests against the current Foundry database prerequisites rather than a reduced database environment.
 
+## Independent review finding and repair
+
+A fresh acceptance review after reconciliation identified a restart-safety defect in the runtime checkpoint identity. The assistant-response lifecycle used Fastify `request.id` as the durable ACP `executionId`. Fastify request identifiers are runtime-local and can repeat after an application restart, so the same conversation could reuse a previously persisted `(conversation_id, execution_id)` pair and fail closed instead of writing a new checkpoint.
+
+The existing ACP branch was repaired in place rather than creating a competing lane. Runtime checkpoint execution identifiers are now generated with `randomUUID()`. The isolated Fastify plus PostgreSQL integration test now closes the application, rebuilds it, repeats the assistant-response lifecycle for the same conversation, and requires two distinct execution identifiers with valid parent checkpoint lineage.
+
+The first implementation commit for this repair was `4ce0bf8f079036696b558d6725d070395dd31382`. The restart-boundary integration test commit was `98a0c57328416fc4972e239ffeaf3ccb2f64abfe`.
+
+Because these commits changed the PR head, all earlier exact-head CI evidence became historical. Fresh exact-head verification is required before merge eligibility can be reconsidered.
+
 ## Verification boundary
 
 No live Supabase mutation, paid provider execution, credential exposure, production rollout, or external authorization is part of this reconciliation.

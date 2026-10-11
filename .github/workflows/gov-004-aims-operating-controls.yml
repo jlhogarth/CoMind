@@ -1,0 +1,38 @@
+name: GOV-004 AIMS Operating Controls
+
+on:
+  pull_request:
+    paths:
+      - 'docs/governance/iso/aims-role-competence-register.csv'
+      - 'docs/governance/iso/aims-incident-escalation-matrix.csv'
+      - 'docs/governance/iso/aims-evidence-retention-schedule.csv'
+      - 'docs/governance/iso/aims-supplier-governance-register.csv'
+      - 'docs/governance/iso/AIMS-MANAGEMENT-REVIEW-PACKAGE.md'
+      - 'scripts/validate_aims_operating_controls.py'
+      - '.github/workflows/gov-004-aims-operating-controls.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/governance/iso/aims-role-competence-register.csv'
+      - 'docs/governance/iso/aims-incident-escalation-matrix.csv'
+      - 'docs/governance/iso/aims-evidence-retention-schedule.csv'
+      - 'docs/governance/iso/aims-supplier-governance-register.csv'
+      - 'docs/governance/iso/AIMS-MANAGEMENT-REVIEW-PACKAGE.md'
+      - 'scripts/validate_aims_operating_controls.py'
+      - '.github/workflows/gov-004-aims-operating-controls.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate-aims-operating-controls:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate GOV-004 AIMS operating controls
+        run: python scripts/validate_aims_operating_controls.py

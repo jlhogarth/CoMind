@@ -1,0 +1,71 @@
+name: ACP-001 Isolated PostgreSQL
+
+on:
+  pull_request:
+    paths:
+      - 'server/src/continuity/**'
+      - 'server/src/app.ts'
+      - 'server/src/env.ts'
+      - 'server/test/continuity-*.test.mjs'
+      - 'server/test/continuity-*.integration.test.mjs'
+      - 'db/migrations/20261010_010_acp_continuity_checkpoints.sql'
+      - 'scripts/test_acp_continuity.sh'
+      - 'docs/ACP-001-OPERATIONS.md'
+      - 'docs/provenance/2026-10-10-acp-001-reconciliation.md'
+      - '.github/workflows/acp-continuity.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'server/src/continuity/**'
+      - 'server/src/app.ts'
+      - 'server/src/env.ts'
+      - 'server/test/continuity-*.test.mjs'
+      - 'server/test/continuity-*.integration.test.mjs'
+      - 'db/migrations/20261010_010_acp_continuity_checkpoints.sql'
+      - 'scripts/test_acp_continuity.sh'
+      - 'docs/ACP-001-OPERATIONS.md'
+      - 'docs/provenance/2026-10-10-acp-001-reconciliation.md'
+      - '.github/workflows/acp-continuity.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  acp-isolated-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.6-pg17-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+      ACP_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      ACP_BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+      - name: Verify ACP migration, runtime lifecycle, Foundry reconciliation, and performance
+        run: bash scripts/test_acp_continuity.sh
+      - name: Upload ACP performance evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: acp-001-continuity-baseline
+          path: artifacts/acp-continuity-baseline.json
+          if-no-files-found: error

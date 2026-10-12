@@ -27,7 +27,7 @@ psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f "${root}/db/migrations/verify_20
   cd "${root}/server"
   npm ci
   npm run build
-  node --test --test-concurrency=1 \
+  CHATGPT_ARCHIVE_DB_TEST=1 node --test --test-concurrency=1 \
     test/chatgpt-archive-ingestion.test.mjs \
     test/chatgpt-archive-ingestion.integration.test.mjs
 )

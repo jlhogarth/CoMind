@@ -107,6 +107,26 @@ archive_row_count() {
   npm ci
   npm run build
 
+  # Direct library invocation must fail before it reads the supplied source path
+  # unless this process has completed the governed archive database preflight.
+  set +e
+  direct_output="$(
+    env -u DATABASE_URL \
+      COMIND_DATABASE_PURPOSE=chatgpt_archive \
+      CHATGPT_ARCHIVE_DATABASE_URL="${archive_database_url}" \
+      node --input-type=module -e "const { ingestChatGptExport } = await import('./dist/archive/chatgpt-export-ingest.js'); await ingestChatGptExport('/tmp/should-not-be-read.json');" 2>&1
+  )"
+  direct_status=$?
+  set -e
+  [[ ${direct_status} -ne 0 ]] || {
+    echo 'Archive library unexpectedly bypassed database preflight' >&2
+    exit 2
+  }
+  grep -Fq 'requires a successful archive database preflight' <<<"${direct_output}" || {
+    echo 'Archive library missing expected preflight guard error' >&2
+    exit 2
+  }
+
   # The historical lossy importer is a tombstone. Prove it cannot write even
   # when handed an apparent source path.
   before_legacy_rows="$(archive_row_count)"

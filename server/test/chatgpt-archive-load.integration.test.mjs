@@ -20,6 +20,8 @@ if (process.env.CHATGPT_ARCHIVE_DB_TEST !== '1') {
   const conversationCount = 100;
   const messagesPerConversation = 20;
   const physicalAssetCount = 10;
+  const distinctAttachmentReferenceCount = 10;
+  const attachmentReferenceObservationCount = 20;
 
   function makeConversation(index) {
     const conversationId = `pit0-conversation-${String(index).padStart(4, '0')}`;
@@ -124,14 +126,16 @@ if (process.env.CHATGPT_ARCHIVE_DB_TEST !== '1') {
            (SELECT count(*) FROM comind.cm_archive_conversation_observation WHERE import_id = $1)::int AS conversations,
            (SELECT count(*) FROM comind.cm_archive_node_observation WHERE import_id = $1 AND source_message_id IS NOT NULL)::int AS messages,
            (SELECT count(*) FROM comind.cm_archive_node_observation WHERE import_id = $1)::int AS nodes,
-           (SELECT count(*) FROM comind.cm_archive_attachment_reference WHERE import_id = $1)::int AS attachment_refs`,
+           (SELECT count(*) FROM comind.cm_archive_attachment_reference WHERE import_id = $1)::int AS attachment_refs,
+           (SELECT count(DISTINCT source_reference) FROM comind.cm_archive_attachment_reference WHERE import_id = $1)::int AS distinct_attachment_refs`,
         [result.importId]
       );
       assert.deepEqual(counts.rows[0], {
         conversations: conversationCount,
         messages: conversationCount * messagesPerConversation,
         nodes: conversationCount * (messagesPerConversation + 1),
-        attachment_refs: physicalAssetCount,
+        attachment_refs: attachmentReferenceObservationCount,
+        distinct_attachment_refs: distinctAttachmentReferenceCount,
       });
 
       const secondStarted = performance.now();
@@ -152,6 +156,8 @@ if (process.env.CHATGPT_ARCHIVE_DB_TEST !== '1') {
           sourceMessageCount: conversationCount * messagesPerConversation,
           sourceNodeCount: conversationCount * (messagesPerConversation + 1),
           physicalAssetCount,
+          distinctAttachmentReferenceCount,
+          attachmentReferenceObservationCount,
           firstImportElapsedMs: Number(elapsedMs.toFixed(3)),
           repeatedImportElapsedMs: Number(repeatedElapsedMs.toFixed(3)),
           status: result.status,

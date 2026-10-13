@@ -100,6 +100,33 @@ The importer accepts:
 
 The CoMind devcontainer and dedicated CI workflow install `unzip`.
 
+## Archive database security boundary
+
+ChatGPT archives contain private historical source evidence. The archive subsystem therefore has a stricter access boundary than ordinary application data.
+
+Migration `20261012_003_chatgpt_archive_access_hardening.sql` establishes the repository contract:
+
+- every archive table has Row Level Security enabled and forced
+- `PUBLIC`, `anon`, `authenticated`, and `service_role` receive no direct archive-table privileges
+- no Data API policy is created for archive tables
+- `comind_archive_ingestor` is a `NOLOGIN`, `NOBYPASSRLS`, non-superuser group role
+- the archive role receives only schema usage plus the table and sequence privileges required for ingestion and reconciliation
+- immutable evidence tables receive `SELECT` and `INSERT`, but no `UPDATE`, `DELETE`, or `TRUNCATE`
+- `cm_archive_import` additionally receives `UPDATE` only because a `PENDING` attempt must be finalized once
+- trigger helper functions are not callable application RPC surfaces
+
+The dedicated verification script models Supabase API roles in disposable PostgreSQL and proves their archive privileges are absent. It also switches into `comind_archive_ingestor` and proves that the constrained role can establish source/import identities and finalize an import under RLS.
+
+### Live deployment credential requirement
+
+The repository does not contain and must not contain a login password for archive ingestion.
+
+Before a live archive import is authorized, deployment must provision a dedicated database login or equivalent protected direct-PostgreSQL credential for the archive process and grant it only the `comind_archive_ingestor` role. The archive CLI must use that constrained credential rather than the project `postgres` credential or a Supabase Data API key.
+
+Credential creation, secret storage, live role provisioning, live migration, and live data loading are separate operational actions and are not performed by this repository-only lane.
+
+The broader pre-existing CoMind RLS backlog is deliberately outside Issue #108. Archive hardening must not be used as authority to bulk-change unrelated tables.
+
 ## CLI
 
 After applying the archive migrations and building the server:
@@ -114,6 +141,8 @@ The CLI prints the final import identifier, archive identifier, status, receipt,
 
 Do not point development verification at a live database.
 
+For live operation, `DATABASE_URL` must resolve to the separately provisioned constrained archive database credential described above.
+
 ## Isolated verification
 
 Use only a disposable local PostgreSQL database named `comind_ci`:
@@ -123,13 +152,13 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5432/comind_ci \
   bash scripts/test_chatgpt_archive_ingestion.sh
 ```
 
-The script refuses other database names and nonlocal hosts. It applies the migrations twice to verify idempotency, verifies immutability and finalization constraints, builds the server, runs parser tests, and runs an end-to-end PostgreSQL ingestion fixture.
+The script refuses other database names and nonlocal hosts. It models the Supabase API roles, applies all archive migrations twice to verify idempotency, verifies immutability and finalization constraints, verifies forced RLS and least-privilege role boundaries, builds the server, runs parser tests, and runs an end-to-end PostgreSQL ingestion fixture.
 
 ## Real export acceptance sequence
 
 1. Keep the original completed export ZIP unchanged.
 2. Record its file name, byte length, and SHA-256 through the importer.
-3. Run the import against an authorized CoMind database environment.
+3. Run the import against an authorized CoMind database environment using the constrained archive database credential.
 4. Review the final receipt.
 5. Require conversation, message, node, and asset reconciliation.
 6. Review every warning, error, and quarantine record.
@@ -160,9 +189,10 @@ Absence from a later export is an observation, not proof of deletion. CoMind pre
 
 This V0 does not establish production readiness. Remaining gates include:
 
-- exact-head CI acceptance on the implementation PR
+- exact-head CI acceptance after the archive security amendment
 - review against a real ChatGPT export schema from the user's completed export
-- authorized Supabase deployment plan and RLS/privilege design
+- separately authorized live Supabase migration and constrained archive-login provisioning
+- post-deployment Supabase security-advisor review and privilege verification
 - durable raw ZIP storage location and retention policy
 - resume/recovery behavior for interrupted `PENDING` imports
 - performance evidence using a realistically sized export

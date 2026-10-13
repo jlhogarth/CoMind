@@ -1,3 +1,5 @@
+export {};
+
 type ClosePool = () => Promise<void>;
 
 let closePool: ClosePool = async () => undefined;

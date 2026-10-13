@@ -2,6 +2,6 @@ FROM mcr.microsoft.com/devcontainers/javascript-node:24
 
 USER root
 RUN apt-get update \
-    && apt-get install --yes --no-install-recommends postgresql-client \
+    && apt-get install --yes --no-install-recommends postgresql-client unzip \
     && rm -rf /var/lib/apt/lists/*
 USER node

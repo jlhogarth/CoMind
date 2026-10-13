@@ -11,7 +11,9 @@ if (process.env.CHATGPT_ARCHIVE_DB_TEST !== '1') {
   process.env.ASSISTANT_PROVIDER = 'disabled';
 
   const { ingestChatGptExport } = await import('../dist/archive/chatgpt-export-ingest.js');
-  const { closePool, query } = await import('../dist/db.js');
+  const { closePool, prepareArchiveDatabaseSession, query } = await import('../dist/db.js');
+
+  await prepareArchiveDatabaseSession();
 
   after(async () => {
     await closePool();

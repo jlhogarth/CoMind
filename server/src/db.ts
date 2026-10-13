@@ -3,6 +3,7 @@ import { Pool } from 'pg';
 const ARCHIVE_DATABASE_PURPOSE = 'chatgpt_archive';
 const databasePurpose = process.env.COMIND_DATABASE_PURPOSE?.trim() || 'application';
 const archiveMode = databasePurpose === ARCHIVE_DATABASE_PURPOSE;
+let archiveDatabaseSessionPrepared = false;
 
 function requireArchiveDatabaseUrl(): string {
   const raw = process.env.CHATGPT_ARCHIVE_DATABASE_URL?.trim();
@@ -63,11 +64,20 @@ export interface ArchiveDatabasePreflight {
   currentUser: string;
 }
 
+export function assertArchiveDatabaseSessionPrepared(): void {
+  if (!archiveMode || !archiveDatabaseSessionPrepared) {
+    throw new Error(
+      'Governed ChatGPT archive ingestion requires a successful archive database preflight in this process'
+    );
+  }
+}
+
 export async function prepareArchiveDatabaseSession(): Promise<ArchiveDatabasePreflight> {
   if (!archiveMode) {
     throw new Error('Archive database preflight requires COMIND_DATABASE_PURPOSE=chatgpt_archive');
   }
 
+  archiveDatabaseSessionPrepared = false;
   const client = await pool.connect();
   let releaseError: Error | undefined = new Error('Discarding PostgreSQL connection after failed archive database preflight');
 
@@ -203,6 +213,7 @@ export async function prepareArchiveDatabaseSession(): Promise<ArchiveDatabasePr
       throw new Error('Archive database role does not have the expected constrained privilege shape');
     }
 
+    archiveDatabaseSessionPrepared = true;
     releaseError = undefined;
     return {
       databaseName: identity.database_name,
@@ -280,5 +291,6 @@ export async function databaseHealth(): Promise<{ ok: number; database_name: str
 }
 
 export async function closePool(): Promise<void> {
+  archiveDatabaseSessionPrepared = false;
   await pool.end();
 }

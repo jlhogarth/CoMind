@@ -2,9 +2,13 @@
 
 ## Evidence state
 
-This lane is repository implementation with isolated PostgreSQL verification when its dedicated workflow passes on the exact pull-request head. It is not a live Supabase deployment and is not yet evidence that a real ChatGPT export has passed the integrity handshake.
+The Issue #108 archive foundation is repository implemented and isolated-PostgreSQL verified on accepted main. It is not yet a live Supabase deployment and is not evidence that a real ChatGPT export has passed the integrity handshake.
 
-A real export is accepted only after its own import receipt reaches `PASS` or an explicitly reviewed `WARN`. A `FAIL`, parser exception, incomplete attempt, or unresolved quarantine record is not accepted as trusted cognition input.
+Issue #110 adds the live credential and operational entry-point hardening required before live deployment. That amendment remains subject to its own exact-head review and merge acceptance.
+
+A real export is accepted only after its own import receipt reaches `PASS`, or after every item in an explicitly reviewed `WARN` is dispositioned. A `FAIL`, parser exception, incomplete `PENDING` attempt, or unresolved quarantine record is not accepted as trusted cognition input.
+
+No source record may disappear silently during ingestion.
 
 ## Purpose
 
@@ -30,8 +34,6 @@ The V0 integrity handshake checks that:
 - malformed evidence is quarantined instead of silently dropped
 - finalized evidence is immutable
 - repeated ingestion of the exact archive under the same parser and schema version reuses the finalized attempt instead of duplicating it
-
-No source record may disappear silently during ingestion.
 
 ## Data layers
 
@@ -87,7 +89,7 @@ The topology hash means equal message counts cannot hide a changed branch graph.
 
 `FAIL` results when reconciliation counts do not match or any parser error is recorded.
 
-A process-level interruption can leave an attempt `PENDING`. V0 deliberately does not pretend a partially persisted attempt is complete. Resume semantics are a later hardening item; a partial attempt must be investigated before reuse.
+A process-level interruption can leave an attempt `PENDING`. V0 deliberately does not pretend a partially persisted attempt is complete. Partial evidence is retained and investigated instead of deleted.
 
 ## Large export handling
 
@@ -115,33 +117,45 @@ Migration `20261012_003_chatgpt_archive_access_hardening.sql` establishes the re
 - `cm_archive_import` additionally receives `UPDATE` only because a `PENDING` attempt must be finalized once
 - trigger helper functions are not callable application RPC surfaces
 
-The dedicated verification script models Supabase API roles in disposable PostgreSQL and proves their archive privileges are absent. It also switches into `comind_archive_ingestor` and proves that the constrained role can establish source/import identities and finalize an import under RLS.
+The isolated verification script models Supabase API roles in disposable PostgreSQL and proves their archive privileges are absent.
 
-### Live deployment credential requirement
+### Dedicated live login contract
 
 The repository does not contain and must not contain a login password for archive ingestion.
 
-Before a live archive import is authorized, deployment must provision a dedicated database login or equivalent protected direct-PostgreSQL credential for the archive process and grant it only the `comind_archive_ingestor` role. The archive CLI must use that constrained credential rather than the project `postgres` credential or a Supabase Data API key.
+Live ingestion uses a separately protected database login with only SET-only membership in `comind_archive_ingestor`. The login must be `NOINHERIT`, non-superuser, NOCREATEDB, NOCREATEROLE, NOREPLICATION, and NOBYPASSRLS.
 
-Credential creation, secret storage, live role provisioning, live migration, and live data loading are separate operational actions and are not performed by this repository-only lane.
+PostgreSQL 17 membership must be granted with `INHERIT FALSE` and `SET TRUE`. The process then explicitly assumes `comind_archive_ingestor` after proving the session identity and membership shape.
 
-The broader pre-existing CoMind RLS backlog is deliberately outside Issue #108. Archive hardening must not be used as authority to bulk-change unrelated tables.
+The governed archive CLI requires `CHATGPT_ARCHIVE_DATABASE_URL`. It never falls back to `DATABASE_URL`.
 
-## CLI
+The application-side archive pool is limited to one connection. Preflight proves the dedicated login identity, exact membership, explicit `SET ROLE`, and expected constrained privilege shape before import. A write-free `--preflight` mode is available for deployment verification.
 
-After applying the archive migrations and building the server:
+A custom PostgreSQL role can still receive privileges granted to `PUBLIC`. `NOINHERIT` does not suppress those privileges. Live deployment therefore requires a separate effective-privilege review after the dedicated login is created.
+
+The broader pre-existing CoMind RLS backlog remains outside this archive milestone unless a verified archive-specific dependency requires otherwise.
+
+## Supported operational entry point
+
+The only supported live ChatGPT archive import entry point is:
 
 ```bash
 cd server
 npm run build
-DATABASE_URL=postgresql://... node dist/archive/chatgpt-export-cli.js /path/to/export.zip
+CHATGPT_ARCHIVE_DATABASE_URL='postgresql://...' \
+  node dist/archive/chatgpt-export-cli.js --preflight
+
+CHATGPT_ARCHIVE_DATABASE_URL='postgresql://...' \
+  node dist/archive/chatgpt-export-cli.js /path/to/export.zip
 ```
+
+The live secret must come from a protected local secret facility or approved secret manager, not from source control or project documentation.
+
+For nonlocal Supabase connections require encrypted transport, using `sslmode=require` at minimum. Prefer direct PostgreSQL connectivity for this session-state-dependent process. If the execution host is IPv4-only and the project does not provide a direct IPv4 endpoint, use the shared Supabase pooler in session mode on port 5432. Do not use transaction pooler mode for this importer because the process depends on session-level `SET ROLE` state.
 
 The CLI prints the final import identifier, archive identifier, status, receipt, and receipt SHA-256. Exit code `2` indicates a completed `FAIL` handshake. Process-level failures use exit code `1`.
 
-Do not point development verification at a live database.
-
-For live operation, `DATABASE_URL` must resolve to the separately provisioned constrained archive database credential described above.
+The historical `server/src/scripts/import_chatgpt_export.ts` projection script is retired. It intentionally performs no database writes and directs operators to the governed archive CLI.
 
 ## Isolated verification
 
@@ -152,18 +166,36 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5432/comind_ci \
   bash scripts/test_chatgpt_archive_ingestion.sh
 ```
 
-The script refuses other database names and nonlocal hosts. It models the Supabase API roles, applies all archive migrations twice to verify idempotency, verifies immutability and finalization constraints, verifies forced RLS and least-privilege role boundaries, builds the server, runs parser tests, and runs an end-to-end PostgreSQL ingestion fixture.
+The script refuses other database names and nonlocal hosts. It models the Supabase API roles, applies all archive migrations twice to verify idempotency, verifies immutability and finalization constraints, verifies forced RLS and least-privilege role boundaries, builds the server, and runs parser and end-to-end ingestion tests.
+
+The isolated test login is `NOINHERIT` and receives `comind_archive_ingestor` with `INHERIT FALSE, SET TRUE`. The test also proves:
+
+- the archive CLI rejects a missing `CHATGPT_ARCHIVE_DATABASE_URL` even when `DATABASE_URL` is present
+- the write-free CLI preflight leaves archive evidence counts unchanged
+- `session_user` remains the dedicated login
+- `current_user` becomes `comind_archive_ingestor`
+- PIT-0 still reconciles under the constrained session
+
+## Live deployment runbook
+
+The exact live sequencing, credential handling, readback checks, Security Advisor gates, PIT-A handshake, and failure handling are maintained in:
+
+`docs/CHATGPT-ARCHIVE-LIVE-DEPLOYMENT.md`
+
+Do not run `verify_20261012_003_chatgpt_archive_access_hardening.sql` unchanged against live Supabase. Its isolated verifier creates immutable synthetic security-fixture evidence. Live verification uses read-only catalog queries unless a separately designed rollback-only smoke is explicitly authorized.
 
 ## Real export acceptance sequence
 
 1. Keep the original completed export ZIP unchanged.
-2. Record its file name, byte length, and SHA-256 through the importer.
-3. Run the import against an authorized CoMind database environment using the constrained archive database credential.
-4. Review the final receipt.
-5. Require conversation, message, node, and asset reconciliation.
-6. Review every warning, error, and quarantine record.
-7. Treat the export as trusted source evidence only after acceptance.
-8. Preserve the original ZIP independently of the normalized database representation.
+2. Preserve an independent backup copy.
+3. Record its file name, byte length, and SHA-256 without modifying it.
+4. Run the write-free archive database preflight using the dedicated live credential.
+5. Run the import against authorized CoMind Supabase using the governed archive CLI.
+6. Review the final receipt independently of the CLI result.
+7. Require conversation, message, node, topology, and asset reconciliation.
+8. Review every warning, error, and quarantine record.
+9. Treat the export as trusted source evidence only after acceptance.
+10. Preserve the original ZIP independently of the normalized database representation.
 
 Embeddings, RAG indexing, memory extraction, summarization, and semantic classification are downstream work and do not block source preservation.
 
@@ -187,14 +219,17 @@ Absence from a later export is an observation, not proof of deletion. CoMind pre
 
 ## Production gates still open
 
-This V0 does not establish production readiness. Remaining gates include:
+Until superseded by later evidence, remaining gates include:
 
-- exact-head CI acceptance after the archive security amendment
-- review against a real ChatGPT export schema from the user's completed export
-- separately authorized live Supabase migration and constrained archive-login provisioning
-- post-deployment Supabase security-advisor review and privilege verification
-- durable raw ZIP storage location and retention policy
-- resume/recovery behavior for interrupted `PENDING` imports
-- performance evidence using a realistically sized export
-- point-in-time diff implementation and acceptance
+- exact-head acceptance and merge of Issue #110 live credential hardening
+- separately authorized live Supabase migrations
+- separately authorized dedicated archive-login provisioning
+- live effective-privilege and RLS readback
+- post-deployment Supabase Security Advisor review
+- write-free live application preflight
+- receipt and quarantine review against the user's untouched full export
+- durable raw ZIP storage and retention decision
+- operating evidence for interrupted `PENDING` recovery handling
+- performance evidence using the real export
+- PIT-B differential implementation only after PIT-A acceptance
 - downstream search, RAG, and governed memory derivation

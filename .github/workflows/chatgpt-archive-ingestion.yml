@@ -5,6 +5,7 @@ on:
     paths:
       - 'server/src/archive/**'
       - 'server/test/chatgpt-archive-ingestion*.test.mjs'
+      - 'server/test/chatgpt-archive-load*.test.mjs'
       - 'db/migrations/20261012_001_chatgpt_archive_ingestion.sql'
       - 'db/migrations/20261012_002_chatgpt_archive_quarantine.sql'
       - 'db/migrations/20261012_003_chatgpt_archive_access_hardening.sql'
@@ -19,6 +20,7 @@ on:
     paths:
       - 'server/src/archive/**'
       - 'server/test/chatgpt-archive-ingestion*.test.mjs'
+      - 'server/test/chatgpt-archive-load*.test.mjs'
       - 'db/migrations/20261012_001_chatgpt_archive_ingestion.sql'
       - 'db/migrations/20261012_002_chatgpt_archive_quarantine.sql'
       - 'db/migrations/20261012_003_chatgpt_archive_access_hardening.sql'
@@ -63,3 +65,11 @@ jobs:
           sudo apt-get install --yes postgresql-client unzip
       - name: Verify lossless and access-hardened ChatGPT archive ingestion
         run: bash scripts/test_chatgpt_archive_ingestion.sh
+      - name: Upload PIT-0 synthetic archive load evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatgpt-archive-pit0-load-baseline
+          path: artifacts/chatgpt-archive-pit0-load-baseline.json
+          if-no-files-found: error
+          retention-days: 30

@@ -83,5 +83,6 @@ archive_database_url='postgresql://comind_archive_test_login:comind_archive_ci_o
   npm run build
   DATABASE_URL="${archive_database_url}" CHATGPT_ARCHIVE_DB_TEST=1 node --test --test-concurrency=1 \
     test/chatgpt-archive-ingestion.test.mjs \
-    test/chatgpt-archive-ingestion.integration.test.mjs
+    test/chatgpt-archive-ingestion.integration.test.mjs \
+    test/chatgpt-archive-load.integration.test.mjs
 )

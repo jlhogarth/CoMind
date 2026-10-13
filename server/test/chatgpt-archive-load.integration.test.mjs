@@ -44,8 +44,8 @@ if (process.env.CHATGPT_ARCHIVE_DB_TEST !== '1') {
         ? {
             attachments: [{
               file_id: `pit0-asset-${String(index / 10).padStart(2, '0')}`,
-              name: `asset-${String(index / 10).padStart(2, '0')}.txt`,
-              mime_type: 'text/plain',
+              name: `asset-${String(index / 10).padStart(2, '0')}.png`,
+              mime_type: 'image/png',
             }],
           }
         : undefined;
@@ -90,9 +90,8 @@ if (process.env.CHATGPT_ARCHIVE_DB_TEST !== '1') {
 
     for (let index = 0; index < physicalAssetCount; index += 1) {
       await writeFile(
-        path.join(root, `asset-${String(index).padStart(2, '0')}.txt`),
-        `PIT-0 synthetic asset ${index}\n`,
-        'utf8'
+        path.join(root, `asset-${String(index).padStart(2, '0')}.png`),
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, index]),
       );
     }
 

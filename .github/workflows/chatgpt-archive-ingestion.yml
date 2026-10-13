@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - 'server/src/archive/**'
+      - 'server/src/db.ts'
+      - 'server/src/scripts/import_chatgpt_export.ts'
       - 'server/test/chatgpt-archive-ingestion*.test.mjs'
       - 'server/test/chatgpt-archive-load*.test.mjs'
       - 'db/migrations/20261012_001_chatgpt_archive_ingestion.sql'
@@ -15,10 +17,13 @@ on:
       - '.devcontainer/Dockerfile'
       - '.github/workflows/chatgpt-archive-ingestion.yml'
       - 'docs/CHATGPT-ARCHIVE-INGESTION.md'
+      - 'docs/CHATGPT-ARCHIVE-LIVE-DEPLOYMENT.md'
   push:
     branches: [main]
     paths:
       - 'server/src/archive/**'
+      - 'server/src/db.ts'
+      - 'server/src/scripts/import_chatgpt_export.ts'
       - 'server/test/chatgpt-archive-ingestion*.test.mjs'
       - 'server/test/chatgpt-archive-load*.test.mjs'
       - 'db/migrations/20261012_001_chatgpt_archive_ingestion.sql'
@@ -30,6 +35,7 @@ on:
       - '.devcontainer/Dockerfile'
       - '.github/workflows/chatgpt-archive-ingestion.yml'
       - 'docs/CHATGPT-ARCHIVE-INGESTION.md'
+      - 'docs/CHATGPT-ARCHIVE-LIVE-DEPLOYMENT.md'
   workflow_dispatch:
 
 permissions:

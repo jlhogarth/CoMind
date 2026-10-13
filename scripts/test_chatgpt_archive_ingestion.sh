@@ -80,6 +80,14 @@ SQL
 
 archive_database_url='postgresql://comind_archive_test_login:comind_archive_ci_only@localhost:5432/comind_ci'
 
+# The NOINHERIT login must remain blind to the private comind schema before the
+# application explicitly assumes comind_archive_ingestor.
+login_schema_usage="$(psql "${archive_database_url}" -X -Atc "SELECT has_schema_privilege(current_user, 'comind', 'USAGE')")"
+[[ "${login_schema_usage}" == "f" ]] || {
+  echo 'Archive test login unexpectedly inherited comind schema USAGE before SET ROLE' >&2
+  exit 2
+}
+
 archive_row_count() {
   psql "${DATABASE_URL}" -X -Atc "
     SELECT
@@ -98,6 +106,27 @@ archive_row_count() {
   cd "${root}/server"
   npm ci
   npm run build
+
+  # The historical lossy importer is a tombstone. Prove it cannot write even
+  # when handed an apparent source path.
+  before_legacy_rows="$(archive_row_count)"
+  set +e
+  legacy_output="$(node dist/scripts/import_chatgpt_export.js /tmp/should-not-be-read.json 2>&1)"
+  legacy_status=$?
+  set -e
+  after_legacy_rows="$(archive_row_count)"
+  [[ ${legacy_status} -eq 2 ]] || {
+    echo 'Retired legacy ChatGPT importer did not fail closed' >&2
+    exit 2
+  }
+  [[ "${before_legacy_rows}" == "${after_legacy_rows}" ]] || {
+    echo 'Retired legacy ChatGPT importer unexpectedly mutated archive evidence' >&2
+    exit 2
+  }
+  grep -Fq 'Legacy ChatGPT projection importer is retired' <<<"${legacy_output}" || {
+    echo 'Retired legacy ChatGPT importer missing expected tombstone message' >&2
+    exit 2
+  }
 
   # The governed CLI must fail closed when the archive-specific credential is
   # absent, even if a syntactically valid DATABASE_URL is present.

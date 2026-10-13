@@ -24,16 +24,17 @@ if (process.env.CHATGPT_ARCHIVE_DB_TEST !== '1') {
   function makeConversation(index) {
     const conversationId = `pit0-conversation-${String(index).padStart(4, '0')}`;
     const baseTime = 1791840000 + index * 100;
+    const rootNodeId = `${conversationId}-root`;
     const mapping = {
-      root: {
-        id: `${conversationId}-root`,
+      [rootNodeId]: {
+        id: rootNodeId,
         parent: null,
         children: [`${conversationId}-node-0001`],
         message: null,
       },
     };
 
-    let previousNodeId = `${conversationId}-root`;
+    let previousNodeId = rootNodeId;
     for (let messageIndex = 1; messageIndex <= messagesPerConversation; messageIndex += 1) {
       const nodeId = `${conversationId}-node-${String(messageIndex).padStart(4, '0')}`;
       const nextNodeId = messageIndex < messagesPerConversation

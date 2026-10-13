@@ -138,22 +138,37 @@ export async function prepareArchiveDatabaseSession(): Promise<ArchiveDatabasePr
       is_member: boolean;
       inherits_privileges: boolean;
       can_set_role: boolean;
-      archive_source: string | null;
-      archive_import: string | null;
-      archive_quarantine: string | null;
+      archive_source_exists: boolean;
+      archive_import_exists: boolean;
+      archive_quarantine_exists: boolean;
     }>(
       `SELECT pg_has_role(session_user, 'comind_archive_ingestor', 'MEMBER') AS is_member,
               pg_has_role(session_user, 'comind_archive_ingestor', 'USAGE') AS inherits_privileges,
               pg_has_role(session_user, 'comind_archive_ingestor', 'SET') AS can_set_role,
-              to_regclass('comind.cm_archive_source')::text AS archive_source,
-              to_regclass('comind.cm_archive_import')::text AS archive_import,
-              to_regclass('comind.cm_archive_quarantine')::text AS archive_quarantine`
+              EXISTS (
+                SELECT 1
+                FROM pg_class c
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE n.nspname = 'comind' AND c.relname = 'cm_archive_source' AND c.relkind IN ('r', 'p')
+              ) AS archive_source_exists,
+              EXISTS (
+                SELECT 1
+                FROM pg_class c
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE n.nspname = 'comind' AND c.relname = 'cm_archive_import' AND c.relkind IN ('r', 'p')
+              ) AS archive_import_exists,
+              EXISTS (
+                SELECT 1
+                FROM pg_class c
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE n.nspname = 'comind' AND c.relname = 'cm_archive_quarantine' AND c.relkind IN ('r', 'p')
+              ) AS archive_quarantine_exists`
     );
     const capability = capabilityResult.rows[0];
     if (!capability?.is_member || capability.inherits_privileges || !capability.can_set_role) {
       throw new Error('Archive database login does not have the required non-inherited SET capability');
     }
-    if (!capability.archive_source || !capability.archive_import || !capability.archive_quarantine) {
+    if (!capability.archive_source_exists || !capability.archive_import_exists || !capability.archive_quarantine_exists) {
       throw new Error('Required governed archive database objects are not deployed');
     }
 

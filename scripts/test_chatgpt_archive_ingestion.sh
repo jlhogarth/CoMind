@@ -44,11 +44,44 @@ psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f "${root}/db/migrations/20261012_
 psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f "${root}/db/migrations/verify_20261012_001_chatgpt_archive_ingestion.sql"
 psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f "${root}/db/migrations/verify_20261012_003_chatgpt_archive_access_hardening.sql"
 
+# Exercise the actual Node importer with a disposable LOGIN role that receives
+# only the constrained archive group role. This password is test-only and the
+# role exists only inside the disposable comind_ci service container.
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 <<'SQL'
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'comind_archive_test_login') THEN
+    CREATE ROLE comind_archive_test_login
+      LOGIN
+      PASSWORD 'comind_archive_ci_only'
+      NOSUPERUSER
+      NOCREATEDB
+      NOCREATEROLE
+      NOREPLICATION
+      NOBYPASSRLS;
+  ELSE
+    ALTER ROLE comind_archive_test_login
+      LOGIN
+      PASSWORD 'comind_archive_ci_only'
+      NOSUPERUSER
+      NOCREATEDB
+      NOCREATEROLE
+      NOREPLICATION
+      NOBYPASSRLS;
+  END IF;
+END;
+$$;
+GRANT comind_archive_ingestor TO comind_archive_test_login;
+GRANT CONNECT ON DATABASE comind_ci TO comind_archive_test_login;
+SQL
+
+archive_database_url='postgresql://comind_archive_test_login:comind_archive_ci_only@localhost:5432/comind_ci'
+
 (
   cd "${root}/server"
   npm ci
   npm run build
-  CHATGPT_ARCHIVE_DB_TEST=1 node --test --test-concurrency=1 \
+  DATABASE_URL="${archive_database_url}" CHATGPT_ARCHIVE_DB_TEST=1 node --test --test-concurrency=1 \
     test/chatgpt-archive-ingestion.test.mjs \
     test/chatgpt-archive-ingestion.integration.test.mjs
 )

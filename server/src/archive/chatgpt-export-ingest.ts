@@ -7,7 +7,7 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 import type { PoolClient } from 'pg';
 
-import { pool } from '../db.js';
+import { assertArchiveDatabaseSessionPrepared, pool } from '../db.js';
 import {
   CHATGPT_ARCHIVE_PARSER_VERSION,
   CHATGPT_ARCHIVE_SCHEMA_VERSION,
@@ -527,6 +527,7 @@ async function finalizeImport(
 }
 
 export async function ingestChatGptExport(inputPath: string): Promise<ArchiveImportResult> {
+  assertArchiveDatabaseSessionPrepared();
   const prepared = await prepareSource(inputPath);
   const client = await pool.connect();
   try {

@@ -26,7 +26,7 @@ jobs:
       - name: Generate dependency lock evidence
         run: npm install --package-lock-only
       - name: Require generated lockfile to be committed
-        run: git diff --exit-code -- package-lock.json
+        run: test -z "$(git status --porcelain -- package-lock.json)"
       - name: Install locked dependencies
         run: npm ci
       - name: Test

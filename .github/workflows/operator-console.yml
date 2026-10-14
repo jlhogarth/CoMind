@@ -25,6 +25,13 @@ jobs:
           node-version: 24
       - name: Generate dependency lock evidence
         run: npm install --package-lock-only
+      - name: Preserve generated dependency lock evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: operator-console-package-lock
+          path: apps/operator-console/package-lock.json
+          if-no-files-found: error
+          retention-days: 7
       - name: Require generated lockfile to be committed
         run: test -z "$(git status --porcelain -- package-lock.json)"
       - name: Install locked dependencies

@@ -23,12 +23,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
-          cache-dependency-path: apps/operator-console/package-lock.json
-      - name: Install dependencies
-        run: npm install --package-lock-only && npm ci
-      - name: Verify generated lockfile is committed
+      - name: Generate dependency lock evidence
+        run: npm install --package-lock-only
+      - name: Require generated lockfile to be committed
         run: git diff --exit-code -- package-lock.json
+      - name: Install locked dependencies
+        run: npm ci
       - name: Test
         run: npm test
       - name: Typecheck

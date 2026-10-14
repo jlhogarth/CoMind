@@ -1,6 +1,7 @@
 export const operatorConsoleCapabilities = Object.freeze({
-  schemaGraph: true,
-  readOnlyExplorer: true,
+  schemaGraphKernel: true,
+  liveSchemaDiscovery: false,
+  liveReadOnlyExplorer: false,
   mutations: false,
   cascadeExecution: false,
   rawSql: false,

@@ -6,3 +6,4 @@ export * from "./relationships";
 export * from "./selection";
 export * from "./types";
 export * from "./validate";
+export * from "./version";

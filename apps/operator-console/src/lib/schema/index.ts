@@ -1,3 +1,4 @@
+export * from "./capabilities";
 export * from "./display";
 export * from "./provider";
 export * from "./registry";

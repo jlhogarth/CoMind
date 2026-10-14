@@ -1,3 +1,4 @@
+export * from "./CapabilityStatus";
 export * from "./ErrorNotice";
 export * from "./data/DataGrid";
 export * from "./data/PaginationSummary";

@@ -42,7 +42,7 @@ def main() -> int:
         "FinOps legacy source blob differs from reviewed Issue #116 manifest",
     )
     require(
-        git_blob_sha(builder_path) == projection["builder_git_blob_sha_at_issue_116_initial_implementation"],
+        git_blob_sha(builder_path) == projection["builder_git_blob_sha"],
         "FinOps projection builder differs from reviewed Issue #116 manifest",
     )
     require(projection.get("raw_source_must_not_be_applied_live") is True, "Raw legacy FinOps migration became live-applicable")

@@ -21,7 +21,9 @@ PY
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 migration="${repo_root}/db/migrations/20261015_001_operator_console_live_activation.sql"
 hardening="${repo_root}/db/migrations/20261015_002_operator_console_service_role_least_privilege.sql"
+deny_policies="${repo_root}/db/migrations/20261015_003_operator_console_explicit_deny_policies.sql"
 verification="${repo_root}/db/migrations/verify_20261015_001_operator_console_live_activation.sql"
+deny_verification="${repo_root}/db/migrations/verify_20261015_003_operator_console_explicit_deny_policies.sql"
 
 psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 DO $$
@@ -109,9 +111,7 @@ SQL
 psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${migration}"
 psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${migration}"
 
-# Supabase production applies default table privileges that grant service_role ALL
-# on newly created public tables. Reproduce that live-only condition before the
-# compensating migration so isolated verification can detect privilege drift.
+# Reproduce Supabase's default direct ALL grant to service_role on new public tables.
 psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 GRANT ALL ON TABLE public.operator_console_relation_registry TO service_role;
 GRANT ALL ON TABLE public.operator_console_verification_records TO service_role;
@@ -120,7 +120,10 @@ SQL
 
 psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${hardening}"
 psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${hardening}"
+psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${deny_policies}"
+psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${deny_policies}"
 psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${verification}"
+psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${deny_verification}"
 
 anon_counts="$(psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -At <<'SQL'
 BEGIN;

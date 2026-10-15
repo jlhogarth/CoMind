@@ -46,11 +46,16 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3100/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
     read_only: true
     tmpfs: [/tmp]
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]
-    networks: [sdn_internal]
+    networks: [sdn_internal, sdn_ingress]
 
   lifecycle:
     build:
@@ -91,6 +96,10 @@ networks:
   sdn_internal:
     driver: bridge
     internal: true
+  sdn_ingress:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.host_binding_ipv4: "127.0.0.1"
 
 volumes:
   sdn_pgdata:

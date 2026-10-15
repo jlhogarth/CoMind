@@ -55,6 +55,13 @@ jobs:
       - name: Run isolated lifecycle acceptance proof
         run: bash sdn/scripts/acceptance.sh
 
+      - name: Capture container diagnostics on failure
+        if: failure()
+        run: |
+          set +e
+          docker compose -f sdn/compose.yaml ps -a > sdn/evidence/container-status.txt 2>&1
+          docker compose -f sdn/compose.yaml logs --no-color ingest db > sdn/evidence/container-logs.txt 2>&1
+
       - name: Upload synthetic acceptance evidence
         if: always()
         uses: actions/upload-artifact@v4

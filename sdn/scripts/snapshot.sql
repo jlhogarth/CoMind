@@ -8,6 +8,8 @@ WITH schema_state AS (
   SELECT count(*)::bigint AS count, encode(digest(coalesce(string_agg(producer_id::text||':'||event_id::text||':'||payload_hash||':'||lifecycle_class,'|' ORDER BY producer_id,event_id),''),'sha256'),'hex') AS hash FROM sdn_telemetry.events
 ), receipt_digest AS (
   SELECT count(*)::bigint AS count, encode(digest(coalesce(string_agg(producer_id::text||':'||event_id::text||':'||payload_hash,'|' ORDER BY producer_id,event_id),''),'sha256'),'hex') AS hash FROM sdn_telemetry.ingestion_receipts
+), conflict_digest AS (
+  SELECT count(*)::bigint AS count, encode(digest(coalesce(string_agg(producer_id::text||':'||event_id::text||':'||original_payload_hash||':'||conflicting_payload_hash,'|' ORDER BY producer_id,event_id,conflict_id),''),'sha256'),'hex') AS hash FROM sdn_evidence.integrity_conflicts
 ), summary_digest AS (
   SELECT count(*)::bigint AS count, encode(digest(coalesce(string_agg(summary_hash||':'||source_count::text,'|' ORDER BY summary_hash),''),'sha256'),'hex') AS hash FROM sdn_summary.summaries
 ), manifest_digest AS (
@@ -18,6 +20,8 @@ WITH schema_state AS (
   SELECT count(*)::bigint AS count, encode(digest(coalesce(string_agg(policy_name||':'||version_number::text||':'||status||':'||policy_hash,'|' ORDER BY policy_name,version_number),''),'sha256'),'hex') AS hash FROM sdn_lifecycle.retention_policy_versions
 ), policy_rule_digest AS (
   SELECT count(*)::bigint AS count, encode(digest(coalesce(string_agg(policy_version_id::text||':'||lifecycle_class||':'||coalesce(summary_after::text,'null')||':'||coalesce(compact_after::text,'null')||':'||coalesce(expire_after::text,'null')||':'||delete_allowed::text,'|' ORDER BY policy_version_id,lifecycle_class),''),'sha256'),'hex') AS hash FROM sdn_lifecycle.retention_rules
+), job_digest AS (
+  SELECT count(*)::bigint AS count, encode(digest(coalesce(string_agg(job_key||':'||job_type||':'||status||':'||as_of::text||':'||coalesce(result::text,'null')||':'||coalesce(error_code,'null'),'|' ORDER BY job_key),''),'sha256'),'hex') AS hash FROM sdn_lifecycle.jobs
 ), evaluation_digest AS (
   SELECT count(*)::bigint AS count, encode(digest(coalesce(string_agg(event_id::text||':'||policy_version_id::text||':'||lifecycle_class||':'||outcome||':'||evaluated_at::text,'|' ORDER BY evaluated_at,event_id,evaluation_id),''),'sha256'),'hex') AS hash FROM sdn_lifecycle.evaluations
 ), transition_digest AS (
@@ -28,12 +32,14 @@ SELECT jsonb_build_object(
   'extensions',jsonb_build_object('count',ex.count,'hash',ex.hash),
   'events',jsonb_build_object('count',e.count,'hash',e.hash),
   'receipts',jsonb_build_object('count',r.count,'hash',r.hash),
+  'integrityConflicts',jsonb_build_object('count',ic.count,'hash',ic.hash),
   'summaries',jsonb_build_object('count',s.count,'hash',s.hash),
   'manifests',jsonb_build_object('count',m.count,'hash',m.hash),
   'provenance',jsonb_build_object('count',p.count,'hash',p.hash),
   'policyVersions',jsonb_build_object('count',pv.count,'hash',pv.hash),
   'policyRules',jsonb_build_object('count',pr.count,'hash',pr.hash),
+  'lifecycleJobs',jsonb_build_object('count',j.count,'hash',j.hash),
   'lifecycleEvaluations',jsonb_build_object('count',ev.count,'hash',ev.hash),
   'transitionLedger',jsonb_build_object('count',tr.count,'hash',tr.hash)
 )::text
-FROM schema_state sc,extension_state ex,event_digest e,receipt_digest r,summary_digest s,manifest_digest m,provenance_digest p,policy_version_digest pv,policy_rule_digest pr,evaluation_digest ev,transition_digest tr;
+FROM schema_state sc,extension_state ex,event_digest e,receipt_digest r,conflict_digest ic,summary_digest s,manifest_digest m,provenance_digest p,policy_version_digest pv,policy_rule_digest pr,job_digest j,evaluation_digest ev,transition_digest tr;

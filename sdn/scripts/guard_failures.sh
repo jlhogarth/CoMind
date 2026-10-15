@@ -24,6 +24,48 @@ expect_guard_failure() {
   }
 }
 
+AUTHORITY=$("${COMPOSE[@]}" exec -T db psql -U postgres -d comind_sdn_test -Atc "SELECT jsonb_build_object(
+  'lifecycleCanPurge',has_function_privilege('sdn_lifecycle_user','sdn_lifecycle.purge_eligible_event(uuid)','EXECUTE'),
+  'purgeCanPurge',has_function_privilege('sdn_purge_user','sdn_lifecycle.purge_eligible_event(uuid)','EXECUTE'),
+  'purgeCanDeleteRaw',has_table_privilege('sdn_purge_user','sdn_telemetry.events','DELETE'),
+  'lifecycleCanDeleteRaw',has_table_privilege('sdn_lifecycle_user','sdn_telemetry.events','DELETE')
+)::text")
+printf '%s\n' "$AUTHORITY" > "$EVIDENCE/authority-boundary.json"
+node - "$EVIDENCE/authority-boundary.json" <<'NODE'
+const fs=require('node:fs');
+const p=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));
+if(p.lifecycleCanPurge!==false) throw new Error('lifecycle user unexpectedly has purge execution authority');
+if(p.purgeCanPurge!==true) throw new Error('purge user lacks scoped purge execution authority');
+if(p.purgeCanDeleteRaw!==false) throw new Error('purge user unexpectedly has raw DELETE authority');
+if(p.lifecycleCanDeleteRaw!==false) throw new Error('lifecycle user unexpectedly has raw DELETE authority');
+NODE
+
+expect_guard_failure lifecycle-cannot-invoke-purge 'permission denied for function purge_eligible_event' <<'SQL'
+BEGIN;
+SET ROLE sdn_lifecycle_user;
+SELECT sdn_lifecycle.purge_eligible_event((SELECT event_pk FROM sdn_telemetry.events LIMIT 1));
+COMMIT;
+SQL
+
+expect_guard_failure purge-cannot-delete-raw 'permission denied for table events' <<'SQL'
+BEGIN;
+SET ROLE sdn_purge_user;
+DELETE FROM sdn_telemetry.events WHERE false;
+COMMIT;
+SQL
+
+expect_guard_failure immutable-policy-version 'append-only relation retention_policy_versions does not permit UPDATE' <<'SQL'
+UPDATE sdn_lifecycle.retention_policy_versions
+SET policy_name='tampered-policy-name'
+WHERE policy_version_id='00000000-0000-4000-8000-000000000001';
+SQL
+
+expect_guard_failure append-only-transition-ledger 'append-only relation transition_ledger does not permit UPDATE' <<'SQL'
+UPDATE sdn_lifecycle.transition_ledger
+SET details='{"tampered":true}'::jsonb
+WHERE transition_id=(SELECT transition_id FROM sdn_lifecycle.transition_ledger ORDER BY recorded_at LIMIT 1);
+SQL
+
 expect_guard_failure purge-missing-derivative 'lacks verified derivative' <<'SQL'
 BEGIN;
 INSERT INTO sdn_telemetry.events(event_pk,producer_id,event_id,schema_version,event_type,lifecycle_class,sensitivity_class,source_timestamp,source_environment,payload,payload_hash,canonicalization_version,policy_version_id,ingested_at)
@@ -67,4 +109,4 @@ SELECT sdn_lifecycle.purge_eligible_event('f1000000-0000-4000-8000-000000000003'
 COMMIT;
 SQL
 
-printf '%s\n' 'All synthetic destructive guard failures were rejected for the expected reason.'
+printf '%s\n' 'All synthetic authority and destructive guard failures were rejected for the expected reason.'

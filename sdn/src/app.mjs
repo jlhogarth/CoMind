@@ -85,12 +85,24 @@ export function buildApp(options = {}) {
   app.get('/health/live', async()=>({status:'live'}));
   app.get('/health/ready', async(_req,reply)=>{ try { await pool.query('SELECT 1'); return {status:'ready'}; } catch(error){ reply.code(503); return {status:'not_ready',error:error instanceof Error?error.message:String(error)}; } });
   app.get('/health/metrics', async(_req,reply)=>{ try {
-    const [counters,lifecycle,size,capacity]=await Promise.all([
+    const [counters,lifecycle,jobs,size,capacity]=await Promise.all([
       pool.query('SELECT counter_name,counter_value FROM sdn_ops.ingest_counters ORDER BY counter_name'),
       pool.query('SELECT outcome,count(*)::bigint AS count FROM sdn_lifecycle.evaluations GROUP BY outcome ORDER BY outcome'),
+      pool.query('SELECT status,count(*)::bigint AS count FROM sdn_lifecycle.jobs GROUP BY status ORDER BY status'),
       pool.query('SELECT pg_database_size(current_database())::bigint AS database_bytes'),
       pool.query('SELECT database_bytes,free_disk_bytes,sampled_at FROM sdn_ops.capacity_samples ORDER BY sampled_at DESC LIMIT 1')]);
-    const fs=await statfs('/'); return { ingestion:Object.fromEntries(counters.rows.map(r=>[r.counter_name,Number(r.counter_value)])), lifecycle:Object.fromEntries(lifecycle.rows.map(r=>[r.outcome,Number(r.count)])), databaseBytes:Number(size.rows[0].database_bytes), latestDatabaseCapacity:capacity.rows[0]??null, serviceFilesystemFreeBytes:Number(fs.bavail)*Number(fs.bsize) };
+    const fs=await statfs('/');
+    const lifecycleJobs=Object.fromEntries(jobs.rows.map(r=>[r.status,Number(r.count)]));
+    return {
+      ingestion:Object.fromEntries(counters.rows.map(r=>[r.counter_name,Number(r.counter_value)])),
+      lifecycle:Object.fromEntries(lifecycle.rows.map(r=>[r.outcome,Number(r.count)])),
+      lifecycleJobs,
+      lifecycleBacklog:(lifecycleJobs.pending??0)+(lifecycleJobs.running??0),
+      lifecycleFailures:(lifecycleJobs.failed??0)+(lifecycleJobs.interrupted??0),
+      databaseBytes:Number(size.rows[0].database_bytes),
+      latestDatabaseCapacity:capacity.rows[0]??null,
+      serviceFilesystemFreeBytes:Number(fs.bavail)*Number(fs.bsize)
+    };
   } catch(error){ reply.code(503); return {error:error instanceof Error?error.message:String(error)}; } });
   app.post('/v1/events', async(request,reply)=>{ if(!authenticate(request,reply)) return; const parsed=EventSchema.safeParse(request.body); if(!parsed.success) return reply.code(400).send({error:'invalid_event',issues:parsed.error.issues}); const result=await persistEvent(parsed.data); return reply.code(result.status).send(result.body); });
   app.post('/v1/events/batch', async(request,reply)=>{ if(!authenticate(request,reply)) return; const parsed=BatchSchema.safeParse(request.body); if(!parsed.success) return reply.code(400).send({error:'invalid_batch',issues:parsed.error.issues}); const results=[]; for(const event of parsed.data.events){ const result=await persistEvent(event); results.push({eventId:event.eventId,status:result.status,...result.body}); } return reply.code(207).send({results}); });

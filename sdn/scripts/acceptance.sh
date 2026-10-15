@@ -3,6 +3,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SDN="$ROOT/sdn"
 EVIDENCE="$SDN/evidence"
+rm -rf "$EVIDENCE"
 mkdir -p "$EVIDENCE"
 cd "$SDN"
 export SDN_DB_OWNER_PASSWORD="${SDN_DB_OWNER_PASSWORD:-$(openssl rand -hex 24)}"
@@ -13,15 +14,26 @@ export SDN_PURGE_PASSWORD="${SDN_PURGE_PASSWORD:-$(openssl rand -hex 24)}"
 export SDN_TEST_PRODUCER_TOKEN="${SDN_TEST_PRODUCER_TOKEN:-$(openssl rand -hex 32)}"
 export SDN_TEST_PRODUCER_ID="${SDN_TEST_PRODUCER_ID:-11111111-1111-4111-8111-111111111111}"
 COMPOSE=(docker compose -f compose.yaml)
-cleanup(){ "${COMPOSE[@]}" down -v --remove-orphans >/dev/null 2>&1 || true; }
-trap cleanup EXIT
-cleanup
+teardown(){ "${COMPOSE[@]}" down -v --remove-orphans >/dev/null 2>&1 || true; }
+finalize(){
+  local rc=$?
+  trap - EXIT
+  if (( rc != 0 )); then
+    "${COMPOSE[@]}" ps -a > "$EVIDENCE/container-status.txt" 2>&1 || true
+    "${COMPOSE[@]}" logs --no-color ingest db > "$EVIDENCE/container-logs.txt" 2>&1 || true
+  fi
+  teardown
+  exit "$rc"
+}
+trap finalize EXIT
+teardown
 TMP=$(mktemp)
 "${COMPOSE[@]}" config --format json > "$TMP"
 node - "$TMP" "$EVIDENCE/topology-proof.json" <<'NODE'
 const fs=require('node:fs'); const [input,output]=process.argv.slice(2); const c=JSON.parse(fs.readFileSync(input,'utf8'));
 for(const n of ['db','restore-db']) if((c.services?.[n]?.ports??[]).length) throw new Error(`${n} publishes a database port`);
 const p=c.services?.ingest?.ports??[]; if(p.length!==1||p[0].host_ip!=='127.0.0.1') throw new Error('ingest is not loopback-only');
+if(c.networks?.sdn_internal?.internal!==true) throw new Error('database network is not internal');
 fs.writeFileSync(output,JSON.stringify({postgresImage:c.services.db.image,restoreImage:c.services['restore-db'].image,dbPorts:c.services.db.ports??[],restorePorts:c.services['restore-db'].ports??[],ingestPorts:p,networkInternal:Boolean(c.networks?.sdn_internal?.internal)},null,2));
 NODE
 rm -f "$TMP"
@@ -31,8 +43,10 @@ rm -f "$TMP"
 ./scripts/bootstrap_roles.sh | tee "$EVIDENCE/runtime-role-bootstrap.log"
 PG_VERSION=$("${COMPOSE[@]}" exec -T db psql -U postgres -d comind_sdn_test -Atc 'show server_version')
 [[ "$PG_VERSION" == 17.* ]] || { echo "Expected PostgreSQL 17, got $PG_VERSION" >&2; exit 1; }
-EXTENSIONS=$("${COMPOSE[@]}" exec -T db psql -U postgres -d comind_sdn_test -Atc "select string_agg(extname,',' order by extname) from pg_extension where extname in ('pgcrypto','citext','pg_trgm','vector')")
-[[ "$EXTENSIONS" == 'citext,pg_trgm,pgcrypto,vector' ]] || { echo "Missing extensions: $EXTENSIONS" >&2; exit 1; }
+EXTENSIONS=$("${COMPOSE[@]}" exec -T db psql -U postgres -d comind_sdn_test -Atc "select string_agg(extname||'='||extversion,',' order by extname) from pg_extension where extname in ('pgcrypto','citext','pg_trgm','vector')")
+EXTENSION_NAMES=$("${COMPOSE[@]}" exec -T db psql -U postgres -d comind_sdn_test -Atc "select string_agg(extname,',' order by extname) from pg_extension where extname in ('pgcrypto','citext','pg_trgm','vector')")
+[[ "$EXTENSION_NAMES" == 'citext,pg_trgm,pgcrypto,vector' ]] || { echo "Missing extensions: $EXTENSION_NAMES" >&2; exit 1; }
+printf 'server_version=%s\nextensions=%s\n' "$PG_VERSION" "$EXTENSIONS" > "$EVIDENCE/runtime-postgres.txt"
 "${COMPOSE[@]}" up -d --build ingest
 for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:3100/health/ready >/dev/null && break; sleep 1; done
 curl -fsS http://127.0.0.1:3100/health/live | tee "$EVIDENCE/health-live.json"
@@ -64,10 +78,23 @@ J2=$(q "select count(*) from sdn_lifecycle.jobs where as_of='$T125'::timestamptz
 [[ "$J1" == 1 && "$J2" == 1 ]] || { echo 'duplicate lifecycle job created' >&2; exit 1; }
 [[ "$(q "select count(*) from sdn_lifecycle.evaluations x join sdn_telemetry.events e on e.event_pk=x.event_pk where e.lifecycle_class='A' and x.outcome='eligible'")" == 0 ]] || { echo 'Class A became eligible' >&2; exit 1; }
 [[ "$(q "select outcome from sdn_lifecycle.evaluations where event_pk='$HELD_PK' order by evaluated_at desc limit 1")" == 'blocked_hold' ]] || { echo 'hold did not block lifecycle' >&2; exit 1; }
+PRE_PURGE_RAW=$(q 'select count(*) from sdn_telemetry.events')
+[[ "$PRE_PURGE_RAW" == 5 ]] || { echo "raw events changed before destructive authority: $PRE_PURGE_RAW" >&2; exit 1; }
+printf 'raw_event_count_before_destructive_authority=%s\n' "$PRE_PURGE_RAW" > "$EVIDENCE/pre-purge-retention.txt"
 FREE_KB=$("${COMPOSE[@]}" exec -T db sh -c "df -Pk /var/lib/postgresql/data | awk 'NR==2 {print \$4}'" | tr -d '\r')
 DB_BYTES=$(q 'select pg_database_size(current_database())')
 "${COMPOSE[@]}" exec -T db psql -U postgres -d comind_sdn_test -c "insert into sdn_ops.capacity_samples(database_bytes,free_disk_bytes) values ($DB_BYTES,$((FREE_KB*1024)))"
 curl -fsS http://127.0.0.1:3100/health/metrics | tee "$EVIDENCE/health-metrics.json"
+node - "$EVIDENCE/health-metrics.json" <<'NODE'
+const fs=require('node:fs'); const m=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));
+const required={accepted:5,duplicates:1,conflicts:1,rejected_missing_policy:1};
+for(const [k,v] of Object.entries(required)) if(m.ingestion?.[k]!==v) throw new Error(`ingestion metric ${k} expected ${v}, got ${m.ingestion?.[k]}`);
+if((m.lifecycleJobs?.interrupted??0)<1) throw new Error('interrupted lifecycle job is not observable');
+if(m.lifecycleBacklog!==0) throw new Error(`expected zero lifecycle backlog, got ${m.lifecycleBacklog}`);
+if((m.lifecycleFailures??0)<1) throw new Error('lifecycle failure count is not observable');
+if(!(m.databaseBytes>0)) throw new Error('database size is not observable');
+if(!(Number(m.latestDatabaseCapacity?.free_disk_bytes)>0)) throw new Error('free disk capacity is not observable');
+NODE
 SOURCE=$("${COMPOSE[@]}" exec -T db psql -U postgres -d comind_sdn_test -Atf /dev/stdin < scripts/snapshot.sql)
 printf '%s\n' "$SOURCE" > "$EVIDENCE/source-snapshot.json"
 "${COMPOSE[@]}" exec -T db pg_dump -U postgres -d comind_sdn_test -Fc > "$EVIDENCE/comind_sdn_test.dump"
@@ -76,6 +103,7 @@ RESTORED=$("${COMPOSE[@]}" exec -T restore-db psql -U postgres -d comind_sdn_res
 printf '%s\n' "$RESTORED" > "$EVIDENCE/restore-snapshot.json"
 [[ "$SOURCE" == "$RESTORED" ]] || { echo 'restore verification mismatch' >&2; exit 1; }
 bash scripts/guard_failures.sh | tee "$EVIDENCE/destructive-guard-summary.txt"
+[[ "$(q 'select count(*) from sdn_telemetry.events')" == 5 ]] || { echo 'guard tests changed raw event population' >&2; exit 1; }
 A_PK=$(q "select event_pk from sdn_telemetry.events where lifecycle_class='A' limit 1")
 if "${COMPOSE[@]}" run --rm purge node src/purge.mjs --event-pk "$A_PK" >"$EVIDENCE/purge-class-a.stdout" 2>"$EVIDENCE/purge-class-a.stderr"; then echo 'Class A purge succeeded unexpectedly' >&2; exit 1; fi
 if "${COMPOSE[@]}" run --rm purge node src/purge.mjs --event-pk "$HELD_PK" >"$EVIDENCE/purge-held.stdout" 2>"$EVIDENCE/purge-held.stderr"; then echo 'held purge succeeded unexpectedly' >&2; exit 1; fi
@@ -86,5 +114,6 @@ RECEIPTS=$(q 'select count(*) from sdn_lifecycle.deletion_receipts'); TOMBSTONES
 [[ "$(q 'select count(*) from sdn_summary.summaries')" == 4 ]] || { echo 'summaries lost' >&2; exit 1; }
 [[ "$(q 'select count(*) from sdn_lifecycle.compaction_manifests')" == 2 ]] || { echo 'manifests lost' >&2; exit 1; }
 [[ "$(q 'select count(*) from sdn_evidence.provenance_edges')" == 1 ]] || { echo 'provenance lost' >&2; exit 1; }
-"${COMPOSE[@]}" exec -T db psql -U postgres -d comind_sdn_test -P pager=off -c "select lifecycle_class,count(*) from sdn_telemetry.events group by lifecycle_class order by lifecycle_class; select outcome,count(*) from sdn_lifecycle.evaluations group by outcome order by outcome; select count(*) receipts from sdn_lifecycle.deletion_receipts; select count(*) tombstones from sdn_lifecycle.tombstones;" > "$EVIDENCE/final-database-state.txt"
+[[ "$(q 'select count(*) from sdn_evidence.integrity_conflicts')" == 1 ]] || { echo 'integrity conflict evidence lost' >&2; exit 1; }
+"${COMPOSE[@]}" exec -T db psql -U postgres -d comind_sdn_test -P pager=off -c "select lifecycle_class,count(*) from sdn_telemetry.events group by lifecycle_class order by lifecycle_class; select outcome,count(*) from sdn_lifecycle.evaluations group by outcome order by outcome; select status,count(*) from sdn_lifecycle.jobs group by status order by status; select count(*) receipts from sdn_lifecycle.deletion_receipts; select count(*) tombstones from sdn_lifecycle.tombstones;" > "$EVIDENCE/final-database-state.txt"
 echo 'SDN-001 isolated acceptance proof completed successfully.'

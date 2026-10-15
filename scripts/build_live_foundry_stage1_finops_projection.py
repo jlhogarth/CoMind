@@ -72,38 +72,41 @@ def build_projection(source_bytes: bytes) -> str:
         "legacy dependency header",
     )
 
+    # Match complete indented column lines, not substrings. Without the leading
+    # indentation, the generic `agent_id` token also matches `owner_agent_id`
+    # and `requested_by_agent_id`, weakening the fail-closed source contract.
     text = replace_exact(
         text,
-        "project_id UUID REFERENCES projects(id) ON DELETE CASCADE,",
-        "project_id UUID,",
+        "    project_id UUID REFERENCES projects(id) ON DELETE CASCADE,\n",
+        "    project_id UUID,\n",
         2,
         "legacy project foreign keys",
     )
     text = replace_exact(
         text,
-        "agent_id UUID REFERENCES agents(id) ON DELETE SET NULL,",
-        "agent_id UUID,",
+        "    agent_id UUID REFERENCES agents(id) ON DELETE SET NULL,\n",
+        "    agent_id UUID,\n",
         5,
         "legacy agent foreign keys",
     )
     text = replace_exact(
         text,
-        "owner_agent_id UUID REFERENCES agents(id) ON DELETE SET NULL,",
-        "owner_agent_id UUID,",
+        "    owner_agent_id UUID REFERENCES agents(id) ON DELETE SET NULL,\n",
+        "    owner_agent_id UUID,\n",
         1,
         "legacy owner-agent foreign key",
     )
     text = replace_exact(
         text,
-        "requested_by_agent_id UUID REFERENCES agents(id) ON DELETE SET NULL,",
-        "requested_by_agent_id UUID,",
+        "    requested_by_agent_id UUID REFERENCES agents(id) ON DELETE SET NULL,\n",
+        "    requested_by_agent_id UUID,\n",
         1,
         "legacy budget-exception agent foreign key",
     )
     text = replace_exact(
         text,
-        "governance_decision_id BIGINT REFERENCES comind_governance_decisions(id) ON DELETE SET NULL,",
-        "governance_decision_id BIGINT,",
+        "    governance_decision_id BIGINT REFERENCES comind_governance_decisions(id) ON DELETE SET NULL,\n",
+        "    governance_decision_id BIGINT,\n",
         1,
         "legacy governance-decision foreign key",
     )

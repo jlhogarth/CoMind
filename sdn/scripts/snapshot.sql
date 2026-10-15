@@ -1,4 +1,10 @@
-WITH event_digest AS (
+WITH schema_state AS (
+  SELECT count(*)::bigint AS count, encode(digest(coalesce(string_agg(schema_name,'|' ORDER BY schema_name),''),'sha256'),'hex') AS hash
+  FROM information_schema.schemata WHERE schema_name IN ('sdn_core','sdn_telemetry','sdn_evidence','sdn_lifecycle','sdn_summary','sdn_memory','sdn_sync','sdn_ops')
+), extension_state AS (
+  SELECT count(*)::bigint AS count, encode(digest(coalesce(string_agg(extname||':'||extversion,'|' ORDER BY extname),''),'sha256'),'hex') AS hash
+  FROM pg_extension WHERE extname IN ('pgcrypto','citext','pg_trgm','vector')
+), event_digest AS (
   SELECT count(*)::bigint AS count, encode(digest(coalesce(string_agg(producer_id::text||':'||event_id::text||':'||payload_hash||':'||lifecycle_class,'|' ORDER BY producer_id,event_id),''),'sha256'),'hex') AS hash FROM sdn_telemetry.events
 ), receipt_digest AS (
   SELECT count(*)::bigint AS count, encode(digest(coalesce(string_agg(producer_id::text||':'||event_id::text||':'||payload_hash,'|' ORDER BY producer_id,event_id),''),'sha256'),'hex') AS hash FROM sdn_telemetry.ingestion_receipts
@@ -8,8 +14,26 @@ WITH event_digest AS (
   SELECT count(*)::bigint AS count, encode(digest(coalesce(string_agg(source_set_hash||':'||source_count::text||':'||verification_status,'|' ORDER BY source_set_hash),''),'sha256'),'hex') AS hash FROM sdn_lifecycle.compaction_manifests
 ), provenance_digest AS (
   SELECT count(*)::bigint AS count, encode(digest(coalesce(string_agg(subject_event_id::text||':'||relation||':'||source_event_id::text,'|' ORDER BY subject_event_id,relation,source_event_id),''),'sha256'),'hex') AS hash FROM sdn_evidence.provenance_edges
-), policy_digest AS (
-  SELECT count(*)::bigint AS count, encode(digest(coalesce(string_agg(policy_name||':'||version_number::text||':'||policy_hash,'|' ORDER BY policy_name,version_number),''),'sha256'),'hex') AS hash FROM sdn_lifecycle.retention_policy_versions
+), policy_version_digest AS (
+  SELECT count(*)::bigint AS count, encode(digest(coalesce(string_agg(policy_name||':'||version_number::text||':'||status||':'||policy_hash,'|' ORDER BY policy_name,version_number),''),'sha256'),'hex') AS hash FROM sdn_lifecycle.retention_policy_versions
+), policy_rule_digest AS (
+  SELECT count(*)::bigint AS count, encode(digest(coalesce(string_agg(policy_version_id::text||':'||lifecycle_class||':'||coalesce(summary_after::text,'null')||':'||coalesce(compact_after::text,'null')||':'||coalesce(expire_after::text,'null')||':'||delete_allowed::text,'|' ORDER BY policy_version_id,lifecycle_class),''),'sha256'),'hex') AS hash FROM sdn_lifecycle.retention_rules
+), evaluation_digest AS (
+  SELECT count(*)::bigint AS count, encode(digest(coalesce(string_agg(event_id::text||':'||policy_version_id::text||':'||lifecycle_class||':'||outcome||':'||evaluated_at::text,'|' ORDER BY evaluated_at,event_id,evaluation_id),''),'sha256'),'hex') AS hash FROM sdn_lifecycle.evaluations
+), transition_digest AS (
+  SELECT count(*)::bigint AS count, encode(digest(coalesce(string_agg(event_id::text||':'||policy_version_id::text||':'||transition_type||':'||recorded_at::text,'|' ORDER BY recorded_at,event_id,transition_id),''),'sha256'),'hex') AS hash FROM sdn_lifecycle.transition_ledger
 )
-SELECT jsonb_build_object('events',jsonb_build_object('count',e.count,'hash',e.hash),'receipts',jsonb_build_object('count',r.count,'hash',r.hash),'summaries',jsonb_build_object('count',s.count,'hash',s.hash),'manifests',jsonb_build_object('count',m.count,'hash',m.hash),'provenance',jsonb_build_object('count',p.count,'hash',p.hash),'policies',jsonb_build_object('count',v.count,'hash',v.hash))::text
-FROM event_digest e,receipt_digest r,summary_digest s,manifest_digest m,provenance_digest p,policy_digest v;
+SELECT jsonb_build_object(
+  'schemas',jsonb_build_object('count',sc.count,'hash',sc.hash),
+  'extensions',jsonb_build_object('count',ex.count,'hash',ex.hash),
+  'events',jsonb_build_object('count',e.count,'hash',e.hash),
+  'receipts',jsonb_build_object('count',r.count,'hash',r.hash),
+  'summaries',jsonb_build_object('count',s.count,'hash',s.hash),
+  'manifests',jsonb_build_object('count',m.count,'hash',m.hash),
+  'provenance',jsonb_build_object('count',p.count,'hash',p.hash),
+  'policyVersions',jsonb_build_object('count',pv.count,'hash',pv.hash),
+  'policyRules',jsonb_build_object('count',pr.count,'hash',pr.hash),
+  'lifecycleEvaluations',jsonb_build_object('count',ev.count,'hash',ev.hash),
+  'transitionLedger',jsonb_build_object('count',tr.count,'hash',tr.hash)
+)::text
+FROM schema_state sc,extension_state ex,event_digest e,receipt_digest r,summary_digest s,manifest_digest m,provenance_digest p,policy_version_digest pv,policy_rule_digest pr,evaluation_digest ev,transition_digest tr;

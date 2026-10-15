@@ -25,7 +25,7 @@ const p=c.services?.ingest?.ports??[]; if(p.length!==1||p[0].host_ip!=='127.0.0.
 fs.writeFileSync(output,JSON.stringify({postgresImage:c.services.db.image,restoreImage:c.services['restore-db'].image,dbPorts:c.services.db.ports??[],restorePorts:c.services['restore-db'].ports??[],ingestPorts:p,networkInternal:Boolean(c.networks?.sdn_internal?.internal)},null,2));
 NODE
 rm -f "$TMP"
-"${COMPOSE[@]}" up -d db restore-db
+"${COMPOSE[@]}" up -d --wait --wait-timeout 60 db restore-db
 ./scripts/migrate.sh | tee "$EVIDENCE/migration-pass-1.log"
 ./scripts/migrate.sh | tee "$EVIDENCE/migration-pass-2.log"
 ./scripts/bootstrap_roles.sh | tee "$EVIDENCE/runtime-role-bootstrap.log"
@@ -75,6 +75,7 @@ cat "$EVIDENCE/comind_sdn_test.dump" | "${COMPOSE[@]}" exec -T restore-db pg_res
 RESTORED=$("${COMPOSE[@]}" exec -T restore-db psql -U postgres -d comind_sdn_restore_test -Atf /dev/stdin < scripts/snapshot.sql)
 printf '%s\n' "$RESTORED" > "$EVIDENCE/restore-snapshot.json"
 [[ "$SOURCE" == "$RESTORED" ]] || { echo 'restore verification mismatch' >&2; exit 1; }
+bash scripts/guard_failures.sh | tee "$EVIDENCE/destructive-guard-summary.txt"
 A_PK=$(q "select event_pk from sdn_telemetry.events where lifecycle_class='A' limit 1")
 if "${COMPOSE[@]}" run --rm purge node src/purge.mjs --event-pk "$A_PK" >"$EVIDENCE/purge-class-a.stdout" 2>"$EVIDENCE/purge-class-a.stderr"; then echo 'Class A purge succeeded unexpectedly' >&2; exit 1; fi
 if "${COMPOSE[@]}" run --rm purge node src/purge.mjs --event-pk "$HELD_PK" >"$EVIDENCE/purge-held.stdout" 2>"$EVIDENCE/purge-held.stderr"; then echo 'held purge succeeded unexpectedly' >&2; exit 1; fi

@@ -21,6 +21,16 @@ jobs:
     steps:
       - name: Checkout exact head
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checked-out head
+        run: |
+          set -euo pipefail
+          EXPECTED='${{ github.event.pull_request.head.sha || github.sha }}'
+          ACTUAL="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED" "$ACTUAL"
+          test "$ACTUAL" = "$EXPECTED"
 
       - name: Set up Node.js 24
         uses: actions/setup-node@v4
@@ -39,6 +49,7 @@ jobs:
           for file in sdn/src/*.mjs; do node --check "$file"; done
           bash -n sdn/scripts/migrate.sh
           bash -n sdn/scripts/bootstrap_roles.sh
+          bash -n sdn/scripts/guard_failures.sh
           bash -n sdn/scripts/acceptance.sh
 
       - name: Run isolated lifecycle acceptance proof
@@ -48,7 +59,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: sdn-001-isolated-evidence-${{ github.sha }}
+          name: sdn-001-isolated-evidence-${{ github.event.pull_request.head.sha || github.sha }}
           path: sdn/evidence/
           if-no-files-found: warn
           retention-days: 14

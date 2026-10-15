@@ -56,17 +56,18 @@ export function LiveExplorer() {
 
   useEffect(() => {
     let cancelled = false;
-    if (!selectedRelation) return;
+    const relation = selectedRelation;
+    if (!relation) return;
 
     async function loadRows() {
       setLoadingRows(true);
       setReadError(undefined);
       try {
-        if (selectedRelation.schema !== "public") {
-          throw new Error(`Browser reads are not authorized for schema ${selectedRelation.schema}`);
+        if (relation.schema !== "public") {
+          throw new Error(`Browser reads are not authorized for schema ${relation.schema}`);
         }
         const result = await readRelationPage(getBrowserSupabaseClient(), {
-          relation: selectedRelation.name,
+          relation: relation.name,
           page: 1,
           pageSize: 25,
         });

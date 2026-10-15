@@ -31,25 +31,45 @@ BEGIN
         RAISE EXCEPTION 'all Operator Console support tables must have RLS enabled';
     END IF;
 
-    IF has_table_privilege('anon', 'public.operator_console_relation_registry', 'SELECT')
-       OR has_table_privilege('authenticated', 'public.operator_console_relation_registry', 'SELECT')
-       OR has_table_privilege('anon', 'public.operator_console_verification_records', 'SELECT')
-       OR has_table_privilege('authenticated', 'public.operator_console_verification_records', 'SELECT')
-       OR has_table_privilege('anon', 'public.operator_console_mutation_audit', 'SELECT')
-       OR has_table_privilege('authenticated', 'public.operator_console_mutation_audit', 'SELECT') THEN
-        RAISE EXCEPTION 'ordinary Data API roles must not read Operator Console support tables';
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.role_table_grants
+        WHERE table_schema = 'public'
+          AND table_name IN (
+              'operator_console_relation_registry',
+              'operator_console_verification_records',
+              'operator_console_mutation_audit'
+          )
+          AND grantee IN ('anon', 'authenticated')
+    ) THEN
+        RAISE EXCEPTION 'ordinary Data API roles must have no direct Operator Console support-table grants';
     END IF;
 
     IF NOT has_table_privilege('service_role', 'public.operator_console_relation_registry', 'SELECT')
+       OR NOT has_table_privilege('service_role', 'public.operator_console_relation_registry', 'INSERT')
+       OR NOT has_table_privilege('service_role', 'public.operator_console_relation_registry', 'UPDATE')
+       OR NOT has_table_privilege('service_role', 'public.operator_console_relation_registry', 'DELETE')
+       OR NOT has_table_privilege('service_role', 'public.operator_console_verification_records', 'SELECT')
        OR NOT has_table_privilege('service_role', 'public.operator_console_verification_records', 'INSERT')
+       OR NOT has_table_privilege('service_role', 'public.operator_console_verification_records', 'UPDATE')
        OR NOT has_table_privilege('service_role', 'public.operator_console_verification_records', 'DELETE')
+       OR NOT has_table_privilege('service_role', 'public.operator_console_mutation_audit', 'SELECT')
        OR NOT has_table_privilege('service_role', 'public.operator_console_mutation_audit', 'INSERT') THEN
         RAISE EXCEPTION 'service_role is missing required Operator Console support privileges';
     END IF;
 
-    IF has_table_privilege('service_role', 'public.operator_console_mutation_audit', 'UPDATE')
-       OR has_table_privilege('service_role', 'public.operator_console_mutation_audit', 'DELETE') THEN
-        RAISE EXCEPTION 'service_role must not receive direct audit UPDATE or DELETE privileges';
+    IF has_table_privilege('service_role', 'public.operator_console_relation_registry', 'TRUNCATE')
+       OR has_table_privilege('service_role', 'public.operator_console_relation_registry', 'REFERENCES')
+       OR has_table_privilege('service_role', 'public.operator_console_relation_registry', 'TRIGGER')
+       OR has_table_privilege('service_role', 'public.operator_console_verification_records', 'TRUNCATE')
+       OR has_table_privilege('service_role', 'public.operator_console_verification_records', 'REFERENCES')
+       OR has_table_privilege('service_role', 'public.operator_console_verification_records', 'TRIGGER')
+       OR has_table_privilege('service_role', 'public.operator_console_mutation_audit', 'UPDATE')
+       OR has_table_privilege('service_role', 'public.operator_console_mutation_audit', 'DELETE')
+       OR has_table_privilege('service_role', 'public.operator_console_mutation_audit', 'TRUNCATE')
+       OR has_table_privilege('service_role', 'public.operator_console_mutation_audit', 'REFERENCES')
+       OR has_table_privilege('service_role', 'public.operator_console_mutation_audit', 'TRIGGER') THEN
+        RAISE EXCEPTION 'service_role has privileges beyond the OC-002 least-privilege contract';
     END IF;
 
     IF has_function_privilege('anon', 'public.operator_console_schema_metadata()', 'EXECUTE')

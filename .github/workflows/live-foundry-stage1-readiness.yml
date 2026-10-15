@@ -26,8 +26,16 @@ jobs:
           --health-retries 5
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+      EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+      - name: Verify exact accepted head
+        run: |
+          actual_sha="$(git rev-parse HEAD)"
+          test "${actual_sha}" = "${EXPECTED_HEAD_SHA}"
+          printf 'Exact Stage 1 head verified: %s\n' "${actual_sha}"
       - name: Install PostgreSQL client
         run: |
           sudo apt-get update

@@ -1,0 +1,44 @@
+name: Operator Console CI
+
+on:
+  pull_request:
+    paths:
+      - "apps/operator-console/**"
+      - ".github/workflows/operator-console.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/operator-console
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Generate dependency lock evidence
+        run: npm install --package-lock-only
+      - name: Preserve generated dependency lock evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: operator-console-package-lock
+          path: apps/operator-console/package-lock.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Require generated lockfile to be committed
+        run: test -z "$(git status --porcelain -- package-lock.json)"
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Test
+        run: npm test
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build
+        run: npm run build

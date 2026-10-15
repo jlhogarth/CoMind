@@ -6,7 +6,9 @@ on:
       - "apps/operator-console/**"
       - "db/migrations/20261015_001_operator_console_live_activation.sql"
       - "db/migrations/20261015_002_operator_console_service_role_least_privilege.sql"
+      - "db/migrations/20261015_003_operator_console_explicit_deny_policies.sql"
       - "db/migrations/verify_20261015_001_operator_console_live_activation.sql"
+      - "db/migrations/verify_20261015_003_operator_console_explicit_deny_policies.sql"
       - "scripts/test_operator_console_live_activation.sh"
       - ".github/workflows/operator-console.yml"
   workflow_dispatch:

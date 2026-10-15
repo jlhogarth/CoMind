@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - "apps/operator-console/**"
+      - "db/migrations/20261015_001_operator_console_live_activation.sql"
+      - "db/migrations/verify_20261015_001_operator_console_live_activation.sql"
+      - "scripts/test_operator_console_live_activation.sh"
       - ".github/workflows/operator-console.yml"
   workflow_dispatch:
 
@@ -42,3 +45,31 @@ jobs:
         run: npm run typecheck
       - name: Build
         run: npm run build
+
+  database-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+      - name: Verify Operator Console live-activation database contract
+        run: bash ./scripts/test_operator_console_live_activation.sh

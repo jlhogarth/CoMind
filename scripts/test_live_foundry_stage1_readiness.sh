@@ -67,6 +67,15 @@ END;
 $$;
 SQL
 
+# Reproduce the accepted live PM substrate using its canonical repository
+# migrations. The post-deployment verifier intentionally checks PM Agent-run
+# state because Stage 1 must not persist execution evidence as a side effect.
+# Do not fabricate only pm_agent_runs as a test-only compatibility surface.
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
+  -f "${repository_root}/db/migrations/20261006_001_comind_pm_ledger.sql"
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
+  -f "${repository_root}/db/migrations/20261006_002_comind_pm_ledger_hardening.sql"
+
 work_dir="$(mktemp -d)"
 trap 'rm -rf "${work_dir}"' EXIT
 projection_sql="${work_dir}/20260910_001_live_foundry_stage1_finops_projection.sql"

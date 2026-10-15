@@ -6,7 +6,7 @@ import { DataGrid } from "@/components/data/DataGrid";
 import { RelationSidebar } from "@/components/schema/RelationSidebar";
 import { readRelationPage } from "@/lib/queries/read";
 import { buildSchemaGraph } from "@/lib/schema/registry";
-import type { SchemaGraph } from "@/lib/schema/types";
+import type { SchemaGraph, SchemaRelation } from "@/lib/schema/types";
 import { validateSchemaMetadata } from "@/lib/schema/validate";
 import { getBrowserSupabaseClient } from "@/lib/supabase/browser";
 
@@ -56,10 +56,8 @@ export function LiveExplorer() {
 
   useEffect(() => {
     let cancelled = false;
-    const relation = selectedRelation;
-    if (!relation) return;
 
-    async function loadRows() {
+    async function loadRows(relation: SchemaRelation) {
       setLoadingRows(true);
       setReadError(undefined);
       try {
@@ -84,7 +82,15 @@ export function LiveExplorer() {
       }
     }
 
-    void loadRows();
+    if (selectedRelation) {
+      void loadRows(selectedRelation);
+    } else {
+      setRows([]);
+      setCount(null);
+      setReadError(undefined);
+      setLoadingRows(false);
+    }
+
     return () => {
       cancelled = true;
     };

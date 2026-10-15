@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   verify:
@@ -19,8 +19,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.ref }}
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -34,16 +32,6 @@ jobs:
           path: apps/operator-console/package-lock.json
           if-no-files-found: error
           retention-days: 7
-      - name: Commit generated lockfile correction
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-        run: |
-          if ! git diff --quiet -- package-lock.json; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add package-lock.json
-            git commit -m "Issue #112: commit authentic generated npm lockfile"
-            git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
-          fi
       - name: Require generated lockfile to be committed
         run: test -z "$(git status --porcelain -- package-lock.json)"
       - name: Install locked dependencies

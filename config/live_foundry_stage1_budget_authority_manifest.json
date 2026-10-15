@@ -1,0 +1,96 @@
+{
+  "schema_version": "1.0.0",
+  "issue": 116,
+  "purpose": "Governed live Foundry activation Stage 1 budget-authority foundation",
+  "authoritative_source_main_sha": "1d40350450d0352810cb9beb6f22d8d4b624fba0",
+  "live_supabase_project_ref": "sbgfuanxiqepcoboxzcl",
+  "engineering_tier": "T3",
+  "live_mutation_authority": "C4 explicit human approval required",
+  "finops_projection": {
+    "source_path": "db/migrations/20260910_001_comind_finops_resource_governor.sql",
+    "source_git_blob_sha": "c5922026aa27b0656a10fe76d29bb17a0e87ca0d",
+    "builder_path": "scripts/build_live_foundry_stage1_finops_projection.py",
+    "builder_git_blob_sha_at_issue_116_initial_implementation": "3b480ddded9167a0e78b4c58021ac668a2c3e092",
+    "live_migration_name": "live_foundry_stage1_finops_current_runtime_projection_v1",
+    "raw_source_must_not_be_applied_live": true,
+    "removes_legacy_identity_authority": true,
+    "preserves_provider_seed_registry": true
+  },
+  "ordered_migrations": [
+    {
+      "ordinal": 1,
+      "kind": "generated_projection",
+      "source": "db/migrations/20260910_001_comind_finops_resource_governor.sql",
+      "source_git_blob_sha": "c5922026aa27b0656a10fe76d29bb17a0e87ca0d",
+      "live_migration_name": "live_foundry_stage1_finops_current_runtime_projection_v1"
+    },
+    {
+      "ordinal": 2,
+      "kind": "repository_sql",
+      "path": "db/migrations/20261008_001_paid_provider_budget_authority_hardening.sql",
+      "git_blob_sha": "ec628d20ed09cdee93bdb58ca2bdb527081a0923",
+      "live_migration_name": "live_foundry_stage1_paid_provider_budget_authority_hardening_v1"
+    },
+    {
+      "ordinal": 3,
+      "kind": "repository_sql",
+      "path": "db/migrations/20261008_002_current_runtime_budget_authority_adapter.sql",
+      "git_blob_sha": "049ebd2f628e365226bbf2e080f1303c11cf6e0a",
+      "live_migration_name": "live_foundry_stage1_current_runtime_budget_authority_adapter_v1"
+    },
+    {
+      "ordinal": 4,
+      "kind": "repository_sql",
+      "path": "db/migrations/20261008_003_current_runtime_budget_authority_adapter_function_hardening.sql",
+      "git_blob_sha": "0cc3019480c77b443c7598ba0d006a385fd5e4e7",
+      "live_migration_name": "live_foundry_stage1_current_runtime_budget_authority_adapter_function_hardening_v1"
+    },
+    {
+      "ordinal": 5,
+      "kind": "repository_sql",
+      "path": "db/migrations/20261008_004_current_runtime_budget_authority_adapter_lifecycle_hardening.sql",
+      "git_blob_sha": "a76d6da1b529840f4bfa797ebb83b2fd0d98f2fd",
+      "live_migration_name": "live_foundry_stage1_current_runtime_budget_authority_adapter_lifecycle_hardening_v1"
+    },
+    {
+      "ordinal": 6,
+      "kind": "repository_sql",
+      "path": "db/migrations/20261008_005_current_runtime_budget_authority_adapter_telemetry_role_hardening.sql",
+      "git_blob_sha": "9e965133e07663cb3c211e3561d58834baa7a9c8",
+      "live_migration_name": "live_foundry_stage1_current_runtime_budget_authority_adapter_telemetry_role_hardening_v1"
+    }
+  ],
+  "expected_live_seed_delta": {
+    "provider_codes": [
+      "local_rtx5090",
+      "openai",
+      "google_gemini",
+      "supabase",
+      "railway",
+      "vercel",
+      "replit"
+    ],
+    "legacy_public_agent_rows": 0,
+    "legacy_governance_decision_rows": 0,
+    "foundry_agent_rows": 0
+  },
+  "excluded_from_stage1": [
+    "db/migrations/20261008_006_foundry_agent_substrate.sql",
+    "db/migrations/20261008_007_foundry_security_prerequisites.sql",
+    "db/migrations/20261008_008_foundry_runtime_orchestration.sql",
+    "db/migrations/20261009_009_foundry_work_lease_kernel.sql",
+    "db/migrations/20261010_010_acp_continuity_checkpoints.sql",
+    "db/migrations/20261012_001_chatgpt_archive_ingestion.sql",
+    "db/migrations/20261012_002_chatgpt_archive_quarantine.sql",
+    "db/migrations/20261012_003_chatgpt_archive_access_hardening.sql",
+    "Agent or Virtual Employee identity population",
+    "paid-provider execution",
+    "credential creation or rotation"
+  ],
+  "parallel_lane_boundaries": {
+    "operator_console_pr": 113,
+    "operator_console_may_mutate_live_schema": false,
+    "chatgpt_archive_pit_a_is_separate": true,
+    "single_live_schema_mutation_lane": true
+  }
+}

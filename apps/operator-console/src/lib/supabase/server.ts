@@ -5,6 +5,8 @@ export interface ServerSupabaseConfig {
   secretKey: string;
 }
 
+type Environment = Record<string, string | undefined>;
+
 function required(name: string, value: string | undefined): string {
   if (!value) {
     throw new Error(`Missing required server environment variable ${name}`);
@@ -13,7 +15,7 @@ function required(name: string, value: string | undefined): string {
 }
 
 export function getServerSupabaseConfig(
-  env: NodeJS.ProcessEnv = process.env,
+  env: Environment = process.env,
 ): ServerSupabaseConfig {
   const url = required("SUPABASE_URL", env.SUPABASE_URL);
   const secretKey = required("SUPABASE_SECRET_KEY", env.SUPABASE_SECRET_KEY);

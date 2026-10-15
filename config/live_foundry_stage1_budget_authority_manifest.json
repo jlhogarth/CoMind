@@ -10,7 +10,7 @@
     "source_path": "db/migrations/20260910_001_comind_finops_resource_governor.sql",
     "source_git_blob_sha": "c5922026aa27b0656a10fe76d29bb17a0e87ca0d",
     "builder_path": "scripts/build_live_foundry_stage1_finops_projection.py",
-    "builder_git_blob_sha_at_issue_116_initial_implementation": "3b480ddded9167a0e78b4c58021ac668a2c3e092",
+    "builder_git_blob_sha": "fe8c8a1d81813b29e789e2b0a93d3288f11ade5c",
     "live_migration_name": "live_foundry_stage1_finops_current_runtime_projection_v1",
     "raw_source_must_not_be_applied_live": true,
     "removes_legacy_identity_authority": true,

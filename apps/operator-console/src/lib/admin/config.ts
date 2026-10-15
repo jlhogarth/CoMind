@@ -2,8 +2,10 @@ export interface AdminExecutionConfig {
   token: string;
 }
 
+type Environment = Record<string, string | undefined>;
+
 export function getAdminExecutionConfig(
-  env: NodeJS.ProcessEnv = process.env,
+  env: Environment = process.env,
 ): AdminExecutionConfig {
   if (env.OPERATOR_CONSOLE_ADMIN_ENABLED !== "true") {
     throw new Error("Operator Console administrative execution is disabled");

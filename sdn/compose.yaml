@@ -1,0 +1,97 @@
+name: comind-sdn-001
+
+services:
+  db:
+    image: pgvector/pgvector:0.8.6-pg17-bookworm
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${SDN_DB_OWNER_PASSWORD:?SDN_DB_OWNER_PASSWORD is required}
+      POSTGRES_DB: comind_sdn_test
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d comind_sdn_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - sdn_pgdata:/var/lib/postgresql/data
+      - ./migrations:/migrations:ro
+    networks: [sdn_internal]
+
+  restore-db:
+    image: pgvector/pgvector:0.8.6-pg17-bookworm
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${SDN_RESTORE_OWNER_PASSWORD:?SDN_RESTORE_OWNER_PASSWORD is required}
+      POSTGRES_DB: comind_sdn_restore_test
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d comind_sdn_restore_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - sdn_restore_pgdata:/var/lib/postgresql/data
+    networks: [sdn_internal]
+
+  ingest:
+    build:
+      context: ..
+      dockerfile: sdn/Dockerfile
+    environment:
+      PORT: "3100"
+      DATABASE_URL: postgresql://sdn_ingest_user:${SDN_INGEST_PASSWORD:?SDN_INGEST_PASSWORD is required}@db:5432/comind_sdn_test
+      SDN_TEST_PRODUCER_ID: ${SDN_TEST_PRODUCER_ID:-11111111-1111-4111-8111-111111111111}
+      SDN_TEST_PRODUCER_TOKEN: ${SDN_TEST_PRODUCER_TOKEN:?SDN_TEST_PRODUCER_TOKEN is required}
+    ports:
+      - "127.0.0.1:${SDN_INGEST_PORT:-3100}:3100"
+    depends_on:
+      db:
+        condition: service_healthy
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    networks: [sdn_internal]
+
+  lifecycle:
+    build:
+      context: ..
+      dockerfile: sdn/Dockerfile
+    command: ["node", "src/lifecycle.mjs"]
+    environment:
+      DATABASE_URL: postgresql://sdn_lifecycle_user:${SDN_LIFECYCLE_PASSWORD:?SDN_LIFECYCLE_PASSWORD is required}@db:5432/comind_sdn_test
+      SDN_AS_OF: ${SDN_AS_OF:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    networks: [sdn_internal]
+    profiles: [tools]
+
+  purge:
+    build:
+      context: ..
+      dockerfile: sdn/Dockerfile
+    command: ["node", "src/purge.mjs"]
+    environment:
+      DATABASE_URL: postgresql://sdn_purge_user:${SDN_PURGE_PASSWORD:?SDN_PURGE_PASSWORD is required}@db:5432/comind_sdn_test
+    depends_on:
+      db:
+        condition: service_healthy
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    networks: [sdn_internal]
+    profiles: [tools]
+
+networks:
+  sdn_internal:
+    driver: bridge
+    internal: true
+
+volumes:
+  sdn_pgdata:
+  sdn_restore_pgdata:

@@ -1,0 +1,54 @@
+name: SDN-001 Isolated Lifecycle Proof
+
+on:
+  pull_request:
+    paths:
+      - 'sdn/**'
+      - '.github/workflows/sdn-001-isolated-lifecycle.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sdn-001-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  isolated-lifecycle-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Record tool versions
+        run: |
+          node --version
+          docker --version
+          docker compose version
+
+      - name: Static syntax checks
+        run: |
+          set -euo pipefail
+          for file in sdn/src/*.mjs; do node --check "$file"; done
+          bash -n sdn/scripts/migrate.sh
+          bash -n sdn/scripts/bootstrap_roles.sh
+          bash -n sdn/scripts/acceptance.sh
+
+      - name: Run isolated lifecycle acceptance proof
+        run: bash sdn/scripts/acceptance.sh
+
+      - name: Upload synthetic acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdn-001-isolated-evidence-${{ github.sha }}
+          path: sdn/evidence/
+          if-no-files-found: warn
+          retention-days: 14

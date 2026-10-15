@@ -1,19 +1,21 @@
 import { Database, GitBranch, ShieldCheck } from "lucide-react";
 
+import { LiveExplorer } from "@/components/live/LiveExplorer";
+
 const foundations = [
   {
-    title: "Schema Registry",
-    detail: "Normalized PostgreSQL relations, columns, keys, and referential actions.",
+    title: "Live Schema Registry",
+    detail: "Server-protected metadata discovery exposes only relations approved for browser inspection.",
     icon: Database,
   },
   {
     title: "Relationship Graph",
-    detail: "Deterministic inbound and outbound foreign-key navigation.",
+    detail: "Actual foreign-key structure drives deterministic inbound and outbound navigation.",
     icon: GitBranch,
   },
   {
-    title: "Governed Access",
-    detail: "Browser access remains RLS-bound. Privileged credentials stay server-side.",
+    title: "Separated Authority",
+    detail: "Browser reads remain RLS-bound. Administrative mutations use a distinct server-only execution path.",
     icon: ShieldCheck,
   },
 ];
@@ -24,14 +26,13 @@ export default function Home() {
       <aside className="sidebar">
         <div className="brand">CoMind</div>
         <div className="product">Operator Console</div>
-        <div className="status">OC-001 foundation</div>
+        <div className="status">OC-002 live activation</div>
       </aside>
       <section className="content">
         <p className="eyebrow">Governed relational operations</p>
-        <h1>Inspect the structure before changing the system.</h1>
+        <h1>Observe live state without collapsing the trust boundary.</h1>
         <p className="lede">
-          OC-001 establishes the schema-driven foundation. Live schema mutation, destructive operations,
-          and privileged browser access remain outside this milestone.
+          Ordinary Console reads use the live CoMind Supabase project through the publishable browser path and remain subject to RLS. Privileged administrative execution is isolated behind a server-only capability gate and an auditable database mutation contract.
         </p>
         <div className="cards">
           {foundations.map(({ title, detail, icon: Icon }) => (
@@ -42,6 +43,7 @@ export default function Home() {
             </article>
           ))}
         </div>
+        <LiveExplorer />
       </section>
     </main>
   );

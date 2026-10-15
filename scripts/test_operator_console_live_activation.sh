@@ -20,6 +20,7 @@ PY
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 migration="${repo_root}/db/migrations/20261015_001_operator_console_live_activation.sql"
+hardening="${repo_root}/db/migrations/20261015_002_operator_console_service_role_least_privilege.sql"
 verification="${repo_root}/db/migrations/verify_20261015_001_operator_console_live_activation.sql"
 
 psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
@@ -107,6 +108,18 @@ SQL
 
 psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${migration}"
 psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${migration}"
+
+# Supabase production applies default table privileges that grant service_role ALL
+# on newly created public tables. Reproduce that live-only condition before the
+# compensating migration so isolated verification can detect privilege drift.
+psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+GRANT ALL ON TABLE public.operator_console_relation_registry TO service_role;
+GRANT ALL ON TABLE public.operator_console_verification_records TO service_role;
+GRANT ALL ON TABLE public.operator_console_mutation_audit TO service_role;
+SQL
+
+psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${hardening}"
+psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${hardening}"
 psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${verification}"
 
 anon_counts="$(psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -At <<'SQL'
@@ -145,6 +158,30 @@ ROLLBACK;
 SQL
 then
     echo 'Anon metadata RPC unexpectedly succeeded.' >&2
+    exit 1
+fi
+
+if psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 >/dev/null 2>&1 <<'SQL'
+BEGIN;
+SET LOCAL ROLE service_role;
+TRUNCATE TABLE public.operator_console_mutation_audit;
+ROLLBACK;
+SQL
+then
+    echo 'service_role TRUNCATE on append-only audit unexpectedly succeeded.' >&2
+    exit 1
+fi
+
+service_metadata_count="$(psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -At <<'SQL'
+BEGIN;
+SET LOCAL ROLE service_role;
+SELECT jsonb_array_length(public.operator_console_schema_metadata()->'relations');
+ROLLBACK;
+SQL
+)"
+
+if [[ "${service_metadata_count}" != *$'3'* ]]; then
+    printf 'Unexpected service_role metadata relation count: %s\n' "${service_metadata_count}" >&2
     exit 1
 fi
 

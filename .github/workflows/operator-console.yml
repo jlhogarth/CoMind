@@ -50,6 +50,41 @@ jobs:
         run: npm run typecheck
       - name: Build
         run: npm run build
+      - name: Build portable self-host image
+        run: |
+          docker build \
+            --build-arg NEXT_PUBLIC_SUPABASE_URL="https://example.supabase.co" \
+            --build-arg NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="sb_publishable_ci_public_value" \
+            --tag comind/operator-console:ci \
+            .
+      - name: Smoke test fail-closed self-host runtime
+        run: |
+          set -euo pipefail
+          docker run --detach \
+            --name operator-console-ci \
+            --publish 127.0.0.1:3000:3000 \
+            comind/operator-console:ci
+          trap 'docker rm --force operator-console-ci >/dev/null 2>&1 || true' EXIT
+
+          ready=false
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            if curl --fail --silent --show-error http://127.0.0.1:3000/ >/dev/null; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+          test "$ready" = "true"
+
+          schema_status="$(curl --silent --output /tmp/schema.json --write-out '%{http_code}' http://127.0.0.1:3000/api/schema)"
+          test "$schema_status" = "503"
+
+          admin_status="$(curl --silent --output /tmp/admin.json --write-out '%{http_code}' \
+            --request POST \
+            --header 'content-type: application/json' \
+            --data '{}' \
+            http://127.0.0.1:3000/api/admin/mutations)"
+          test "$admin_status" = "503"
 
   database-contract:
     runs-on: ubuntu-latest

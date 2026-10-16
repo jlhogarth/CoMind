@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - issue-127-live-foundry-stage1-deployment
-  pull_request:
-    branches:
-      - main
 
 permissions:
   contents: read
@@ -56,7 +53,7 @@ jobs:
           sudo apt-get install --yes postgresql-client python3
           npx --yes "supabase@${SUPABASE_CLI_VERSION}" --version
 
-      - name: Normalize database URL in runner memory
+      - name: Build verified IPv4 Session pooler URL in runner memory
         shell: bash
         run: |
           set -euo pipefail
@@ -70,8 +67,10 @@ jobs:
 
           print(f"::add-mask::{raw}")
 
-          host = "db.sbgfuanxiqepcoboxzcl.supabase.co"
-          marker = "@" + host
+          project_ref = "sbgfuanxiqepcoboxzcl"
+          direct_host = f"db.{project_ref}.supabase.co"
+          pooler_host = "aws-0-us-east-1.pooler.supabase.com"
+          marker = "@" + direct_host
           if marker not in raw:
               raise SystemExit("DATABASE_URL does not target the authorized CoMind Supabase direct host")
 
@@ -81,19 +80,22 @@ jobs:
           if scheme not in {"postgres", "postgresql"}:
               raise SystemExit("DATABASE_URL has an unsupported URI scheme")
 
-          userinfo, suffix = rest.rsplit(marker, 1)
+          userinfo, _suffix = rest.rsplit(marker, 1)
           if ":" not in userinfo:
               raise SystemExit("DATABASE_URL user-info is missing a password separator")
-          username_raw, password_raw = userinfo.split(":", 1)
+          _username_raw, password_raw = userinfo.split(":", 1)
 
-          username = quote_from_bytes(unquote_to_bytes(username_raw), safe="")
           password = quote_from_bytes(unquote_to_bytes(password_raw), safe="")
-          normalized = f"{scheme}://{username}:{password}@{host}{suffix}"
+          pooler_username = quote_from_bytes(f"postgres.{project_ref}".encode("utf-8"), safe="")
+          normalized = (
+              f"postgresql://{pooler_username}:{password}@{pooler_host}:5432/postgres"
+              "?sslmode=require"
+          )
 
           print(f"::add-mask::{normalized}")
           with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env_file:
               env_file.write(f"NORMALIZED_DATABASE_URL={normalized}\n")
-          print("Database URL normalized for runner use without changing the stored secret.")
+          print("Verified CoMind Session pooler URL built in runner memory without changing the stored secret.")
           PY
 
       - name: Verify governed manifest and generate migration 1

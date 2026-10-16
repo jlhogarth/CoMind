@@ -3,10 +3,11 @@ set -euo pipefail
 
 : "${SUPABASE_SESSION_DATABASE_URL:?SUPABASE_SESSION_DATABASE_URL is required}"
 
-SUPABASE_SESSION_DATABASE_URL="${SUPABASE_SESSION_DATABASE_URL}" python3 <<'PY'
+mapfile -d '' -t connection_parts < <(
+  SUPABASE_SESSION_DATABASE_URL="${SUPABASE_SESSION_DATABASE_URL}" python3 <<'PY'
 import os
 import sys
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 raw = os.environ["SUPABASE_SESSION_DATABASE_URL"]
 parsed = urlparse(raw)
@@ -15,8 +16,12 @@ expected = {
     "host": "aws-0-us-east-1.pooler.supabase.com",
     "port": 5432,
     "username": "postgres.sbgfuanxiqepcoboxzcl",
-    "path": "/postgres",
+    "database": "postgres",
 }
+
+username = unquote(parsed.username or "")
+password = unquote(parsed.password or "")
+database = unquote(parsed.path.lstrip("/"))
 
 if parsed.scheme not in {"postgres", "postgresql"}:
     print("Production connectivity proof requires a PostgreSQL URL.", file=sys.stderr)
@@ -27,24 +32,43 @@ if parsed.hostname != expected["host"]:
 if parsed.port != expected["port"]:
     print("Production connectivity proof refused an unexpected database port.", file=sys.stderr)
     raise SystemExit(2)
-if parsed.username != expected["username"]:
+if username != expected["username"]:
     print("Production connectivity proof refused an unexpected database username.", file=sys.stderr)
     raise SystemExit(2)
-if parsed.path != expected["path"]:
+if database != expected["database"]:
     print("Production connectivity proof refused an unexpected database name.", file=sys.stderr)
     raise SystemExit(2)
-if parsed.password is None or parsed.password == "":
+if password == "":
     print("Production connectivity proof requires a non-empty database credential.", file=sys.stderr)
     raise SystemExit(2)
 
-print("Supabase Session pooler connection metadata validated without printing credentials.")
+for value in (parsed.hostname, str(parsed.port), username, password, database):
+    sys.stdout.write(value)
+    sys.stdout.write("\0")
+
+print("Supabase Session pooler connection metadata validated without printing credentials.", file=sys.stderr)
 PY
+)
+
+if [[ "${#connection_parts[@]}" -ne 5 ]]; then
+  echo "Production connectivity proof could not derive the expected connection parameters." >&2
+  exit 2
+fi
+
+export PGHOST="${connection_parts[0]}"
+export PGPORT="${connection_parts[1]}"
+export PGUSER="${connection_parts[2]}"
+export PGPASSWORD="${connection_parts[3]}"
+export PGDATABASE="${connection_parts[4]}"
+unset SUPABASE_SESSION_DATABASE_URL
 
 export PGCONNECT_TIMEOUT="10"
 export PGSSLMODE="require"
 export PGOPTIONS="-c default_transaction_read_only=on -c statement_timeout=15000 -c lock_timeout=5000"
 
-connectivity_output="$(psql "${SUPABASE_SESSION_DATABASE_URL}" -X -q -At -v ON_ERROR_STOP=1 <<'SQL'
+PSQL_BIN="${PSQL_BIN:-psql}"
+
+connectivity_output="$("${PSQL_BIN}" -X -q -At -v ON_ERROR_STOP=1 <<'SQL'
 BEGIN READ ONLY;
 
 WITH expected_stage1(name) AS (
@@ -92,8 +116,8 @@ SQL
 )"
 
 if [[ "${connectivity_output}" != "connectivity_pass" ]]; then
-    echo "Live Supabase read-only connectivity contract failed." >&2
-    exit 1
+  echo "Live Supabase read-only connectivity contract failed." >&2
+  exit 1
 fi
 
 printf 'Live Supabase read-only connectivity contract passed.\n'

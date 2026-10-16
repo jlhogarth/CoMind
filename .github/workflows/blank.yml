@@ -29,11 +29,16 @@ jobs:
           test -d db
           test -f .github/workflows/live-supabase-connectivity-readonly.yml
           test -f scripts/verify_live_supabase_connectivity_readonly.sh
+          test -f scripts/test_live_supabase_connectivity_readonly.sh
 
           if find . -type f \( -name '*.zip' -o -name '*.tar' -o -name '*.tar.gz' -o -name '*.tgz' -o -name '*.7z' \) | grep -q .; then
             echo "::error title=Source archive committed::Source archives must stay out of the repository."
             exit 1
           fi
+
+      - name: Verify read-only pooled connectivity URI handling
+        shell: bash
+        run: bash ./scripts/test_live_supabase_connectivity_readonly.sh
 
       - name: Require SUPABASE_PROJECT_REF variable
         if: ${{ vars.SUPABASE_PROJECT_REF == '' }}

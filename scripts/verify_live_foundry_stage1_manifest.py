@@ -138,12 +138,16 @@ def main() -> int:
         "Future Foundry deployment must preserve 006 before 007 ordering",
     )
     require(
-        compatibility.get("operator_console_service_role_and_forced_rls_compatibility_required") is True,
-        "Operator Console privilege and RLS compatibility gate was removed",
+        compatibility.get("operator_console_public_registry_non_exposure_required") is True,
+        "Operator Console public-registry non-exposure gate was removed",
     )
     require(
-        compatibility.get("foundry_runtime_write_paths_must_not_depend_on_raw_service_role_dml") is True,
-        "Foundry runtime write-path least-privilege invariant was removed",
+        compatibility.get("stage1_public_relations_must_not_be_auto_registered_for_console_admin") is True,
+        "Stage 1 public relations must not be automatically delegated to Operator Console administration",
+    )
+    require(
+        compatibility.get("foundry_runtime_must_not_depend_on_operator_console_admin_rpc") is True,
+        "Foundry runtime must remain independent of the Operator Console administrative RPC",
     )
 
     parallel = manifest["parallel_lane_boundaries"]

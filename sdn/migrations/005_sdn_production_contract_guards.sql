@@ -1,15 +1,16 @@
 \set ON_ERROR_STOP on
 
 CREATE TABLE IF NOT EXISTS sdn_core.schema_contracts (
-  component text PRIMARY KEY,
+  component text NOT NULL,
   schema_version text NOT NULL,
   contract_hash char(64) NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT clock_timestamp()
+  created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  PRIMARY KEY (component, schema_version)
 );
 
 INSERT INTO sdn_core.schema_contracts(component,schema_version,contract_hash)
 VALUES ('sdn-core','2.0.0',encode(digest('sdn-core:2.0.0:sdn-002-recovery-foundation','sha256'),'hex'))
-ON CONFLICT (component) DO NOTHING;
+ON CONFLICT (component,schema_version) DO NOTHING;
 
 DROP TRIGGER IF EXISTS schema_contracts_immutable ON sdn_core.schema_contracts;
 CREATE TRIGGER schema_contracts_immutable
@@ -24,7 +25,11 @@ SET search_path = pg_catalog, sdn_core
 AS $$
 DECLARE observed_version text;
 BEGIN
-  SELECT schema_version INTO observed_version FROM sdn_core.schema_contracts WHERE component=p_component;
+  SELECT schema_version INTO observed_version
+  FROM sdn_core.schema_contracts
+  WHERE component=p_component
+  ORDER BY created_at DESC, schema_version DESC
+  LIMIT 1;
   IF observed_version IS NULL THEN
     RAISE EXCEPTION 'schema contract % is not registered', p_component USING ERRCODE='P0002';
   END IF;

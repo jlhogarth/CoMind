@@ -125,8 +125,9 @@
   ],
   "future_compatibility_gates": {
     "foundry_agent_substrate_before_security_sweep": true,
-    "operator_console_service_role_and_forced_rls_compatibility_required": true,
-    "foundry_runtime_write_paths_must_not_depend_on_raw_service_role_dml": true
+    "operator_console_public_registry_non_exposure_required": true,
+    "stage1_public_relations_must_not_be_auto_registered_for_console_admin": true,
+    "foundry_runtime_must_not_depend_on_operator_console_admin_rpc": true
   },
   "parallel_lane_boundaries": {
     "operator_console_issue": 118,

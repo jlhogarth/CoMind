@@ -1,0 +1,28 @@
+ARG PGVECTOR_IMAGE=pgvector/pgvector:0.8.6-pg17-bookworm
+
+FROM ${PGVECTOR_IMAGE} AS pgbackrest-build
+ARG PGBACKREST_VERSION=2.59.3
+USER root
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      ca-certificates curl meson ninja-build gcc python3 pkg-config \
+      libpq-dev libssl-dev libxml2-dev liblz4-dev libzstd-dev \
+      libbz2-dev zlib1g-dev libssh2-1-dev libsystemd-dev \
+ && rm -rf /var/lib/apt/lists/*
+RUN mkdir -p /build \
+ && curl -fsSL "https://github.com/pgbackrest/pgbackrest/releases/download/release%2F${PGBACKREST_VERSION}/pgbackrest-${PGBACKREST_VERSION}.tar.gz" \
+    | tar -xz -C /build \
+ && meson setup /build/pgbackrest "/build/pgbackrest-${PGBACKREST_VERSION}" \
+ && ninja -C /build/pgbackrest \
+ && /build/pgbackrest/src/pgbackrest version
+
+FROM ${PGVECTOR_IMAGE}
+USER root
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates libxml2 libssh2-1 \
+ && rm -rf /var/lib/apt/lists/*
+COPY --from=pgbackrest-build /build/pgbackrest/src/pgbackrest /usr/local/bin/pgbackrest
+RUN chmod 0755 /usr/local/bin/pgbackrest \
+ && mkdir -p /etc/pgbackrest /var/lib/pgbackrest /var/log/pgbackrest \
+ && chown -R postgres:postgres /var/lib/pgbackrest /var/log/pgbackrest \
+ && pgbackrest version

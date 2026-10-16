@@ -1,0 +1,150 @@
+{
+  "schema_version": "1.0.0",
+  "captured_at_utc": "2026-10-16T03:42:54.177Z",
+  "project_ref": "sbgfuanxiqepcoboxzcl",
+  "authoritative_main_sha": "bab9c6f162adf1300f6e28d0afc1afb6ac62a681",
+  "database": "postgres",
+  "postgres_server_version": "17.11",
+  "evidence_state": {
+    "documented": true,
+    "implemented": true,
+    "isolated_verified": true,
+    "live_deployed": true,
+    "postdeploy_verified": true,
+    "security_reconciled": true,
+    "agent_configured": false,
+    "agent_operating": false,
+    "agent_successful_execution": false
+  },
+  "migration_ledger": [
+    {"version": "20261005213616", "name": "comind_base_v2_initial_build"},
+    {"version": "20261006051527", "name": "comind_pm_ledger_maintenance_package_v0_1"},
+    {"version": "20261006051627", "name": "comind_pm_ledger_hardening_v0_1_1"},
+    {"version": "20261015211851", "name": "operator_console_live_activation_v0_2"},
+    {"version": "20261015212201", "name": "operator_console_service_role_least_privilege_v0_2_1"},
+    {"version": "20261015212719", "name": "operator_console_explicit_deny_policies_v0_2_2"},
+    {"version": "20261016031254", "name": "live_foundry_stage1_finops_current_runtime_projection_v1"},
+    {"version": "20261016031412", "name": "live_foundry_stage1_paid_provider_budget_authority_hardening_v1"},
+    {"version": "20261016031511", "name": "live_foundry_stage1_current_runtime_budget_authority_adapter_v1"},
+    {"version": "20261016031947", "name": "live_foundry_stage1_current_runtime_budget_authority_adapter_function_hardening_v1"},
+    {"version": "20261016032259", "name": "live_foundry_stage1_current_runtime_budget_authority_adapter_lifecycle_hardening_v1"},
+    {"version": "20261016032328", "name": "live_foundry_stage1_current_runtime_budget_authority_adapter_telemetry_role_hardening_v1"}
+  ],
+  "provider_codes": [
+    "google_gemini",
+    "local_rtx5090",
+    "openai",
+    "railway",
+    "replit",
+    "supabase",
+    "vercel"
+  ],
+  "protected_row_counts": {
+    "comind.cm_org": 1,
+    "comind.cm_project": 1,
+    "comind.cm_actor": 1,
+    "comind.cm_agent": 0,
+    "comind.cm_agent_run": 0,
+    "comind.cm_agent_step": 0,
+    "comind.cm_tool_call": 0,
+    "comind.cm_conversation": 0,
+    "comind.cm_message": 0,
+    "comind.cm_task": 0,
+    "comind.cm_milestone": 0,
+    "comind.cm_doc": 0,
+    "comind.cm_evidence": 0,
+    "comind_pm.pm_agent_runs": 0,
+    "comind_pm.pm_work_items": 3,
+    "comind.cm_budget_authority_binding": 0,
+    "comind.cm_budget_authority_reservation": 0,
+    "comind.cm_budget_authority_telemetry": 0
+  },
+  "operator_console_registry": [
+    {
+      "schema_name": "public",
+      "relation_name": "comments",
+      "browser_read": true,
+      "admin_insert": true,
+      "admin_update": true,
+      "admin_delete": false,
+      "destructive_allowed": false,
+      "enabled": true
+    },
+    {
+      "schema_name": "public",
+      "relation_name": "operator_console_verification_records",
+      "browser_read": false,
+      "admin_insert": true,
+      "admin_update": true,
+      "admin_delete": true,
+      "destructive_allowed": true,
+      "enabled": true
+    },
+    {
+      "schema_name": "public",
+      "relation_name": "posts",
+      "browser_read": true,
+      "admin_insert": true,
+      "admin_update": true,
+      "admin_delete": false,
+      "destructive_allowed": false,
+      "enabled": true
+    },
+    {
+      "schema_name": "public",
+      "relation_name": "users",
+      "browser_read": true,
+      "admin_insert": true,
+      "admin_update": true,
+      "admin_delete": false,
+      "destructive_allowed": false,
+      "enabled": true
+    }
+  ],
+  "security_advisor_baseline": {
+    "warn": {
+      "function_search_path_mutable": [
+        "comind.current_actor()",
+        "comind.fn_belief_update_beta(uuid,boolean,jsonb)",
+        "comind.fn_create_causal_node_from_memory(uuid,text,text)",
+        "comind.set_current_actor(uuid)",
+        "comind.set_updated_at_checklist()",
+        "comind.set_updated_at_research_refs()",
+        "comind.set_updated_at()"
+      ]
+    },
+    "info": {
+      "rls_enabled_no_policy": [
+        "comind.cm_budget_authority_binding",
+        "comind.cm_budget_authority_reservation",
+        "comind.cm_budget_authority_telemetry",
+        "public.comind_budget_exceptions",
+        "public.comind_budget_policies",
+        "public.comind_cost_alerts",
+        "public.comind_cost_reservation_events",
+        "public.comind_cost_reservations",
+        "public.comind_execution_checkpoints",
+        "public.comind_routing_decisions",
+        "public.comind_service_connections",
+        "public.comind_service_providers",
+        "public.comind_service_rate_cards",
+        "public.comind_usage_events",
+        "public.comind_workflow_cost_envelopes"
+      ]
+    }
+  },
+  "lf2_predeployment_absence": [
+    "comind.cm_foundry_agent_profile",
+    "comind.cm_foundry_capability",
+    "comind.cm_foundry_capability_grant",
+    "comind.cm_foundry_authorization_request",
+    "comind.cm_foundry_authorization_decision",
+    "comind.cm_foundry_execution_context",
+    "comind.cm_foundry_deliberation",
+    "comind.cm_foundry_deliberation_participant",
+    "comind.cm_foundry_deliberation_event",
+    "comind.cm_foundry_deliberation_outcome",
+    "comind.cm_foundry_recovery_checkpoint",
+    "comind.cm_foundry_adapter_operation"
+  ]
+}

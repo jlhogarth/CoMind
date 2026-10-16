@@ -1,0 +1,233 @@
+name: comind-sdn-002-foundation
+
+x-sdn-app-security: &sdn-app-security
+  read_only: true
+  tmpfs:
+    - /tmp
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+
+services:
+  db:
+    build:
+      context: ../..
+      dockerfile: sdn/production/Dockerfile.pgbackrest
+    image: comind/sdn-postgres:sdn-002
+    user: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_owner_password
+      POSTGRES_DB: comind_sdn_test
+    command:
+      - postgres
+      - -c
+      - unix_socket_directories=/tmp
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_command=pgbackrest --stanza=sdn archive-push %p
+      - -c
+      - archive_timeout=60s
+      - -c
+      - wal_level=replica
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d comind_sdn_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    volumes:
+      - ${SDN_PERSIST_ROOT:?SDN_PERSIST_ROOT is required}/postgres/data:/var/lib/postgresql/data
+      - ${SDN_PERSIST_ROOT:?SDN_PERSIST_ROOT is required}/backups/pgbackrest:/var/lib/pgbackrest
+      - ${SDN_PERSIST_ROOT:?SDN_PERSIST_ROOT is required}/logs/pgbackrest:/var/log/pgbackrest
+      - ./pgbackrest.conf:/etc/pgbackrest/pgbackrest.conf:ro
+      - ../migrations:/migrations:ro
+    secrets:
+      - db_owner_password
+    networks:
+      - sdn_internal
+
+  restore-db:
+    image: comind/sdn-postgres:sdn-002
+    user: postgres
+    command:
+      - postgres
+      - -c
+      - unix_socket_directories=/tmp
+      - -c
+      - archive_mode=off
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d comind_sdn_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    volumes:
+      - ${SDN_RECOVERY_ROOT:?SDN_RECOVERY_ROOT is required}/postgres/data:/var/lib/postgresql/data
+      - ${SDN_PERSIST_ROOT:?SDN_PERSIST_ROOT is required}/backups/pgbackrest:/var/lib/pgbackrest:ro
+      - ${SDN_RECOVERY_ROOT:?SDN_RECOVERY_ROOT is required}/logs/pgbackrest:/var/log/pgbackrest
+      - ./pgbackrest.conf:/etc/pgbackrest/pgbackrest.conf:ro
+    networks:
+      - sdn_internal
+    profiles:
+      - recovery
+
+  admin:
+    image: comind/sdn-postgres:sdn-002
+    user: postgres
+    entrypoint: ["/bin/sh", "-ec"]
+    command: ["echo SDN administrative tool profile requires an explicit command"]
+    <<: *sdn-app-security
+    secrets:
+      - db_owner_password
+      - ingest_password
+      - lifecycle_password
+      - purge_password
+      - observer_password
+      - backup_password
+    networks:
+      - sdn_internal
+    profiles:
+      - tools
+
+  ingest:
+    build:
+      context: ../..
+      dockerfile: sdn/Dockerfile
+    environment:
+      PORT: "3100"
+      SDN_TEST_PRODUCER_ID: ${SDN_TEST_PRODUCER_ID:-11111111-1111-4111-8111-111111111111}
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        export DATABASE_URL="postgresql://sdn_ingest_user:$$(cat /run/secrets/ingest_password)@db:5432/comind_sdn_test"
+        export SDN_TEST_PRODUCER_TOKEN="$$(cat /run/secrets/producer_token)"
+        exec node src/index.mjs
+    ports:
+      - "127.0.0.1:${SDN_INGEST_PORT:-3102}:3100"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3100/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    <<: *sdn-app-security
+    secrets:
+      - ingest_password
+      - producer_token
+    networks:
+      - sdn_internal
+      - sdn_ingress
+
+  lifecycle:
+    build:
+      context: ../..
+      dockerfile: sdn/Dockerfile
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        export DATABASE_URL="postgresql://sdn_lifecycle_user:$$(cat /run/secrets/lifecycle_password)@db:5432/comind_sdn_test"
+        exec node src/lifecycle.mjs
+    depends_on:
+      db:
+        condition: service_healthy
+    <<: *sdn-app-security
+    secrets:
+      - lifecycle_password
+    networks:
+      - sdn_internal
+    profiles:
+      - tools
+
+  purge:
+    build:
+      context: ../..
+      dockerfile: sdn/Dockerfile
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        export DATABASE_URL="postgresql://sdn_purge_user:$$(cat /run/secrets/purge_password)@db:5432/comind_sdn_test"
+        exec node src/purge.mjs
+    depends_on:
+      db:
+        condition: service_healthy
+    <<: *sdn-app-security
+    secrets:
+      - purge_password
+    networks:
+      - sdn_internal
+    profiles:
+      - tools
+
+  restic:
+    image: restic/restic:0.19.1
+    user: "${SDN_HOST_UID:?SDN_HOST_UID is required}:${SDN_HOST_GID:?SDN_HOST_GID is required}"
+    environment:
+      RESTIC_REPOSITORY: /repository
+      RESTIC_PASSWORD_FILE: /run/secrets/restic_password
+    command: ["version"]
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    volumes:
+      - ${SDN_PERSIST_ROOT:?SDN_PERSIST_ROOT is required}/artifacts:/data/artifacts:ro
+      - ${SDN_PERSIST_ROOT:?SDN_PERSIST_ROOT is required}/archive:/data/archive:ro
+      - ${SDN_PERSIST_ROOT:?SDN_PERSIST_ROOT is required}/backups/restic:/repository
+      - ${SDN_RECOVERY_ROOT:?SDN_RECOVERY_ROOT is required}/artifacts:/restore
+    secrets:
+      - restic_password
+    network_mode: none
+    profiles:
+      - backup
+
+networks:
+  sdn_internal:
+    driver: bridge
+    internal: true
+  sdn_ingress:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.host_binding_ipv4: "127.0.0.1"
+
+secrets:
+  db_owner_password:
+    file: ${SDN_SECRET_ROOT:?SDN_SECRET_ROOT is required}/db_owner_password
+  ingest_password:
+    file: ${SDN_SECRET_ROOT:?SDN_SECRET_ROOT is required}/ingest_password
+  lifecycle_password:
+    file: ${SDN_SECRET_ROOT:?SDN_SECRET_ROOT is required}/lifecycle_password
+  purge_password:
+    file: ${SDN_SECRET_ROOT:?SDN_SECRET_ROOT is required}/purge_password
+  observer_password:
+    file: ${SDN_SECRET_ROOT:?SDN_SECRET_ROOT is required}/observer_password
+  backup_password:
+    file: ${SDN_SECRET_ROOT:?SDN_SECRET_ROOT is required}/backup_password
+  producer_token:
+    file: ${SDN_SECRET_ROOT:?SDN_SECRET_ROOT is required}/producer_token
+  restic_password:
+    file: ${SDN_SECRET_ROOT:?SDN_SECRET_ROOT is required}/restic_password

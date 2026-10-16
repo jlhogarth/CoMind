@@ -1,0 +1,202 @@
+name: Live Foundry Stage 1 C4 Deployment
+
+on:
+  push:
+    branches:
+      - issue-127-live-foundry-stage1-deployment
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-comind-supabase-schema-mutation
+  cancel-in-progress: false
+
+env:
+  EXPECTED_MAIN_SHA: bab9c6f162adf1300f6e28d0afc1afb6ac62a681
+  SUPABASE_CLI_VERSION: 2.120.0
+  DEPLOY_WORKDIR: ${{ runner.temp }}/live-foundry-stage1
+
+jobs:
+  deploy-stage1:
+    name: Authorized six-migration Stage 1 deployment
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - name: Check out authorized deployment branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify exclusive deployment lease and exact main
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${DATABASE_URL:-}"
+          echo "::add-mask::${DATABASE_URL}"
+          git fetch origin main --depth=1
+          actual_main="$(git rev-parse origin/main)"
+          test "${actual_main}" = "${EXPECTED_MAIN_SHA}"
+          parent_sha="$(git rev-parse HEAD^)"
+          test "${parent_sha}" = "${EXPECTED_MAIN_SHA}"
+          changed="$(git diff --name-only "${EXPECTED_MAIN_SHA}"...HEAD)"
+          test "${changed}" = ".github/workflows/live-foundry-stage1-c4-deploy.yml"
+          printf 'Exact authoritative main lease verified: %s\n' "${actual_main}"
+
+      - name: Install execution dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client python3
+          npx --yes "supabase@${SUPABASE_CLI_VERSION}" --version
+
+      - name: Verify governed manifest and generate migration 1
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/verify_live_foundry_stage1_manifest.py
+          mkdir -p "${DEPLOY_WORKDIR}"
+          npx --yes "supabase@${SUPABASE_CLI_VERSION}" init --workdir "${DEPLOY_WORKDIR}" --yes
+          mkdir -p "${DEPLOY_WORKDIR}/supabase/migrations"
+
+          cat > "${DEPLOY_WORKDIR}/supabase/migrations/20261005213616_comind_base_v2_initial_build.sql" <<'SQL'
+          -- Already applied live before Stage 1. Local history alignment only.
+          SQL
+          cat > "${DEPLOY_WORKDIR}/supabase/migrations/20261006051527_comind_pm_ledger_maintenance_package_v0_1.sql" <<'SQL'
+          -- Already applied live before Stage 1. Local history alignment only.
+          SQL
+          cat > "${DEPLOY_WORKDIR}/supabase/migrations/20261006051627_comind_pm_ledger_hardening_v0_1_1.sql" <<'SQL'
+          -- Already applied live before Stage 1. Local history alignment only.
+          SQL
+          cat > "${DEPLOY_WORKDIR}/supabase/migrations/20261015211851_operator_console_live_activation_v0_2.sql" <<'SQL'
+          -- Already applied live before Stage 1. Local history alignment only.
+          SQL
+          cat > "${DEPLOY_WORKDIR}/supabase/migrations/20261015212201_operator_console_service_role_least_privilege_v0_2_1.sql" <<'SQL'
+          -- Already applied live before Stage 1. Local history alignment only.
+          SQL
+          cat > "${DEPLOY_WORKDIR}/supabase/migrations/20261015212719_operator_console_explicit_deny_policies_v0_2_2.sql" <<'SQL'
+          -- Already applied live before Stage 1. Local history alignment only.
+          SQL
+
+          python3 scripts/build_live_foundry_stage1_finops_projection.py \
+            --output "${DEPLOY_WORKDIR}/supabase/migrations/20261016025001_live_foundry_stage1_finops_current_runtime_projection_v1.sql"
+
+      - name: Final read-only live preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f db/verification/live_foundry_stage1_preflight.sql
+          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from public.operator_console_relation_registry where relation_name like 'comind_%';")" = "0"
+          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent;")" = "0"
+          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent_run;")" = "0"
+          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind_pm.pm_agent_runs;")" = "0"
+
+      - name: Dry-run migration 1 only
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push \
+            --workdir "${DEPLOY_WORKDIR}" \
+            --db-url "${DATABASE_URL}" \
+            --dry-run
+
+      - name: Apply migration 1 and read back
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push --workdir "${DEPLOY_WORKDIR}" --db-url "${DATABASE_URL}" --yes
+          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from supabase_migrations.schema_migrations where version='20261016025001' and name='live_foundry_stage1_finops_current_runtime_projection_v1';")" = "1"
+          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from public.comind_service_providers;")" = "7"
+          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent;")" = "0"
+          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent_run;")" = "0"
+          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind_pm.pm_agent_runs;")" = "0"
+          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from public.operator_console_relation_registry where relation_name like 'comind_%';")" = "0"
+          echo 'Migration 1 readback PASS'
+
+      - name: Stage and apply migration 2
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp db/migrations/20261008_001_paid_provider_budget_authority_hardening.sql \
+            "${DEPLOY_WORKDIR}/supabase/migrations/20261016025002_live_foundry_stage1_paid_provider_budget_authority_hardening_v1.sql"
+          npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push --workdir "${DEPLOY_WORKDIR}" --db-url "${DATABASE_URL}" --dry-run
+          npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push --workdir "${DEPLOY_WORKDIR}" --db-url "${DATABASE_URL}" --yes
+          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from supabase_migrations.schema_migrations where version='20261016025002' and name='live_foundry_stage1_paid_provider_budget_authority_hardening_v1';")" = "1"
+          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent;")" = "0"
+          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent_run;")" = "0"
+          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind_pm.pm_agent_runs;")" = "0"
+          echo 'Migration 2 readback PASS'
+
+      - name: Stage and apply migration 3
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp db/migrations/20261008_002_current_runtime_budget_authority_adapter.sql \
+            "${DEPLOY_WORKDIR}/supabase/migrations/20261016025003_live_foundry_stage1_current_runtime_budget_authority_adapter_v1.sql"
+          npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push --workdir "${DEPLOY_WORKDIR}" --db-url "${DATABASE_URL}" --dry-run
+          npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push --workdir "${DEPLOY_WORKDIR}" --db-url "${DATABASE_URL}" --yes
+          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from supabase_migrations.schema_migrations where version='20261016025003' and name='live_foundry_stage1_current_runtime_budget_authority_adapter_v1';")" = "1"
+          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent;")" = "0"
+          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent_run;")" = "0"
+          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind_pm.pm_agent_runs;")" = "0"
+          echo 'Migration 3 readback PASS'
+
+      - name: Stage and apply migration 4
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp db/migrations/20261008_003_current_runtime_budget_authority_adapter_function_hardening.sql \
+            "${DEPLOY_WORKDIR}/supabase/migrations/20261016025004_live_foundry_stage1_current_runtime_budget_authority_adapter_function_hardening_v1.sql"
+          npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push --workdir "${DEPLOY_WORKDIR}" --db-url "${DATABASE_URL}" --dry-run
+          npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push --workdir "${DEPLOY_WORKDIR}" --db-url "${DATABASE_URL}" --yes
+          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from supabase_migrations.schema_migrations where version='20261016025004' and name='live_foundry_stage1_current_runtime_budget_authority_adapter_function_hardening_v1';")" = "1"
+          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent;")" = "0"
+          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent_run;")" = "0"
+          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind_pm.pm_agent_runs;")" = "0"
+          echo 'Migration 4 readback PASS'
+
+      - name: Stage and apply migration 5
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp db/migrations/20261008_004_current_runtime_budget_authority_adapter_lifecycle_hardening.sql \
+            "${DEPLOY_WORKDIR}/supabase/migrations/20261016025005_live_foundry_stage1_current_runtime_budget_authority_adapter_lifecycle_hardening_v1.sql"
+          npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push --workdir "${DEPLOY_WORKDIR}" --db-url "${DATABASE_URL}" --dry-run
+          npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push --workdir "${DEPLOY_WORKDIR}" --db-url "${DATABASE_URL}" --yes
+          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from supabase_migrations.schema_migrations where version='20261016025005' and name='live_foundry_stage1_current_runtime_budget_authority_adapter_lifecycle_hardening_v1';")" = "1"
+          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent;")" = "0"
+          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent_run;")" = "0"
+          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind_pm.pm_agent_runs;")" = "0"
+          echo 'Migration 5 readback PASS'
+
+      - name: Stage and apply migration 6
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp db/migrations/20261008_005_current_runtime_budget_authority_adapter_telemetry_role_hardening.sql \
+            "${DEPLOY_WORKDIR}/supabase/migrations/20261016025006_live_foundry_stage1_current_runtime_budget_authority_adapter_telemetry_role_hardening_v1.sql"
+          npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push --workdir "${DEPLOY_WORKDIR}" --db-url "${DATABASE_URL}" --dry-run
+          npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push --workdir "${DEPLOY_WORKDIR}" --db-url "${DATABASE_URL}" --yes
+          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from supabase_migrations.schema_migrations where version='20261016025006' and name='live_foundry_stage1_current_runtime_budget_authority_adapter_telemetry_role_hardening_v1';")" = "1"
+          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent;")" = "0"
+          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent_run;")" = "0"
+          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind_pm.pm_agent_runs;")" = "0"
+          echo 'Migration 6 readback PASS'
+
+      - name: Verify terminal Stage 1 contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f db/verification/live_foundry_stage1_postdeploy.sql
+          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from public.operator_console_relation_registry where relation_name like 'comind_%';")" = "0"
+          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent;")" = "0"
+          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent_run;")" = "0"
+          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent_step;")" = "0"
+          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_tool_call;")" = "0"
+          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind_pm.pm_agent_runs;")" = "0"
+          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from public.comind_service_providers;")" = "7"
+          psql "${DATABASE_URL}" -X -Atqc "select version, name from supabase_migrations.schema_migrations order by version;"
+          echo 'Live Foundry Stage 1 terminal contract PASS'

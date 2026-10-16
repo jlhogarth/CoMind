@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - issue-127-live-foundry-stage1-deployment
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read

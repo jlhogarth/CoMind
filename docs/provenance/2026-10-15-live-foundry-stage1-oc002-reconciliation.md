@@ -45,7 +45,23 @@ Observed migration ledger:
 5. `20261015212201 operator_console_service_role_least_privilege_v0_2_1`
 6. `20261015212719 operator_console_explicit_deny_policies_v0_2_2`
 
-The accepted Issue #116 preflight failed closed because it expected only the first three migration names. All other technical gates evaluated during the live read-only reconciliation passed.
+The accepted Issue #116 preflight failed closed because it expected only the first three migration names.
+
+After Issue #123 reconciled the exact migration version/name pairs, the revised preflight was executed read-only against live Supabase and returned `technical_preflight_pass = true` with `c4_authorized = false` and an empty migration delta.
+
+The live preflight observed:
+
+- `comind`: 4 RLS-enabled tables and 75 RLS-disabled tables;
+- `comind_pm`: 10 RLS-enabled tables and 0 RLS-disabled tables;
+- `comind.cm_agent`: 0 rows;
+- `comind.cm_agent_run`: 0 rows;
+- `comind.cm_agent_step`: 0 rows;
+- `comind.cm_tool_call`: 0 rows;
+- `comind_pm.pm_agent_runs`: 0 rows;
+- `comind.cm_org`: 1 row;
+- `comind.cm_project`: 1 row;
+- `comind.cm_actor`: 1 row;
+- `comind_pm.pm_work_items`: 3 rows.
 
 The following checked classes remained absent live:
 
@@ -55,20 +71,27 @@ The following checked classes remained absent live:
 - ACP continuity checkpoint relation
 - ChatGPT Archive relations
 
-Checked Agent, Agent-run, tool-call, PM Agent-run, memory, message, task, milestone, document, and evidence row counts remained zero.
-
 ## Security state
 
 Supabase Security Advisor continued to report seven pre-existing `function_search_path_mutable` warnings in the `comind` schema.
 
-OC-002 materially changes the privilege environment even though it does not edit Foundry migration files. Its live least-privilege and explicit-deny controls restrict `service_role` access and force RLS across `comind` and `comind_pm`.
+A reconciliation error was detected and corrected during Issue #123 implementation. An initial semantic reading overstated the scope of OC-002 migrations `002` and `003`. Exact source inspection established the actual boundary:
 
-Consequences for future Foundry deployment:
+- `20261015_001_operator_console_live_activation.sql` creates Operator Console support tables and functions in `public`, enables RLS on those support tables, and registers a bounded public relational surface;
+- `20261015_002_operator_console_service_role_least_privilege.sql` narrows `service_role` privileges on the three Operator Console support tables only;
+- `20261015_003_operator_console_explicit_deny_policies.sql` adds restrictive policies for `anon` and `authenticated` on the three Operator Console support tables only;
+- none of those three migrations performs a blanket privilege rewrite or forced-RLS sweep across `comind` or `comind_pm`.
 
-- future Foundry relations in `comind` must be verified against inherited/default privilege behavior;
-- runtime writes must not assume unrestricted raw `service_role` DML;
-- controlled write functions and authorization paths must be verified after the Foundry substrate exists;
-- the Operator Console security posture must not be weakened to make Foundry activation easier.
+The live `comind` and `comind_pm` RLS state is therefore not evidence that OC-002 failed to apply.
+
+The actual future compatibility boundary is in the shared `public` schema. Stage 1 creates its own `public.comind_*` FinOps relations and functions. Those Stage 1 objects must not become Operator Console administrative relations merely because they exist in `public`.
+
+Required future checks:
+
+- Stage 1 public relations remain absent from `operator_console_relation_registry` unless a separate governed decision explicitly delegates them;
+- Operator Console administrative mutation remains registry-gated;
+- Foundry runtime does not depend on the Operator Console administrative RPC;
+- Stage 1 grants and RLS are verified independently of Operator Console controls.
 
 ## Dependency correction
 
@@ -106,14 +129,14 @@ The Stage 1 manifest now records the six reviewed pre-Stage 1 migration version/
 
 The read-only preflight now compares exact migration version/name pairs rather than names alone.
 
-Isolated readiness verification now proves three states:
+Isolated readiness verification is designed to prove four states:
 
 1. exact reviewed baseline passes;
 2. a missing expected migration fails closed;
 3. an unexpected additional migration fails closed;
 4. removing the negative fixture restores the exact baseline to pass.
 
-The isolated test models OC-002 migration provenance only. It does not claim to reproduce the entire live Operator Console runtime or privilege surface. That live privilege interaction remains a later explicit compatibility gate.
+The isolated test models OC-002 migration provenance only. It does not claim to reproduce the full live Operator Console runtime. Operator Console public-registry non-exposure remains an explicit later compatibility gate for Stage 1 public objects.
 
 ## Rollback and forward-repair boundary
 

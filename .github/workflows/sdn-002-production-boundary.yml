@@ -1,0 +1,79 @@
+name: SDN-002 Production Boundary Recovery
+
+on:
+  pull_request:
+    paths:
+      - 'sdn/**'
+      - '.github/workflows/sdn-002-production-boundary.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sdn-002-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  acceptance:
+    name: Non-production recovery proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Static validation
+        run: |
+          set -euo pipefail
+          bash -n sdn/scripts/acceptance.sh
+          bash -n sdn/scripts/sdn-002-acceptance.sh
+          node --check sdn/scripts/capacity_guard.mjs
+          docker compose version
+
+      - name: SDN-001 regression proof
+        run: bash sdn/scripts/acceptance.sh
+
+      - name: SDN-002 production-boundary and recovery proof
+        run: bash sdn/scripts/sdn-002-acceptance.sh
+
+      - name: Preserve exact-head and regression evidence
+        run: |
+          set -euo pipefail
+          EVIDENCE=sdn/evidence/sdn-002
+          mkdir -p "$EVIDENCE/sdn-001-regression"
+          cp sdn/evidence/source-snapshot.json "$EVIDENCE/sdn-001-regression/source-snapshot.json"
+          cp sdn/evidence/restore-snapshot.json "$EVIDENCE/sdn-001-regression/restore-snapshot.json"
+          cmp -s sdn/evidence/source-snapshot.json sdn/evidence/restore-snapshot.json
+          printf 'baseline_main=%s\nworkflow_head=%s\nsdn_001_regression=pass\n' \
+            '4d625c340f8864791d373640affec4aa99204a07' "$(git rev-parse HEAD)" \
+            > "$EVIDENCE/repository-head.txt"
+          (
+            cd "$EVIDENCE"
+            rm -f SHA256SUMS EVIDENCE-MANIFEST-SHA256.txt
+            find . -type f ! -name SHA256SUMS ! -name EVIDENCE-MANIFEST-SHA256.txt -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+            sha256sum SHA256SUMS > EVIDENCE-MANIFEST-SHA256.txt
+          )
+
+      - name: Assert no tracked runtime material
+        run: |
+          set -euo pipefail
+          git status --short
+          if git status --short | grep -E '(^|/)(secrets|runtime|recovery-runtime)/'; then
+            echo 'Runtime or secret material appeared in the worktree' >&2
+            exit 1
+          fi
+
+      - name: Upload SDN-002 acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdn-002-acceptance-evidence
+          path: sdn/evidence/sdn-002
+          if-no-files-found: warn
+          retention-days: 14

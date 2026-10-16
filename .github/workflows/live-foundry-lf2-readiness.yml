@@ -53,3 +53,6 @@ jobs:
 
       - name: Verify LF-2 production-shaped isolated substrate
         run: bash ./scripts/test_live_foundry_lf2_agent_substrate.sh
+
+      - name: Evaluate exact live postdeployment SQL in isolated shape
+        run: bash ./scripts/test_live_foundry_lf2_postdeploy_contract_shape.sh

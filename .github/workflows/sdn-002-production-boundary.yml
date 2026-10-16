@@ -70,10 +70,10 @@ jobs:
           fi
 
       - name: Upload SDN-002 acceptance evidence
-        if: always()
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: sdn-002-acceptance-evidence
           path: sdn/evidence/sdn-002
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 14

@@ -56,6 +56,46 @@ jobs:
           sudo apt-get install --yes postgresql-client python3
           npx --yes "supabase@${SUPABASE_CLI_VERSION}" --version
 
+      - name: Normalize database URL in runner memory
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          from urllib.parse import quote_from_bytes, unquote_to_bytes
+
+          raw = os.environ.get("DATABASE_URL", "").strip()
+          if not raw:
+              raise SystemExit("DATABASE_URL is empty")
+
+          print(f"::add-mask::{raw}")
+
+          host = "db.sbgfuanxiqepcoboxzcl.supabase.co"
+          marker = "@" + host
+          if marker not in raw:
+              raise SystemExit("DATABASE_URL does not target the authorized CoMind Supabase direct host")
+
+          if "://" not in raw:
+              raise SystemExit("DATABASE_URL has no URI scheme")
+          scheme, rest = raw.split("://", 1)
+          if scheme not in {"postgres", "postgresql"}:
+              raise SystemExit("DATABASE_URL has an unsupported URI scheme")
+
+          userinfo, suffix = rest.rsplit(marker, 1)
+          if ":" not in userinfo:
+              raise SystemExit("DATABASE_URL user-info is missing a password separator")
+          username_raw, password_raw = userinfo.split(":", 1)
+
+          username = quote_from_bytes(unquote_to_bytes(username_raw), safe="")
+          password = quote_from_bytes(unquote_to_bytes(password_raw), safe="")
+          normalized = f"{scheme}://{username}:{password}@{host}{suffix}"
+
+          print(f"::add-mask::{normalized}")
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env_file:
+              env_file.write(f"NORMALIZED_DATABASE_URL={normalized}\n")
+          print("Database URL normalized for runner use without changing the stored secret.")
+          PY
+
       - name: Verify governed manifest and generate migration 1
         shell: bash
         run: |
@@ -91,11 +131,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f db/verification/live_foundry_stage1_preflight.sql
-          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from public.operator_console_relation_registry where relation_name like 'comind_%';")" = "0"
-          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent;")" = "0"
-          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent_run;")" = "0"
-          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind_pm.pm_agent_runs;")" = "0"
+          psql "${NORMALIZED_DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f db/verification/live_foundry_stage1_preflight.sql
+          test "$(psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select count(*) from public.operator_console_relation_registry where relation_name like 'comind_%';")" = "0"
+          test "$(psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent;")" = "0"
+          test "$(psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent_run;")" = "0"
+          test "$(psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select count(*) from comind_pm.pm_agent_runs;")" = "0"
 
       - name: Dry-run migration 1 only
         shell: bash
@@ -103,20 +143,20 @@ jobs:
           set -euo pipefail
           npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push \
             --workdir "${DEPLOY_WORKDIR}" \
-            --db-url "${DATABASE_URL}" \
+            --db-url "${NORMALIZED_DATABASE_URL}" \
             --dry-run
 
       - name: Apply migration 1 and read back
         shell: bash
         run: |
           set -euo pipefail
-          npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push --workdir "${DEPLOY_WORKDIR}" --db-url "${DATABASE_URL}" --yes
-          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from supabase_migrations.schema_migrations where version='20261016025001' and name='live_foundry_stage1_finops_current_runtime_projection_v1';")" = "1"
-          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from public.comind_service_providers;")" = "7"
-          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent;")" = "0"
-          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent_run;")" = "0"
-          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind_pm.pm_agent_runs;")" = "0"
-          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from public.operator_console_relation_registry where relation_name like 'comind_%';")" = "0"
+          npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push --workdir "${DEPLOY_WORKDIR}" --db-url "${NORMALIZED_DATABASE_URL}" --yes
+          test "$(psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select count(*) from supabase_migrations.schema_migrations where version='20261016025001' and name='live_foundry_stage1_finops_current_runtime_projection_v1';")" = "1"
+          test "$(psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select count(*) from public.comind_service_providers;")" = "7"
+          test "$(psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent;")" = "0"
+          test "$(psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent_run;")" = "0"
+          test "$(psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select count(*) from comind_pm.pm_agent_runs;")" = "0"
+          test "$(psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select count(*) from public.operator_console_relation_registry where relation_name like 'comind_%';")" = "0"
           echo 'Migration 1 readback PASS'
 
       - name: Stage and apply migration 2
@@ -125,12 +165,12 @@ jobs:
           set -euo pipefail
           cp db/migrations/20261008_001_paid_provider_budget_authority_hardening.sql \
             "${DEPLOY_WORKDIR}/supabase/migrations/20261016025002_live_foundry_stage1_paid_provider_budget_authority_hardening_v1.sql"
-          npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push --workdir "${DEPLOY_WORKDIR}" --db-url "${DATABASE_URL}" --dry-run
-          npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push --workdir "${DEPLOY_WORKDIR}" --db-url "${DATABASE_URL}" --yes
-          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from supabase_migrations.schema_migrations where version='20261016025002' and name='live_foundry_stage1_paid_provider_budget_authority_hardening_v1';")" = "1"
-          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent;")" = "0"
-          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent_run;")" = "0"
-          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind_pm.pm_agent_runs;")" = "0"
+          npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push --workdir "${DEPLOY_WORKDIR}" --db-url "${NORMALIZED_DATABASE_URL}" --dry-run
+          npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push --workdir "${DEPLOY_WORKDIR}" --db-url "${NORMALIZED_DATABASE_URL}" --yes
+          test "$(psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select count(*) from supabase_migrations.schema_migrations where version='20261016025002' and name='live_foundry_stage1_paid_provider_budget_authority_hardening_v1';")" = "1"
+          test "$(psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent;")" = "0"
+          test "$(psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent_run;")" = "0"
+          test "$(psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select count(*) from comind_pm.pm_agent_runs;")" = "0"
           echo 'Migration 2 readback PASS'
 
       - name: Stage and apply migration 3
@@ -139,12 +179,12 @@ jobs:
           set -euo pipefail
           cp db/migrations/20261008_002_current_runtime_budget_authority_adapter.sql \
             "${DEPLOY_WORKDIR}/supabase/migrations/20261016025003_live_foundry_stage1_current_runtime_budget_authority_adapter_v1.sql"
-          npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push --workdir "${DEPLOY_WORKDIR}" --db-url "${DATABASE_URL}" --dry-run
-          npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push --workdir "${DEPLOY_WORKDIR}" --db-url "${DATABASE_URL}" --yes
-          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from supabase_migrations.schema_migrations where version='20261016025003' and name='live_foundry_stage1_current_runtime_budget_authority_adapter_v1';")" = "1"
-          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent;")" = "0"
-          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent_run;")" = "0"
-          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind_pm.pm_agent_runs;")" = "0"
+          npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push --workdir "${DEPLOY_WORKDIR}" --db-url "${NORMALIZED_DATABASE_URL}" --dry-run
+          npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push --workdir "${DEPLOY_WORKDIR}" --db-url "${NORMALIZED_DATABASE_URL}" --yes
+          test "$(psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select count(*) from supabase_migrations.schema_migrations where version='20261016025003' and name='live_foundry_stage1_current_runtime_budget_authority_adapter_v1';")" = "1"
+          test "$(psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent;")" = "0"
+          test "$(psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent_run;")" = "0"
+          test "$(psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select count(*) from comind_pm.pm_agent_runs;")" = "0"
           echo 'Migration 3 readback PASS'
 
       - name: Stage and apply migration 4
@@ -153,12 +193,12 @@ jobs:
           set -euo pipefail
           cp db/migrations/20261008_003_current_runtime_budget_authority_adapter_function_hardening.sql \
             "${DEPLOY_WORKDIR}/supabase/migrations/20261016025004_live_foundry_stage1_current_runtime_budget_authority_adapter_function_hardening_v1.sql"
-          npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push --workdir "${DEPLOY_WORKDIR}" --db-url "${DATABASE_URL}" --dry-run
-          npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push --workdir "${DEPLOY_WORKDIR}" --db-url "${DATABASE_URL}" --yes
-          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from supabase_migrations.schema_migrations where version='20261016025004' and name='live_foundry_stage1_current_runtime_budget_authority_adapter_function_hardening_v1';")" = "1"
-          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent;")" = "0"
-          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent_run;")" = "0"
-          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind_pm.pm_agent_runs;")" = "0"
+          npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push --workdir "${DEPLOY_WORKDIR}" --db-url "${NORMALIZED_DATABASE_URL}" --dry-run
+          npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push --workdir "${DEPLOY_WORKDIR}" --db-url "${NORMALIZED_DATABASE_URL}" --yes
+          test "$(psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select count(*) from supabase_migrations.schema_migrations where version='20261016025004' and name='live_foundry_stage1_current_runtime_budget_authority_adapter_function_hardening_v1';")" = "1"
+          test "$(psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent;")" = "0"
+          test "$(psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent_run;")" = "0"
+          test "$(psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select count(*) from comind_pm.pm_agent_runs;")" = "0"
           echo 'Migration 4 readback PASS'
 
       - name: Stage and apply migration 5
@@ -167,12 +207,12 @@ jobs:
           set -euo pipefail
           cp db/migrations/20261008_004_current_runtime_budget_authority_adapter_lifecycle_hardening.sql \
             "${DEPLOY_WORKDIR}/supabase/migrations/20261016025005_live_foundry_stage1_current_runtime_budget_authority_adapter_lifecycle_hardening_v1.sql"
-          npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push --workdir "${DEPLOY_WORKDIR}" --db-url "${DATABASE_URL}" --dry-run
-          npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push --workdir "${DEPLOY_WORKDIR}" --db-url "${DATABASE_URL}" --yes
-          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from supabase_migrations.schema_migrations where version='20261016025005' and name='live_foundry_stage1_current_runtime_budget_authority_adapter_lifecycle_hardening_v1';")" = "1"
-          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent;")" = "0"
-          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent_run;")" = "0"
-          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind_pm.pm_agent_runs;")" = "0"
+          npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push --workdir "${DEPLOY_WORKDIR}" --db-url "${NORMALIZED_DATABASE_URL}" --dry-run
+          npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push --workdir "${DEPLOY_WORKDIR}" --db-url "${NORMALIZED_DATABASE_URL}" --yes
+          test "$(psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select count(*) from supabase_migrations.schema_migrations where version='20261016025005' and name='live_foundry_stage1_current_runtime_budget_authority_adapter_lifecycle_hardening_v1';")" = "1"
+          test "$(psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent;")" = "0"
+          test "$(psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent_run;")" = "0"
+          test "$(psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select count(*) from comind_pm.pm_agent_runs;")" = "0"
           echo 'Migration 5 readback PASS'
 
       - name: Stage and apply migration 6
@@ -181,25 +221,25 @@ jobs:
           set -euo pipefail
           cp db/migrations/20261008_005_current_runtime_budget_authority_adapter_telemetry_role_hardening.sql \
             "${DEPLOY_WORKDIR}/supabase/migrations/20261016025006_live_foundry_stage1_current_runtime_budget_authority_adapter_telemetry_role_hardening_v1.sql"
-          npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push --workdir "${DEPLOY_WORKDIR}" --db-url "${DATABASE_URL}" --dry-run
-          npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push --workdir "${DEPLOY_WORKDIR}" --db-url "${DATABASE_URL}" --yes
-          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from supabase_migrations.schema_migrations where version='20261016025006' and name='live_foundry_stage1_current_runtime_budget_authority_adapter_telemetry_role_hardening_v1';")" = "1"
-          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent;")" = "0"
-          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent_run;")" = "0"
-          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind_pm.pm_agent_runs;")" = "0"
+          npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push --workdir "${DEPLOY_WORKDIR}" --db-url "${NORMALIZED_DATABASE_URL}" --dry-run
+          npx --yes "supabase@${SUPABASE_CLI_VERSION}" db push --workdir "${DEPLOY_WORKDIR}" --db-url "${NORMALIZED_DATABASE_URL}" --yes
+          test "$(psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select count(*) from supabase_migrations.schema_migrations where version='20261016025006' and name='live_foundry_stage1_current_runtime_budget_authority_adapter_telemetry_role_hardening_v1';")" = "1"
+          test "$(psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent;")" = "0"
+          test "$(psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent_run;")" = "0"
+          test "$(psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select count(*) from comind_pm.pm_agent_runs;")" = "0"
           echo 'Migration 6 readback PASS'
 
       - name: Verify terminal Stage 1 contract
         shell: bash
         run: |
           set -euo pipefail
-          psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f db/verification/live_foundry_stage1_postdeploy.sql
-          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from public.operator_console_relation_registry where relation_name like 'comind_%';")" = "0"
-          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent;")" = "0"
-          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent_run;")" = "0"
-          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent_step;")" = "0"
-          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_tool_call;")" = "0"
-          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from comind_pm.pm_agent_runs;")" = "0"
-          test "$(psql "${DATABASE_URL}" -X -Atqc "select count(*) from public.comind_service_providers;")" = "7"
-          psql "${DATABASE_URL}" -X -Atqc "select version, name from supabase_migrations.schema_migrations order by version;"
+          psql "${NORMALIZED_DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f db/verification/live_foundry_stage1_postdeploy.sql
+          test "$(psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select count(*) from public.operator_console_relation_registry where relation_name like 'comind_%';")" = "0"
+          test "$(psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent;")" = "0"
+          test "$(psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent_run;")" = "0"
+          test "$(psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_agent_step;")" = "0"
+          test "$(psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select count(*) from comind.cm_tool_call;")" = "0"
+          test "$(psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select count(*) from comind_pm.pm_agent_runs;")" = "0"
+          test "$(psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select count(*) from public.comind_service_providers;")" = "7"
+          psql "${NORMALIZED_DATABASE_URL}" -X -Atqc "select version, name from supabase_migrations.schema_migrations order by version;"
           echo 'Live Foundry Stage 1 terminal contract PASS'

@@ -1,1 +1,5 @@
 evidence/
+production/.env
+production/secrets/
+runtime/
+recovery-runtime/

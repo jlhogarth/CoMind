@@ -1,0 +1,99 @@
+{
+  "schema_version": "1.0.0",
+  "milestone": "LF-2",
+  "title": "Foundry Agent Substrate",
+  "source_path": "db/migrations/20261008_006_foundry_agent_substrate.sql",
+  "source_git_blob_sha": "79de1b53f4d13da15ec6b5b4d308cdacba60b753",
+  "live_migration_name": "live_foundry_lf2_agent_substrate_v1",
+  "live_migration_version": null,
+  "requires_lf1_baseline": true,
+  "required_relations": [
+    "comind.cm_org",
+    "comind.cm_actor",
+    "comind.cm_project",
+    "comind.cm_agent",
+    "comind.cm_agent_run",
+    "comind.cm_task",
+    "comind.cm_conversation",
+    "comind.cm_evidence",
+    "comind.cm_policy_rule",
+    "comind.cm_memory_node",
+    "comind.cm_budget_authority_binding"
+  ],
+  "creates_relations": [
+    "comind.cm_foundry_agent_profile",
+    "comind.cm_foundry_capability",
+    "comind.cm_foundry_capability_grant",
+    "comind.cm_foundry_authorization_request",
+    "comind.cm_foundry_authorization_decision",
+    "comind.cm_foundry_execution_context",
+    "comind.cm_foundry_deliberation",
+    "comind.cm_foundry_deliberation_participant",
+    "comind.cm_foundry_deliberation_event",
+    "comind.cm_foundry_deliberation_outcome",
+    "comind.cm_foundry_recovery_checkpoint",
+    "comind.cm_foundry_adapter_operation"
+  ],
+  "creates_functions": [
+    "comind.cm_reject_foundry_substrate_mutation()"
+  ],
+  "creates_named_indexes": [
+    "comind.idx_cm_foundry_capability_grant_active_project",
+    "comind.idx_cm_foundry_capability_grant_active_global",
+    "comind.idx_cm_foundry_execution_context_idempotency",
+    "comind.idx_cm_foundry_deliberation_participant_unique",
+    "comind.idx_cm_foundry_profile_org",
+    "comind.idx_cm_foundry_authorization_request_project",
+    "comind.idx_cm_foundry_execution_context_project",
+    "comind.idx_cm_foundry_deliberation_project",
+    "comind.idx_cm_foundry_adapter_operation_context"
+  ],
+  "creates_named_triggers": [
+    "trg_cm_foundry_authorization_decision_immutable",
+    "trg_cm_foundry_execution_context_immutable",
+    "trg_cm_foundry_deliberation_event_immutable",
+    "trg_cm_foundry_deliberation_outcome_immutable",
+    "trg_cm_foundry_recovery_checkpoint_immutable",
+    "trg_cm_foundry_adapter_operation_immutable"
+  ],
+  "security_contract": {
+    "rls_enabled_on_all_created_relations": true,
+    "anon_table_privileges": [],
+    "authenticated_table_privileges": [],
+    "service_role_table_privileges": ["SELECT", "INSERT"],
+    "service_role_update_delegated": false,
+    "service_role_delete_delegated": false,
+    "mutation_guard_security": "INVOKER",
+    "mutation_guard_fixed_search_path": "comind, public, pg_temp",
+    "expected_security_advisor_delta": {
+      "function_search_path_mutable_warn_delta": 0,
+      "rls_enabled_no_policy_info_delta": 12,
+      "expected_warn_total_after_lf2": 7,
+      "expected_info_total_after_lf2": 27
+    }
+  },
+  "data_contract": {
+    "seeds_agent_rows": false,
+    "seeds_agent_run_rows": false,
+    "seeds_foundry_rows": false,
+    "executes_provider": false,
+    "expected_created_relation_row_count": 0
+  },
+  "explicitly_excluded": [
+    "db/migrations/20261008_007_foundry_security_prerequisites.sql",
+    "db/migrations/20261008_008_foundry_runtime_orchestration.sql",
+    "db/migrations/20261009_009_foundry_work_lease_kernel.sql",
+    "Agent identity population",
+    "Agent execution",
+    "PM Agent execution",
+    "paid-provider execution",
+    "Operator Console registry expansion",
+    "Archive/PIT-A schema mutation",
+    "ACP schema mutation",
+    "Sovereign Data Node schema mutation"
+  ],
+  "forward_repair_policy": {
+    "destructive_rollback_default": false,
+    "on_failure": "freeze further LF-2 mutation, capture committed state, diagnose exact delta, prefer reviewed forward repair"
+  }
+}

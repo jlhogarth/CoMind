@@ -1,0 +1,42 @@
+name: Live Supabase Read-Only Connectivity
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-supabase-readonly-connectivity
+  cancel-in-progress: false
+
+jobs:
+  verify-live-supabase-connectivity:
+    name: Verify live Supabase read-only connectivity
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SUPABASE_SESSION_DATABASE_URL: ${{ secrets.SUPABASE_SESSION_DATABASE_URL }}
+    steps:
+      - name: Check out authoritative repository state
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client python3
+
+      - name: Require dedicated pooled database secret
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${SUPABASE_SESSION_DATABASE_URL:-}" ]]; then
+            echo "::error title=Missing pooled database secret::SUPABASE_SESSION_DATABASE_URL is not configured."
+            exit 1
+          fi
+
+      - name: Run bounded read-only connectivity proof
+        shell: bash
+        run: bash ./scripts/verify_live_supabase_connectivity_readonly.sh

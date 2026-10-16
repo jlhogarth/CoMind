@@ -27,21 +27,11 @@ jobs:
           test -d .github/workflows
           test -d server
           test -d db
+          test -f .github/workflows/live-supabase-connectivity-readonly.yml
+          test -f scripts/verify_live_supabase_connectivity_readonly.sh
 
           if find . -type f \( -name '*.zip' -o -name '*.tar' -o -name '*.tar.gz' -o -name '*.tgz' -o -name '*.7z' \) | grep -q .; then
             echo "::error title=Source archive committed::Source archives must stay out of the repository."
-            exit 1
-          fi
-
-      - name: Require DATABASE_URL secret
-        shell: bash
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: |
-          set -euo pipefail
-
-          if [ -z "${DATABASE_URL:-}" ]; then
-            echo "::error title=Missing DATABASE_URL::Add DATABASE_URL as a GitHub Actions repository secret."
             exit 1
           fi
 
@@ -55,4 +45,4 @@ jobs:
       - name: Confirm required Actions configuration
         shell: bash
         run: |
-          echo "Required GitHub Actions configuration is present. Values were not printed."
+          echo "Repository health configuration is present. Production database credentials are intentionally verified only by the manual Live Supabase Read-Only Connectivity workflow."

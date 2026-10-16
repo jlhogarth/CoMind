@@ -1,4 +1,4 @@
--- Issue #116 Live Foundry Stage 1 technical preflight
+-- Issues #116 and #123 Live Foundry Stage 1 technical preflight
 -- READ ONLY. This file must never mutate live state.
 -- A PASS means only that the observed database shape matches the reviewed
 -- pre-authorization baseline. It is not C4 approval and is not deployment evidence.
@@ -85,25 +85,38 @@ unexpected_stage1_functions AS (
     FROM stage1_functions
     WHERE to_regprocedure(object_name) IS NOT NULL
 ),
-expected_migrations(name) AS (
+expected_migrations(version, name) AS (
     VALUES
-        ('comind_base_v2_initial_build'),
-        ('comind_pm_ledger_hardening_v0_1_1'),
-        ('comind_pm_ledger_maintenance_package_v0_1')
+        ('20261005213616', 'comind_base_v2_initial_build'),
+        ('20261006051527', 'comind_pm_ledger_maintenance_package_v0_1'),
+        ('20261006051627', 'comind_pm_ledger_hardening_v0_1_1'),
+        ('20261015211851', 'operator_console_live_activation_v0_2'),
+        ('20261015212201', 'operator_console_service_role_least_privilege_v0_2_1'),
+        ('20261015212719', 'operator_console_explicit_deny_policies_v0_2_2')
 ),
 current_migrations AS (
-    SELECT name
+    SELECT version::text AS version, name
     FROM supabase_migrations.schema_migrations
 ),
 migration_delta AS (
-    SELECT 'unexpected_live_migration'::text AS delta_type, c.name
+    SELECT
+        'unexpected_live_migration'::text AS delta_type,
+        c.version,
+        c.name
     FROM current_migrations c
-    LEFT JOIN expected_migrations e USING (name)
+    LEFT JOIN expected_migrations e
+      ON e.version = c.version
+     AND e.name = c.name
     WHERE e.name IS NULL
     UNION ALL
-    SELECT 'missing_expected_migration'::text, e.name
+    SELECT
+        'missing_expected_migration'::text,
+        e.version,
+        e.name
     FROM expected_migrations e
-    LEFT JOIN current_migrations c USING (name)
+    LEFT JOIN current_migrations c
+      ON c.version = e.version
+     AND c.name = e.name
     WHERE c.name IS NULL
 ),
 protected_counts AS (
@@ -166,7 +179,8 @@ gates AS (
 SELECT jsonb_pretty(
     jsonb_build_object(
         'evidence_state', 'read_only_technical_preflight',
-        'issue', 116,
+        'source_issue', 116,
+        'reconciliation_issue', 123,
         'project_ref', 'sbgfuanxiqepcoboxzcl',
         'technical_preflight_pass',
             g.required_roles_present
@@ -191,7 +205,16 @@ SELECT jsonb_pretty(
         'unexpected_legacy_identity_surfaces', COALESCE((SELECT jsonb_agg(object_name ORDER BY object_name) FROM unexpected_legacy_identity_surfaces), '[]'::jsonb),
         'unexpected_stage1_relations', COALESCE((SELECT jsonb_agg(object_name ORDER BY object_name) FROM unexpected_stage1_relations), '[]'::jsonb),
         'unexpected_stage1_functions', COALESCE((SELECT jsonb_agg(object_name ORDER BY object_name) FROM unexpected_stage1_functions), '[]'::jsonb),
-        'migration_delta', COALESCE((SELECT jsonb_agg(jsonb_build_object('type', delta_type, 'name', name) ORDER BY delta_type, name) FROM migration_delta), '[]'::jsonb),
+        'migration_delta', COALESCE(
+            (
+                SELECT jsonb_agg(
+                    jsonb_build_object('type', delta_type, 'version', version, 'name', name)
+                    ORDER BY delta_type, version, name
+                )
+                FROM migration_delta
+            ),
+            '[]'::jsonb
+        ),
         'protected_row_counts', pc.counts,
         'rls_snapshot', rs.state,
         'policy_snapshot', ps.policies,

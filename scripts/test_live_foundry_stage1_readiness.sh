@@ -78,6 +78,95 @@ psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
 
 work_dir="$(mktemp -d)"
 trap 'rm -rf "${work_dir}"' EXIT
+
+# Reproduce the exact reviewed pre-Stage 1 live migration ledger. These rows
+# model migration provenance only. They do not claim the Operator Console
+# runtime is present in this isolated fixture.
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 <<'SQL'
+CREATE SCHEMA IF NOT EXISTS supabase_migrations;
+CREATE TABLE IF NOT EXISTS supabase_migrations.schema_migrations (
+    version text,
+    statements text[],
+    name text PRIMARY KEY
+);
+INSERT INTO supabase_migrations.schema_migrations (version, statements, name)
+VALUES
+    ('20261005213616', ARRAY[]::text[], 'comind_base_v2_initial_build'),
+    ('20261006051527', ARRAY[]::text[], 'comind_pm_ledger_maintenance_package_v0_1'),
+    ('20261006051627', ARRAY[]::text[], 'comind_pm_ledger_hardening_v0_1_1'),
+    ('20261015211851', ARRAY[]::text[], 'operator_console_live_activation_v0_2'),
+    ('20261015212201', ARRAY[]::text[], 'operator_console_service_role_least_privilege_v0_2_1'),
+    ('20261015212719', ARRAY[]::text[], 'operator_console_explicit_deny_policies_v0_2_2')
+ON CONFLICT (name) DO UPDATE
+SET version = EXCLUDED.version,
+    statements = EXCLUDED.statements;
+SQL
+
+preflight_output="${work_dir}/preflight.out"
+psql "${DATABASE_URL}" -X -At -v ON_ERROR_STOP=1 \
+  -f "${repository_root}/db/verification/live_foundry_stage1_preflight.sql" \
+  >"${preflight_output}"
+if ! grep -q '"technical_preflight_pass": true' "${preflight_output}"; then
+  echo "Stage 1 preflight did not accept the exact reviewed six-migration baseline." >&2
+  cat "${preflight_output}" >&2
+  exit 1
+fi
+
+# Missing expected migration must fail closed.
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 <<'SQL'
+DELETE FROM supabase_migrations.schema_migrations
+WHERE version = '20261015212719'
+  AND name = 'operator_console_explicit_deny_policies_v0_2_2';
+SQL
+missing_output="${work_dir}/preflight-missing.out"
+psql "${DATABASE_URL}" -X -At -v ON_ERROR_STOP=1 \
+  -f "${repository_root}/db/verification/live_foundry_stage1_preflight.sql" \
+  >"${missing_output}"
+if ! grep -q '"technical_preflight_pass": false' "${missing_output}" \
+   || ! grep -q 'missing_expected_migration' "${missing_output}" \
+   || ! grep -q 'operator_console_explicit_deny_policies_v0_2_2' "${missing_output}"; then
+  echo "Stage 1 preflight did not fail closed for a missing reviewed migration." >&2
+  cat "${missing_output}" >&2
+  exit 1
+fi
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 <<'SQL'
+INSERT INTO supabase_migrations.schema_migrations (version, statements, name)
+VALUES ('20261015212719', ARRAY[]::text[], 'operator_console_explicit_deny_policies_v0_2_2');
+SQL
+
+# Unexpected additional migration must fail closed.
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 <<'SQL'
+INSERT INTO supabase_migrations.schema_migrations (version, statements, name)
+VALUES ('20261015999999', ARRAY[]::text[], 'unknown_live_schema_drift_test_only');
+SQL
+unexpected_output="${work_dir}/preflight-unexpected.out"
+psql "${DATABASE_URL}" -X -At -v ON_ERROR_STOP=1 \
+  -f "${repository_root}/db/verification/live_foundry_stage1_preflight.sql" \
+  >"${unexpected_output}"
+if ! grep -q '"technical_preflight_pass": false' "${unexpected_output}" \
+   || ! grep -q 'unexpected_live_migration' "${unexpected_output}" \
+   || ! grep -q 'unknown_live_schema_drift_test_only' "${unexpected_output}"; then
+  echo "Stage 1 preflight did not fail closed for unexpected live migration drift." >&2
+  cat "${unexpected_output}" >&2
+  exit 1
+fi
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 <<'SQL'
+DELETE FROM supabase_migrations.schema_migrations
+WHERE version = '20261015999999'
+  AND name = 'unknown_live_schema_drift_test_only';
+SQL
+
+# Exact baseline must recover to PASS after the negative fixtures are removed.
+recovered_preflight_output="${work_dir}/preflight-recovered.out"
+psql "${DATABASE_URL}" -X -At -v ON_ERROR_STOP=1 \
+  -f "${repository_root}/db/verification/live_foundry_stage1_preflight.sql" \
+  >"${recovered_preflight_output}"
+if ! grep -q '"technical_preflight_pass": true' "${recovered_preflight_output}"; then
+  echo "Stage 1 preflight did not recover after migration-drift fixtures were removed." >&2
+  cat "${recovered_preflight_output}" >&2
+  exit 1
+fi
+
 projection_sql="${work_dir}/20260910_001_live_foundry_stage1_finops_projection.sql"
 
 python3 "${repository_root}/scripts/build_live_foundry_stage1_finops_projection.py" \
@@ -110,15 +199,9 @@ psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
 psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
   -f "${repository_root}/db/migrations/verify_20261008_005_current_runtime_budget_authority_adapter_telemetry_role_hardening.sql"
 
-# Model only the migration-history rows that the read-only post-deploy verifier
-# expects after an authorized Stage 1 deployment.
+# Model only the Stage 1 migration-history rows expected after a separately
+# authorized deployment. The reviewed pre-Stage 1 baseline remains present.
 psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 <<'SQL'
-CREATE SCHEMA IF NOT EXISTS supabase_migrations;
-CREATE TABLE IF NOT EXISTS supabase_migrations.schema_migrations (
-    version text,
-    statements text[],
-    name text PRIMARY KEY
-);
 INSERT INTO supabase_migrations.schema_migrations (version, statements, name)
 VALUES
     ('20261015100101', ARRAY[]::text[], 'live_foundry_stage1_finops_current_runtime_projection_v1'),

@@ -93,6 +93,9 @@ services:
     entrypoint: ["/bin/sh", "-ec"]
     command: ["echo SDN administrative tool profile requires an explicit command"]
     <<: *sdn-app-security
+    volumes:
+      - ../migrations:/migrations:ro
+      - ../scripts:/scripts:ro
     secrets:
       - db_owner_password
       - ingest_password

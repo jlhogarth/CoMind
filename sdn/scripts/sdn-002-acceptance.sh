@@ -41,7 +41,11 @@ finalize() {
     "${COMPOSE[@]}" logs --no-color db ingest > "$EVIDENCE/container-logs-on-failure.txt" 2>&1 || true
   fi
   "${COMPOSE[@]}" down --remove-orphans >/dev/null 2>&1 || true
-  rm -rf "$WORK"
+  if docker image inspect comind/sdn-postgres:sdn-002 >/dev/null 2>&1; then
+    docker run --rm --user 0 --entrypoint /bin/sh -v "$WORK:/work" comind/sdn-postgres:sdn-002 -ec \
+      'find /work -mindepth 1 -depth -delete' >/dev/null 2>&1 || true
+  fi
+  rm -rf "$WORK" >/dev/null 2>&1 || true
   exit "$rc"
 }
 trap finalize EXIT
@@ -91,6 +95,11 @@ docker run --rm --user 0 -v "$SDN_RECOVERY_ROOT:/host" comind/sdn-postgres:sdn-0
   'chown -R postgres:postgres /host/postgres /host/logs/pgbackrest && chmod 0700 /host/postgres/data && chmod 0770 /host/logs/pgbackrest'
 
 "${COMPOSE[@]}" up -d --wait --wait-timeout 90 db
+"${TOOLS[@]}" run --rm admin \
+  'export PGPASSWORD="$(cat /run/secrets/db_owner_password)"; if [ "$(psql -h db -U postgres -d postgres -Atc "select count(*) from pg_database where datname='"'"'comind_sdn_test'"'"'")" != 1 ]; then createdb -h db -U postgres comind_sdn_test; fi; psql -h db -U postgres -d comind_sdn_test -Atc "select current_database()"' \
+  > "$EVIDENCE/database-bootstrap.txt"
+grep -qx 'comind_sdn_test' "$EVIDENCE/database-bootstrap.txt" || { echo 'Application database bootstrap did not verify comind_sdn_test' >&2; exit 1; }
+
 for pass in 1 2; do
   "${TOOLS[@]}" run --rm admin \
     'export PGPASSWORD="$(cat /run/secrets/db_owner_password)"; for sql in /migrations/*.sql; do echo "Applying $(basename "$sql")"; psql -h db -U postgres -d comind_sdn_test -v ON_ERROR_STOP=1 -f "$sql"; done' \

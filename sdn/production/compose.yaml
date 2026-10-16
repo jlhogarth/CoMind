@@ -34,7 +34,7 @@ services:
       - wal_level=replica
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d comind_sdn_test"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d postgres"]
       interval: 2s
       timeout: 3s
       retries: 30

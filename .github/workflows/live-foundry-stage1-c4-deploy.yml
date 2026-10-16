@@ -15,7 +15,7 @@ concurrency:
 env:
   EXPECTED_MAIN_SHA: bab9c6f162adf1300f6e28d0afc1afb6ac62a681
   SUPABASE_CLI_VERSION: 2.120.0
-  DEPLOY_WORKDIR: ${{ runner.temp }}/live-foundry-stage1
+  DEPLOY_WORKDIR: /tmp/live-foundry-stage1
 
 jobs:
   deploy-stage1:
@@ -39,8 +39,8 @@ jobs:
           git fetch origin main --depth=1
           actual_main="$(git rev-parse origin/main)"
           test "${actual_main}" = "${EXPECTED_MAIN_SHA}"
-          parent_sha="$(git rev-parse HEAD^)"
-          test "${parent_sha}" = "${EXPECTED_MAIN_SHA}"
+          merge_base="$(git merge-base HEAD origin/main)"
+          test "${merge_base}" = "${EXPECTED_MAIN_SHA}"
           changed="$(git diff --name-only "${EXPECTED_MAIN_SHA}"...HEAD)"
           test "${changed}" = ".github/workflows/live-foundry-stage1-c4-deploy.yml"
           printf 'Exact authoritative main lease verified: %s\n' "${actual_main}"

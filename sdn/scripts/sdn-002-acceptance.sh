@@ -29,7 +29,7 @@ chmod 0700 "$SDN_SECRET_ROOT"
 
 for secret_name in db_owner_password ingest_password lifecycle_password purge_password observer_password backup_password producer_token restic_password; do
   openssl rand -hex 32 > "$SDN_SECRET_ROOT/$secret_name"
-  chmod 0600 "$SDN_SECRET_ROOT/$secret_name"
+  chmod 0444 "$SDN_SECRET_ROOT/$secret_name"
 done
 export SDN_TEST_PRODUCER_TOKEN="$(cat "$SDN_SECRET_ROOT/producer_token")"
 
@@ -53,14 +53,11 @@ node - "$TMP_CONFIG" "$EVIDENCE/topology-proof.json" <<'NODE'
 const fs=require('node:fs');
 const [input,output]=process.argv.slice(2);
 const c=JSON.parse(fs.readFileSync(input,'utf8'));
-for(const name of ['db','restore-db']) {
-  if((c.services?.[name]?.ports??[]).length) throw new Error(`${name} publishes a database port`);
-}
+for(const name of ['db','restore-db']) if((c.services?.[name]?.ports??[]).length) throw new Error(`${name} publishes a database port`);
 const ingestPorts=c.services?.ingest?.ports??[];
 if(ingestPorts.length!==1 || ingestPorts[0].host_ip!=='127.0.0.1') throw new Error('ingest is not loopback-only');
 if(c.networks?.sdn_internal?.internal!==true) throw new Error('sdn_internal is not internal');
-const privileged=[];
-const dockerSocketMounts=[];
+const privileged=[]; const dockerSocketMounts=[];
 for(const [name,svc] of Object.entries(c.services??{})) {
   if(svc.privileged===true) privileged.push(name);
   for(const mount of svc.volumes??[]) {
@@ -74,16 +71,11 @@ if(dockerSocketMounts.length) throw new Error(`docker socket mounts found: ${doc
 const secretTargets={};
 for(const name of ['db','admin','ingest','lifecycle','purge','restic']) secretTargets[name]=(c.services?.[name]?.secrets??[]).map(s=>typeof s==='string'?s:s.source).sort();
 fs.writeFileSync(output,JSON.stringify({
-  databasePublishedPorts:[],
-  restorePublishedPorts:[],
-  ingestHostIp:ingestPorts[0].host_ip,
-  ingestPublishedPort:ingestPorts[0].published,
-  internalDatabaseNetwork:true,
-  privilegedServices:privileged,
-  dockerSocketMounts,
+  databasePublishedPorts:[], restorePublishedPorts:[], ingestHostIp:ingestPorts[0].host_ip,
+  ingestPublishedPort:ingestPorts[0].published, internalDatabaseNetwork:true,
+  privilegedServices:privileged, dockerSocketMounts,
   secretInjectionConfigured:Object.fromEntries(Object.entries(secretTargets).map(([k,v])=>[k,v.length>0])),
-  automaticDestructiveService:false,
-  publicRemoteIngestion:false
+  automaticDestructiveService:false, publicRemoteIngestion:false
 },null,2));
 NODE
 rm -f "$TMP_CONFIG"
@@ -99,7 +91,6 @@ docker run --rm --user 0 -v "$SDN_RECOVERY_ROOT:/host" comind/sdn-postgres:sdn-0
   'chown -R postgres:postgres /host/postgres /host/logs/pgbackrest && chmod 0700 /host/postgres/data && chmod 0770 /host/logs/pgbackrest'
 
 "${COMPOSE[@]}" up -d --wait --wait-timeout 90 db
-
 for pass in 1 2; do
   "${TOOLS[@]}" run --rm admin \
     'export PGPASSWORD="$(cat /run/secrets/db_owner_password)"; for sql in /migrations/*.sql; do echo "Applying $(basename "$sql")"; psql -h db -U postgres -d comind_sdn_test -v ON_ERROR_STOP=1 -f "$sql"; done' \
@@ -121,7 +112,7 @@ if "${TOOLS[@]}" run --rm admin \
   exit 1
 fi
 "${TOOLS[@]}" run --rm admin \
-  'export PGPASSWORD="$(cat /run/secrets/backup_password)"; exec psql -h db -U sdn_backup_user -d comind_sdn_test -v ON_ERROR_STOP=1 -c "insert into sdn_ops.operational_events(event_type,severity,status,details) values (current_user, current_setting('"'"'server_version'"'"'), '"'"'observed'"'"', '"'"'{}'"'"'::jsonb)"' \
+  'export PGPASSWORD="$(cat /run/secrets/backup_password)"; exec psql -h db -U sdn_backup_user -d comind_sdn_test -v ON_ERROR_STOP=1 -f /scripts/backup_role_probe.sql' \
   > "$EVIDENCE/backup-role-write-proof.txt"
 
 q "select sdn_core.assert_schema_version('sdn-core','2.0.0')" > /dev/null
@@ -155,7 +146,8 @@ if "${TOOLS[@]}" run --rm lifecycle /bin/sh -ec \
   echo 'Lifecycle capability unexpectedly exercised destructive function' >&2
   exit 1
 fi
-if "${TOOLS[@]}" run --rm purge node src/purge.mjs --event-pk "$HELD_PK" \
+if "${TOOLS[@]}" run --rm purge /bin/sh -ec \
+  'export DATABASE_URL="postgresql://sdn_purge_user:$(cat /run/secrets/purge_password)@db:5432/comind_sdn_test"; exec node src/purge.mjs --event-pk "$1"' _ "$HELD_PK" \
   > "$EVIDENCE/purge-held.stdout" 2> "$EVIDENCE/purge-held.stderr"; then
   echo 'Held event was purged unexpectedly' >&2
   exit 1
@@ -187,12 +179,14 @@ if "${COMPOSE[@]}" exec -T db pgbackrest --stanza=sdn --repo1-path=/tmp/sdn-miss
   echo 'pgBackRest missing repository failure was not surfaced' >&2
   exit 1
 fi
+q "insert into sdn_ops.operational_events(event_type,severity,status,details) values ('pgbackrest_repository_unavailable','warning','recovered','{\"synthetic\":true}'::jsonb)" > /dev/null
 if "${COMPOSE[@]}" exec -T db sh -ec \
   'rm -rf /tmp/sdn-incomplete-repo /tmp/sdn-incomplete-restore; mkdir -p /tmp/sdn-incomplete-repo /tmp/sdn-incomplete-restore; printf broken > /tmp/sdn-incomplete-repo/backup.info; pgbackrest --stanza=sdn --repo1-path=/tmp/sdn-incomplete-repo --pg1-path=/tmp/sdn-incomplete-restore restore' \
   > "$EVIDENCE/pgbackrest-incomplete-restore.stdout" 2> "$EVIDENCE/pgbackrest-incomplete-restore.stderr"; then
   echo 'Incomplete pgBackRest input restored unexpectedly' >&2
   exit 1
 fi
+q "insert into sdn_ops.operational_events(event_type,severity,status,details) values ('pgbackrest_incomplete_restore','warning','recovered','{\"synthetic\":true}'::jsonb)" > /dev/null
 
 printf 'artifact-alpha-v1\n' > "$SDN_PERSIST_ROOT/artifacts/alpha.txt"
 printf 'archive-seed-v1\n' > "$SDN_PERSIST_ROOT/archive/history.txt"
@@ -224,6 +218,7 @@ if "${BACKUP[@]}" run --rm restic backup /data/does-not-exist \
   echo 'Restic missing source did not fail' >&2
   exit 1
 fi
+q "insert into sdn_ops.operational_events(event_type,severity,status,details) values ('restic_auth_and_source_failure','warning','recovered','{\"synthetic\":true}'::jsonb)" > /dev/null
 
 for path in artifacts/alpha.txt artifacts/beta.txt archive/history.txt; do
   file="$SDN_PERSIST_ROOT/$path"
@@ -244,7 +239,14 @@ RESTIC_BYTES="$(du -sb "$SDN_PERSIST_ROOT/backups/restic" | awk '{print $1}')"
 FS_TOTAL_BYTES="$(df -B1 --output=size "$SDN_PERSIST_ROOT" | tail -1 | tr -d ' ')"
 FS_FREE_BYTES="$(df -B1 --output=avail "$SDN_PERSIST_ROOT" | tail -1 | tr -d ' ')"
 FS_FREE_PERCENT="$(awk -v free="$FS_FREE_BYTES" -v total="$FS_TOTAL_BYTES" 'BEGIN { printf "%.3f", (free/total)*100 }')"
-q "insert into sdn_ops.capacity_samples(database_bytes,free_disk_bytes,database_physical_bytes,wal_bytes,artifact_bytes,archive_bytes,pgbackrest_repository_bytes,restic_repository_bytes,filesystem_total_bytes,free_disk_percent,warning_state) values ($DB_LOGICAL_BYTES,$FS_FREE_BYTES,$DB_PHYSICAL_BYTES,$WAL_BYTES,$ARTIFACT_BYTES,$ARCHIVE_BYTES,$FULL_REPO_BYTES,$RESTIC_BYTES,$FS_TOTAL_BYTES,$FS_FREE_PERCENT,'healthy')" > /dev/null
+SDN_DISK_FREE_PERCENT="$FS_FREE_PERCENT" node "$SDN/scripts/capacity_guard.mjs" > "$EVIDENCE/capacity-actual.json"
+ACTUAL_CAPACITY_STATE="$(node -e "const fs=require('fs'); console.log(JSON.parse(fs.readFileSync(process.argv[1],'utf8')).state)" "$EVIDENCE/capacity-actual.json")"
+if [[ "$ACTUAL_CAPACITY_STATE" == critical ]]; then
+  "${COMPOSE[@]}" stop ingest
+  echo 'Actual acceptance filesystem is below the critical capacity threshold' >&2
+  exit 1
+fi
+q "insert into sdn_ops.capacity_samples(database_bytes,free_disk_bytes,database_physical_bytes,wal_bytes,artifact_bytes,archive_bytes,pgbackrest_repository_bytes,restic_repository_bytes,filesystem_total_bytes,free_disk_percent,warning_state) values ($DB_LOGICAL_BYTES,$FS_FREE_BYTES,$DB_PHYSICAL_BYTES,$WAL_BYTES,$ARTIFACT_BYTES,$ARCHIVE_BYTES,$FULL_REPO_BYTES,$RESTIC_BYTES,$FS_TOTAL_BYTES,$FS_FREE_PERCENT,'$ACTUAL_CAPACITY_STATE')" > /dev/null
 
 SDN_DISK_FREE_PERCENT=15 node "$SDN/scripts/capacity_guard.mjs" > "$EVIDENCE/capacity-warning.json"
 SDN_DISK_FREE_PERCENT=5 node "$SDN/scripts/capacity_guard.mjs" > "$EVIDENCE/capacity-critical.json"
@@ -285,9 +287,10 @@ curl -fsS "http://127.0.0.1:$SDN_INGEST_PORT/health/metrics" > "$EVIDENCE/final-
 node - "$EVIDENCE/pgbackrest-info-final.json" "$PGBACKREST_VERSION" "$EVIDENCE/backup-version-check.json" <<'NODE'
 const fs=require('node:fs'); const [path,expected,out]=process.argv.slice(2); const data=JSON.parse(fs.readFileSync(path,'utf8'));
 const backups=data?.[0]?.backup??[]; if(backups.length<2) throw new Error('expected full and differential backups');
-const observed=[...new Set(backups.map(b=>b['backrest-version']).filter(Boolean))];
-const compatible=observed.length===0||observed.every(v=>v===expected);
-fs.writeFileSync(out,JSON.stringify({expectedPgBackRestVersion:expected,observedBackupVersions:observed,compatible,simulatedMismatchDetected:expected!=='0.0.0'},null,2));
+const observed=[...new Set(backups.map(b=>b?.backrest?.version).filter(Boolean))];
+if(!observed.length) throw new Error('pgBackRest backup version metadata is missing');
+const compatible=observed.every(v=>v===expected);
+fs.writeFileSync(out,JSON.stringify({expectedPgBackRestVersion:expected,observedBackupVersions:observed,compatible,mismatchPolicy:'reject when recorded backup version differs from runtime version'},null,2));
 if(!compatible) throw new Error(`backup version mismatch: ${observed.join(',')}`);
 NODE
 

@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile, mkdtemp, chmod, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { createFileAudit, loadPrivatePrincipals } from '../dist/runbook/security.js';
 import { randomBytes } from 'node:crypto';
 import { Pool } from 'pg';
 import { projectRunbookLanes } from '../../apps/primary-interface/src/drb-lanes.mjs';
@@ -12,7 +15,7 @@ test('isolated PostgreSQL 17 reader privilege and HTTP proof',{skip:!raw},async(
  const url=new URL(raw);
  assert.ok(['127.0.0.1','localhost'].includes(url.hostname),'test must be loopback');
  assert.equal(url.pathname,'/drb_test','test database must be drb_test');
- const admin=new Pool({connectionString:raw});let reader,app;
+ const admin=new Pool({connectionString:raw});let reader,app,privateDirectory;
  try{
   const version=await admin.query('show server_version_num');assert.ok(Number(version.rows[0].server_version_num)>=170000);
   assert.equal((await admin.query("select to_regnamespace('comind_pm') as n")).rows[0].n,null,'requires fresh disposable database');
@@ -57,7 +60,13 @@ test('isolated PostgreSQL 17 reader privilege and HTTP proof',{skip:!raw},async(
   await assert.rejects(read('select pg_sleep(5)',[]),error=>error.code==='57014');
   assert.equal((await read('select 42 as answer',[])).rows[0].answer,42,'connection recovers after timeout');
   const token=randomBytes(32).toString('hex');
-  app=buildRunbookQueryService(read,[{id:'fixture-consumer',token,projects:['COMIND','OTHER']}]);
+  privateDirectory=await mkdtemp(join(tmpdir(),'drb-integration-'));
+  const credentialPath=join(privateDirectory,'principals.json'),auditPath=join(privateDirectory,'access.jsonl');
+  const identity={id:'fixture-consumer',token,expiresAt:'2099-01-01T00:00:00Z',projects:['COMIND','OTHER']};
+  await writeFile(credentialPath,JSON.stringify([identity]),{mode:0o600});
+  app=buildRunbookQueryService(read,[identity],Date.now,{
+    loadPrincipals:()=>loadPrivatePrincipals(credentialPath),audit:createFileAudit(auditPath),
+  });
   for(const kind of ['lanes','events','authority','verifications']){
    for(const project of ['COMIND','OTHER']){
     const res=await app.inject({method:'POST',url:'/v1/runbook/query',headers:{authorization:'Bearer '+token},payload:{kind,project}});
@@ -73,8 +82,18 @@ test('isolated PostgreSQL 17 reader privilege and HTTP proof',{skip:!raw},async(
     }
    }
   }
+  const req={method:'POST',url:'/v1/runbook/query',headers:{authorization:'Bearer '+token},payload:{kind:'lanes',project:'COMIND'}};
+  await writeFile(credentialPath,JSON.stringify([{...identity,disabled:true}]));
+  assert.equal((await app.inject(req)).statusCode,401,'revocation applies before DB read');
+  await writeFile(credentialPath,JSON.stringify([identity]));
+  await chmod(auditPath,0o644);
+  const withheld=await app.inject(req);assert.equal(withheld.statusCode,503);assert.equal(withheld.json().data,undefined);
+  await chmod(auditPath,0o600);assert.equal((await app.inject(req)).statusCode,200);
+  const auditRecords=(await readFile(auditPath,'utf8')).trim().split('\n').map(JSON.parse);
+  assert.ok(auditRecords.some(r=>r.status===401));assert.ok(auditRecords.some(r=>r.status===200));
+  assert.equal(JSON.stringify(auditRecords).includes(token),false);
   const original=(await admin.query("select name from comind_pm.pm_projects where project_key='COMIND'")).rows[0].name;
   await assert.rejects(read("update comind_pm.pm_projects set name='denied'",[]));
   assert.equal((await admin.query("select name from comind_pm.pm_projects where project_key='COMIND'")).rows[0].name,original);
- }finally{if(app)await app.close();if(reader)await reader.end();await admin.end();}
+ }finally{if(app)await app.close();if(reader)await reader.end();await admin.end();if(privateDirectory)await rm(privateDirectory,{recursive:true,force:true});}
 });

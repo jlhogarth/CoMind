@@ -32,7 +32,7 @@ jobs:
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run build
       - run: node --test ../apps/primary-interface/test/*.test.mjs
-      - run: node --test test/runbook-query.test.mjs
+      - run: node --test test/runbook-query.test.mjs test/runbook-security.test.mjs
       - run: node --test test/runbook-query.integration.test.mjs
         env:
           DRB_TEST_ADMIN_URL: postgres://postgres:drb_isolated_ci_only@127.0.0.1:5432/drb_test

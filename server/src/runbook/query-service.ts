@@ -1,6 +1,8 @@
 import Fastify from 'fastify';
 import { createHash, timingSafeEqual, randomUUID } from 'node:crypto';
 import { z } from 'zod';
+import { validatePrincipals, type Principal, type AccessAudit } from './security.js';
+export type { Principal } from './security.js';
 
 const requestSchema = z.object({
   project: z.string().regex(/^[A-Z0-9_-]{1,64}$/),
@@ -9,7 +11,6 @@ const requestSchema = z.object({
   since: z.string().datetime({ offset: true }).optional(),
   limit: z.number().int().min(1).max(100).default(25),
 }).strict();
-export type Principal = { id: string; token: string; projects: string[] };
 export type ReadQuery = (sql: string, params: unknown[]) => Promise<{ rows: Record<string, unknown>[] }>;
 const sources = {
   lanes: ['v_runbook_lane_state', 'last_event_at', 'work_key'],
@@ -26,36 +27,76 @@ const columns = {
 } as const;
 const digest = (value: string) => createHash('sha256').update(value).digest();
 
-export function buildRunbookQueryService(read: ReadQuery, principals: Principal[], now = Date.now) {
-  if (!principals.length || new Set(principals.map(p => p.id)).size !== principals.length
-      || new Set(principals.map(p => p.token)).size !== principals.length
-      || principals.some(p => !p.id || p.token.length < 32 || !p.projects.length)) {
-    throw new Error('Invalid RunBook principal configuration');
-  }
+type SecurityOptions = {
+  loadPrincipals?: () => Promise<Principal[]>;
+  audit?: (record: AccessAudit) => Promise<void>;
+};
+export function buildRunbookQueryService(read: ReadQuery, principals: Principal[], now = Date.now, options: SecurityOptions = {}) {
+  const initial = validatePrincipals(principals);
   const app = Fastify({ logger: false, bodyLimit: 4096, requestTimeout: 10000, trustProxy: false });
   const windows = new Map<string, { start: number; count: number }>();
   let active = 0;
-  app.addHook('onSend', async (_request, reply) => {
+  const records = new WeakMap<object, AccessAudit>();
+  let globalWindow = { start: now(), count: 0 };
+  app.addHook('onRequest', async (request, reply) => {
+    const record: AccessAudit = { request_id: randomUUID(), observed_at: new Date(now()).toISOString(),
+      principal_id: null, operation: request.method === 'POST' && request.url === '/v1/runbook/query' ? 'runbook.query' : 'unsupported',
+      status: 0, project: null, kind: null };
+    records.set(request, record);
+    const time = now();
+    if (time - globalWindow.start >= 60000) globalWindow = { start: time, count: 0 };
+    if (++globalWindow.count > 300) {
+      reply.header('Retry-After', '60');
+      return reply.code(429).send({ request_id: record.request_id, error: 'global_rate_limited' });
+    }
+  });
+  app.setErrorHandler((error, request, reply) => {
+    const code = error && typeof error === 'object' && 'statusCode' in error ? Number(error.statusCode) : 500;
+    const status = Number.isInteger(code) && code >= 400 && code < 500 ? code : 500;
+    return reply.code(status).send({ request_id: records.get(request)?.request_id,
+      error: status === 413 ? 'request_too_large' : 'request_rejected' });
+  });
+  app.addHook('onSend', async (request, reply, payload) => {
     reply.header('Cache-Control', 'no-store');
     reply.header('X-Content-Type-Options', 'nosniff');
+    const record = records.get(request);
+    if (record && options.audit) {
+      record.status = reply.statusCode;
+      try { await options.audit(record); }
+      catch {
+        reply.code(503).type('application/json');
+        return JSON.stringify({ request_id: record.request_id, error: 'audit_unavailable' });
+      }
+    }
+    return payload;
   });
   app.post('/v1/runbook/query', async (request, reply) => {
-    const requestId = randomUUID();
+    const record = records.get(request)!;
+    const requestId = record.request_id;
     const fail = (status: number, error: string) => reply.code(status).send({ request_id: requestId, error });
     const header = request.headers.authorization;
     if (!header?.startsWith('Bearer ') || header.length > 1024) return fail(401, 'unauthorized');
     const supplied = digest(header.slice(7));
-    const principal = principals.find(p => timingSafeEqual(digest(p.token), supplied));
-    if (!principal) return fail(401, 'unauthorized');
+    let current: Principal[];
+    try { current = options.loadPrincipals ? validatePrincipals(await options.loadPrincipals()) : initial; }
+    catch { return fail(503, 'credentials_unavailable'); }
+    const principal = current.find(p => timingSafeEqual(digest(p.token), supplied));
+    if (!principal || principal.disabled || Date.parse(principal.expiresAt) <= now()) return fail(401, 'unauthorized');
+    record.principal_id = principal.id;
     const time = now();
     let window = windows.get(principal.id);
     if (!window || time - window.start >= 60000) {
+      if (windows.size >= 1024 && !windows.has(principal.id)) {
+        for (const [id, old] of windows) if (time - old.start >= 60000) windows.delete(id);
+        if (windows.size >= 1024) return fail(503, 'identity_capacity');
+      }
       window = { start: time, count: 0 }; windows.set(principal.id, window);
     }
     if (++window.count > 60) { reply.header('Retry-After', '60'); return fail(429, 'rate_limited'); }
     const parsed = requestSchema.safeParse(request.body);
     if (!parsed.success) return fail(400, 'invalid_query');
     const input = parsed.data;
+    record.project = input.project; record.kind = input.kind;
     if (!principal.projects.includes(input.project)) return fail(403, 'forbidden');
     if (active >= 4) { reply.header('Retry-After', '1'); return fail(429, 'busy'); }
     const [view, timestamp, tie] = sources[input.kind];

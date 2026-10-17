@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildRunbookQueryService } from '../dist/runbook/query-service.js';
 const token='a'.repeat(48), headers={authorization:`Bearer ${token}`};
-const principals=[{id:'test',token,projects:['COMIND']}];
+const principals=[{id:'test',token,expiresAt:'2099-01-01T00:00:00Z',projects:['COMIND']}];
 const payload={project:'COMIND',kind:'events'};
 test('authentication, scope and strict bounds precede DB access',async()=>{
  let calls=0;const app=buildRunbookQueryService(async()=>{calls++;return {rows:[]};},principals);

@@ -482,9 +482,9 @@
 }
 
 @keyframes cm-mode-change {
-  0% { opacity: 0.55; transform: scale(0.965); }
-  60% { opacity: 1; transform: scale(1.018); }
-  100% { opacity: 1; transform: scale(1); }
+  0% { opacity: 0.55; scale: 0.965; }
+  60% { opacity: 1; scale: 1.018; }
+  100% { opacity: 1; scale: 1; }
 }
 
 @keyframes cm-core-breathe {

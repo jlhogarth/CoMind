@@ -44,6 +44,7 @@ jobs:
           set -euo pipefail
           bash -n sdn/scripts/acceptance.sh
           bash -n sdn/scripts/sdn-002-acceptance.sh
+          node --check sdn/src/db.mjs
           node --check sdn/scripts/capacity_guard.mjs
           docker compose version
 
@@ -84,7 +85,7 @@ jobs:
           fi
 
       - name: Upload SDN-002 acceptance evidence
-        if: success()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: sdn-002-acceptance-evidence

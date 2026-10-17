@@ -41,18 +41,26 @@ BEGIN
             ('current_actor', ''),
             ('set_updated_at_checklist', ''),
             ('set_updated_at_research_refs', '')
+    ),
+    actual AS (
+        SELECT
+            p.oid,
+            p.proname AS name,
+            pg_get_function_identity_arguments(p.oid) AS identity_args,
+            p.proconfig
+        FROM pg_catalog.pg_proc p
+        JOIN pg_catalog.pg_namespace n
+          ON n.oid = p.pronamespace
+        WHERE n.nspname = 'comind'
     )
     SELECT array_agg(r.name ORDER BY r.name)
     INTO v_missing
     FROM required r
-    LEFT JOIN pg_catalog.pg_proc p
-      ON p.proname = r.name
-    LEFT JOIN pg_catalog.pg_namespace n
-      ON n.oid = p.pronamespace
-     AND n.nspname = 'comind'
-    WHERE p.oid IS NULL
-       OR pg_get_function_identity_arguments(p.oid) <> r.identity_args
-       OR NOT ('search_path=comind, public, pg_temp' = ANY(COALESCE(p.proconfig, ARRAY[]::text[])));
+    LEFT JOIN actual a
+      ON a.name = r.name
+     AND a.identity_args = r.identity_args
+    WHERE a.oid IS NULL
+       OR NOT ('search_path=comind, public, pg_temp' = ANY(COALESCE(a.proconfig, ARRAY[]::text[])));
 
     IF v_missing IS NOT NULL THEN
         RAISE EXCEPTION 'Required fixed search_path missing or incorrect for functions: %', v_missing;

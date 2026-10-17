@@ -8,11 +8,11 @@ Base: `76e6d9549640d7e726219f7d477dcc2976ebf19c`.
 
 ## Decision checkpoint
 
-**C: defer binding provider selection pending critical evidence.** Preferred next validation candidate: a separate Supabase Pro production project, Small compute, seven-day PITR. Primary challenger: Neon Launch, or Scale if private networking / contractual availability is required. Neither is selected for purchase or activation.
+**C: defer binding provider selection pending critical evidence.** Joseph selected under $50/month for the managed database (excluding SDN hardware and independent backups) and recovery-first availability. Preferred next validation candidate: Neon Launch. Supabase Pro with daily backups remains an integration-simple alternative only if its larger data-loss window is explicitly accepted. Neither is selected for purchase or activation.
 
 Supabase's existing API integration reduces transition risk, but is not a reason to waive recovery, security, or cost requirements. Its recovery-equipped entry is approximately $130/month for one Small project, before other usage and independent backups [S1-S3]. Neon may materially reduce database-only cost [N1]; authentication, API replacement, audit export and operational work must be included before claiming a lower total cost. Existing use of Neon in earlier project history is not disqualifying evidence.
 
-The evidence does not yet establish an acceptable production availability class, monthly ceiling, measured load, complete Supabase service dependency inventory, or tested provider exit. Those gaps block an unconditional recommendation. Do not infer that hyperscalers are rejected on price: region/SKU quotes remain incomplete. A draft is a concrete reviewable architecture proposal, not architecture acceptance.
+The budget band and recovery-first availability preference are now supplied. Exact data-loss tolerance, emergency recovery reserve, measured load, complete Supabase service dependency inventory and tested provider exit remain unresolved. Those gaps block an unconditional recommendation. Do not infer that hyperscalers are rejected on price: region/SKU quotes remain incomplete. A draft is a concrete reviewable architecture proposal, not architecture acceptance.
 
 ## Package contents
 
@@ -41,6 +41,10 @@ Read-only connector inventory identified CoMind project `sbgfuanxiqepcoboxzcl`, 
 Aggregate table counts: comind 94, comind_pm 13, public 18, auth 27, storage 8, realtime 3, supabase_migrations 1, vault 1. Approximate table/index relation bytes total 7,118,848 at observation, excluding system relations, WAL and object bytes. This is not billed disk usage or evidence of empty application tables. No user rows, secrets, auth credentials or object contents were retrieved.
 
 Repository server/src/db.ts uses node-postgres, session advisory locks, and a separately guarded archive connection. apps/operator-console/src/lib/queries/read.ts uses SupabaseClient.from() via the Data API. Transaction pooling cannot be assumed safe for existing session-lock and archive SET ROLE behavior. Migrations use a direct non-pooled connection. No browser may receive database credentials.
+
+## Updated screening under Joseph's preferences
+
+Neon Launch leads the next compatibility investigation: the initial assumed database-only scenario is $21.30/month including the assumed retained history. Gateway/identity replacement can erase that saving and must be measured/costed. Supabase Pro at $25/month without PITR fits the database budget but daily backup loss exposure does not meet the proposed five-minute RPO. Recovery-first concerns downtime, not accepted data loss. No recovery objective was relaxed by implication. Supabase Small plus PITR (~$130) is out of the stated budget. Exact monthly cap below $50 and emergency reserve are still to be confirmed before paid commitment.
 
 ## Decision rules
 

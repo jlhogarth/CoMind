@@ -34,3 +34,9 @@ Next: review draft checkpoint and resolve evidence blockers; use isolated non-pr
 Existing RunBook event `4b96ef6e-08e7-4c68-a21a-b0ada6174ccf` was appended and read back successfully at `2026-10-17T04:13:55.675361Z` (00:13:55 America/Indiana/Indianapolis). It records checkpoint C as partial, no production authorization, findings, evidence, failures, risks and next actions. Its document_commit aa57e97 identifies the local documentation checkpoint, not a published remote commit.
 
 Git HTTPS push failed because no shell GitHub credentials were available. The authenticated GitHub connector was used instead to create the same dedicated branch from the verified base and publish the documentation tree. No credentials were requested, copied or exposed. Remote publication evidence must be verified separately.
+
+## User preference update
+
+Joseph selected under $50/month for managed database costs (excluding SDN hardware and independent backups) and recovery-first availability through the checkpoint questions. This changes the preferred validation candidate to Neon Launch. Supabase Pro daily-only remains possible if larger data-loss exposure is explicitly accepted; its PITR configuration exceeds budget. These preferences are not purchase, migration or activation approval. Recovery-first does not implicitly relax RPO. Checkpoint remains C pending compatibility, total-service cost and data-loss tolerance evidence.
+
+Draft PR: https://github.com/jlhogarth/CoMind/pull/141. Initial remote checkpoint 613040db0b7704c987b21075a8a3d7e35b562676 was fetched and its package matched local files. Publication ledger event 0d3ab554-0b1f-4ac0-b5e8-8696985a89f9 at 2026-10-17T04:14:51.547175Z was read back. No-placeholder and repository configuration CI passed on that initial head; other workflows were in progress at observation. Later heads require fresh CI inspection.

@@ -30,7 +30,7 @@ No plan creates an independently verified hard total cost ceiling merely by enab
 
 ## Screening disposition
 
-Supabase is conditionally preferred for integration simplicity; Neon is the cost challenger. RDS Multi-AZ, Cloud SQL HA, Azure zone-redundant and Aiven Business remain resilience challengers if hot standby/private access requirements outweigh entry cost. Aurora is not justified by measured load yet. None is permanently rejected. A provider with no complete quote cannot be declared economically inferior.
+Following Joseph's under-$50 database budget and recovery-first preference, Neon Launch is the preferred validation candidate; Supabase Pro daily-backup-only is the integration challenger if its data-loss window is accepted. Supabase with PITR exceeds the stated budget. RDS Multi-AZ, Cloud SQL HA, Azure zone-redundant and Aiven Business remain resilience challengers if hot standby/private access requirements outweigh entry cost. Aurora is not justified by measured load yet. None is permanently rejected. A provider with no complete quote cannot be declared economically inferior.
 
 No latency, uptime, failover, vector performance or portability benchmarks were run. SLA percentages represent contracts with exclusions and credits, not measured CoMind end-to-end availability. Provider certification does not certify CoMind.
 

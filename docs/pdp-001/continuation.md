@@ -11,11 +11,11 @@ Never substitute plausibility, confidence, verbosity, convenience, or user agree
 Repository: https://github.com/jlhogarth/CoMind
 Issue: https://github.com/jlhogarth/CoMind/issues/140
 Branch: issue-140-pdp-001-platform-authority
-Decision package: docs/pdp-001/README.md and linked files. Read the current remote branch, AGENTS.md and actual PR state before continuing. Locate the draft PR by this branch; do not assume its number or acceptance.
+Decision package: docs/pdp-001/README.md and linked files. Read the current remote branch, AGENTS.md and actual PR state before continuing. Draft PR: https://github.com/jlhogarth/CoMind/pull/141. Inspect its current head, checks and acceptance.
 
 Verified base at creation: 76e6d9549640d7e726219f7d477dcc2976ebf19c. Reconcile current main and other lanes without overwriting active work. One milestone, issue, branch and draft PR.
 
-Current checkpoint: C, defer binding provider selection. Conditional preferred validation candidate is a NEW separate Supabase Pro Small project with seven-day PITR, about $130/month before other usage and independent backups. Neon Launch/Scale is primary cost challenger. RDS Multi-AZ, Cloud SQL HA, Azure zone-redundant and Aiven Business remain eligible resilience challengers. No provider has been approved for purchase or production.
+Current checkpoint: C, defer binding provider selection. Joseph selected managed database budget under $50/month (excluding SDN hardware and independent backups) and recovery-first availability. Preferred validation candidate is Neon Launch; initial assumed database-only scenario $21.30/month. Supabase Pro daily-only at $25 is an integration alternative if the larger data-loss window is explicitly accepted. Supabase Small plus PITR at ~$130 exceeds budget. Recovery-first does not imply acceptance of a 24-hour RPO. RDS Multi-AZ, Cloud SQL HA, Azure zone-redundant and Aiven Business remain eligible resilience challengers. No provider has been approved for purchase or production.
 
 Read providers.md for dated primary evidence and missing quotes. Google full price retrieval exceeded size; Azure dynamic rates absent; no complete hyperscaler total was invented. Supabase Pro lacks listed platform audit logs and uptime SLA; PrivateLink tier evidence conflicts within pricing page and needs verification. PITR spend is outside spend cap. Database backups exclude object contents. Neon multi-AZ storage does not mean hot standby compute or automatic cross-region replication.
 
@@ -27,7 +27,7 @@ architecture.md contains every failure case, provisional unmeasured RPO/RTO and 
 
 SDN-003 issue #136 and draft PR #137 remain planning-only and unchanged. At PDP acceptance, propose exact dependency updates; do not rewrite SDN-003 before decision acceptance.
 
-Next actions: inspect draft PR/checks and validation.md; resolve Joseph's ordinary/emergency monthly ceiling and required availability class; complete redacted service dependency inventory and comparable region/SKU quotes; prepare isolated PG17 compatibility/load/recovery proofs. Do all safe planning work before seeking any needed paid validation scope. Keep provider selection C where evidence remains critical. Do not claim planning acceptance or production readiness solely because documents exist.
+Next actions: inspect draft PR/checks and validation.md; resolve exact under-$50 cap/emergency reserve and acceptable data-loss window; complete redacted service dependency inventory and comparable region/SKU quotes; prepare isolated PG17 compatibility/load/recovery proofs. Do all safe planning work before seeking any needed paid validation scope. Keep provider selection C where evidence remains critical. Do not claim planning acceptance or production readiness solely because documents exist.
 
 Authority: research, reversible repository documentation/tests and concise existing Durable RunBook capture authorized. NOT authorized: purchases/upgrades, paid production creation, new production credentials, production data movement, DNS/network changes, live routing, destructive lifecycle, deletion, provider decommission or cutover. No production DDL under PDP-001.
 

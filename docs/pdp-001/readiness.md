@@ -77,7 +77,7 @@ PDP acceptance becomes a blocking activation dependency, not permission to activ
 
 | ID | Missing evidence / risk | Owner / resolution | Gate |
 | --- | --- | --- | --- |
-| PDP-R01 | Monthly ordinary/emergency ceiling and availability class undefined | Joseph chooses after reviewing cost/resilience options | Binding selection |
+| PDP-R01 | Under-$50 managed budget and recovery-first selected; exact cap/emergency reserve and acceptable data-loss window unresolved | Joseph specifies remaining business limits after cost/resilience review | Binding selection |
 | PDP-R02 | Peak TPS/concurrency/vector working set, growth and WAL amplification unmeasured | Architecture operator measures representative isolated workload | Sizing and cost acceptance |
 | PDP-R03 | Full Supabase Auth/API/Vault/objects/functions dependency usage unknown | Application owner produces redacted inventory and compatibility rehearsal | Migration selection |
 | PDP-R04 | Exact region/SKU/HA quotes incomplete for hyperscalers; backup vendor unknown | Research/operator retrieves comparable official quote and off-host restore costs | Economic comparison |

@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.1.0",
+  "schema_version": "1.2.0",
   "milestone": "LF-3",
   "title": "Foundry Security and Compatibility Readiness",
   "source_path": "db/migrations/20261008_007_foundry_security_prerequisites.sql",
@@ -18,6 +18,7 @@
     "comind_policy_count": 12,
     "comind_unconditional_true_policy_count": 12,
     "mutable_search_path_function_count": 7,
+    "target_function_security_invoker_count": 7,
     "anon_table_privileges": [],
     "authenticated_table_privileges": [],
     "service_role_select_table_count": 15,
@@ -37,6 +38,7 @@
     "comind_policy_count": 0,
     "comind_unconditional_true_policy_count": 0,
     "mutable_search_path_function_count": 0,
+    "target_function_security_invoker_count": 7,
     "anon_table_privileges": [],
     "authenticated_table_privileges": [],
     "service_role_select_table_count": 15,
@@ -79,6 +81,7 @@
     "removes_unconditional_true_policies": true,
     "revokes_public_anon_authenticated_table_privileges": true,
     "fixes_target_function_search_paths": "comind, public, pg_temp",
+    "changes_target_function_security_mode": false,
     "changes_service_role_grants": false,
     "changes_function_execute_grants": false,
     "changes_schema_usage_grants": false,
@@ -95,8 +98,11 @@
     "live_broad_conversation_document_policy_count": 12,
     "current_canonical_target_function_search_paths_fixed": true,
     "live_mutable_target_function_count": 7,
+    "current_canonical_set_current_actor_security_definer": true,
+    "live_set_current_actor_security_definer": false,
+    "migration_007_changes_target_function_security_mode": false,
     "migration_007_creates_cm_assistant_generation": false,
-    "interpretation": "Migration 007 reconciles current live RLS, broad-policy, and target-function search-path security state but does not reconcile the missing canonical cm_assistant_generation relation."
+    "interpretation": "Migration 007 reconciles current live RLS, broad-policy, and target-function search-path security state but does not reconcile the missing canonical cm_assistant_generation relation or canonical/live set_current_actor security-mode drift."
   },
   "runtime_compatibility_contract": {
     "service_role_bypassrls_required_to_remain_true": true,
@@ -107,6 +113,7 @@
     "core_application_database_role": "must be identified and verified before live activation if a core application runtime is connected to this database",
     "core_application_runtime_compatibility_status": "unresolved",
     "missing_cm_assistant_generation_must_be_reconciled_or_proven_irrelevant_before_core_runtime_compatibility_claim": true,
+    "set_current_actor_security_mode_drift_must_be_reconciled_or_proven_irrelevant_before_core_runtime_compatibility_claim": true,
     "migration_007_does_not_make_database_url_role_safe": true,
     "migration_007_does_not_reconcile_all_canonical_live_schema_drift": true
   },
@@ -138,9 +145,10 @@
   "residual_security_gaps": [
     "Migration 007 is a one-time sweep of current comind tables and does not automatically enable RLS on future tables.",
     "Migration 007 does not alter function EXECUTE privileges; the seven targeted functions retain their existing ACL shape.",
+    "Migration 007 does not alter target function SECURITY INVOKER or SECURITY DEFINER mode.",
     "Migration 007 does not create application or Agent authorization policies.",
     "Migration 007 does not create the repository-defined cm_assistant_generation table that is absent from live Supabase.",
-    "Core application database-role and deployment-surface compatibility remain unresolved until evidenced.",
+    "Core application database-role, function-mode, and deployment-surface compatibility remain unresolved until evidenced.",
     "A lower Security Advisor finding count is not an acceptance criterion by itself."
   ],
   "forward_repair_policy": {

@@ -1,0 +1,70 @@
+name: Brand Runtime
+
+on:
+  pull_request:
+    paths:
+      - "brand/**"
+      - ".github/workflows/brand-runtime.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Validate brand runtime contract
+        run: python brand/validate_runtime.py
+
+      - name: Validate Experience Lab JavaScript syntax
+        run: node --check brand/lab.js
+
+  postgres-registry-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: brand_runtime_ci
+          POSTGRES_DB: comind_brand_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d comind_brand_ci"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=12
+    env:
+      PGPASSWORD: brand_runtime_ci
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Apply proposed brand registry to isolated PostgreSQL 17
+        run: >-
+          psql
+          --host=127.0.0.1
+          --username=postgres
+          --dbname=comind_brand_ci
+          --set=ON_ERROR_STOP=1
+          --file=brand/sql/001_branding_manager_registry.sql
+
+      - name: Execute transactional registry verification
+        run: >-
+          psql
+          --host=127.0.0.1
+          --username=postgres
+          --dbname=comind_brand_ci
+          --set=ON_ERROR_STOP=1
+          --file=brand/sql/verify_branding_manager_registry.sql

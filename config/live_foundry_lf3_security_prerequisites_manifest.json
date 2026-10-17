@@ -1,0 +1,139 @@
+{
+  "schema_version": "1.0.0",
+  "milestone": "LF-3",
+  "title": "Foundry Security and Compatibility Readiness",
+  "source_path": "db/migrations/20261008_007_foundry_security_prerequisites.sql",
+  "source_git_blob_sha": "461a43037301d121ab46ebda083b740baa04212f",
+  "live_migration_name": "live_foundry_lf3_security_prerequisites_v1",
+  "live_migration_version": null,
+  "requires_lf2_baseline": true,
+  "accepted_lf2_main_sha": "596cfd23043a94839f5ca29ed9a714d9f177c63c",
+  "project_ref": "sbgfuanxiqepcoboxzcl",
+  "postgres_version": "17.11",
+  "predeployment_contract": {
+    "migration_ledger_entries": 13,
+    "comind_table_count": 94,
+    "comind_rls_enabled": 19,
+    "comind_rls_disabled": 75,
+    "comind_policy_count": 12,
+    "comind_unconditional_true_policy_count": 12,
+    "mutable_search_path_function_count": 7,
+    "anon_table_privileges": [],
+    "authenticated_table_privileges": [],
+    "service_role_select_table_count": 15,
+    "service_role_insert_table_count": 15,
+    "service_role_update_table_count": 0,
+    "custom_default_acl_count_for_comind_or_global": 0,
+    "security_advisor": {
+      "function_search_path_mutable_warn": 7,
+      "rls_enabled_no_policy_info": 27
+    }
+  },
+  "postdeployment_contract": {
+    "migration_ledger_entries": 14,
+    "comind_table_count": 94,
+    "comind_rls_enabled": 94,
+    "comind_rls_disabled": 0,
+    "comind_policy_count": 0,
+    "comind_unconditional_true_policy_count": 0,
+    "mutable_search_path_function_count": 0,
+    "anon_table_privileges": [],
+    "authenticated_table_privileges": [],
+    "service_role_select_table_count": 15,
+    "service_role_insert_table_count": 15,
+    "service_role_update_table_count": 0,
+    "custom_default_acl_count_for_comind_or_global": 0,
+    "expected_security_advisor": {
+      "function_search_path_mutable_warn": 0,
+      "function_search_path_mutable_warn_delta": -7,
+      "rls_enabled_no_policy_info": 106,
+      "rls_enabled_no_policy_info_delta": 79,
+      "interpretation": "The INFO increase is expected fail-closed coverage, not a claim of security regression or completion."
+    }
+  },
+  "target_functions": [
+    "comind.set_updated_at()",
+    "comind.fn_belief_update_beta(uuid, boolean, jsonb)",
+    "comind.fn_create_causal_node_from_memory(uuid, text, text)",
+    "comind.set_current_actor(uuid)",
+    "comind.current_actor()",
+    "comind.set_updated_at_checklist()",
+    "comind.set_updated_at_research_refs()"
+  ],
+  "policies_removed": [
+    "comind.cm_conversation:conv_modify_own",
+    "comind.cm_conversation:conv_select_all",
+    "comind.cm_conversation:conv_update_own",
+    "comind.cm_doc:doc_modify_all",
+    "comind.cm_doc:doc_select_all",
+    "comind.cm_doc:doc_update_all",
+    "comind.cm_doc_chunk:chunk_modify_all",
+    "comind.cm_doc_chunk:chunk_select_all",
+    "comind.cm_doc_chunk:chunk_update_all",
+    "comind.cm_message:msg_modify_all",
+    "comind.cm_message:msg_select_all",
+    "comind.cm_message:msg_update_all"
+  ],
+  "security_contract": {
+    "enables_rls_on_all_current_comind_tables": true,
+    "removes_unconditional_true_policies": true,
+    "revokes_public_anon_authenticated_table_privileges": true,
+    "fixes_target_function_search_paths": "comind, public, pg_temp",
+    "changes_service_role_grants": false,
+    "changes_function_execute_grants": false,
+    "changes_schema_usage_grants": false,
+    "changes_default_privileges": false,
+    "auto_hardens_future_tables": false,
+    "creates_client_access_policies": false,
+    "expands_agent_authority": false
+  },
+  "runtime_compatibility_contract": {
+    "service_role_bypassrls_required_to_remain_true": true,
+    "postgres_bypassrls_required_to_remain_true": true,
+    "anon_bypassrls_required_to_remain_false": true,
+    "authenticated_bypassrls_required_to_remain_false": true,
+    "operator_console_comind_schema_usage_required": false,
+    "core_application_database_role": "must be identified and verified before live activation if a core application runtime is connected to this database",
+    "migration_007_does_not_make_database_url_role_safe": true
+  },
+  "data_contract": {
+    "creates_tables": false,
+    "creates_rows": false,
+    "changes_protected_row_counts": false,
+    "seeds_agent_rows": false,
+    "executes_agent": false,
+    "executes_provider": false,
+    "changes_provider_registry": false,
+    "changes_operator_console_registry": false
+  },
+  "explicitly_excluded": [
+    "db/migrations/20261008_008_foundry_runtime_orchestration.sql",
+    "db/migrations/20261009_009_foundry_work_lease_kernel.sql",
+    "Agent identity population",
+    "Agent execution",
+    "Virtual Employee activation",
+    "PM Agent execution",
+    "paid-provider execution",
+    "credential creation, rotation, disclosure, or inference",
+    "Operator Console registry expansion",
+    "Archive/PIT-A mutation",
+    "ACP mutation",
+    "Sovereign Data Node mutation",
+    "destructive production rollback"
+  ],
+  "residual_security_gaps": [
+    "Migration 007 is a one-time sweep of current comind tables and does not automatically enable RLS on future tables.",
+    "Migration 007 does not alter function EXECUTE privileges; the seven targeted functions retain their existing ACL shape.",
+    "Migration 007 does not create application or Agent authorization policies.",
+    "A lower Security Advisor finding count is not an acceptance criterion by itself."
+  ],
+  "forward_repair_policy": {
+    "destructive_rollback_default": false,
+    "on_unexpected_live_state": "freeze further LF-3 mutation, preserve evidence, diagnose exact committed delta, and prefer reviewed forward repair"
+  },
+  "approval_boundary": {
+    "repository_readiness_work": "authorized",
+    "live_migration_007": "requires fresh Joseph C4 approval",
+    "t3_merge": "requires explicit human approval under AGENTS.md"
+  }
+}

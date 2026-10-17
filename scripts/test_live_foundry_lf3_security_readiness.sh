@@ -30,10 +30,11 @@ bash "${repository_root}/scripts/test_live_foundry_lf2_agent_substrate.sh"
 # The current canonical base contains the Issue #78 conversation fast-path table
 # cm_assistant_generation and already removes the old broad conversation/document
 # policies. It also already carries fixed search paths on the seven functions that
-# remain mutable in live Supabase. The accepted live initial build predates those
-# repository-only changes. Normalize only this disposable database back to the
-# exact accepted live LF-2 pre-007 shape so migration 007 is tested against what
-# would actually be deployed.
+# remain mutable in live Supabase. Canonical set_current_actor is SECURITY DEFINER,
+# while accepted live is SECURITY INVOKER. The accepted live initial build predates
+# those repository-only changes. Normalize only this disposable database back to
+# the exact accepted live LF-2 pre-007 shape so migration 007 is tested against
+# what would actually be deployed.
 psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 <<'SQL'
 DROP TABLE IF EXISTS comind.cm_assistant_generation CASCADE;
 
@@ -63,6 +64,14 @@ CREATE POLICY msg_modify_all ON comind.cm_message FOR INSERT WITH CHECK (true);
 CREATE POLICY msg_select_all ON comind.cm_message FOR SELECT USING (true);
 CREATE POLICY msg_update_all ON comind.cm_message FOR UPDATE USING (true);
 
+ALTER FUNCTION comind.set_updated_at() SECURITY INVOKER;
+ALTER FUNCTION comind.fn_belief_update_beta(uuid, boolean, jsonb) SECURITY INVOKER;
+ALTER FUNCTION comind.fn_create_causal_node_from_memory(uuid, text, text) SECURITY INVOKER;
+ALTER FUNCTION comind.set_current_actor(uuid) SECURITY INVOKER;
+ALTER FUNCTION comind.current_actor() SECURITY INVOKER;
+ALTER FUNCTION comind.set_updated_at_checklist() SECURITY INVOKER;
+ALTER FUNCTION comind.set_updated_at_research_refs() SECURITY INVOKER;
+
 ALTER FUNCTION comind.set_updated_at() RESET search_path;
 ALTER FUNCTION comind.fn_belief_update_beta(uuid, boolean, jsonb) RESET search_path;
 ALTER FUNCTION comind.fn_create_causal_node_from_memory(uuid, text, text) RESET search_path;
@@ -81,6 +90,7 @@ DECLARE
     v_rls bigint;
     v_policies bigint;
     v_mutable bigint;
+    v_invoker bigint;
 BEGIN
     SELECT count(*), count(*) FILTER (WHERE c.relrowsecurity)
       INTO v_tables, v_rls
@@ -106,6 +116,15 @@ BEGIN
        );
     IF v_mutable <> 7 THEN
         RAISE EXCEPTION 'LF-3 isolated pre-shape mutable search-path count drifted: %', v_mutable;
+    END IF;
+
+    SELECT count(*) INTO v_invoker
+      FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+     WHERE n.nspname='comind'
+       AND p.proname IN ('set_updated_at','fn_belief_update_beta','fn_create_causal_node_from_memory','set_current_actor','current_actor','set_updated_at_checklist','set_updated_at_research_refs')
+       AND p.prosecdef IS FALSE;
+    IF v_invoker <> 7 THEN
+        RAISE EXCEPTION 'LF-3 isolated pre-shape target function invoker count drifted: %', v_invoker;
     END IF;
 END;
 $$;

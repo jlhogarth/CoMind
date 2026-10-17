@@ -33,6 +33,13 @@ test('isolated PostgreSQL 17 reader privilege and HTTP proof',{skip:!raw},async(
   reader=new Pool({connectionString:url.toString(),max:1});
   await verifyRunbookReader(reader);
   await assert.rejects(verifyRunbookReader(admin),/least-privilege/);
+  await admin.query('grant update on comind_pm.pm_projects to comind_runbook_query_login');
+  await assert.rejects(verifyRunbookReader(reader),/least-privilege/);
+  await admin.query('revoke update on comind_pm.pm_projects from comind_runbook_query_login');
+  await admin.query('alter table comind_pm.pm_projects disable row level security');
+  await assert.rejects(verifyRunbookReader(reader),/least-privilege/);
+  await admin.query('alter table comind_pm.pm_projects enable row level security');
+  await verifyRunbookReader(reader);
   for(const view of ['lane_state','timeline','authority','verification']){
    const result=await reader.query(`select project_key from comind_pm.v_runbook_${view}`);
    assert.ok(result.rows.length>0);assert.ok(result.rows.every(r=>r.project_key==='COMIND'));
@@ -46,6 +53,8 @@ test('isolated PostgreSQL 17 reader privilege and HTTP proof',{skip:!raw},async(
   const read=createRunbookReadQuery(reader);
   await assert.rejects(read('select 1/0',[]));
   assert.equal((await read('select 42 as answer',[])).rows[0].answer,42,'connection recovers after rollback');
+  await assert.rejects(read('select pg_sleep(5)',[]),error=>error.code==='57014');
+  assert.equal((await read('select 42 as answer',[])).rows[0].answer,42,'connection recovers after timeout');
   const token=randomBytes(32).toString('hex');
   app=buildRunbookQueryService(read,[{id:'fixture-consumer',token,projects:['COMIND','OTHER']}]);
   for(const kind of ['lanes','events','authority','verifications']){

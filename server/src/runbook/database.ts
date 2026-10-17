@@ -13,6 +13,12 @@ export async function verifyRunbookReader(pool: Pool): Promise<void> {
             OR has_any_column_privilege(current_user,c.oid,'INSERT,UPDATE'))
       )
       AND NOT EXISTS (
+        SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+        WHERE n.nspname='comind_pm' AND c.relkind IN ('r','p')
+          AND c.relname IN ('pm_projects','pm_work_items','pm_events','pm_authorizations','pm_verifications')
+          AND (NOT c.relrowsecurity OR c.relowner=r.oid)
+      )
+      AND NOT EXISTS (
         SELECT 1 FROM pg_namespace n WHERE n.nspname !~ '^pg_' AND has_schema_privilege(current_user,n.oid,'CREATE')
       )
       AND NOT EXISTS (

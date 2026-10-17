@@ -1,3 +1,4 @@
+import { renderLanes } from './lane-view.mjs';
 import { assessHumanAction } from './human-attention.mjs';
 import { routeFor, parseRoute } from './navigation.mjs';
 const value = x => typeof x === 'string' && x.trim() ? x : 'Unavailable: source did not supply this field';
@@ -11,10 +12,13 @@ export function mountCockpit(root, source, { clock = () => new Date().toISOStrin
     root.replaceChildren();
     const route = parseRoute(win.location.hash.slice(1) || '/attention');
     const now = clock();
-    const coverage = section('Source and coverage');
+    const coverage = section('Attention source and coverage');
     coverage.append(el('p', `${source.synthetic === true ? 'SYNTHETIC TEST FIXTURE. ' : ''}${value(source.status)} | ${value(source.sourceRef)}`), el('p', `Source observed: ${value(source.observedAt)}. Assessed: ${now}`));
     if (!route) { section('Unknown route').append(link('Return to attention', '/attention')); }
-    else if (route.entity !== 'attention') {
+    else if (route.entity === 'lanes') {
+      coverage.remove();
+      renderLanes(root, source.lanes, route);
+    } else if (route.entity !== 'attention') {
       section(route.entity).append(el('p', 'Unavailable: canonical entity adapter is not connected. No operational records or counts are inferred.'), el('p', route.id ? `Requested identifier: ${route.id}` : 'No record selected.'));
     } else if (source.status !== 'ready') {
       section('Attention unavailable').append(el('p', value(source.reason)), el('p', 'No count is available. A source failure or missing integration is not an empty queue.'));

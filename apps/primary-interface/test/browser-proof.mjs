@@ -61,6 +61,46 @@ try {
   await page.getByText(expected,{exact:true}).waitFor();
   if(status!=='ready') assert.equal(await page.locator('a.metric').count(),0);
  }
+ // Synthetic DRB envelope exercises the same adapter verified against PostgreSQL.
+ await page.evaluate(async()=>{
+  window.unmountFixture();history.replaceState(null,'','#/lanes');
+  const id='00000000-0000-4000-8000-000000000001';
+  window.laneFixture={version:'drb-002.v1',kind:'lanes',source:'comind_pm.v_runbook_lane_state',source_relations:['comind_pm.v_runbook_lane_state','comind_pm.pm_work_items'],request_id:id,project:'COMIND',lane:null,limit:25,more_available:true,retrieved_at:'2026-10-17T21:00:00Z',data:[{id,project_id:id,project_key:'COMIND',item_type:'lane',work_key:'PI-TEST',title:'Synthetic lane <img src=x onerror=alert(1)>',status:'review',owner:'Synthetic owner',current_summary:'Synthetic summary',next_action:'Inspect fixture',priority:'high'}]};
+  const {mountCockpit}=await import('./src/cockpit.mjs');
+  window.unmountFixture=mountCockpit(document.querySelector('main'),{lanes:{status:'ready',project:'COMIND',synthetic:true,envelope:window.laneFixture}});
+ });
+ await page.getByRole('heading',{name:'Development lane records',exact:true}).waitFor();
+ await page.getByLabel('Search lanes',{exact:true}).fill('Synthetic');
+ await page.getByLabel('Lane lifecycle',{exact:true}).selectOption('review');
+ await page.getByRole('button',{name:'Apply lane filters'}).click();
+ await page.getByRole('link',{name:'1 matching lanes in supplied window',exact:true}).waitFor();
+ await page.getByRole('link',{name:'PI-TEST:',exact:false}).focus();await page.keyboard.press('Enter');
+ await page.getByRole('heading',{name:'Development lane detail',exact:true}).waitFor();
+ assert.ok(page.url().includes('comind_pm.pm_work_items%3A'));
+ await page.getByText('Synthetic owner',{exact:true}).waitFor();
+ assert.equal(await page.locator('img').count(),0);
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+ await page.getByRole('link',{name:'Back to filtered lanes',exact:true}).click();
+ await page.getByLabel('Search lanes',{exact:true}).waitFor();
+ assert.equal(await page.getByLabel('Search lanes',{exact:true}).inputValue(),'Synthetic');
+ assert.equal(await page.getByLabel('Lane lifecycle',{exact:true}).inputValue(),'review');
+ await page.goBack();await page.getByRole('heading',{name:'Development lane detail',exact:true}).waitFor();
+ await page.goForward();await page.getByRole('heading',{name:'Development lane records',exact:true}).waitFor();
+ await page.evaluate(()=>window.location.hash='/lanes/missing');
+ await page.getByText('Lane unavailable in this bounded source window.',{exact:false}).waitFor();
+ for(const [status,mode,expected] of [['ready','empty','No matching lanes in this successful bounded window.'],['ready','duplicate','Lane source integrity unavailable'],['ready','scope','Lane source integrity unavailable'],['missing','empty','Development lanes unavailable'],['failed','empty','Development lanes unavailable'],['forbidden','empty','Development lanes unavailable'],['partial','empty','Development lanes unavailable']]){
+  await page.evaluate(async({status,mode})=>{
+   window.unmountFixture();history.replaceState(null,'','#/lanes');
+   const envelope=structuredClone(window.laneFixture);
+   if(mode==='empty')envelope.data=[];
+   if(mode==='duplicate')envelope.data.push(envelope.data[0]);
+   if(mode==='scope')envelope.project='OTHER';
+   const {mountCockpit}=await import('./src/cockpit.mjs');
+   window.unmountFixture=mountCockpit(document.querySelector('main'),{lanes:{status,project:'COMIND',synthetic:true,envelope}});
+  },{status,mode});
+  await page.getByText(expected,{exact:true}).waitFor();
+  if(status!=='ready'||mode!=='empty')assert.equal(await page.locator('a.metric').count(),0);
+ }
  assert.deepEqual(errors,[]);
  console.log('Browser proof passed: unavailable source, keyboard/focus, escaped text, read-only actions, encoded deep links, evidence drill-down, filter/history, expiry and mobile overflow.');
 } finally {await browser?.close();await new Promise(r=>server.close(r));}

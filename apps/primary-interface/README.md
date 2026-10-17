@@ -77,3 +77,7 @@ Canonical source inspection and unresolved integration requirements: `docs/SOURC
 ## Canonical read projection development
 
 `src/canonical-projections.mjs` provides bounded, dependency-free projections for existing Foundry requests, PM decisions and lane work items. This is a separate source contract, not a complete `assessHumanAction` input. No unsupported conversion is supplied. See `docs/CANONICAL-READS.md` for field semantics, DRB-002 compatibility gap, explicit resolvers and trusted-server activation blockers. Browser integration remains unavailable.
+
+## Read-only development lanes
+
+`mountCockpit` accepts a separate `lanes` source with `status`, expected `project`, and DRB `envelope`. It renders canonical UUID deep links, owner, lifecycle, summary, source times, coverage and unresolved integrations. The adapter and list/detail renderer do not fetch data or authenticate operators. Failed/forbidden/partial/missing responses have no count; malformed scope/IDs fail visibly. Successful counts describe only the supplied filtered window. Default browser remains unavailable until reviewed live transport is activated. Synthetic lane browser proof covers filters, native history, keyboard links, escaping, mobile overflow and failure states.

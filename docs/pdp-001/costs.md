@@ -56,3 +56,7 @@ Proposed budget guardrails: fixed approved SKU/maximum autoscale; no unapproved 
 Joseph selected a managed-database budget under $50/month, excluding SDN hardware and independent backup, and recovery-first availability. This is a planning preference, not purchase authority. Neon Launch initial assumed $21.30 fits database-only; Supabase Pro daily-only $25 also fits but does not satisfy the proposed five-minute RPO. Supabase PITR ~$130 does not fit. Added gateway/identity costs and growth may exceed the budget.
 
 Critical missing inputs: exact cap within the under-$50 band, emergency-recovery reserve, acceptable data-loss window, measured peak load/working set, selected region, SDN hardware/power cost and independent backup quote. Resolver: Joseph for business limits; architecture/operator for measured load and quotes. Until resolved, no complete total or approved cost ceiling exists.
+
+## Long-term two-provider stage
+
+Joseph clarified that the under-$50 amount is the initial managed budget; the eventual target is two production providers with failover. Budget the second provider, replication/egress, retained WAL, warm standby capacity, independent coordination and end-to-end drills separately. No combined future ceiling or approved purchase exists. Initial candidate selection must preserve this path; do not optimize only for the first month's bill. See provider-failover.md.

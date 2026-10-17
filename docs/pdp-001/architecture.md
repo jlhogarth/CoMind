@@ -66,6 +66,10 @@ The following behavior is required design, not verified production behavior. Clo
 
 Offline reads of confidential content require current valid cached access rights. Expired authorization may stop reads as well as writes. Local drafts never become approval records until managed authority validates them. No offline side-effect execution is proposed in PDP-001.
 
+## Future two-provider continuity
+
+See [provider-failover.md](provider-failover.md). Long-term managed control-plane authority can transfer between two independent providers through a fenced single-writer transition. Initial under-$50 deployment is one writer plus recovery, not a claim of dual-provider failover. SDN is not promoted. All future failover, replication and whole-service dependency proofs remain required.
+
 ## Recovery objectives and authority
 
 Provisional objectives for review, not achieved guarantees:

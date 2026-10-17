@@ -21,6 +21,7 @@ The budget band and recovery-first availability preference are now supplied. Exa
 - [Synchronization, failure and recovery design](architecture.md)
 - [Security, migration, risks and acceptance](readiness.md)
 - [Cost scenarios](costs.md)
+- [Staged two-provider failover](provider-failover.md)
 - [RunBook record](runbook.md)
 - [Ready-to-paste continuation](continuation.md)
 
@@ -45,6 +46,10 @@ Repository server/src/db.ts uses node-postgres, session advisory locks, and a se
 ## Updated screening under Joseph's preferences
 
 Neon Launch leads the next compatibility investigation: the initial assumed database-only scenario is $21.30/month including the assumed retained history. Gateway/identity replacement can erase that saving and must be measured/costed. Supabase Pro at $25/month without PITR fits the database budget but daily backup loss exposure does not meet the proposed five-minute RPO. Recovery-first concerns downtime, not accepted data loss. No recovery objective was relaxed by implication. Supabase Small plus PITR (~$130) is out of the stated budget. Exact monthly cap below $50 and emergency reserve are still to be confirmed before paid commitment.
+
+## Long-term availability target
+
+Joseph clarified that $50 is the initial budget and the eventual target is two production provider databases with failover. Selection must preserve a verified path to an independent standby and single-writer promotion. See provider-failover.md for replication, fencing, whole-service portability and future cost gates. No second provider, combined budget or automatic-failover authority is selected.
 
 ## Decision rules
 

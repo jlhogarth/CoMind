@@ -24,10 +24,46 @@ PY
 
 python3 "${repository_root}/scripts/verify_live_foundry_lf3_manifest.py"
 
-# Reproduce the accepted LF-2 production-shaped substrate without migration 007.
+# Reproduce the accepted LF-2 governed substrate without migration 007.
 bash "${repository_root}/scripts/test_live_foundry_lf2_agent_substrate.sh"
 
-# Prove that the disposable fixture still matches the security shape migration 007
+# The current canonical base contains the Issue #78 conversation fast-path table
+# cm_assistant_generation and already removes the old broad conversation/document
+# policies. The accepted live initial build predates that repository-only change:
+# live has no cm_assistant_generation and still has twelve unconditional policies.
+# Normalize only this disposable database back to the exact accepted live LF-2
+# pre-007 shape so migration 007 is tested against what would actually be deployed.
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 <<'SQL'
+DROP TABLE IF EXISTS comind.cm_assistant_generation CASCADE;
+
+DROP POLICY IF EXISTS conv_modify_own ON comind.cm_conversation;
+DROP POLICY IF EXISTS conv_select_all ON comind.cm_conversation;
+DROP POLICY IF EXISTS conv_update_own ON comind.cm_conversation;
+DROP POLICY IF EXISTS doc_modify_all ON comind.cm_doc;
+DROP POLICY IF EXISTS doc_select_all ON comind.cm_doc;
+DROP POLICY IF EXISTS doc_update_all ON comind.cm_doc;
+DROP POLICY IF EXISTS chunk_modify_all ON comind.cm_doc_chunk;
+DROP POLICY IF EXISTS chunk_select_all ON comind.cm_doc_chunk;
+DROP POLICY IF EXISTS chunk_update_all ON comind.cm_doc_chunk;
+DROP POLICY IF EXISTS msg_modify_all ON comind.cm_message;
+DROP POLICY IF EXISTS msg_select_all ON comind.cm_message;
+DROP POLICY IF EXISTS msg_update_all ON comind.cm_message;
+
+CREATE POLICY conv_modify_own ON comind.cm_conversation FOR INSERT WITH CHECK (true);
+CREATE POLICY conv_select_all ON comind.cm_conversation FOR SELECT USING (true);
+CREATE POLICY conv_update_own ON comind.cm_conversation FOR UPDATE USING (true);
+CREATE POLICY doc_modify_all ON comind.cm_doc FOR INSERT WITH CHECK (true);
+CREATE POLICY doc_select_all ON comind.cm_doc FOR SELECT USING (true);
+CREATE POLICY doc_update_all ON comind.cm_doc FOR UPDATE USING (true);
+CREATE POLICY chunk_modify_all ON comind.cm_doc_chunk FOR INSERT WITH CHECK (true);
+CREATE POLICY chunk_select_all ON comind.cm_doc_chunk FOR SELECT USING (true);
+CREATE POLICY chunk_update_all ON comind.cm_doc_chunk FOR UPDATE USING (true);
+CREATE POLICY msg_modify_all ON comind.cm_message FOR INSERT WITH CHECK (true);
+CREATE POLICY msg_select_all ON comind.cm_message FOR SELECT USING (true);
+CREATE POLICY msg_update_all ON comind.cm_message FOR UPDATE USING (true);
+SQL
+
+# Prove that the disposable fixture now matches the security shape migration 007
 # is expected to transform. These are structural gates, not live deployment gates.
 psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 <<'SQL'
 DO $$

@@ -12,6 +12,7 @@ REQUIRED_FILES = {
     "layout.css",
     "motion.css",
     "experience.css",
+    "mode-native.css",
     "comind-brand.css",
     "demo.html",
     "lab.html",
@@ -25,6 +26,7 @@ REQUIRED_IMPORTS = {
     './layout.css',
     './motion.css',
     './experience.css',
+    './mode-native.css',
 }
 
 REQUIRED_SCOPES = {
@@ -116,6 +118,7 @@ def validate_no_remote_runtime_dependencies() -> None:
         ROOT / "layout.css",
         ROOT / "motion.css",
         ROOT / "experience.css",
+        ROOT / "mode-native.css",
         ROOT / "comind-brand.css",
         ROOT / "lab.html",
         ROOT / "lab.js",

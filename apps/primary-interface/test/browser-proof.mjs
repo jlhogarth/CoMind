@@ -73,6 +73,7 @@ try {
  await page.getByLabel('Search lanes',{exact:true}).fill('Synthetic');
  await page.getByLabel('Lane lifecycle',{exact:true}).selectOption('review');
  await page.getByRole('button',{name:'Apply lane filters'}).click();
+ await page.waitForFunction(()=>Array.from(document.querySelectorAll('a')).some(a=>a.textContent.startsWith('PI-TEST:')&&a.getAttribute('href').includes('q=Synthetic')&&a.getAttribute('href').includes('state=review')));
  await page.getByRole('link',{name:'1 matching lanes in supplied window',exact:true}).waitFor();
  await page.getByRole('link',{name:'PI-TEST:',exact:false}).focus();await page.keyboard.press('Enter');
  await page.getByRole('heading',{name:'Development lane detail',exact:true}).waitFor();

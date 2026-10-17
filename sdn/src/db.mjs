@@ -4,7 +4,15 @@ const { Pool } = pg;
 
 export function createPool(connectionString = process.env.DATABASE_URL) {
   if (!connectionString) throw new Error('DATABASE_URL is required');
-  return new Pool({ connectionString, max: 10, idleTimeoutMillis: 10_000, connectionTimeoutMillis: 5_000 });
+  const pool = new Pool({ connectionString, max: 10, idleTimeoutMillis: 10_000, connectionTimeoutMillis: 5_000 });
+  pool.on('error', (error) => {
+    console.error(JSON.stringify({
+      level: 'error',
+      event: 'sdn_postgres_idle_client_error',
+      message: error instanceof Error ? error.message : String(error),
+    }));
+  });
+  return pool;
 }
 
 export async function withTransaction(pool, fn) {

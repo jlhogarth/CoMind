@@ -1,0 +1,48 @@
+import { randomUUID } from 'node:crypto';
+import { canonicalJson, sha256 } from './canonical.mjs';
+import { createPool, withTransaction } from './db.mjs';
+
+const pool=createPool();
+const asOf=new Date(process.env.SDN_AS_OF||Date.now());
+if(Number.isNaN(asOf.getTime())) throw new Error('SDN_AS_OF must be an ISO-8601 timestamp');
+const asOfIso=asOf.toISOString();
+const jobKey=sha256(`evaluate:${asOfIso}`);
+async function recordEvaluation(c,e,j,o,t,d){ await c.query(`INSERT INTO sdn_lifecycle.evaluations(evaluation_id,job_id,event_pk,producer_id,event_id,policy_version_id,lifecycle_class,outcome,details,evaluated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::timestamptz)`,[randomUUID(),j,e.event_pk,e.producer_id,e.event_id,e.policy_version_id,e.lifecycle_class,o,canonicalJson(d),t]); }
+async function transition(c,e,type,t,d){ await c.query(`INSERT INTO sdn_lifecycle.transition_ledger(transition_id,event_pk,producer_id,event_id,transition_type,policy_version_id,details,recorded_at) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::timestamptz)`,[randomUUID(),e.event_pk,e.producer_id,e.event_id,type,e.policy_version_id,canonicalJson(d),t]); }
+async function main(){
+ const summary=await withTransaction(pool,async c=>{
+  const interrupted=await c.query(`UPDATE sdn_lifecycle.jobs SET status='interrupted',finished_at=$1::timestamptz,error_code='lease_expired',error_detail='Worker lease expired before completion.' WHERE status='running' AND lease_expires_at IS NOT NULL AND lease_expires_at <= $1::timestamptz RETURNING job_id`,[asOfIso]);
+  const prior=await c.query('SELECT job_id,status FROM sdn_lifecycle.jobs WHERE job_key=$1',[jobKey]);
+  if(prior.rowCount===1&&prior.rows[0].status==='completed') return {duplicateJob:true,jobId:prior.rows[0].job_id,interruptedRecovered:interrupted.rowCount};
+  const jobId=prior.rows[0]?.job_id??randomUUID();
+  if(prior.rowCount===0) await c.query(`INSERT INTO sdn_lifecycle.jobs(job_id,job_key,job_type,status,as_of,started_at,lease_expires_at) VALUES ($1,$2,'evaluate','running',$3::timestamptz,clock_timestamp(),clock_timestamp()+interval '5 minutes')`,[jobId,jobKey,asOfIso]);
+  else await c.query(`UPDATE sdn_lifecycle.jobs SET status='running',started_at=clock_timestamp(),finished_at=NULL,lease_expires_at=clock_timestamp()+interval '5 minutes',error_code=NULL,error_detail=NULL WHERE job_id=$1`,[jobId]);
+  const events=await c.query(`SELECT e.*,
+    EXTRACT(EPOCH FROM r.summary_after)::double precision AS summary_after_seconds,
+    EXTRACT(EPOCH FROM r.compact_after)::double precision AS compact_after_seconds,
+    EXTRACT(EPOCH FROM r.expire_after)::double precision AS expire_after_seconds,
+    r.delete_allowed,
+    EXISTS(SELECT 1 FROM sdn_lifecycle.holds h WHERE h.event_pk=e.event_pk AND h.released_at IS NULL AND h.starts_at <= $1::timestamptz AND (h.ends_at IS NULL OR h.ends_at > $1::timestamptz)) AS has_active_hold
+    FROM sdn_telemetry.events e
+    LEFT JOIN sdn_lifecycle.retention_rules r ON r.policy_version_id=e.policy_version_id AND r.lifecycle_class=e.lifecycle_class
+    ORDER BY e.ingested_at,e.event_pk`,[asOfIso]);
+  const outcomes={retained:0,summarized:0,compacted:0,eligible:0,blocked:0};
+  for(const e of events.rows){
+   const age=Math.max(0,(asOf.getTime()-new Date(e.ingested_at).getTime())/1000);
+   const sa=e.summary_after_seconds==null?null:Number(e.summary_after_seconds);
+   const ca=e.compact_after_seconds==null?null:Number(e.compact_after_seconds);
+   const ea=e.expire_after_seconds==null?null:Number(e.expire_after_seconds);
+   if(e.delete_allowed==null){ await recordEvaluation(c,e,jobId,'blocked_missing_policy',asOfIso,{ageSeconds:age}); outcomes.blocked++; continue; }
+   let derivative=await c.query(`SELECT s.summary_id,s.summary_hash,s.verified_at FROM sdn_summary.summaries s JOIN sdn_summary.summary_sources ss ON ss.summary_id=s.summary_id WHERE ss.source_event_pk=$1 ORDER BY s.created_at DESC LIMIT 1`,[e.event_pk]);
+   if(sa!=null&&age>=sa&&derivative.rowCount===0){ const id=randomUUID(),v=typeof e.payload?.value==='number'?e.payload.value:null; const content=e.lifecycle_class==='D'?{kind:'metric-rollup-v1',eventType:e.event_type,sampleCount:1,min:v,max:v,sum:v,sourcePayloadHash:e.payload_hash}:{kind:'current-state-v1',eventType:e.event_type,state:e.payload,sourcePayloadHash:e.payload_hash}; const hash=sha256(content); await c.query(`INSERT INTO sdn_summary.summaries(summary_id,summary_kind,lifecycle_class,algorithm_id,algorithm_version,content,summary_hash,source_count,created_at,verified_at) VALUES ($1,$2,$3,'deterministic-json','1',$4::jsonb,$5,1,$6::timestamptz,$6::timestamptz)`,[id,content.kind,e.lifecycle_class,canonicalJson(content),hash,asOfIso]); await c.query(`INSERT INTO sdn_summary.summary_sources(summary_id,source_event_pk,source_producer_id,source_event_id,source_payload_hash) VALUES ($1,$2,$3,$4,$5)`,[id,e.event_pk,e.producer_id,e.event_id,e.payload_hash]); await transition(c,e,'summarized',asOfIso,{summaryId:id,summaryHash:hash}); outcomes.summarized++; derivative={rowCount:1,rows:[{summary_id:id,summary_hash:hash,verified_at:asOfIso}]}; }
+   let manifest=await c.query(`SELECT manifest_id,source_count,source_set_hash,verification_status,verified_at FROM sdn_lifecycle.compaction_manifests WHERE source_event_pk=$1 ORDER BY created_at DESC LIMIT 1`,[e.event_pk]);
+   if(e.lifecycle_class==='D'&&ca!=null&&age>=ca&&manifest.rowCount===0&&derivative.rowCount===1){ const id=randomUUID(),setHash=sha256(`${e.producer_id}:${e.event_id}:${e.payload_hash}`); await c.query(`INSERT INTO sdn_lifecycle.compaction_manifests(manifest_id,source_event_pk,policy_version_id,algorithm_id,algorithm_version,source_count,source_set_hash,derivative_summary_id,verification_status,created_at,verified_at) VALUES ($1,$2,$3,'source-set-sha256','1',1,$4,$5,'verified',$6::timestamptz,$6::timestamptz)`,[id,e.event_pk,e.policy_version_id,setHash,derivative.rows[0].summary_id,asOfIso]); await c.query(`INSERT INTO sdn_lifecycle.compaction_manifest_sources(manifest_id,source_event_pk,source_producer_id,source_event_id,source_payload_hash) VALUES ($1,$2,$3,$4,$5)`,[id,e.event_pk,e.producer_id,e.event_id,e.payload_hash]); await transition(c,e,'compaction_verified',asOfIso,{manifestId:id,sourceSetHash:setHash}); outcomes.compacted++; manifest={rowCount:1,rows:[{manifest_id:id,verification_status:'verified',verified_at:asOfIso}]}; }
+   let outcome='retained'; const detail={ageSeconds:age,deleteAllowed:e.delete_allowed,hasActiveHold:e.has_active_hold};
+   if(e.lifecycle_class==='A'||e.delete_allowed===false) outcome='retained_authoritative'; else if(ea==null) outcome='blocked_missing_expiration_policy'; else if(age<ea) outcome='retained_before_expiry'; else if(e.has_active_hold) outcome='blocked_hold'; else if(derivative.rowCount!==1||!derivative.rows[0].verified_at) outcome='blocked_missing_derivative'; else if(e.lifecycle_class==='D'&&(manifest.rowCount!==1||manifest.rows[0].verification_status!=='verified'||!manifest.rows[0].verified_at)) outcome='blocked_incomplete_compaction'; else outcome='eligible';
+   await recordEvaluation(c,e,jobId,outcome,asOfIso,detail); if(outcome==='eligible')outcomes.eligible++; else if(outcome.startsWith('blocked_'))outcomes.blocked++; else outcomes.retained++;
+  }
+  await c.query(`UPDATE sdn_lifecycle.jobs SET status='completed',finished_at=clock_timestamp(),lease_expires_at=NULL,result=$2::jsonb WHERE job_id=$1`,[jobId,canonicalJson(outcomes)]);
+  return {duplicateJob:false,jobId,interruptedRecovered:interrupted.rowCount,...outcomes};
+ }); console.log(JSON.stringify({asOf:asOfIso,...summary}));
+}
+try{await main();}finally{await pool.end();}

@@ -1,11 +1,47 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "1.1.0",
   "issue": 116,
+  "reconciliation_issue": 123,
   "purpose": "Governed live Foundry activation Stage 1 budget-authority foundation",
   "authoritative_source_main_sha": "1d40350450d0352810cb9beb6f22d8d4b624fba0",
+  "reconciled_authoritative_main_sha": "4d625c340f8864791d373640affec4aa99204a07",
   "live_supabase_project_ref": "sbgfuanxiqepcoboxzcl",
   "engineering_tier": "T3",
   "live_mutation_authority": "C4 explicit human approval required",
+  "reviewed_live_baseline": {
+    "evidence_state": "read_only_reconciliation",
+    "observed_operator_console_issue": 118,
+    "observed_operator_console_pr": 119,
+    "observed_operator_console_pr_head": "57d83293cb88f79e1910f3bff98d16f92ccf5c9c",
+    "expected_migrations_pre_stage1": [
+      {
+        "version": "20261005213616",
+        "name": "comind_base_v2_initial_build"
+      },
+      {
+        "version": "20261006051527",
+        "name": "comind_pm_ledger_maintenance_package_v0_1"
+      },
+      {
+        "version": "20261006051627",
+        "name": "comind_pm_ledger_hardening_v0_1_1"
+      },
+      {
+        "version": "20261015211851",
+        "name": "operator_console_live_activation_v0_2"
+      },
+      {
+        "version": "20261015212201",
+        "name": "operator_console_service_role_least_privilege_v0_2_1"
+      },
+      {
+        "version": "20261015212719",
+        "name": "operator_console_explicit_deny_policies_v0_2_2"
+      }
+    ],
+    "unknown_migration_drift_must_fail_closed": true,
+    "operator_console_live_schema_authority_active_at_reconciliation": true
+  },
   "finops_projection": {
     "source_path": "db/migrations/20260910_001_comind_finops_resource_governor.sql",
     "source_git_blob_sha": "c5922026aa27b0656a10fe76d29bb17a0e87ca0d",
@@ -87,10 +123,21 @@
     "paid-provider execution",
     "credential creation or rotation"
   ],
+  "future_compatibility_gates": {
+    "foundry_agent_substrate_before_security_sweep": true,
+    "operator_console_public_registry_non_exposure_required": true,
+    "stage1_public_relations_must_not_be_auto_registered_for_console_admin": true,
+    "foundry_runtime_must_not_depend_on_operator_console_admin_rpc": true
+  },
   "parallel_lane_boundaries": {
-    "operator_console_pr": 113,
-    "operator_console_may_mutate_live_schema": false,
+    "operator_console_issue": 118,
+    "operator_console_pr": 119,
+    "operator_console_observed_head": "57d83293cb88f79e1910f3bff98d16f92ccf5c9c",
+    "operator_console_holds_live_schema_mutation_authority": true,
+    "live_foundry_may_mutate_live_schema": false,
+    "requires_operator_console_terminal_baseline_before_live_stage1": true,
     "chatgpt_archive_pit_a_is_separate": true,
+    "sovereign_data_node_issue_122_must_not_mutate_live_supabase": true,
     "single_live_schema_mutation_lane": true
   }
 }

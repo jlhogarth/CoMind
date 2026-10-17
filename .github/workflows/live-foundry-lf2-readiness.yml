@@ -1,0 +1,58 @@
+name: Live Foundry LF-2 Readiness
+
+on:
+  pull_request:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lf2-agent-substrate-readiness:
+    name: LF-2 Agent substrate without LF-3
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.6-pg17-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+    steps:
+      - name: Check out exact workflow head
+        uses: actions/checkout@v4
+
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          printf 'Exact LF-2 workflow head verified: %s\n' "${GITHUB_SHA}"
+
+      - name: Install PostgreSQL client and Python
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client python3
+
+      - name: Verify LF-2 manifest integrity
+        run: python3 ./scripts/verify_live_foundry_lf2_manifest.py
+
+      - name: Verify LF-2 production-shaped isolated substrate
+        run: bash ./scripts/test_live_foundry_lf2_agent_substrate.sh
+
+      - name: Evaluate exact live postdeployment SQL in isolated shape
+        run: bash ./scripts/test_live_foundry_lf2_postdeploy_contract_shape.sh

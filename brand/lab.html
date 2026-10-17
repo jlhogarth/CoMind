@@ -18,10 +18,13 @@
       </div>
     </div>
 
-    <div class="cm-mode-switch" aria-label="Experience intensity">
-      <button class="cm-mode-button cm-focus-bloom" type="button" data-set-experience="calm" aria-pressed="false">Calm</button>
-      <button class="cm-mode-button cm-focus-bloom" type="button" data-set-experience="operational" aria-pressed="true">Operational</button>
-      <button class="cm-mode-button cm-focus-bloom" type="button" data-set-experience="cinematic" aria-pressed="false">Cinematic</button>
+    <div class="cm-cluster" style="justify-content: flex-end;">
+      <span class="cm-mode-readout" data-current-experience aria-live="polite">Mode: operational</span>
+      <div class="cm-mode-switch" aria-label="Experience intensity">
+        <button class="cm-mode-button cm-focus-bloom" type="button" data-set-experience="calm" aria-pressed="false">Calm</button>
+        <button class="cm-mode-button cm-focus-bloom" type="button" data-set-experience="operational" aria-pressed="true">Operational</button>
+        <button class="cm-mode-button cm-focus-bloom" type="button" data-set-experience="cinematic" aria-pressed="false">Cinematic</button>
+      </div>
     </div>
   </header>
 
@@ -69,7 +72,7 @@
     <section class="cm-grid cm-stagger" aria-label="Brand runtime characteristics">
       <article class="cm-panel cm-panel--padded cm-metric" data-comind-scope="cognition">
         <div class="cm-metric-value">Signal</div>
-        <div class="cm-metric-label">Caribbean blue identifies cognition, data movement, and active system focus.</div>
+        <div class="cm-metric-label">Blue-shifted Caribbean signal identifies cognition, data movement, and active system focus.</div>
       </article>
       <article class="cm-panel cm-panel--padded cm-metric" data-comind-scope="operator">
         <div class="cm-metric-value">Agency</div>

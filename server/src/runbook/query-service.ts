@@ -19,7 +19,7 @@ const sources = {
 } as const;
 // Explicit projection avoids leaking details/conditions or future columns through SELECT *.
 const columns = {
-  lanes: 'project_key,work_key,title,status,current_summary,last_event_at,next_action',
+  lanes: 's.project_key,w.id,w.project_id,w.item_type,s.work_key,s.title,s.status,s.priority,s.owner,s.current_summary,s.last_event_at,s.next_action,w.updated_at',
   events: 'event_id,project_key,work_key,occurred_at,action_summary,result_summary,outcome,next_action,source_system,source_ref,evidence',
   authority: 'authorization_id,project_key,work_key,effective_at,authorization_type,decision,scope,authorized_by,expires_at,source_system,source_ref,evidence',
   verifications: 'verification_id,project_key,work_key,verified_at,check_name,outcome,result_summary,verified_by,event_id,evidence',
@@ -59,19 +59,24 @@ export function buildRunbookQueryService(read: ReadQuery, principals: Principal[
     if (!principal.projects.includes(input.project)) return fail(403, 'forbidden');
     if (active >= 4) { reply.header('Retry-After', '1'); return fail(429, 'busy'); }
     const [view, timestamp, tie] = sources[input.kind];
+    // work_key is globally UNIQUE in pm_work_items. Both sides retain reader RLS.
+    const laneJoin = input.kind === 'lanes'
+      ? " JOIN comind_pm.pm_work_items w ON w.work_key = s.work_key AND w.item_type = 'lane'" : '';
     active++;
     try {
       const result = await read(
-        `SELECT ${columns[input.kind]} FROM comind_pm.${view}
-         WHERE project_key = $1 AND ($2::text IS NULL OR work_key = $2)
-         AND ($3::timestamptz IS NULL OR ${timestamp} > $3::timestamptz)
-         ORDER BY ${timestamp} DESC NULLS LAST, ${tie} DESC LIMIT $4`,
+        `SELECT ${columns[input.kind]} FROM comind_pm.${view} s${laneJoin}
+         WHERE s.project_key = $1 AND ($2::text IS NULL OR s.work_key = $2)
+         AND ($3::timestamptz IS NULL OR s.${timestamp} > $3::timestamptz)
+         ORDER BY s.${timestamp} DESC NULLS LAST, s.${tie} DESC LIMIT $4`,
         [input.project, input.lane ?? null, input.since ?? null, input.limit + 1]);
       const more = result.rows.length > input.limit;
       const data = result.rows.slice(0, input.limit);
       const body = { version: 'drb-002.v1', request_id: requestId,
         retrieved_at: new Date(now()).toISOString(), source: `comind_pm.${view}`,
         project: input.project, lane: input.lane ?? null, kind: input.kind,
+        limit: input.limit, source_relations: input.kind === 'lanes'
+          ? [`comind_pm.${view}`, 'comind_pm.pm_work_items'] : [`comind_pm.${view}`],
         more_available: more, data };
       if (Buffer.byteLength(JSON.stringify(body)) > 262144) return fail(413, 'result_too_large');
       return body;

@@ -1,7 +1,7 @@
 name: DRB-002 Query Contract
 on:
   pull_request:
-    paths: ['server/**', 'db/**', '.github/workflows/drb-002-query.yml']
+    paths: ['server/**', 'db/**', 'apps/primary-interface/**', '.github/workflows/drb-002-query.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -31,6 +31,7 @@ jobs:
           cache-dependency-path: server/package-lock.json
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run build
+      - run: node --test ../apps/primary-interface/test/*.test.mjs
       - run: node --test test/runbook-query.test.mjs
       - run: node --test test/runbook-query.integration.test.mjs
         env:

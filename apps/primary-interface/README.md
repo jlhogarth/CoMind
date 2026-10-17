@@ -73,3 +73,7 @@ Serve the repository root, for example with `python -m http.server 8000`, then o
 Entity URLs use hash routes (`#/attention/:id`) for portable static hosting without server rewrites. The reserved product paths remain `/attention`, `/lanes`, `/ves`, `/runbook`, `/evidence`. Native links, forms, skip link, visible focus and hash history support keyboard/back/forward navigation. Query filters persist in detail links and return links. A headline count links to precisely its filtered source snapshot, never to an inferred live total. Other entity detail routes identify the requested record and explain unavailable adapters.
 
 Canonical source inspection and unresolved integration requirements: `docs/SOURCE-MAP.md`. Browser proof: `node apps/primary-interface/test/browser-proof.mjs` with Playwright and Chromium installed; `PI_PLAYWRIGHT_MODULE` can point to a separately installed Playwright package. No browser package is a production dependency.
+
+## Canonical read projection development
+
+`src/canonical-projections.mjs` provides bounded, dependency-free projections for existing Foundry requests, PM decisions and lane work items. This is a separate source contract, not a complete `assessHumanAction` input. No unsupported conversion is supplied. See `docs/CANONICAL-READS.md` for field semantics, DRB-002 compatibility gap, explicit resolvers and trusted-server activation blockers. Browser integration remains unavailable.

@@ -37,3 +37,11 @@ First browser run failed because skip-link `#content` replaced the entity route.
 
 Next chat title: CoMind Continue Primary Interface PI-001 Canonical Read Projections #003.
 Read current PR #143 / #139 / #119 heads and all checks first. Continue T1 reversible repository development with existing authority boundaries. Specify and test canonical read projections for attention and development lanes from existing Foundry and PM/RunBook sources. Missing joins, revisions, freshness or access policy remain explicit blockers owned by PI/Foundry/DRB integration owners. Do not expose private schemas, create duplicate registries, infer executing VEs or enable decisions. Preserve BRAND dependency and OC ownership. Refresh this handoff at consequential changes. Report STATUS / CHANGED / WHY / IMPACT / VERIFIED / OPEN / NEXT; JOSEPH only when action is required.
+
+## Canonical Read Projections 003 checkpoint
+
+Read current remote state before further changes. This slice adds a pure canonical projection module and tests, plus docs/CANONICAL-READS.md. Local suite: 31 passed. Source domains remain separate; source UUIDs/status values and bounded coverage preserved; missing joins/revision/evidence/access remain explicit. Browser stays unavailable and decision controls disabled. No live DB capture claimed.
+
+Inspected DRB-002 at 842f0cd on drb-002-governed-query (issue #144). Its read service remains an unactivated prototype. Its lane response lacks UUID required by PI's canonical work-item identity. Coordinate via durable evidence; do not merge or change DRB work solely for PI convenience.
+
+Next: independently review projection contracts and field semantics, resolve lane UUID/field contract with DRB and authored attention/revision/evidence contract with Foundry. Establish tested trusted-server operator read access under separate activation authority before browser integration. Keep #143 draft and stacked on #139; OC #119 stays separate. Inspect exact-head CI after publication. P0 VE/RunBook/evidence integration remains open.

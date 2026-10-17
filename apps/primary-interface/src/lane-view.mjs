@@ -36,8 +36,9 @@ export function renderLanes(root, source, route) {
     return;
   }
   const s=section('Development lane records'),form=el('form'),label=el('label','Search lanes'),input=el('input');
-  input.value=route.filters.q;label.append(input);
+  input.setAttribute('aria-label','Search lanes');input.value=route.filters.q;label.append(input);
   const stateLabel=el('label','Lane lifecycle'),select=el('select');
+  select.setAttribute('aria-label','Lane lifecycle');
   const statuses=new Set(['backlog','ready','in_progress','blocked','review','done','canceled','deferred',...page.records.map(r=>r.lifecycle).filter(x=>typeof x==='string')]);
   for(const status of ['',...statuses]){const o=el('option',status||'All');o.value=status;select.append(o);}select.value=route.filters.state;
   stateLabel.append(select);form.append(label,stateLabel,el('button','Apply lane filters'));

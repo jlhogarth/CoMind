@@ -4,6 +4,12 @@ on:
   pull_request:
     paths:
       - "apps/operator-console/**"
+      - "db/migrations/20261015_001_operator_console_live_activation.sql"
+      - "db/migrations/20261015_002_operator_console_service_role_least_privilege.sql"
+      - "db/migrations/20261015_003_operator_console_explicit_deny_policies.sql"
+      - "db/migrations/verify_20261015_001_operator_console_live_activation.sql"
+      - "db/migrations/verify_20261015_003_operator_console_explicit_deny_policies.sql"
+      - "scripts/test_operator_console_live_activation.sh"
       - ".github/workflows/operator-console.yml"
   workflow_dispatch:
 
@@ -36,9 +42,74 @@ jobs:
         run: test -z "$(git status --porcelain -- package-lock.json)"
       - name: Install locked dependencies
         run: npm ci
+      - name: Reject high or critical production dependency advisories
+        run: npm audit --omit=dev --audit-level=high
       - name: Test
         run: npm test
       - name: Typecheck
         run: npm run typecheck
       - name: Build
         run: npm run build
+      - name: Build portable self-host image
+        run: |
+          docker build \
+            --build-arg NEXT_PUBLIC_SUPABASE_URL="https://example.supabase.co" \
+            --build-arg NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="sb_publishable_ci_public_value" \
+            --tag comind/operator-console:ci \
+            .
+      - name: Smoke test fail-closed self-host runtime
+        run: |
+          set -euo pipefail
+          docker run --detach \
+            --name operator-console-ci \
+            --publish 127.0.0.1:3000:3000 \
+            comind/operator-console:ci
+          trap 'docker rm --force operator-console-ci >/dev/null 2>&1 || true' EXIT
+
+          ready=false
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            if curl --fail --silent --show-error http://127.0.0.1:3000/ >/dev/null; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+          test "$ready" = "true"
+
+          schema_status="$(curl --silent --output /tmp/schema.json --write-out '%{http_code}' http://127.0.0.1:3000/api/schema)"
+          test "$schema_status" = "503"
+
+          admin_status="$(curl --silent --output /tmp/admin.json --write-out '%{http_code}' \
+            --request POST \
+            --header 'content-type: application/json' \
+            --data '{}' \
+            http://127.0.0.1:3000/api/admin/mutations)"
+          test "$admin_status" = "503"
+
+  database-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+      - name: Verify Operator Console live-activation database contract
+        run: bash ./scripts/test_operator_console_live_activation.sh

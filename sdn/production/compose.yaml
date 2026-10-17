@@ -189,6 +189,7 @@ services:
     environment:
       RESTIC_REPOSITORY: /repository
       RESTIC_PASSWORD_FILE: /run/secrets/restic_password
+      RESTIC_CACHE_DIR: /tmp/restic-cache
     command: ["version"]
     read_only: true
     tmpfs:

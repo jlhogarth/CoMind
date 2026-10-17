@@ -44,3 +44,7 @@ Draft PR: https://github.com/jlhogarth/CoMind/pull/141. Initial remote checkpoin
 ## Two-provider long-term requirement
 
 Joseph clarified: "$50" is the initial budget; eventual target is two production provider DBs with failover. Added provider-failover.md and linked stage/dependency/cost/continuity requirements. No production standby or automatic failover authority granted. Initial selection must demonstrate a credible independent-provider route; complete-service failover, fencing, replication permissions and future combined costs remain proof requirements. Upstream PostgreSQL logical replication restrictions and slot management were verified against primary PG17 documentation.
+
+## Neon history correction
+
+Joseph recalled prior Neon incompatibility with ChatGPT. Personal Context retrieval returned October 4-6 accounts of missing Neon database MCP tools despite enabled skills, blocked direct SQL/network/browser auth, and transaction_read_only=on on the old target. The repository independently records the October 5 move from Neon-specific automation to Supabase. These are attributed historical records, not new Neon tests or proof of provider-wide failure. Supabase connector SQL and RunBook capture work in this session. Neon lead nomination is superseded by a compatibility block; checkpoint remains C. No paid environment or new credentials used.

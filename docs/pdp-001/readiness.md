@@ -91,6 +91,10 @@ PDP acceptance becomes a blocking activation dependency, not permission to activ
 
 Joseph remains accountable until implementation owners are explicitly assigned; these role labels do not invent running VEs or delegated assignments. No exceptions are approved. Any later exception needs Joseph's named decision, scope, expiry and compensating evidence.
 
+## Historical Neon operational compatibility gate
+
+Neon is blocked from lead-candidate status until the earlier ChatGPT/Work tool-exposure, network/authentication and read-only migration failures are reconciled with current reproducible evidence. See neon-history.md. Supplier capability documentation does not establish usable access in Joseph's workflow. Supabase is the working reference; its recovery/cost gaps remain.
+
 ## Additional long-term selection gate
 
 Joseph requires an eventual two-provider production failover path. Validate provider-pair replication permissions, compatibility, independent failure domains, fencing and Auth/API/object portability before representing a candidate as suitable for that target. See provider-failover.md. This adds a design requirement, not a requirement to provision two providers during PDP-001 or fit both under the initial budget. Future combined cost and loss/failover targets remain unresolved.

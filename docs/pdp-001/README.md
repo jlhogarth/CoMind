@@ -8,7 +8,7 @@ Base: `76e6d9549640d7e726219f7d477dcc2976ebf19c`.
 
 ## Decision checkpoint
 
-**C: defer binding provider selection pending critical evidence.** Joseph selected under $50/month for the managed database (excluding SDN hardware and independent backups) and recovery-first availability. Preferred next validation candidate: Neon Launch. Supabase Pro with daily backups remains an integration-simple alternative only if its larger data-loss window is explicitly accepted. Neither is selected for purchase or activation.
+**C: defer binding provider selection pending critical evidence.** Joseph selected under $50/month for the managed database (excluding SDN hardware and independent backups) and recovery-first availability. Neon is compatibility-blocked pending repeatable ChatGPT/Work access and migration proof; no provider is preferred unconditionally. Supabase Pro with daily backups remains an integration-simple alternative only if its larger data-loss window is explicitly accepted. Neither is selected for purchase or activation.
 
 Supabase's existing API integration reduces transition risk, but is not a reason to waive recovery, security, or cost requirements. Its recovery-equipped entry is approximately $130/month for one Small project, before other usage and independent backups [S1-S3]. Neon may materially reduce database-only cost [N1]; authentication, API replacement, audit export and operational work must be included before claiming a lower total cost. Existing use of Neon in earlier project history is not disqualifying evidence.
 
@@ -17,6 +17,7 @@ The budget band and recovery-first availability preference are now supplied. Exa
 ## Package contents
 
 - [Provider comparison and evidence](providers.md)
+- [Prior Neon compatibility evidence](neon-history.md)
 - [Data authority matrix](authority.csv)
 - [Synchronization, failure and recovery design](architecture.md)
 - [Security, migration, risks and acceptance](readiness.md)
@@ -45,7 +46,7 @@ Repository server/src/db.ts uses node-postgres, session advisory locks, and a se
 
 ## Updated screening under Joseph's preferences
 
-Neon Launch leads the next compatibility investigation: the initial assumed database-only scenario is $21.30/month including the assumed retained history. Gateway/identity replacement can erase that saving and must be measured/costed. Supabase Pro at $25/month without PITR fits the database budget but daily backup loss exposure does not meet the proposed five-minute RPO. Recovery-first concerns downtime, not accepted data loss. No recovery objective was relaxed by implication. Supabase Small plus PITR (~$130) is out of the stated budget. Exact monthly cap below $50 and emergency reserve are still to be confirmed before paid commitment.
+Neon Launch pricing is only a conditional investigation: the initial assumed database-only scenario is $21.30/month including the assumed retained history. Prior October ChatGPT/Work tool exposure, network/authentication and read-only migration blockers must be reproduced and resolved before Neon can lead. Gateway/identity replacement can erase that saving and must be measured/costed. Supabase Pro at $25/month without PITR fits the database budget but daily backup loss exposure does not meet the proposed five-minute RPO. Recovery-first concerns downtime, not accepted data loss. No recovery objective was relaxed by implication. Supabase Small plus PITR (~$130) is out of the stated budget. Exact monthly cap below $50 and emergency reserve are still to be confirmed before paid commitment.
 
 ## Long-term availability target
 

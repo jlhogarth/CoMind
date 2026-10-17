@@ -31,15 +31,32 @@ jobs:
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
     steps:
-      - name: Check out exact workflow head
+      - name: Check out exact workflow candidate
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
-      - name: Verify exact checked-out head
+      - name: Verify exact checked-out candidate
         shell: bash
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
-          printf 'Exact LF-3 workflow head verified: %s\n' "${GITHUB_SHA}"
+          printf 'Exact LF-3 workflow candidate verified: %s\n' "${GITHUB_SHA}"
+
+      - name: Verify exact PR source and base parents
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          EXPECTED_SOURCE_HEAD: ${{ github.event.pull_request.head.sha }}
+          EXPECTED_BASE_HEAD: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          actual_base="$(git rev-parse HEAD^1)"
+          actual_source="$(git rev-parse HEAD^2)"
+          test "${actual_base}" = "${EXPECTED_BASE_HEAD}"
+          test "${actual_source}" = "${EXPECTED_SOURCE_HEAD}"
+          printf 'Exact LF-3 PR base verified: %s\n' "${actual_base}"
+          printf 'Exact LF-3 PR source head verified: %s\n' "${actual_source}"
 
       - name: Install PostgreSQL client and Python
         shell: bash

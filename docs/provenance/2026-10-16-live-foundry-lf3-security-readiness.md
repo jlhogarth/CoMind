@@ -79,7 +79,21 @@ The repository application DB layer uses the role embedded in `DATABASE_URL` for
 
 The connected Railway inventory currently contains only the OC-002 acceptance Operator Console service. Its browser relational surface is the public schema and migration 007 does not change the Operator Console registry. No connected Railway core CoMind application service was found during this readiness review.
 
+A Vercel project named `co-mind` was found in the connected Vercel inventory. Project-detail inspection was denied by the current connector scope, so its deployment configuration and database identity were not verified. No secret value was requested or read. This remains an explicit deployment-surface uncertainty, not evidence that the project is or is not connected to this Supabase database.
+
 Deployment activation must fail closed if a current core application runtime using this live database is later identified with a non-BYPASSRLS database role that depends on direct `comind` access without policies.
+
+## Canonical repository versus live schema drift discovered by LF-3 CI
+
+The first production-shaped LF-3 workflow proved that the current canonical repository build and the accepted live database are not identical even before migration 007. Current canonical `MASTER.sql` produces 95 `comind` tables with 20 RLS-enabled tables, while accepted live LF-2 has 94 and 19.
+
+The extra canonical relation is `comind.cm_assistant_generation`, introduced by Issue #78 for conversation fast-path generation ownership. Its provenance explicitly deferred live Supabase mutation and production deployment. Current server routes reference the table for assistant generation and conversation status, but the table is absent from accepted live Supabase.
+
+The current canonical security SQL also already removes the twelve broad conversation/document/message policies and already fixes the seven target function search paths. Live Supabase still contains those twelve policies and still reports the seven mutable-search-path functions. Migration 007 is therefore a live reconciliation mechanism for those security differences, not a reason to rewrite the current canonical base backward.
+
+Migration 007 does not create `cm_assistant_generation`. The missing relation is pre-existing canonical/live drift and remains outside LF-3's authorized mutation scope. It must be reconciled under the appropriate canonical-schema lane or proven irrelevant to any current live core application runtime before LF-3 can make a core-runtime compatibility claim.
+
+The LF-3 isolated test deliberately normalizes only its disposable database back to the exact accepted live pre-007 state: it removes `cm_assistant_generation`, reinstates the twelve accepted live broad policies, and resets the seven target functions' search paths. It then requires migration 007 itself to produce the intended postdeployment security state. This preserves the distinction between current canonical implementation and current deployed reality.
 
 ## Authority reconciliation
 
@@ -89,11 +103,15 @@ No global runtime lock is claimed. The governing control remains explicit coordi
 
 Migration 007 still requires fresh C4 approval. Repository readiness work does not consume that approval.
 
-## Verification defect and forward repair
+## Verification defects, evidence, and forward repairs
 
-The first execution of the new read-only LF-3 preflight failed only `target_functions_still_mutable_ok`. Diagnosis showed the verifier joined `pg_proc` by function name before constraining the namespace, allowing same-named functions in other schemas to create a false failure.
+The first execution of the new read-only LF-3 live preflight failed only `target_functions_still_mutable_ok`. Diagnosis showed the verifier joined `pg_proc` by function name before constraining the namespace, allowing same-named functions in other schemas to create a false failure. No production drift or mutation occurred. The verifier was repaired to constrain target functions to `comind` before matching identity arguments, and the repaired committed preflight passed every live gate.
 
-No production drift or mutation occurred. The verifier was repaired to constrain target functions to `comind` before matching identity arguments. The repaired committed preflight was rerun and passed every gate. This converts the failure into a regression-resistant catalog query rather than silently dismissing it.
+The first dedicated LF-3 CI run then failed before migration 007 because the current canonical isolated builder produced 95 `comind` tables with 20 RLS-enabled, not the accepted live 94 and 19. Diagnosis identified repository-only `cm_assistant_generation`. The test was repaired by normalizing only the disposable fixture to the live table and policy shape rather than weakening the 94/19 production contract.
+
+The next LF-3 CI run reached that repaired 94/19/12-policy shape but found zero mutable-search-path functions rather than live's seven. Diagnosis established that the current canonical build already fixes those search paths. The disposable live-shape normalizer was hardened again to reset only the seven migration-007 target function search paths before asserting the predeployment contract. Migration 007 must then restore all seven fixed paths.
+
+Each failure was bounded to read-only live inspection or disposable CI. No live database mutation occurred. Each repair preserved the production contract and made the reason for canonical/live normalization explicit rather than lowering an assertion to make CI pass.
 
 ## Repository readiness package
 
@@ -107,7 +125,7 @@ The LF-3 branch adds:
 - `.github/workflows/live-foundry-lf3-readiness.yml`;
 - this provenance record.
 
-The isolated workflow rebuilds the accepted LF-2 production-shaped substrate, proves the migration 007 pre-shape, applies migration 007 twice for idempotency, runs the existing generic migration 007 verifier, reruns the LF-2 service-role verifier after 007, checks protected Agent/PM state, and evaluates the exact LF-3 live postdeployment SQL against disposable boundary fixtures.
+The isolated workflow rebuilds the accepted LF-2 governed substrate, normalizes the disposable canonical database to the exact accepted live pre-007 security shape, proves that pre-shape, applies migration 007 twice for idempotency, runs the existing generic migration 007 verifier, reruns the LF-2 service-role verifier after 007, checks protected Agent/PM state, and evaluates the exact LF-3 live postdeployment SQL against disposable boundary fixtures.
 
 ## Residual gaps deliberately not broadened into LF-3
 
@@ -115,8 +133,9 @@ The isolated workflow rebuilds the accepted LF-2 production-shaped substrate, pr
 2. Migration 007 does not change default privileges.
 3. Migration 007 does not change function EXECUTE privileges.
 4. Migration 007 does not create application or Agent RLS policies.
-5. Migration 007 does not prove compatibility for an unidentified future application database role.
-6. Migration 007 does not activate Agents, Virtual Employees, PM Agents, providers, or paid execution.
+5. Migration 007 does not create the canonical `cm_assistant_generation` relation that is absent from live Supabase.
+6. Migration 007 does not prove compatibility for an unidentified core application database role or an uninspected deployment surface.
+7. Migration 007 does not activate Agents, Virtual Employees, PM Agents, providers, or paid execution.
 
 These are explicit boundaries, not hidden completion claims.
 
@@ -126,13 +145,14 @@ Unexpected live state freezes further LF-3 mutation. Preserve committed evidence
 
 ## Human approval boundary
 
-Before any T3 merge or live deployment:
+Before T3 merge of the readiness package:
 
 1. exact-head LF-3 CI must pass;
 2. current authoritative main must be reverified;
 3. live read-only preflight must still pass;
 4. schema-mutation authority must still belong to Live Foundry;
-5. any live core application database role must be identified or explicitly established as not operating against this database;
-6. Joseph must provide the required approval.
+5. Joseph must provide the required T3 approval.
+
+Before any live migration 007 execution, the separate C4 gate also requires current deployment-surface and database-role compatibility evidence. The known missing `cm_assistant_generation` canonical relation must be reconciled or proven irrelevant to any operating core runtime. T3 merge approval must not be interpreted as C4 deployment approval.
 
 No live migration 007 execution occurred during this readiness work.

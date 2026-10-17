@@ -23,3 +23,17 @@ Local contract/routing validation: 26 passed. Brand static and no-marker validat
 Before this slice, remote readback confirmed all returned checks passed on PI `041ed219024cf540997cbe32ae676215c024cfe6`, BRAND `c5fc5d8bfd818a3feb22f5585bde93059a255658`, and OC `f831b89e405351cbdbaaaf113f291f7a56d72215`. All three PRs remain draft, unmerged and cleanly mergeable at that readback. Read current heads again. Keep #143 stacked on #139 until accepted merge. No OC files changed.
 
 Next: finish browser CI proof and repair any failure; verify mobile rendering and unavailable/partial/forbidden/malformed source behavior; then specify a reviewed trusted-server canonical projection before implementing live source integration. P0 lanes/VE/RunBook adapters remain open. No production activation or security expansion.
+
+## Browser verification and next handoff
+
+Implementation head `69ad323a66d9e74523f5ddb1b7ab55f3e771b757` passed the expanded Primary Interface browser and 26 contract/routing tests:
+https://github.com/jlhogarth/CoMind/actions/runs/39063615542
+No Placeholder Policy passed:
+https://github.com/jlhogarth/CoMind/actions/runs/39063615500
+Main CI (inspect completion/current head):
+https://github.com/jlhogarth/CoMind/actions/runs/39063615520
+
+First browser run failed because skip-link `#content` replaced the entity route. Repair `9050633d0282cceab8daefaf29dec21853d649ac` prevents that route mutation and moves focus directly. Repaired proof passed, then `69ad323` expanded source-state coverage and passed again. Browser acceptance here is synthetic development verification, not live data, production identity, assistive-technology certification or deployment acceptance.
+
+Next chat title: CoMind Continue Primary Interface PI-001 Canonical Read Projections #003.
+Read current PR #143 / #139 / #119 heads and all checks first. Continue T1 reversible repository development with existing authority boundaries. Specify and test canonical read projections for attention and development lanes from existing Foundry and PM/RunBook sources. Missing joins, revisions, freshness or access policy remain explicit blockers owned by PI/Foundry/DRB integration owners. Do not expose private schemas, create duplicate registries, infer executing VEs or enable decisions. Preserve BRAND dependency and OC ownership. Refresh this handoff at consequential changes. Report STATUS / CHANGED / WHY / IMPACT / VERIFIED / OPEN / NEXT; JOSEPH only when action is required.

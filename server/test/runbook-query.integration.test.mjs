@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { randomBytes } from 'node:crypto';
 import { Pool } from 'pg';
+import { projectRunbookLanes } from '../../apps/primary-interface/src/drb-lanes.mjs';
 import { buildRunbookQueryService } from '../dist/runbook/query-service.js';
 import { createRunbookReadQuery, verifyRunbookReader } from '../dist/runbook/database.js';
 
@@ -61,6 +62,15 @@ test('isolated PostgreSQL 17 reader privilege and HTTP proof',{skip:!raw},async(
    for(const project of ['COMIND','OTHER']){
     const res=await app.inject({method:'POST',url:'/v1/runbook/query',headers:{authorization:'Bearer '+token},payload:{kind,project}});
     assert.equal(res.statusCode,200);assert.equal(res.json().data.length>0,project==='COMIND');
+    if(kind==='lanes' && project==='COMIND') {
+     const projected=projectRunbookLanes(res.json(),'COMIND');
+     const canonical=(await admin.query("select id,project_id from comind_pm.pm_work_items where work_key='COMIND-FIXTURE'")).rows[0];
+     assert.equal(projected.records[0].sourceId,canonical.id);
+     assert.equal(projected.records[0].source.project_id,canonical.project_id);
+     assert.equal(projected.records[0].source.owner,null);
+     assert.equal(projected.records[0].source.item_type,'lane');
+     assert.equal(projected.coverage.total,null);
+    }
    }
   }
   const original=(await admin.query("select name from comind_pm.pm_projects where project_key='COMIND'")).rows[0].name;

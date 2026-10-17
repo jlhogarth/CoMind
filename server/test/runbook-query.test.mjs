@@ -50,3 +50,16 @@ test('concurrent capacity rejects the fifth query',async()=>{
  releases.forEach(release=>release());assert.ok((await Promise.all(requests)).every(res=>res.statusCode===200));
  }finally{releases.forEach(release=>release());await app.close();}
 });
+test('lane projection adds canonical UUIDs and explicit fields without arbitrary metadata',async()=>{
+ const app=buildRunbookQueryService(async(sql,params)=>{
+  assert.match(sql,/w\.id,w\.project_id,w\.item_type/);
+  assert.match(sql,/JOIN comind_pm\.pm_work_items w ON w\.work_key = s\.work_key AND w\.item_type = 'lane'/);
+  assert.match(sql,/s\.owner/);assert.doesNotMatch(sql,/metadata|SELECT \*/);
+  assert.deepEqual(params,['COMIND',null,null,26]);return {rows:[]};
+ },principals);
+ try{
+  const res=await app.inject({method:'POST',url:'/v1/runbook/query',headers,payload:{project:'COMIND',kind:'lanes'}});
+  assert.equal(res.statusCode,200);assert.equal(res.json().limit,25);
+  assert.deepEqual(res.json().source_relations,['comind_pm.v_runbook_lane_state','comind_pm.pm_work_items']);
+ }finally{await app.close();}
+});

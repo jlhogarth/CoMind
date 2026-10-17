@@ -3,6 +3,9 @@ on:
   pull_request:
     paths:
       - 'apps/primary-interface/**'
+      - 'server/src/primary-interface/**'
+      - 'server/test/pi-read*'
+      - 'server/src/runbook/**'
       - '.github/workflows/primary-interface.yml'
   workflow_dispatch:
 permissions:
@@ -23,3 +26,10 @@ jobs:
           node "$RUNNER_TEMP/pi-browser/node_modules/playwright/cli.js" install --with-deps chromium
       - name: Read-only browser navigation proof
         run: PI_PLAYWRIGHT_MODULE="$RUNNER_TEMP/pi-browser/node_modules/playwright" node apps/primary-interface/test/browser-proof.mjs
+      - name: Build isolated trusted read gateway
+        run: |
+          npm ci --prefix server --ignore-scripts --no-audit --no-fund
+          npm run build --prefix server
+      - name: Browser trusted read connection proof
+        working-directory: server
+        run: PI_PLAYWRIGHT_MODULE="$RUNNER_TEMP/pi-browser/node_modules/playwright" node test/pi-read-browser.mjs

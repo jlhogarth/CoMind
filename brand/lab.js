@@ -1,5 +1,6 @@
 (() => {
   const root = document.documentElement;
+  const body = document.body;
   const modeButtons = [...document.querySelectorAll("[data-set-experience]")];
   const scopeButtons = [...document.querySelectorAll("[data-set-scope]")];
   const runButton = document.querySelector("[data-run-scenario]");
@@ -10,6 +11,7 @@
   const log = document.querySelector("[data-lab-log]");
   const heroVisual = document.querySelector("[data-hero-visual]");
   const scopePreview = document.querySelector("[data-scope-preview]");
+  const modeReadout = document.querySelector("[data-current-experience]");
 
   const allowedModes = new Set(["calm", "operational", "cinematic"]);
   const allowedScopes = new Set(["cognition", "operator", "governance", "success", "warning", "danger"]);
@@ -65,6 +67,18 @@
   const setMode = (mode, announce = true) => {
     if (!allowedModes.has(mode)) return;
     root.dataset.comindExperience = mode;
+    body.dataset.comindExperience = mode;
+
+    if (modeReadout) {
+      modeReadout.textContent = `Mode: ${mode}`;
+      modeReadout.dataset.mode = mode;
+    }
+
+    if (heroVisual) {
+      heroVisual.classList.remove("cm-mode-change");
+      void heroVisual.offsetWidth;
+      heroVisual.classList.add("cm-mode-change");
+    }
 
     modeButtons.forEach((button) => {
       button.setAttribute(

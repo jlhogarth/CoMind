@@ -63,3 +63,13 @@ Browser roles receive only explicitly reviewed least-privilege/RLS projections. 
 ## Verification and recovery
 
 Run `node --test apps/primary-interface/test/*.test.mjs`. Tests use identified synthetic fixtures only. Dedicated CI has no network/provider/database calls. Work is additive T1 repository development, with no new package dependencies or paid cost. Evaluation is linear in evidence/reference count. Revert PI-only commits to recover; BRAND-001 and OC-002 files are untouched.
+
+## Read-only browser detail and navigation
+
+Serve the repository root, for example with `python -m http.server 8000`, then open `http://localhost:8000/apps/primary-interface/index.html#/attention`. This is a development browser surface, not a deployed operational cockpit. The default source is explicitly unavailable; no mock operational metrics or records are bundled into the entry point.
+
+`src/cockpit.mjs` renders the existing assessment, source coverage/time, stop reason, authority boundary, recommendation, consequences, evidence/freshness issues, RunBook references and disabled decision controls. Missing fields remain unavailable. No history contents are inferred from references. Every decision control remains disabled even when the presentation contract is reviewable. Refresh assessment rechecks time; displayed assessment time is explicit and there is no background rerender that would destroy keyboard focus or an unfinished filter.
+
+Entity URLs use hash routes (`#/attention/:id`) for portable static hosting without server rewrites. The reserved product paths remain `/attention`, `/lanes`, `/ves`, `/runbook`, `/evidence`. Native links, forms, skip link, visible focus and hash history support keyboard/back/forward navigation. Query filters persist in detail links and return links. A headline count links to precisely its filtered source snapshot, never to an inferred live total. Other entity detail routes identify the requested record and explain unavailable adapters.
+
+Canonical source inspection and unresolved integration requirements: `docs/SOURCE-MAP.md`. Browser proof: `node apps/primary-interface/test/browser-proof.mjs` with Playwright and Chromium installed; `PI_PLAYWRIGHT_MODULE` can point to a separately installed Playwright package. No browser package is a production dependency.

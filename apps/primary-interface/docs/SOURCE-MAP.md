@@ -1,0 +1,16 @@
+# PI-001 canonical source inspection
+
+Inspected on 2026-10-17 from the PI branch based on `041ed219024cf540997cbe32ae676215c024cfe6`. Repository definitions establish candidate mappings, not current live contents or access proof.
+
+| Domain | Existing canonical repository source | Projection gap / boundary |
+| --- | --- | --- |
+| Foundry attention | `db/migrations/20261008_006_foundry_agent_substrate.sql`: `cm_foundry_authorization_request`, `cm_foundry_authorization_decision` | Request has actor/profile/capability, authority level, environment, target, reason, evidence references and times. Status vocabulary differs from PI. No PI revision, recommendation, consequences or direct lane/RunBook relation. Do not infer a safe mapping or invent missing fields. |
+| Project decisions | `db/migrations/20261006_001_comind_pm_ledger.sql`: `pm_decision_records`, linked `pm_work_items` | Existing options, selected option, rationale, actor/time and metadata. Separate decision domain from Foundry. No common concurrency revision or evidence-expiry contract established. |
+| Durable RunBook | `db/migrations/20261016_001_durable_runbook_foundation.sql`: `pm_events`, `pm_authorizations`, `pm_verifications`, `pm_event_links`; `v_runbook_timeline`, `v_runbook_authority`, `v_runbook_verification`, `v_runbook_lane_state` | Reuse these records and views. Provenance document `docs/provenance/2026-10-16-drb-001-durable-runbook-live-foundation.md` reports live deployment, but this lane has not independently queried live data. Private schema: ordinary browser roles have no access. No direct browser adapter authorized. |
+| Lanes and evidence | PM ledger `pm_work_items`, `pm_work_item_dependencies`, `pm_links`; RunBook event links and verifications | Need explicit lane identity joins, source coverage, access filtering, observation time and evidence expiry/conflict semantics. Passing a check is not timeless evidence. |
+| VE operations | Agent substrate `cm_foundry_agent_profile`, capability grants, execution context; `db/migrations/20261009_009_foundry_work_lease_kernel.sql` | Registry, grants, contexts and leases have distinct meanings. None alone establishes current execution. Use canonical identities; no second registry. |
+| Decision graph | `db/sql/v2/05_schema_decision_conflict.sql` | Decision-tree graph is not a human approval queue or authority ledger. |
+
+Next integration owner: PI-001 with Foundry and DRB owners. Required before a live adapter: reviewed trusted-server identity/access projection; exact source keys and relation joins; status mapping; revision/concurrency semantics; bounded pagination and coverage; freshness policy; explicit missing/failed/forbidden/partial/empty states; tests against canonical schemas. No database mutation or new registry is introduced here.
+
+The default browser entry point intentionally supplies unavailable source state and no records. The view can consume the existing PI projection through `mountCockpit`; automated browser proof alone injects clearly marked synthetic fixtures. Source references render as text, with internal encoded drill-down links. Arbitrary external source URLs are not followed.

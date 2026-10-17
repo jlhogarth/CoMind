@@ -2,9 +2,9 @@
 
 ## Purpose
 
-The CoMind Brand Runtime is the framework-agnostic visual contract for CoMind HTML interfaces. It turns branding from a collection of page-local styling decisions into a reusable system of semantic color, field depth, layout, motion, interaction state, and accessibility behavior.
+The CoMind Brand Runtime is the framework-agnostic visual contract for CoMind HTML interfaces. It turns branding from a collection of page-local styling decisions into a reusable system of semantic color, field depth, layout, motion, interaction state, accessibility behavior, experience intensity, and versioned application adoption.
 
-The runtime is intentionally CSS-first. Plain HTML can consume it directly, and React or Next.js applications can adopt the same contract without depending on a specific component library or animation package.
+The runtime is CSS-first. Plain HTML can consume it directly, and React or Next.js applications can adopt the same contract without depending on a specific component library or paid animation package.
 
 ## Visual concept
 
@@ -16,6 +16,8 @@ The system uses four visual ideas:
 2. **Signal**: Caribbean blue and luminous aqua identify cognition, active systems, focus, and information flow.
 3. **Human agency**: copper and warm gold identify decisions, provenance, operator action, and consequential intervention.
 4. **Motion with meaning**: animation communicates state, hierarchy, causality, entry, completion, or attention. Motion is not ornamental noise.
+
+A core rule is: **stillness is the default; motion means something.**
 
 ## Stable HTML contract
 
@@ -37,15 +39,50 @@ Apply semantic scope to any subtree that needs a different accent language:
 <section data-comind-scope="danger">...</section>
 ```
 
-Scope changes semantic accent variables. Components should consume semantic variables such as `--cm-accent`, `--cm-accent-soft`, and `--cm-accent-border` instead of embedding product-specific hexadecimal values.
+Scope changes semantic accent variables. Components should consume variables such as `--cm-accent`, `--cm-accent-soft`, and `--cm-accent-border` instead of embedding product-specific hexadecimal values.
+
+## Experience intensity
+
+The runtime defines three presentation modes:
+
+- `calm`: reduced field movement and lower ambient intensity for reading-heavy or contemplative workflows.
+- `operational`: the default balance for daily application use.
+- `cinematic`: stronger field depth, faster orbital/signal motion, and greater visual drama for high-value entry, command, presentation, and showcase surfaces.
+
+Set the mode at the document root:
+
+```html
+<html data-comind-experience="operational">
+```
+
+These modes affect presentation only. They never represent system authority, security, certification, or production state.
 
 ## Files
 
 - `tokens.css`: canonical palette, semantic tokens, typography, spacing, radius, depth, timing, and easing.
 - `layout.css`: application field, shell, rail, stage, hero, grid, panel, stack, cluster, and command primitives.
 - `motion.css`: page reveal, stagger, field drift, signal sweep, node pulse, focus bloom, and reduced-motion behavior.
-- `comind-brand.css`: aggregate entry point.
-- `demo.html`: static reference composition using only the brand runtime.
+- `experience.css`: Calm, Operational, and Cinematic modes plus richer visual-system primitives.
+- `comind-brand.css`: aggregate CSS entry point.
+- `demo.html`: minimal static reference composition.
+- `lab.html`: interactive Experience Lab.
+- `lab.js`: dependency-free interaction controller for the Experience Lab.
+- `sql/001_branding_manager_registry.sql`: repository-only PostgreSQL registry design for versioned brand profiles, scopes, modes, application bindings, and evidence.
+- `sql/verify_branding_manager_registry.sql`: transactional verification script for the proposed registry.
+
+## Experience Lab
+
+Open `lab.html` with the adjacent runtime files available.
+
+The lab supports:
+
+- Calm, Operational, and Cinematic intensity switching.
+- semantic scope switching across cognition, operator, governance, success, warning, and danger.
+- a manual reduced-motion preview.
+- a visual state simulation that moves through cognition, governance, operator review, and verified completion.
+- a local event stream that records only in-browser presentation events.
+
+The simulation has no API calls, no database calls, and no production side effects.
 
 ## Motion vocabulary
 
@@ -73,6 +110,10 @@ Use for keyboard focus and high-value interaction focus. It reinforces the acces
 
 Use after a successful state transition or completion. The motion should end in a quiet stable state.
 
+### Core and orbit
+
+Use the dimensional core and orbit language only on high-value surfaces such as product entry, orchestration, system overview, or presentation views. Do not place it behind dense tables or long-form reading surfaces.
+
 ## Motion restrictions
 
 Do not animate body text, dense tables, destructive confirmation copy, audit evidence, or values whose visual stability is important for interpretation.
@@ -81,7 +122,7 @@ Do not use continuous high-frequency movement as decoration. Continuous motion i
 
 Prefer `transform` and `opacity`. Avoid uncontrolled paint-heavy filters and large animated shadows.
 
-All nonessential animation must become effectively static when `prefers-reduced-motion: reduce` is active.
+All nonessential animation must become effectively static when `prefers-reduced-motion: reduce` is active. The Experience Lab also provides a manual reduced-motion preview.
 
 ## Layout vocabulary
 
@@ -95,6 +136,8 @@ All nonessential animation must become effectively static when `prefers-reduced-
 - `.cm-stack`: vertical rhythm primitive.
 - `.cm-cluster`: wrapping horizontal grouping primitive.
 - `.cm-command-bar`: action and status region.
+- `.cm-experience-stage`: dramatic two-region introduction surface.
+- `.cm-experience-visual`: bounded visual field for dimensional state representation.
 
 Applications may compose these primitives without inheriting a fixed page design.
 
@@ -105,6 +148,7 @@ Applications may compose these primitives without inheriting a fixed page design
 - Reduced-motion preferences are honored globally.
 - Motion must not obscure text or interfere with reading order.
 - Semantic scopes are visual only and do not grant authority or imply a security state.
+- Experience intensity must not alter information availability.
 - Application teams remain responsible for accessible names, landmarks, keyboard order, and semantic HTML.
 
 ## Branding Manager capability contract
@@ -113,14 +157,33 @@ The CoMind Branding Manager owns and evolves:
 
 - canonical semantic tokens and palette provenance;
 - scope names and compatibility rules;
+- Calm, Operational, and Cinematic experience policies;
 - approved motion vocabulary and restrictions;
 - layout and surface primitives;
 - application adoption guidance;
 - accessibility and performance constraints;
 - versioned change history and migration guidance;
-- visual acceptance criteria for future web applications.
+- visual acceptance criteria for future web applications;
+- future application-to-brand-profile binding policy.
 
 The Branding Manager does not own application business logic, authorization, database policy, or security state. A visual scope must never be treated as an authorization control.
+
+## Proposed persistent registry
+
+The SQL under `brand/sql/` is a design artifact only and is not applied by BRAND-001.
+
+It models:
+
+- named brand profiles;
+- immutable accepted versions;
+- semantic scopes;
+- experience modes;
+- layout presets;
+- application bindings;
+- append-only branding lifecycle evidence;
+- accepted-profile and application-brand catalog views.
+
+The SQL grants no access to `PUBLIC`. A future live deployment must receive a separate authority classification, migration review, RLS/service-identity design where applicable, isolated PostgreSQL proof, and explicit production authorization.
 
 ## Operator Console coordination
 
@@ -130,11 +193,13 @@ BRAND-001 intentionally does not modify `apps/operator-console`. PR #119 remains
 
 1. Import or serve `comind-brand.css`.
 2. Apply `.cm-app` and a semantic `data-comind-scope` at the application root.
-3. Replace page-local palette values with semantic tokens.
-4. Adopt layout primitives only where they simplify existing structure.
-5. Add motion where it communicates a real state or transition.
-6. Verify keyboard focus, contrast, reduced-motion behavior, responsive layout, and application-specific visual regression.
+3. Choose an experience intensity appropriate to the surface.
+4. Replace page-local palette values with semantic tokens.
+5. Adopt layout primitives only where they simplify existing structure.
+6. Add motion where it communicates a real state or transition.
+7. Verify keyboard focus, contrast, reduced-motion behavior, responsive layout, and application-specific visual regression.
+8. Bind an application to a persistent profile only after the registry is separately approved and deployed.
 
 ## Governance
 
-BRAND-001 is T1 reversible repository development. It does not authorize production deployment or changes to production authority boundaries.
+BRAND-001 is T1 reversible repository development. It does not authorize production deployment, database migration, or changes to production authority boundaries.

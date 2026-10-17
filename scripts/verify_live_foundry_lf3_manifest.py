@@ -27,7 +27,7 @@ def fail(message: str) -> None:
 
 manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
 
-if manifest.get("schema_version") != "1.1.0":
+if manifest.get("schema_version") != "1.2.0":
     fail("LF-3 manifest schema version drifted")
 if manifest.get("milestone") != "LF-3":
     fail("LF-3 manifest milestone drifted")
@@ -54,14 +54,18 @@ if (pre.get("comind_table_count"), pre.get("comind_rls_enabled"), pre.get("comin
     fail("LF-3 predeployment RLS baseline drifted")
 if (pre.get("comind_policy_count"), pre.get("comind_unconditional_true_policy_count")) != (12, 12):
     fail("LF-3 predeployment policy baseline drifted")
-if (pre.get("mutable_search_path_function_count")) != 7:
+if pre.get("mutable_search_path_function_count") != 7:
     fail("LF-3 predeployment mutable function baseline drifted")
+if pre.get("target_function_security_invoker_count") != 7:
+    fail("LF-3 predeployment target function security mode drifted")
 if (post.get("comind_table_count"), post.get("comind_rls_enabled"), post.get("comind_rls_disabled")) != (94, 94, 0):
     fail("LF-3 postdeployment RLS contract drifted")
 if (post.get("comind_policy_count"), post.get("comind_unconditional_true_policy_count")) != (0, 0):
     fail("LF-3 postdeployment policy contract drifted")
 if post.get("mutable_search_path_function_count") != 0:
     fail("LF-3 postdeployment mutable function contract drifted")
+if post.get("target_function_security_invoker_count") != 7:
+    fail("LF-3 postdeployment target function security mode drifted")
 
 advisor = post.get("expected_security_advisor", {})
 if advisor.get("function_search_path_mutable_warn") != 0 or advisor.get("function_search_path_mutable_warn_delta") != -7:
@@ -71,6 +75,7 @@ if advisor.get("rls_enabled_no_policy_info") != 106 or advisor.get("rls_enabled_
 
 security = manifest.get("security_contract", {})
 for key in (
+    "changes_target_function_security_mode",
     "changes_service_role_grants",
     "changes_function_execute_grants",
     "changes_schema_usage_grants",
@@ -95,6 +100,12 @@ if drift.get("current_canonical_target_function_search_paths_fixed") is not True
     fail("LF-3 manifest must record canonical target function hardening")
 if drift.get("live_mutable_target_function_count") != 7:
     fail("LF-3 manifest live mutable function drift count changed")
+if drift.get("current_canonical_set_current_actor_security_definer") is not True:
+    fail("LF-3 manifest must record canonical set_current_actor SECURITY DEFINER mode")
+if drift.get("live_set_current_actor_security_definer") is not False:
+    fail("LF-3 manifest must record live set_current_actor SECURITY INVOKER mode")
+if drift.get("migration_007_changes_target_function_security_mode") is not False:
+    fail("LF-3 must not imply migration 007 changes function security mode")
 if drift.get("migration_007_creates_cm_assistant_generation") is not False:
     fail("LF-3 must not imply migration 007 reconciles missing canonical tables")
 
@@ -103,6 +114,8 @@ if runtime.get("core_application_runtime_compatibility_status") != "unresolved":
     fail("LF-3 must not claim core runtime compatibility without evidence")
 if runtime.get("missing_cm_assistant_generation_must_be_reconciled_or_proven_irrelevant_before_core_runtime_compatibility_claim") is not True:
     fail("LF-3 missing canonical table compatibility gate drifted")
+if runtime.get("set_current_actor_security_mode_drift_must_be_reconciled_or_proven_irrelevant_before_core_runtime_compatibility_claim") is not True:
+    fail("LF-3 function security-mode compatibility gate drifted")
 if runtime.get("migration_007_does_not_reconcile_all_canonical_live_schema_drift") is not True:
     fail("LF-3 must preserve partial-reconciliation boundary")
 

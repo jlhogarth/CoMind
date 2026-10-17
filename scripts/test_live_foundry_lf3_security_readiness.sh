@@ -29,10 +29,11 @@ bash "${repository_root}/scripts/test_live_foundry_lf2_agent_substrate.sh"
 
 # The current canonical base contains the Issue #78 conversation fast-path table
 # cm_assistant_generation and already removes the old broad conversation/document
-# policies. The accepted live initial build predates that repository-only change:
-# live has no cm_assistant_generation and still has twelve unconditional policies.
-# Normalize only this disposable database back to the exact accepted live LF-2
-# pre-007 shape so migration 007 is tested against what would actually be deployed.
+# policies. It also already carries fixed search paths on the seven functions that
+# remain mutable in live Supabase. The accepted live initial build predates those
+# repository-only changes. Normalize only this disposable database back to the
+# exact accepted live LF-2 pre-007 shape so migration 007 is tested against what
+# would actually be deployed.
 psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 <<'SQL'
 DROP TABLE IF EXISTS comind.cm_assistant_generation CASCADE;
 
@@ -61,6 +62,14 @@ CREATE POLICY chunk_update_all ON comind.cm_doc_chunk FOR UPDATE USING (true);
 CREATE POLICY msg_modify_all ON comind.cm_message FOR INSERT WITH CHECK (true);
 CREATE POLICY msg_select_all ON comind.cm_message FOR SELECT USING (true);
 CREATE POLICY msg_update_all ON comind.cm_message FOR UPDATE USING (true);
+
+ALTER FUNCTION comind.set_updated_at() RESET search_path;
+ALTER FUNCTION comind.fn_belief_update_beta(uuid, boolean, jsonb) RESET search_path;
+ALTER FUNCTION comind.fn_create_causal_node_from_memory(uuid, text, text) RESET search_path;
+ALTER FUNCTION comind.set_current_actor(uuid) RESET search_path;
+ALTER FUNCTION comind.current_actor() RESET search_path;
+ALTER FUNCTION comind.set_updated_at_checklist() RESET search_path;
+ALTER FUNCTION comind.set_updated_at_research_refs() RESET search_path;
 SQL
 
 # Prove that the disposable fixture now matches the security shape migration 007

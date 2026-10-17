@@ -44,6 +44,23 @@ try {
  await page.evaluate(()=>window.fixtureNow='2026-10-17T20:00:00Z');await page.getByRole('button',{name:'Refresh assessment'}).click();await page.getByText('Assessment: needs_refresh',{exact:true}).waitFor();
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
  await page.evaluate(()=>{window.location.hash='/attention/missing';});await page.getByText('Record unavailable in this source snapshot.',{exact:true}).waitFor();
+ for (const [status, records, expected] of [
+  ['ready', [], 'No matching records in this successful source snapshot.'],
+  ['forbidden', [], 'Attention unavailable'],
+  ['failed', [], 'Attention unavailable'],
+  ['partial', [], 'Attention unavailable'],
+  ['ready', [null], 'Source integrity unavailable'],
+  ['ready', [{id:'duplicate'},{id:'duplicate'}], 'Source integrity unavailable'],
+ ]) {
+  await page.evaluate(async ({status,records})=>{
+   window.unmountFixture();
+   history.replaceState(null,'','#/attention');
+   const {mountCockpit}=await import('./src/cockpit.mjs');
+   window.unmountFixture=mountCockpit(document.querySelector('main'),{status,records,synthetic:true,sourceRef:'test fixture',reason:'Synthetic source boundary',observedAt:null});
+  },{status,records});
+  await page.getByText(expected,{exact:true}).waitFor();
+  if(status!=='ready') assert.equal(await page.locator('a.metric').count(),0);
+ }
  assert.deepEqual(errors,[]);
  console.log('Browser proof passed: unavailable source, keyboard/focus, escaped text, read-only actions, encoded deep links, evidence drill-down, filter/history, expiry and mobile overflow.');
 } finally {await browser?.close();await new Promise(r=>server.close(r));}

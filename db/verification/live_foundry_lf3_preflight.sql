@@ -40,7 +40,7 @@ expected_policies(table_name, policy_name, command) AS (
         ('cm_message','msg_update_all','w')
 ),
 actual_policies AS (
-    SELECT c.relname AS table_name, p.polname AS policy_name, p.polcmd AS command
+    SELECT c.relname AS table_name, p.polname AS policy_name, p.polcmd::text AS command
     FROM pg_policy p
     JOIN pg_class c ON c.oid = p.polrelid
     JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -59,6 +59,12 @@ target_functions(name, identity_args) AS (
         ('current_actor',''),
         ('set_updated_at_checklist',''),
         ('set_updated_at_research_refs','')
+),
+actual_target_functions AS (
+    SELECT p.oid, p.proname AS name, pg_get_function_identity_arguments(p.oid) AS identity_args, p.proconfig
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'comind'
 ),
 comind_tables AS (
     SELECT c.oid, c.relname, c.relrowsecurity
@@ -124,10 +130,11 @@ gates AS (
         (SELECT mutable_search_path_count FROM security_shape) = 7 AS known_search_path_warn_shape_ok,
         (SELECT rls_no_policy_count FROM security_shape) = 27 AS known_rls_no_policy_info_shape_ok,
         NOT EXISTS (
-            SELECT 1 FROM target_functions t
-            LEFT JOIN pg_proc p ON p.proname=t.name
-            LEFT JOIN pg_namespace n ON n.oid=p.pronamespace AND n.nspname='comind'
-            WHERE p.oid IS NULL OR pg_get_function_identity_arguments(p.oid)<>t.identity_args OR EXISTS (SELECT 1 FROM unnest(COALESCE(p.proconfig,ARRAY[]::text[])) s(setting) WHERE setting LIKE 'search_path=%')
+            SELECT 1
+            FROM target_functions t
+            LEFT JOIN actual_target_functions a ON a.name=t.name AND a.identity_args=t.identity_args
+            WHERE a.oid IS NULL
+               OR EXISTS (SELECT 1 FROM unnest(COALESCE(a.proconfig,ARRAY[]::text[])) s(setting) WHERE setting LIKE 'search_path=%')
         ) AS target_functions_still_mutable_ok,
         (SELECT exposed_count FROM client_exposure) = 0 AS client_roles_fail_closed_ok,
         (SELECT select_count FROM service_role_shape)=15 AND (SELECT insert_count FROM service_role_shape)=15 AS service_role_select_insert_shape_ok,

@@ -21,7 +21,7 @@ test('isolated Foundry request reader enforces restricted login, RLS and PI UUID
   await admin.query(await (await import('node:fs/promises')).readFile(new URL('../../db/test/pi_foundry_reader.sql',import.meta.url),'utf8'));
   const org=(await admin.query("INSERT INTO comind.cm_org(name,slug) VALUES($1,$2) RETURNING org_id",['PI Foundry Test '+randomUUID(),'pi-foundry-'+randomUUID()])).rows[0].org_id;
   const actor=(await admin.query("INSERT INTO comind.cm_actor(org_id,kind,handle,display_name) VALUES($1,'agent',$2,'Synthetic Foundry reader fixture') RETURNING actor_id",[org,'pi-foundry-'+randomUUID()])).rows[0].actor_id;
-  await admin.query("INSERT INTO comind.cm_project(project_id,org_id,title,slug,created_by) VALUES($1,$3,'PI Foundry allowed fixture',$4,$5),($2,$3,'PI Foundry other fixture',$6,$5)",
+  await admin.query("INSERT INTO comind.cm_project(project_id,org_id,title,slug,created_by) VALUES($1,$3,'PI Foundry allowed fixture',$4,$6),($2,$3,'PI Foundry other fixture',$5,$6)",
    [projectId,otherProjectId,org,'pi-foundry-allowed-'+randomUUID(),'pi-foundry-other-'+randomUUID(),actor]);
   const capability=(await admin.query("INSERT INTO comind.cm_foundry_capability(capability_code,description,action,target_kind,max_authority,risk_class,cost_bearing,adapter) VALUES($1,'Synthetic read fixture','read','github_issue','C1','low',false,'github') RETURNING capability_id",['pi.foundry.read.'+randomUUID()])).rows[0].capability_id;
   const allowedId=randomUUID(),hiddenId=randomUUID();
@@ -56,6 +56,8 @@ test('isolated Foundry request reader enforces restricted login, RLS and PI UUID
   if(gateway)await gateway.close();
   if(reader)await reader.end();
   await admin.query('DROP POLICY IF EXISTS pi_foundry_reader_test ON comind.cm_foundry_authorization_request').catch(()=>{});
+  await admin.query('REVOKE ALL ON comind.cm_foundry_authorization_request FROM comind_foundry_query_login').catch(()=>{});
+  await admin.query('REVOKE ALL ON SCHEMA comind FROM comind_foundry_query_login').catch(()=>{});
   await admin.query('DROP ROLE IF EXISTS comind_foundry_query_login').catch(()=>{});
   await admin.end();
  }

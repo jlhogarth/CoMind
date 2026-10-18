@@ -47,6 +47,12 @@ The API adds `GET /api/pi/decisions` using the same operator cookie, project che
 
 The project-decision source remains distinct from Foundry authorization requests and the presentation-only human-action assessment. A selected option does not establish approval, authority, evidence truth or completed human review. Test-only permissions scope the PM fixture reader to synthetic COMIND and the Foundry reader to one synthetic Foundry project UUID. No production database grants or RLS policies changed. The Foundry project UUID to PM project key relationship remains unverified, so these sources remain separate.
 
+## RunBook event canonical projection
+
+The bounded `comind_pm.v_runbook_timeline` response is projected through the same `pi-canonical-read.v1` envelope used for lanes and PM decisions. Event identity is namespaced by its source relation and preserves the source UUID. Each record carries the retrieval observation time, fixed reviewed source fields, null revision, disabled decisions, and explicit blockers for unresolved decision/authorization/verification links and evidence verification policy. The `outcome` and evidence values remain historical source claims. They do not prove current execution authority, evidence validity, or a verified result. The projection excludes unreviewed fields and does not synthesize lane relationships from other source domains. Coverage is a bounded window with unknown total; the UI uses projected records and labels the window as incomplete history.
+
+The event source contract has no concurrency revision, cursor, or independently authored evidence verification state. Those gaps remain visible on each record and cannot be inferred from `occurred_at` or retrieval time. Evidence is preserved as data and rendered as text.
+
 Exact-head PostgreSQL and browser CI must prove this extension before acceptance. Local TypeScript build and 65 focused PI/server contract tests pass; the complete server suite reports 209 passed and 7 database-dependent skips. Local Chromium and PostgreSQL executables are unavailable in this environment.
 
 ## Native Foundry request read, isolated extension

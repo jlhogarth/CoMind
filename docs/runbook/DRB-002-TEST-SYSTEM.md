@@ -56,6 +56,10 @@ The integration branch is stacked on PR #147 at inspected head 6ffcabc1cad349241
 
 Next: verify exact-head CI and diagnose failures before claiming acceptance. Review/adopt the Test integration with the current PI lane without overwriting concurrent work. After acceptance, expand toward a reusable operator Test environment and any remaining attention/evidence contracts. Production decisions, host-specific grants, independent security review and explicit activation authority remain separate. Read current AGENTS.md, remote heads, this guide and live RunBook before resuming. Update this continuation and provenance at each material checkpoint.
 
+## Canonical event projection follow-up, 2026-10-18
+
+The PI adapter now returns RunBook events under the shared canonical-read envelope with relation-namespaced event IDs, per-record observed-at time, null revision, bounded coverage and explicit blockers for missing event relationships and evidence policy. The connected Test reader renders those projected records, not raw source rows. This does not add event-to-decision, authorization, lane, or verification joins. Local tests passed; exact-head browser and PostgreSQL CI remain pending for this follow-up.
+
 ## Exact-head acceptance evidence
 
 Verified isolated Test candidate: `0d0155285db497af51745964a08928aea8789686` on PR #147. All 11 returned workflows completed successfully. Primary Interface run [39168308952](https://github.com/jlhogarth/CoMind/actions/runs/39168308952) passed the actual PostgreSQL 17 capture-to-RunBook-to-PI-browser proof and preserved artifact `drb-test-system-evidence` for 14 days. DRB query contract [39168308948](https://github.com/jlhogarth/CoMind/actions/runs/39168308948), Main CI [39168308973](https://github.com/jlhogarth/CoMind/actions/runs/39168308973), and No Placeholder [39168308951](https://github.com/jlhogarth/CoMind/actions/runs/39168308951) passed. Seven other returned workflows passed as well.

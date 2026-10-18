@@ -40,3 +40,13 @@ Synthetic data and generated temporary Test identities only. No live Supabase or
 - #119 head `f831b89e405351cbdbaaaf113f291f7a56d72215`, still separate and untouched.
 
 No predecessor PR was merged or retargeted. Resume with current remote heads before further changes.
+
+## Canonical RunBook event projection follow-up
+
+Remote starting head was re-read on PR #147: `5304139659b5a612a2fca37bf94470edda542810`. It remained draft, open, unmerged and mergeable. Current dependency readback: PI #143 `d889f2395648af90bb0b8235c43226168d2c4534`, BRAND #139 `c5fc5d8bfd818a3feb22f5585bde93059a255658`, DRB #145 `19b7cf8ad9e38dc1f6738925b6f7b4a09f09359a`, and OC #119 `f831b89e405351cbdbaaaf113f291f7a56d72215`. All remain separate. Exact #147 starting-head workflows: 11 returned, all successful; no review submissions found.
+
+Change: `projectRunbookEvents` now routes reviewed `comind_pm.v_runbook_timeline` fields through the shared canonical envelope. Event records include namespaced identity, source relation, per-record retrieval observation, unknown revision, disabled decisions, and explicit blockers for missing decision/authorization/verification relationships and evidence verification policy. The opt-in browser renders the projected rows. Unknown source fields remain excluded. No database query, role, grant, migration, or source relationship changed.
+
+Local verification: PI suite 52/52 passed; complete server suite 211 passed, 0 failed, 8 database-dependent tests skipped; TypeScript build passed; focused gateway/RunBook tests 17/17 passed; no-placeholder and `git diff --check` passed. Local browser run stopped before launch because the pinned Chromium executable is not installed in this checkout; it is not a browser test pass. Exact-head CI must verify browser and real PostgreSQL 17 system proof before this follow-up can be called accepted.
+
+Limitations: This remains bounded history, not a complete archive or lossless cursor. RunBook has no concurrency revision or independently authored evidence verification state in this projection. The Foundry-to-PM crosswalk and complete lane/decision/authorization/verification semantics remain unresolved. Stored outcomes remain source claims, evidence stays text/data, controls remain disabled, default `index.html` disconnected, all Test identities synthetic, and production activation unauthorized. No live RunBook or database read/capture occurred. No Joseph action required.

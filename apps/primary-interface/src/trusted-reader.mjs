@@ -36,9 +36,9 @@ export async function readTrustedEvents(project, { lane, limit=25, fetchImpl=glo
   try{
     const response=await fetchImpl(`/api/pi/events?${params}`,{method:'GET',credentials:'same-origin',cache:'no-store',redirect:'error',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(7000)]):AbortSignal.timeout(7000)});
     if(!response.ok)return {status:response.status===401||response.status===403?'forbidden':'failed',project,reason:response.status===401?'Operator session missing, expired or revoked.':response.status===403?'Project read denied.':'Trusted reader unavailable.'};
-    const envelope=await response.json();projectRunbookEvents(envelope,project);
+    const envelope=await response.json();const projection=projectRunbookEvents(envelope,project);
     if(envelope.limit!==limit||envelope.lane!==(lane??null))throw Error('Source scope mismatch');
-    return {status:'ready',project,envelope};
+    return {status:'ready',project,envelope,projection};
   }catch{return {status:'failed',project,reason:'Trusted reader failed or returned invalid source data.'};}
 }
 

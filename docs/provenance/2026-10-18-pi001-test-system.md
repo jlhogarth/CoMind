@@ -73,3 +73,12 @@ Exact-head Primary Interface run 39177702879 and DRB-002 Query Contract run 3917
 ### Browser failure and repair of candidate 2d312d2
 
 The exact-head PI contract suite and DRB query tests passed, but Primary Interface run 39177801876 failed the connected browser proof before database acceptance. Moving all reader UI under `main` exposed that the lane renderer replaces its mount root's children during initialization, removing the forms. The page now gives lane rendering a dedicated child host and keeps the primary landmark intact; the skip control focuses the main content region. The PostgreSQL acceptance step was skipped after the browser failure. Candidate 2d312d2 is not accepted; the corrected page requires a fresh exact-head run.
+
+
+## Reader-state and accessibility review acceptance
+
+Implementation candidate `d9d1e634622a92f9068bc8f390a00316e110e253` passed all 11 returned workflows on exact head. Primary Interface run [39177942031](https://github.com/jlhogarth/CoMind/actions/runs/39177942031) passed PI tests, browser navigation, trusted-reader browser proof, and actual PostgreSQL 17 capture-to-RunBook-to-browser acceptance. DRB-002 Query Contract [39177942033](https://github.com/jlhogarth/CoMind/actions/runs/39177942033), Main CI [39177942016](https://github.com/jlhogarth/CoMind/actions/runs/39177942016), and No Placeholder Policy [39177942026](https://github.com/jlhogarth/CoMind/actions/runs/39177942026) passed; the other seven returned workflows passed. Artifact `drb-test-system-evidence` (ID `12154124720`) is retained through 2026-11-01 23:48:17 UTC.
+
+The reader now distinguishes denied, unavailable, and malformed/out-of-scope responses. Successful empty remains a successful zero-row page. Previous results clear at refresh; bounded coverage remains bounded, even when no further page is reported. Observation time is shown without inventing a staleness threshold. The skip link targets the primary content landmark, source sections remain independently labeled, status updates use polite live regions, and lane rendering is isolated to its child host.
+
+No database, RunBook, production roles, grants, deployment, activation, or production authorization changed. The Foundry UUID to PM project crosswalk remains an explicit blocker pending source-owner reviewed mapping, cardinality, lifecycle, read access policy, provenance and verification semantics. Lane, attention, revision, event relationship and evidence verification semantics remain incomplete; no unified operational assessment is claimed.

@@ -1,6 +1,6 @@
 import {mountCockpit} from './cockpit.mjs';
 import {createLaneReadController,createTrustedReadController,readTrustedEvents,readTrustedDecisions,readTrustedFoundryRequests} from './trusted-reader.mjs';
-const root=document.querySelector('main'),status=document.querySelector('#read-status');
+const root=document.querySelector('#lane-view'),content=document.querySelector('#content'),status=document.querySelector('#read-status');
 const decisionStatus=document.querySelector('#decision-status'),decisionList=document.querySelector('#decision-list');
 let unmount=()=>{};
 function show(lanes){
@@ -89,7 +89,7 @@ document.querySelector('#foundry-scope').addEventListener('submit',event=>{
  decisionController.clear('Decision results cleared because a Foundry source was requested.');
  void foundryController.refresh(foundryProject);
 });
-document.querySelector('.skip').addEventListener('click',event=>{event.preventDefault();root.focus();});
+document.querySelector('.skip').addEventListener('click',event=>{event.preventDefault();content.focus();});
 window.addEventListener('pagehide',()=>{eventController.stop();controller.stop();decisionController.stop();foundryController.stop();unmount();});
 // A restored bfcache page must start again with no retained source or session assertion.
 window.addEventListener('pageshow',event=>{if(event.persisted)window.location.reload();});

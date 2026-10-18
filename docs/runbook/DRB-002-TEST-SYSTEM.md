@@ -58,7 +58,9 @@ Next: verify exact-head CI and diagnose failures before claiming acceptance. Rev
 
 ## Canonical event projection follow-up, 2026-10-18
 
-The PI adapter now returns RunBook events under the shared canonical-read envelope with relation-namespaced event IDs, per-record observed-at time, null revision, bounded coverage and explicit blockers for missing event relationships and evidence policy. The connected Test reader renders those projected records, not raw source rows. This does not add event-to-decision, authorization, lane, or verification joins. Local tests passed; exact-head browser and PostgreSQL CI remain pending for this follow-up.
+The PI adapter now returns RunBook events under the shared canonical-read envelope with relation-namespaced event IDs, per-record observed-at time, null revision, bounded coverage and explicit blockers for missing event relationships and evidence policy. The connected Test reader renders those projected records, not raw source rows. This does not add event-to-decision, authorization, lane, or verification joins.
+
+Exact implementation head `2d718223bc0d120085d5470a413109ff107c62a5` passed all 11 returned PR workflows. Primary Interface run 39171293609 completed browser navigation, trusted reader browser proof, and actual PostgreSQL 17 capture-to-RunBook-to-browser acceptance successfully. `drb-test-system-evidence` contains acceptance JSON and screenshot and is retained through 2026-11-01 22:14 UTC. DRB Query Contract 39171293512, Main CI 39171293678 and No Placeholder Policy 39171293483 passed; all other returned workflows passed. This was synthetic isolated Test data and did not access or write live RunBook data.
 
 ## Exact-head acceptance evidence
 

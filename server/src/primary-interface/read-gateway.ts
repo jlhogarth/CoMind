@@ -18,6 +18,12 @@ const decisionEnvelopeSchema=z.object({version:z.literal('drb-002.v1'),request_i
   source:z.literal('comind_pm.pm_decision_records'),project:z.string(),lane:z.string().nullable(),kind:z.literal('decisions'),limit:z.number().int(),
   source_relations:z.tuple([z.literal('comind_pm.pm_decision_records'),z.literal('comind_pm.pm_work_items'),z.literal('comind_pm.pm_projects')]),
   more_available:z.boolean(),data:z.array(decisionRowSchema).max(100)});
+const eventRowSchema=z.object({event_id:z.string().uuid(),project_key:z.string(),work_key:text,
+  occurred_at:z.string().datetime({offset:true}),action_summary:text,result_summary:text,outcome:text,next_action:text,
+  source_system:text,source_ref:text,evidence:z.array(z.unknown())});
+const eventEnvelopeSchema=z.object({version:z.literal('drb-002.v1'),request_id:z.string().uuid(),retrieved_at:z.string().datetime({offset:true}),
+  source:z.literal('comind_pm.v_runbook_timeline'),project:z.string(),lane:z.string().nullable(),kind:z.literal('events'),limit:z.number().int(),
+  source_relations:z.tuple([z.literal('comind_pm.v_runbook_timeline')]),more_available:z.boolean(),data:z.array(eventRowSchema).max(100)});
 const foundryQuerySchema=z.object({project_id:z.string().uuid(),limit:z.coerce.number().int().min(1).max(100).default(25)}).strict();
 const foundryRowSchema=z.object({authorization_request_id:z.string().uuid(),requesting_profile_id:z.string().uuid().nullable(),
   requesting_actor_id:z.string().uuid(),capability_id:z.string().uuid(),project_id:z.string().uuid(),task_id:z.string().uuid().nullable(),
@@ -41,11 +47,12 @@ export async function buildPiReadGateway(options:GatewayOptions){
   const timeout=options.timeoutMs??5000;if(!Number.isInteger(timeout)||timeout<10||timeout>5000)throw Error('Invalid read timeout');
   const now=options.now??Date.now;
   const {projectRunbookLanes}=await import(new URL('../../../apps/primary-interface/src/drb-lanes.mjs',import.meta.url).href);
+  const {projectRunbookEvents}=await import(new URL('../../../apps/primary-interface/src/drb-events.mjs',import.meta.url).href);
   const {projectRunbookDecisions}=await import(new URL('../../../apps/primary-interface/src/drb-decisions.mjs',import.meta.url).href);
   const app=Fastify({logger:false,bodyLimit:4096,requestTimeout:10000,trustProxy:false});
   const audits=new WeakMap<object,AccessAudit>();let active=0,windowStart=now(),requests=0;
   app.addHook('onRequest',async(req,reply)=>{
-    const operation=req.url.startsWith('/api/pi/foundry-requests')?'pi.foundry':req.url.startsWith('/api/pi/decisions')?'pi.decisions':req.url.startsWith('/api/pi/lanes')?'pi.lanes':'unsupported';
+    const operation=req.url.startsWith('/api/pi/events')?'pi.events':req.url.startsWith('/api/pi/foundry-requests')?'pi.foundry':req.url.startsWith('/api/pi/decisions')?'pi.decisions':req.url.startsWith('/api/pi/lanes')?'pi.lanes':'unsupported';
     audits.set(req,{request_id:randomUUID(),observed_at:new Date(now()).toISOString(),principal_id:null,operation,status:0,project:null,kind:null});
     if(now()-windowStart>=60000){windowStart=now();requests=0;}
     if(++requests>120){reply.header('Retry-After','60');return reply.code(429).send({error:'rate_limited'});}
@@ -119,6 +126,38 @@ export async function buildPiReadGateway(options:GatewayOptions){
       const envelope=decisionEnvelopeSchema.parse(JSON.parse(body));
       if(envelope.project!==input.project||envelope.lane!==(input.lane??null)||envelope.limit!==input.limit)throw Error('Source scope mismatch');
       projectRunbookDecisions(envelope,input.project);
+      return reply.send(envelope);
+    }catch{return fail(503,'reader_unavailable');}finally{active--;}
+  });
+  app.get('/api/pi/events',async(req,reply)=>{
+    const fail=(code:number,error:string)=>reply.code(code).send({error,request_id:audits.get(req)!.request_id});
+    if((req.headers.origin&&req.headers.origin!==options.origin)||
+      (req.headers['sec-fetch-site']&&!['same-origin','none'].includes(String(req.headers['sec-fetch-site']))))return fail(403,'forbidden');
+    const cookies=(req.headers.cookie??'').split(';').map(x=>x.trim()).filter(x=>x.startsWith('__Host-comind_pi='));
+    if(cookies.length!==1)return fail(401,'unauthorized');
+    const token=cookies[0].slice('__Host-comind_pi='.length);
+    if(!/^[A-Za-z0-9_-]{32,256}$/.test(token))return fail(401,'unauthorized');
+    let session:Principal|undefined;
+    try{session=validatePrincipals(await options.loadSessions()).find(p=>timingSafeEqual(digest(p.token),digest(token)));}catch{return fail(503,'sessions_unavailable');}
+    if(!session||session.disabled||Date.parse(session.expiresAt)<=now())return fail(401,'unauthorized');
+    audits.get(req)!.principal_id=session.id;
+    const parsed=querySchema.safeParse(req.query);if(!parsed.success)return fail(400,'invalid_query');
+    const input=parsed.data;audits.get(req)!.project=input.project;audits.get(req)!.kind='events';
+    if(!session.projects.includes(input.project))return fail(403,'forbidden');
+    let backend:Principal|undefined;
+    try{backend=validatePrincipals(await options.loadBackend()).find(p=>p.id===options.backendId);}catch{return fail(503,'reader_unavailable');}
+    if(!backend||backend.disabled||Date.parse(backend.expiresAt)<=now()||!backend.projects.includes(input.project)||backend.token===token)return fail(503,'reader_unavailable');
+    if(active>=4)return fail(429,'busy');active++;
+    try{
+      const response=await fetch(new URL('/v1/runbook/query',upstream),{method:'POST',redirect:'manual',signal:AbortSignal.timeout(timeout),
+        headers:{'Content-Type':'application/json',Authorization:`Bearer ${backend.token}`},body:JSON.stringify({...input,kind:'events'})});
+      if(response.status!==200){await response.body?.cancel();return fail(response.status===403?403:503,response.status===403?'forbidden':'reader_unavailable');}
+      if(!response.headers.get('content-type')?.startsWith('application/json')){await response.body?.cancel();return fail(502,'invalid_source');}
+      let body='';let bytes=0;const reader=response.body?.getReader();if(!reader)return fail(502,'invalid_source');
+      const decoder=new TextDecoder();try{for(;;){const part=await reader.read();if(part.done)break;bytes+=part.value.byteLength;if(bytes>262144){await reader.cancel();return fail(502,'invalid_source');}body+=decoder.decode(part.value,{stream:true});}}finally{reader.releaseLock();}body+=decoder.decode();
+      const envelope=eventEnvelopeSchema.parse(JSON.parse(body));
+      if(envelope.project!==input.project||envelope.lane!==(input.lane??null)||envelope.limit!==input.limit)throw Error('Source scope mismatch');
+      projectRunbookEvents(envelope,input.project);
       return reply.send(envelope);
     }catch{return fail(503,'reader_unavailable');}finally{active--;}
   });

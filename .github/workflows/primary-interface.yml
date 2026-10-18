@@ -5,6 +5,8 @@ on:
       - 'apps/primary-interface/**'
       - 'server/src/primary-interface/**'
       - 'server/test/pi-read*'
+      - 'server/test/runbook-system.e2e.mjs'
+      - 'db/**'
       - 'server/src/runbook/**'
       - '.github/workflows/primary-interface.yml'
   workflow_dispatch:
@@ -13,7 +15,18 @@ permissions:
 jobs:
   human-attention-contract:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: drb_system_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: isolated_system_ci_only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d drb_system_test"
+          --health-interval 5s --health-timeout 5s --health-retries 12
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -33,3 +46,19 @@ jobs:
       - name: Browser trusted read connection proof
         working-directory: server
         run: PI_PLAYWRIGHT_MODULE="$RUNNER_TEMP/pi-browser/node_modules/playwright" node test/pi-read-browser.mjs
+
+      - name: Real database capture to RunBook to browser acceptance
+        working-directory: server
+        run: node test/runbook-system.e2e.mjs
+        env:
+          DRB_SYSTEM_ADMIN_URL: postgres://postgres:isolated_system_ci_only@127.0.0.1:5432/drb_system_test
+          PI_PLAYWRIGHT_MODULE: ${{ runner.temp }}/pi-browser/node_modules/playwright
+          DRB_SYSTEM_ARTIFACT_DIR: ${{ runner.temp }}/drb-system-evidence
+      - name: Preserve isolated system acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: drb-test-system-evidence
+          path: ${{ runner.temp }}/drb-system-evidence
+          if-no-files-found: warn
+          retention-days: 14

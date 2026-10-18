@@ -106,3 +106,24 @@ test('untrusted upstream origins and repeated unauthenticated requests are rejec
  const x=await setup();try{for(let i=0;i<120;i++)assert.equal((await x.app.inject({url:query})).statusCode,401);
  assert.equal((await x.app.inject({url:query})).statusCode,429);}finally{await x.close();}
 });
+test('RunBook timeline preserves canonical event scope, strips extras and enforces session boundary',async()=>{
+ const eventId=randomUUID(),body={version:'drb-002.v1',request_id:randomUUID(),retrieved_at:new Date().toISOString(),
+  source:'comind_pm.v_runbook_timeline',source_relations:['comind_pm.v_runbook_timeline'],project:'COMIND',lane:'DRB-E2E',kind:'events',limit:1,
+  more_available:true,data:[{event_id:eventId,project_key:'COMIND',work_key:'DRB-E2E',occurred_at:new Date().toISOString(),action_summary:'Synthetic event',
+   result_summary:'Recorded',outcome:'pass',next_action:null,source_system:'test',source_ref:'test-reference',evidence:[],private:backend.token}]};
+ let calls=0;const x=await setup(async(req,res)=>{
+  calls++;assert.equal(req.headers.authorization,'Bearer '+backend.token);let request='';for await(const part of req)request+=part;
+  assert.deepEqual(JSON.parse(request),{project:'COMIND',lane:'DRB-E2E',limit:1,kind:'events'});
+  res.setHeader('content-type','application/json');res.end(JSON.stringify(body));
+ });
+ try{
+  const query='/api/pi/events?project=COMIND&lane=DRB-E2E&limit=1';
+  assert.equal((await x.app.inject({url:query})).statusCode,401);
+  const result=await x.app.inject({url:query,headers});assert.equal(result.statusCode,200);assert.equal(result.json().data[0].event_id,eventId);
+  assert.equal(result.json().data[0].private,undefined);assert.equal(result.headers['cache-control'],'no-store');assert.equal(x.audit.at(-1).operation,'pi.events');
+  assert.equal((await x.app.inject({url:'/api/pi/events?project=OTHER',headers})).statusCode,403);
+  assert.equal((await x.app.inject({url:query,headers:{...headers,origin:'https://evil.invalid'}})).statusCode,403);
+  body.data[0].project_key='OTHER';assert.equal((await x.app.inject({url:query,headers})).statusCode,503);
+  assert.equal(calls,2);assert.equal(JSON.stringify(x.audit).includes('Synthetic event'),false);
+ }finally{await x.close();}
+});

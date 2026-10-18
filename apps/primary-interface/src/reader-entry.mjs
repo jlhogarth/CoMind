@@ -1,5 +1,5 @@
 import {mountCockpit} from './cockpit.mjs';
-import {createLaneReadController,createTrustedReadController,readTrustedDecisions,readTrustedFoundryRequests} from './trusted-reader.mjs';
+import {createLaneReadController,createTrustedReadController,readTrustedEvents,readTrustedDecisions,readTrustedFoundryRequests} from './trusted-reader.mjs';
 const root=document.querySelector('main'),status=document.querySelector('#read-status');
 const decisionStatus=document.querySelector('#decision-status'),decisionList=document.querySelector('#decision-list');
 let unmount=()=>{};
@@ -47,23 +47,48 @@ function showFoundry(state){
  }
 }
 let foundryController=createTrustedReadController({onState:showFoundry,read:readTrustedFoundryRequests});
+const eventStatus=document.querySelector('#event-status'),eventList=document.querySelector('#event-list');
+function showEvents(state){
+ eventList.replaceChildren();
+ eventStatus.textContent=state.status==='ready'
+  ?`Received ${state.envelope.data.length} RunBook events. Observation time: ${state.envelope.retrieved_at}. More available: ${state.envelope.more_available?'yes':'no'}. This window is not a complete archive.`
+  :state.reason;
+ if(state.status!=='ready')return;
+ const doc=eventList.ownerDocument;
+ if(!state.envelope.data.length){const empty=doc.createElement('p');empty.textContent='The source returned a successful empty page.';eventList.append(empty);return;}
+ for(const row of state.envelope.data){
+  const article=doc.createElement('article'),heading=doc.createElement('h3'),list=doc.createElement('dl');
+  heading.textContent=row.action_summary??'Event without summary';article.append(heading);
+  for(const [label,value] of [['Canonical event ID',row.event_id],['Project',row.project_key],['Lane',row.work_key],
+   ['Occurred at',row.occurred_at],['Result',row.result_summary],['Outcome source value',row.outcome],['Next action',row.next_action],
+   ['Source system',row.source_system],['Source reference',row.source_ref],['Evidence references source JSON',JSON.stringify(row.evidence)]]){
+   const term=doc.createElement('dt'),description=doc.createElement('dd');term.textContent=label;description.textContent=value??'Not recorded';list.append(term,description);
+  }
+  article.append(list);eventList.append(article);
+ }
+}
+const eventController=createTrustedReadController({onState:showEvents,read:readTrustedEvents});
 const form=document.querySelector('#read-scope');
 form.addEventListener('submit',event=>{
   event.preventDefault();if(!form.reportValidity())return;
   // The request project is a lookup key, never an authorization assertion.
   const project=document.querySelector('#project').value;
+  const lane=document.querySelector('#lane').value;const options=lane?{lane}:{};
   foundryController.clear('Foundry results cleared because a different source was requested.');
-  if(event.submitter?.value==='decisions'){controller.clear('Lane results cleared because a different source was requested.');void decisionController.refresh(project);}
-  else{decisionController.clear('Decision results cleared because a different source was requested.');void controller.refresh(project);}
+  if(event.submitter?.value==='events'){controller.clear('Lane results cleared because a different source was requested.');decisionController.clear('Decision results cleared because a different source was requested.');void eventController.refresh(project,options);return;}
+  eventController.clear('RunBook results cleared because a different source was requested.');
+  if(event.submitter?.value==='decisions'){controller.clear('Lane results cleared because a different source was requested.');void decisionController.refresh(project,options);}
+  else{decisionController.clear('Decision results cleared because a different source was requested.');void controller.refresh(project,options);}
 });
 document.querySelector('#foundry-scope').addEventListener('submit',event=>{
  event.preventDefault();const foundryProject=document.querySelector('#foundry-project').value;
  if(!event.currentTarget.reportValidity())return;
+ eventController.clear('RunBook results cleared because a Foundry source was requested.');
  controller.clear('Lane results cleared because a Foundry source was requested.');
  decisionController.clear('Decision results cleared because a Foundry source was requested.');
  void foundryController.refresh(foundryProject);
 });
 document.querySelector('.skip').addEventListener('click',event=>{event.preventDefault();root.focus();});
-window.addEventListener('pagehide',()=>{controller.stop();decisionController.stop();foundryController.stop();unmount();});
+window.addEventListener('pagehide',()=>{eventController.stop();controller.stop();decisionController.stop();foundryController.stop();unmount();});
 // A restored bfcache page must start again with no retained source or session assertion.
 window.addEventListener('pageshow',event=>{if(event.persisted)window.location.reload();});

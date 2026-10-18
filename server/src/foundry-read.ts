@@ -20,33 +20,35 @@ export type FoundryRequestRow = {
 
 export async function verifyFoundryReader(pool: Pool): Promise<void> {
   const result = await pool.query(`
-    SELECT current_user = 'comind_foundry_query_login' AND session_user = current_user
-      AND NOT (r.rolsuper OR r.rolcreatedb OR r.rolcreaterole OR r.rolreplication OR r.rolbypassrls)
-      AND NOT EXISTS (SELECT 1 FROM pg_auth_members WHERE member = r.oid)
-      AND NOT EXISTS (
+    SELECT
+      current_user = 'comind_foundry_query_login' AND session_user = current_user AS exact_login,
+      NOT (r.rolsuper OR r.rolcreatedb OR r.rolcreaterole OR r.rolreplication OR r.rolbypassrls) AS no_elevated_flags,
+      NOT EXISTS (SELECT 1 FROM pg_auth_members WHERE member = r.oid) AS no_role_memberships,
+      NOT EXISTS (
         SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
         WHERE n.nspname NOT IN ('pg_catalog','information_schema') AND c.relkind IN ('r','p','v','m','f')
           AND (has_table_privilege(current_user,c.oid,'INSERT,UPDATE,DELETE,TRUNCATE,TRIGGER')
             OR has_any_column_privilege(current_user,c.oid,'INSERT,UPDATE'))
-      )
-      AND has_table_privilege(current_user,'comind.cm_foundry_authorization_request','SELECT')
-      AND NOT has_table_privilege(current_user,'comind.cm_foundry_authorization_request','INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
-      AND (SELECT relrowsecurity AND relowner <> r.oid FROM pg_class WHERE oid='comind.cm_foundry_authorization_request'::regclass)
-      AND NOT EXISTS (
+      ) AS no_write_privileges,
+      has_table_privilege(current_user,'comind.cm_foundry_authorization_request','SELECT') AS target_select,
+      NOT has_table_privilege(current_user,'comind.cm_foundry_authorization_request','INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') AS target_no_write,
+      (SELECT relrowsecurity AND relowner <> r.oid FROM pg_class WHERE oid='comind.cm_foundry_authorization_request'::regclass) AS target_rls_and_not_owner,
+      NOT EXISTS (
         SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
         WHERE n.nspname NOT IN ('pg_catalog','information_schema') AND c.oid <> 'comind.cm_foundry_authorization_request'::regclass
           AND has_table_privilege(current_user,c.oid,'SELECT')
-      )
-      AND NOT EXISTS (
+      ) AS no_other_table_reads,
+      NOT EXISTS (
         SELECT 1 FROM pg_namespace n WHERE n.nspname !~ '^pg_' AND has_schema_privilege(current_user,n.oid,'CREATE')
-      )
-      AND NOT EXISTS (
+      ) AS no_schema_create,
+      NOT EXISTS (
         SELECT 1 FROM pg_proc f JOIN pg_namespace n ON n.oid=f.pronamespace
         WHERE n.nspname='comind' AND f.prosecdef AND has_function_privilege(current_user,f.oid,'EXECUTE')
-      ) AS safe
+      ) AS no_executable_security_definer
     FROM pg_roles r WHERE r.rolname=current_user`);
-  if (result.rows.length !== 1 || result.rows[0].safe !== true) {
-    throw new Error('Foundry database reader failed least-privilege preflight');
+  const failed=result.rows.length===1?Object.entries(result.rows[0]).filter(([,value])=>value!==true).map(([key])=>key):['role_not_found'];
+  if (failed.length) {
+    throw new Error(`Foundry database reader failed least-privilege preflight: ${failed.join(',')}`);
   }
   await pool.query('SELECT authorization_request_id FROM comind.cm_foundry_authorization_request LIMIT 0');
 }

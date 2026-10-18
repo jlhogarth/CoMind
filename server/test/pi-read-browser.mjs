@@ -10,9 +10,12 @@ let browser,drb,gateway,web;
 try{
  const backend={id:'drb-fixture',token:randomBytes(32).toString('hex'),expiresAt:'2099-01-01T00:00:00Z',projects:['COMIND']};
  const operator={...backend,id:'operator-fixture',token:randomBytes(32).toString('hex')};
- const id=randomUUID(),sessions=join(directory,'sessions.json'),credentials=join(directory,'backend.json');
+ const id=randomUUID(),decisionId=randomUUID(),workItemId=randomUUID(),projectId=randomUUID(),sessions=join(directory,'sessions.json'),credentials=join(directory,'backend.json');
  await writeFile(sessions,JSON.stringify([operator]),{mode:0o600});await writeFile(credentials,JSON.stringify([backend]),{mode:0o600});
- drb=buildRunbookQueryService(async()=>({rows:[{id,project_id:randomUUID(),project_key:'COMIND',item_type:'lane',work_key:'PI-FIXTURE',title:'Synthetic connected lane',owner:'Synthetic owner',status:'review',private:backend.token}]}),[backend],Date.now,{loadPrincipals:()=>loadPrivatePrincipals(credentials),audit:createFileAudit(join(directory,'drb-audit.jsonl'))});
+ drb=buildRunbookQueryService(async(sql)=>({rows:sql.includes('pm_decision_records')?[{id:decisionId,work_item_id:workItemId,project_id:projectId,
+  project_key:'COMIND',item_type:'lane',work_key:'PI-FIXTURE',decision_needed:'Synthetic project decision',options_json:'["<img src=x onerror=alert(1)>"]',
+  selected_option:null,rationale:null,reversibility:'unknown',decided_by:null,decided_at:null,created_at:new Date().toISOString(),updated_at:new Date().toISOString(),private:backend.token}]:
+  [{id,project_id:projectId,project_key:'COMIND',item_type:'lane',work_key:'PI-FIXTURE',title:'Synthetic connected lane',owner:'Synthetic owner',status:'review',private:backend.token}]}),[backend],Date.now,{loadPrincipals:()=>loadPrivatePrincipals(credentials),audit:createFileAudit(join(directory,'drb-audit.jsonl'))});
  const upstream=await drb.listen({host:'127.0.0.1',port:0});
  web=createServer(async(req,res)=>{
   if(req.url.startsWith('/api/pi/')){
@@ -38,6 +41,15 @@ try{
  await page.getByRole('link',{name:'PI-FIXTURE: Synthetic connected lane',exact:true}).click();
  await page.getByRole('heading',{name:'Development lane detail',exact:true}).waitFor();
  await page.getByText(id,{exact:true}).waitFor();
+ await page.getByRole('button',{name:'Read project decisions',exact:true}).click();
+ await page.getByText('Received 1 project decision records.',{exact:false}).waitFor();
+ await page.getByRole('heading',{name:'Development lanes unavailable',exact:true}).waitFor();
+ assert.equal(await page.getByText('Synthetic connected lane',{exact:true}).count(),0);
+ await page.getByRole('heading',{name:'PI-FIXTURE: Synthetic project decision',exact:true}).waitFor();
+ await page.getByText(decisionId,{exact:true}).waitFor();
+ await page.getByText('["<img src=x onerror=alert(1)>"]',{exact:true}).waitFor();
+ assert.equal(await page.locator('#decision-list img').count(),0);
+ assert.equal(await page.getByRole('button',{name:/approve|reject|hold/i}).count(),0);
  assert.equal((await page.content()).includes(backend.token),false);
  assert.equal(requests.some(r=>JSON.stringify(r).includes(backend.token)),false);
  assert.equal(requests.some(r=>r.url.startsWith(upstream)),false);

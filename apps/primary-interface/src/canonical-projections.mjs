@@ -5,7 +5,7 @@ const SOURCES = Object.freeze({
     fields: ['authorization_request_id','status','reason','authority_level','environment','target_kind','target_ref','requested_at','expires_at'],
     statuses: ['pending','approved','denied','cancelled','expired'] },
   project: { relation: 'comind_pm.pm_decision_records', key: 'id',
-    fields: ['id','work_item_id','decision_needed','selected_option','rationale','decided_at','created_at','updated_at'] },
+    fields: ['id','work_item_id','project_id','project_key','item_type','work_key','decision_needed','options_json','selected_option','rationale','reversibility','decided_by','decided_at','created_at','updated_at'] },
   lanes: { relation: 'comind_pm.pm_work_items', key: 'id',
     fields: ['id','project_id','work_key','item_type','title','status','owner','current_summary','last_event_at','updated_at'],
     statuses: ['backlog','ready','in_progress','blocked','review','done','canceled','deferred'] },

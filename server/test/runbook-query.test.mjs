@@ -35,12 +35,25 @@ test('per principal rate control resets',async()=>{
  assert.equal((await app.inject({method:'POST',url:'/v1/runbook/query',headers,payload})).statusCode,200);
  }finally{await app.close();}
 });
-test('all query surfaces select the expected view',async()=>{
- for(const [kind,view] of [['lanes','lane_state'],['events','timeline'],['authority','authority'],['verifications','verification']]){
- const app=buildRunbookQueryService(async(sql,params)=>{assert.match(sql,new RegExp('comind_pm.v_runbook_'+view));
+test('all query surfaces select the expected canonical source',async()=>{
+ for(const [kind,source] of [['lanes','v_runbook_lane_state'],['events','v_runbook_timeline'],['authority','v_runbook_authority'],['verifications','v_runbook_verification'],['decisions','pm_decision_records']]){
+ const app=buildRunbookQueryService(async(sql,params)=>{assert.match(sql,new RegExp('comind_pm\\.'+source));
  assert.equal(params[2],'2026-10-17T00:00:00Z');return {rows:[]};},principals);
  try{assert.equal((await app.inject({method:'POST',url:'/v1/runbook/query',headers,payload:{...payload,kind,since:'2026-10-17T00:00:00Z'}})).statusCode,200);
  }finally{await app.close();}}
+});
+test('project decision read joins both canonical parents and selects reviewed fields only',async()=>{
+ const app=buildRunbookQueryService(async(sql,params)=>{
+  assert.match(sql,/d\.id,d\.work_item_id,w\.project_id,w\.item_type/);
+  assert.match(sql,/JOIN comind_pm\.pm_work_items w ON w\.id = d\.work_item_id/);
+  assert.match(sql,/JOIN comind_pm\.pm_projects p ON p\.id = w\.project_id/);
+  assert.match(sql,/p\.project_key = \$1/);assert.match(sql,/w\.work_key = \$2/);
+  assert.doesNotMatch(sql,/metadata|SELECT \*/);assert.deepEqual(params,['COMIND','PI-001',null,26]);return {rows:[]};
+ },principals);
+ try{const res=await app.inject({method:'POST',url:'/v1/runbook/query',headers,payload:{project:'COMIND',kind:'decisions',lane:'PI-001'}});
+  assert.equal(res.statusCode,200);assert.equal(res.json().source,'comind_pm.pm_decision_records');
+  assert.deepEqual(res.json().source_relations,['comind_pm.pm_decision_records','comind_pm.pm_work_items','comind_pm.pm_projects']);
+ }finally{await app.close();}
 });
 test('concurrent capacity rejects the fifth query',async()=>{
  const releases=[];const app=buildRunbookQueryService(()=>new Promise(resolve=>releases.push(()=>resolve({rows:[]}))),principals);

@@ -36,7 +36,7 @@ export async function loadPrivatePrincipals(path: string): Promise<Principal[]> 
 }
 export type AccessAudit = {
   request_id: string; observed_at: string; principal_id: string | null;
-  operation: 'pi.lanes' | 'runbook.query' | 'unsupported' | 'service.start'; status: number;
+  operation: 'pi.lanes' | 'pi.decisions' | 'runbook.query' | 'unsupported' | 'service.start'; status: number;
   project: string | null; kind: string | null;
 };
 export function createFileAudit(path: string, maximumBytes = 50 * 1024 * 1024) {

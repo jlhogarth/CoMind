@@ -33,6 +33,40 @@ test('successful read uses backend credential and strips unreviewed response fie
   assert.equal(out.headers['cache-control'],'no-store');assert.doesNotMatch(out.body,new RegExp(backend.token));assert.equal(out.json().private,undefined);
  }finally{await x.close();}
 });
+test('project decisions use the same trusted session boundary and preserve source joins',async()=>{
+ const id=randomUUID(),workItem=randomUUID(),projectId=randomUUID();let calls=0;
+ const x=await setup(async(req,res)=>{
+  calls++;assert.equal(req.headers.authorization,'Bearer '+backend.token);let body='';for await(const chunk of req)body+=chunk;
+  assert.deepEqual(JSON.parse(body),{project:'COMIND',limit:25,kind:'decisions'});
+  res.setHeader('content-type','application/json');res.end(JSON.stringify({version:'drb-002.v1',request_id:id,retrieved_at:new Date().toISOString(),
+   source:'comind_pm.pm_decision_records',source_relations:['comind_pm.pm_decision_records','comind_pm.pm_work_items','comind_pm.pm_projects'],
+   project:'COMIND',lane:null,kind:'decisions',limit:25,more_available:false,private:backend.token,data:[{id,work_item_id:workItem,project_id:projectId,
+   project_key:'COMIND',item_type:'lane',work_key:'PI-001',decision_needed:'Synthetic decision',options_json:'[]',selected_option:null,rationale:null,
+   reversibility:'unknown',decided_by:null,decided_at:null,created_at:new Date().toISOString(),updated_at:new Date().toISOString(),private:backend.token}]}));
+ });
+ try{
+  const out=await x.app.inject({url:'/api/pi/decisions?project=COMIND',headers});assert.equal(out.statusCode,200);
+  assert.equal(out.json().data[0].work_item_id,workItem);assert.equal(out.json().data[0].private,undefined);assert.doesNotMatch(out.body,new RegExp(backend.token));
+  assert.equal(x.audit.at(-1).operation,'pi.decisions');
+  assert.equal((await x.app.inject({url:'/api/pi/decisions?project=OTHER',headers})).statusCode,403);assert.equal(calls,1);
+ }finally{await x.close();}
+});
+test('decision source mismatch, redirect and audit failure withhold the entire result',async()=>{
+ const id=randomUUID(),body={version:'drb-002.v1',request_id:id,retrieved_at:new Date().toISOString(),
+  source:'comind_pm.pm_decision_records',source_relations:['comind_pm.pm_decision_records','comind_pm.pm_work_items','comind_pm.pm_projects'],
+  project:'OTHER',lane:null,kind:'decisions',limit:25,more_available:false,data:[]};
+ for(const handler of [(_q,r)=>{r.setHeader('content-type','application/json');r.end(JSON.stringify(body));},
+  (_q,r)=>{r.statusCode=302;r.setHeader('location','https://evil.invalid');r.end();},
+  (_q,r)=>{r.setHeader('content-type','application/json');r.end(JSON.stringify({...body,project:'COMIND',source:'unreviewed.relation'}));}]){
+  const x=await setup(handler);try{
+   const result=await x.app.inject({url:'/api/pi/decisions?project=COMIND',headers});assert.ok([502,503].includes(result.statusCode));
+   assert.equal(result.json().data,undefined);
+  }finally{await x.close();}
+ }
+ const audit=await setup(undefined,{audit:async()=>{throw Error('private audit path');}});
+ try{const result=await audit.app.inject({url:'/api/pi/decisions?project=COMIND',headers});assert.equal(result.statusCode,503);assert.equal(result.json().data,undefined);}
+ finally{await audit.close();}
+});
 test('upstream redirects, invalid scope, oversized bodies and timeout fail closed',async()=>{
  const handlers=[(_q,r)=>{r.statusCode=302;r.setHeader('Location','https://evil.invalid');r.end();},
  (_q,r)=>{r.setHeader('content-type','application/json');r.end(JSON.stringify({project:'OTHER'}));},

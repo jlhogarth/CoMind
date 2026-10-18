@@ -7,7 +7,7 @@ export type { Principal } from './security.js';
 const requestSchema = z.object({
   project: z.string().regex(/^[A-Z0-9_-]{1,64}$/),
   lane: z.string().regex(/^[A-Z0-9_-]{1,64}$/).optional(),
-  kind: z.enum(['lanes', 'events', 'authority', 'verifications']),
+  kind: z.enum(['lanes', 'events', 'authority', 'verifications', 'decisions']),
   since: z.string().datetime({ offset: true }).optional(),
   limit: z.number().int().min(1).max(100).default(25),
 }).strict();
@@ -17,6 +17,7 @@ const sources = {
   events: ['v_runbook_timeline', 'occurred_at', 'event_id'],
   authority: ['v_runbook_authority', 'effective_at', 'authorization_id'],
   verifications: ['v_runbook_verification', 'verified_at', 'verification_id'],
+  decisions: ['pm_decision_records', 'updated_at', 'id'],
 } as const;
 // Explicit projection avoids leaking details/conditions or future columns through SELECT *.
 const columns = {
@@ -24,6 +25,7 @@ const columns = {
   events: 'event_id,project_key,work_key,occurred_at,action_summary,result_summary,outcome,next_action,source_system,source_ref,evidence',
   authority: 'authorization_id,project_key,work_key,effective_at,authorization_type,decision,scope,authorized_by,expires_at,source_system,source_ref,evidence',
   verifications: 'verification_id,project_key,work_key,verified_at,check_name,outcome,result_summary,verified_by,event_id,evidence',
+  decisions: 'd.id,d.work_item_id,w.project_id,w.item_type,p.project_key,w.work_key,d.decision_needed,d.options::text AS options_json,d.selected_option,d.rationale,d.reversibility,d.decided_by,d.decided_at,d.created_at,d.updated_at',
 } as const;
 const digest = (value: string) => createHash('sha256').update(value).digest();
 
@@ -103,21 +105,28 @@ export function buildRunbookQueryService(read: ReadQuery, principals: Principal[
     // work_key is globally UNIQUE in pm_work_items. Both sides retain reader RLS.
     const laneJoin = input.kind === 'lanes'
       ? " JOIN comind_pm.pm_work_items w ON w.work_key = s.work_key AND w.item_type = 'lane'" : '';
+    const decisionJoin = input.kind === 'decisions'
+      ? ' JOIN comind_pm.pm_work_items w ON w.id = d.work_item_id JOIN comind_pm.pm_projects p ON p.id = w.project_id' : '';
+    const from = input.kind === 'decisions' ? `comind_pm.${view} d${decisionJoin}` : `comind_pm.${view} s${laneJoin}`;
+    const projectColumn = input.kind === 'decisions' ? 'p.project_key' : 's.project_key';
+    const laneColumn = input.kind === 'decisions' ? 'w.work_key' : 's.work_key';
+    const timestampColumn = input.kind === 'decisions' ? 'd.updated_at' : `s.${timestamp}`;
+    const tieColumn = input.kind === 'decisions' ? 'd.id' : `s.${tie}`;
     active++;
     try {
       const result = await read(
-        `SELECT ${columns[input.kind]} FROM comind_pm.${view} s${laneJoin}
-         WHERE s.project_key = $1 AND ($2::text IS NULL OR s.work_key = $2)
-         AND ($3::timestamptz IS NULL OR s.${timestamp} > $3::timestamptz)
-         ORDER BY s.${timestamp} DESC NULLS LAST, s.${tie} DESC LIMIT $4`,
+        `SELECT ${columns[input.kind]} FROM ${from}
+         WHERE ${projectColumn} = $1 AND ($2::text IS NULL OR ${laneColumn} = $2)
+         AND ($3::timestamptz IS NULL OR ${timestampColumn} > $3::timestamptz)
+         ORDER BY ${timestampColumn} DESC NULLS LAST, ${tieColumn} DESC LIMIT $4`,
         [input.project, input.lane ?? null, input.since ?? null, input.limit + 1]);
       const more = result.rows.length > input.limit;
       const data = result.rows.slice(0, input.limit);
       const body = { version: 'drb-002.v1', request_id: requestId,
         retrieved_at: new Date(now()).toISOString(), source: `comind_pm.${view}`,
         project: input.project, lane: input.lane ?? null, kind: input.kind,
-        limit: input.limit, source_relations: input.kind === 'lanes'
-          ? [`comind_pm.${view}`, 'comind_pm.pm_work_items'] : [`comind_pm.${view}`],
+        limit: input.limit, source_relations: ['lanes', 'decisions'].includes(input.kind)
+          ? [`comind_pm.${view}`, 'comind_pm.pm_work_items', ...(input.kind === 'decisions' ? ['comind_pm.pm_projects'] : [])] : [`comind_pm.${view}`],
         more_available: more, data };
       if (Buffer.byteLength(JSON.stringify(body)) > 262144) return fail(413, 'result_too_large');
       return body;

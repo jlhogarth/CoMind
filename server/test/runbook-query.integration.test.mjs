@@ -33,11 +33,17 @@ test('isolated PostgreSQL 17 reader privilege and HTTP proof',{skip:!raw},async(
     INSERT INTO comind_pm.pm_authorizations(project_id,work_item_id,event_id,authorization_type,decision,scope,authorized_by)
       SELECT project_id,work_item_id,id,'approval','approved','Synthetic scope','test fixture' FROM comind_pm.pm_events WHERE summary='Synthetic event';
     INSERT INTO comind_pm.pm_verifications(project_id,work_item_id,event_id,verification_type,check_name,outcome,verified_by)
-      SELECT project_id,work_item_id,id,'fixture','Synthetic check','pass','test fixture' FROM comind_pm.pm_events WHERE summary='Synthetic event';`);
+      SELECT project_id,work_item_id,id,'fixture','Synthetic check','pass','test fixture' FROM comind_pm.pm_events WHERE summary='Synthetic event';
+    INSERT INTO comind_pm.pm_decision_records(work_item_id,decision_needed,options,reversibility)
+      SELECT id,'Synthetic project decision','["retain","defer"]'::jsonb,'unknown' FROM comind_pm.pm_work_items WHERE work_key like '%-FIXTURE';`);
   url.username='comind_runbook_query_login';url.password=password;
   reader=new Pool({connectionString:url.toString(),max:1});
   await verifyRunbookReader(reader);
   await assert.rejects(verifyRunbookReader(admin),/least-privilege/);
+  await admin.query('revoke select on comind_pm.pm_decision_records from comind_runbook_query_login');
+  await assert.rejects(verifyRunbookReader(reader),/permission denied/);
+  await admin.query('grant select on comind_pm.pm_decision_records to comind_runbook_query_login');
+  await verifyRunbookReader(reader);
   await admin.query('grant update on comind_pm.pm_projects to comind_runbook_query_login');
   await assert.rejects(verifyRunbookReader(reader),/least-privilege/);
   await admin.query('revoke update on comind_pm.pm_projects from comind_runbook_query_login');
@@ -68,7 +74,7 @@ test('isolated PostgreSQL 17 reader privilege and HTTP proof',{skip:!raw},async(
   app=buildRunbookQueryService(read,[identity],Date.now,{
     loadPrincipals:()=>loadPrivatePrincipals(credentialPath),audit:createFileAudit(auditPath),
   });
-  for(const kind of ['lanes','events','authority','verifications']){
+  for(const kind of ['lanes','events','authority','verifications','decisions']){
    for(const project of ['COMIND','OTHER']){
     const res=await app.inject({method:'POST',url:'/v1/runbook/query',headers:{authorization:'Bearer '+token},payload:{kind,project}});
     assert.equal(res.statusCode,200);assert.equal(res.json().data.length>0,project==='COMIND');
@@ -80,6 +86,13 @@ test('isolated PostgreSQL 17 reader privilege and HTTP proof',{skip:!raw},async(
      assert.equal(projected.records[0].source.owner,null);
      assert.equal(projected.records[0].source.item_type,'lane');
      assert.equal(projected.coverage.total,null);
+    }
+    if(kind==='decisions' && project==='COMIND') {
+     const row=res.json().data[0];assert.equal(row.project_key,'COMIND');assert.equal(row.work_key,'COMIND-FIXTURE');
+     assert.equal(row.options_json,'["retain", "defer"]');
+     const {projectRunbookDecisions}=await import('../../apps/primary-interface/src/drb-decisions.mjs');
+     const projected=projectRunbookDecisions(res.json(),'COMIND');
+     assert.equal(projected.records[0].source.work_item_id,row.work_item_id);assert.equal(projected.records[0].decisionEnabled,false);
     }
    }
   }
@@ -94,6 +107,11 @@ test('isolated PostgreSQL 17 reader privilege and HTTP proof',{skip:!raw},async(
   const connected=await gateway.inject({url:'/api/pi/lanes?project=COMIND',headers:browserHeaders});
   assert.equal(connected.statusCode,200);
   assert.equal(projectRunbookLanes(connected.json(),'COMIND').records.length,1);
+  const decisions=await gateway.inject({url:'/api/pi/decisions?project=COMIND',headers:browserHeaders});
+  assert.equal(decisions.statusCode,200);assert.equal(decisions.json().data[0].decision_needed,'Synthetic project decision');
+  const piAudit=(await readFile(gatewayAuditPath,'utf8')).trim().split('\n').map(JSON.parse);
+  assert.ok(piAudit.some(r=>r.operation==='pi.decisions'&&r.project==='COMIND'&&r.status===200));
+  assert.equal(JSON.stringify(piAudit).includes(token),false);assert.equal(JSON.stringify(piAudit).includes('Synthetic project decision'),false);
   assert.equal(connected.body.includes(token),false);
   assert.equal((await gateway.inject({url:'/api/pi/lanes?project=OTHER',headers:browserHeaders})).statusCode,403);
   await writeFile(sessionsPath,JSON.stringify([{...operator,disabled:true}]));

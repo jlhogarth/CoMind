@@ -15,7 +15,7 @@ export async function verifyRunbookReader(pool: Pool): Promise<void> {
       AND NOT EXISTS (
         SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
         WHERE n.nspname='comind_pm' AND c.relkind IN ('r','p')
-          AND c.relname IN ('pm_projects','pm_work_items','pm_events','pm_authorizations','pm_verifications')
+          AND c.relname IN ('pm_projects','pm_work_items','pm_events','pm_authorizations','pm_verifications','pm_decision_records')
           AND (NOT c.relrowsecurity OR c.relowner=r.oid)
       )
       AND NOT EXISTS (
@@ -32,6 +32,7 @@ export async function verifyRunbookReader(pool: Pool): Promise<void> {
   for (const view of ['v_runbook_lane_state', 'v_runbook_timeline', 'v_runbook_authority', 'v_runbook_verification']) {
     await pool.query(`SELECT 1 FROM comind_pm.${view} LIMIT 0`);
   }
+  await pool.query('SELECT 1 FROM comind_pm.pm_decision_records LIMIT 0');
 }
 
 export function createRunbookReadQuery(pool: Pool): ReadQuery {

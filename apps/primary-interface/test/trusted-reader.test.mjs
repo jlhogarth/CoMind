@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {readTrustedLanes} from '../src/trusted-reader.mjs';
+import {readTrustedLanes,readTrustedDecisions,createTrustedReadController} from '../src/trusted-reader.mjs';
 test('browser reader uses only fixed same-origin cookie transport, never a DRB credential',async()=>{
  const out=await readTrustedLanes('COMIND',{fetchImpl:async(url,options)=>{
   assert.equal(url,'/api/pi/lanes?project=COMIND&limit=25');assert.equal(options.credentials,'same-origin');
@@ -43,4 +43,28 @@ test('reader forwards cancellation and rejects a mismatched project state',async
  await readTrustedLanes('COMIND',{signal,fetchImpl:async(_url,options)=>{assert.ok(options.signal);return {ok:false,status:503};}});
  const {createLaneReadController}=await import('../src/trusted-reader.mjs');let state;
  const c=createLaneReadController({onState:s=>state=s,read:async()=>({status:'ready',project:'OTHER'})});await c.refresh('COMIND');assert.equal(state.status,'failed');c.stop();
+});
+test('decision reader uses only the same-origin cookie route and validates source domain and scope',async()=>{
+ let request;const id='00000000-0000-4000-8000-000000000001';
+ const result=await readTrustedDecisions('COMIND',{lane:'PI-001',limit:1,fetchImpl:async(url,options)=>{
+  request={url,options};return {ok:true,json:async()=>({version:'drb-002.v1',kind:'decisions',source:'comind_pm.pm_decision_records',
+   source_relations:['comind_pm.pm_decision_records','comind_pm.pm_work_items','comind_pm.pm_projects'],request_id:id,
+   project:'COMIND',lane:'PI-001',limit:1,more_available:false,retrieved_at:'2026-10-18T01:00:00Z',data:[]})};
+ }});
+ assert.equal(request.url,'/api/pi/decisions?project=COMIND&limit=1&lane=PI-001');assert.equal(request.options.credentials,'same-origin');
+ assert.equal(request.options.cache,'no-store');assert.equal(request.options.redirect,'error');assert.equal(result.status,'ready');
+ const wrong=await readTrustedDecisions('COMIND',{fetchImpl:async()=>({ok:true,json:async()=>({project:'OTHER'})})});assert.equal(wrong.status,'failed');
+ await assert.rejects(readTrustedDecisions('COMIND',{limit:101}),/Invalid decision read scope/);
+});
+test('shared reader controller drops superseded decision results',async()=>{
+ const replies=[];let latest;const c=createTrustedReadController({onState:s=>latest=s,read:()=>new Promise(resolve=>replies.push(resolve))});
+ const old=c.refresh('COMIND');const newer=c.refresh('OTHER');
+ replies[1]({status:'forbidden',project:'OTHER',reason:'Project read denied.'});await newer;
+ replies[0]({status:'ready',project:'COMIND',envelope:{data:[{id:'stale'}]}});await old;
+ assert.equal(latest.status,'forbidden');assert.equal(latest.project,'OTHER');c.stop();
+});
+test('clearing a source cancels it and rejects a late successful result',async()=>{
+ let finish,calls=0;const states=[];const c=createTrustedReadController({onState:s=>states.push(s),read:()=>{calls++;return new Promise(r=>finish=r);}});
+ const pending=c.refresh('COMIND');c.clear('Source switched.');finish({status:'ready',project:'COMIND',envelope:{data:[{id:'stale'}]}});await pending;
+ assert.equal(calls,1);assert.equal(states.at(-1).status,'missing');assert.equal(states.at(-1).project,null);c.stop();
 });

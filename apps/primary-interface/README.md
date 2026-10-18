@@ -12,7 +12,7 @@ Architecture acceptance is established by Joseph's PI-001 handoff. Production ac
 | Semantic colors, motion, layouts, profile registry | BRAND-001 #138 / PR #139 |
 | Relational explorer and protected administrative routes | OC-002 #118 / PR #119 |
 | Agent identity, capability, authorization and leases | Foundry contracts, consumed through reviewed adapters |
-| Transactional state and human decisions | Supabase control plane, future reviewed integration |
+| Transactional state and human decisions | Supabase control plane, read-only project decision integration tested in isolation |
 | Large evidence and cognitive artifacts | SDN data plane, bounded source references in cockpit |
 | Consequential history | Durable RunBook, authoritative source integration still open |
 
@@ -36,7 +36,7 @@ These are reserved product routes, not implemented HTTP endpoints. Unavailable f
 
 | Order | Deliverable | Current acceptance / next proof |
 | --- | --- | --- |
-| P0.1 | Human attention | Pure presentation assessment implemented; server decision recording and browser detail still open |
+| P0.1 | Human attention | Pure presentation assessment implemented; canonical sources are not yet a complete attention assessment; decision recording stays open |
 | P0.2 | Navigation and drill-down | Route contract defined; keyboard, history, deep-link and filtered count proof open |
 | P0.3 | Development lanes | Source adapters, dependency state and exact-head evidence open |
 | P0.4 | VE operations | Full detail contract above; canonical registry/lease mapping and freshness proof open |
@@ -76,8 +76,8 @@ Canonical source inspection and unresolved integration requirements: `docs/SOURC
 
 ## Canonical read projection development
 
-`src/canonical-projections.mjs` provides bounded, dependency-free projections for existing Foundry requests, PM decisions and lane work items. This is a separate source contract, not a complete `assessHumanAction` input. No unsupported conversion is supplied. See `docs/CANONICAL-READS.md` for field semantics, DRB-002 compatibility gap, explicit resolvers and trusted-server activation blockers. Browser integration remains unavailable.
+`src/canonical-projections.mjs` provides bounded, dependency-free projections for existing Foundry requests, PM decisions and lane work items. This is a separate source contract, not a complete `assessHumanAction` input. No unsupported conversion is supplied. The isolated reader connects lanes and PM decision records through the trusted-server path. Foundry authorization reads remain disconnected pending a verified join between Foundry project UUIDs and PM project keys. See `docs/CANONICAL-READS.md` for field semantics, explicit resolvers and production activation blockers.
 
 ## Read-only development lanes
 
-`mountCockpit` accepts a separate `lanes` source with `status`, expected `project`, and DRB `envelope`. It renders canonical UUID deep links, owner, lifecycle, summary, source times, coverage and unresolved integrations. The adapter and list/detail renderer do not fetch data or authenticate operators. Failed/forbidden/partial/missing responses have no count; malformed scope/IDs fail visibly. Successful counts describe only the supplied filtered window. Default browser remains unavailable until reviewed live transport is activated. Synthetic lane browser proof covers filters, native history, keyboard links, escaping, mobile overflow and failure states.
+`mountCockpit` accepts a separate `lanes` source with `status`, expected `project`, and DRB `envelope`. It renders canonical UUID deep links, owner, lifecycle, summary, source times, coverage and unresolved integrations. `reader.html` is a separate opt-in page using the isolated same-origin API for lanes and raw PM decision records. The server authenticates an operator session, checks project scope, and uses a distinct backend credential; browser code never receives it. PM decision rows are not treated as Foundry authorization or completed human-action assessments. Test-only PostgreSQL scope proof is pending exact-head CI. The default index remains disconnected. This does not establish production identity, grants, security acceptance or activation.

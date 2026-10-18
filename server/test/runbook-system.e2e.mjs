@@ -41,11 +41,16 @@ try{
    await client.query('begin');await client.query('set local role service_role');
    const row=await client.query(`select comind_pm.record_runbook_event(p_project_key=>$1,p_work_key=>$2,p_event_type=>'verification',
     p_actor=>'isolated system test',p_actor_type=>'system',p_summary=>$3,p_result_summary=>$4,p_outcome=>$5,
-    p_source_system=>'isolated-e2e',p_source_ref=>'server/test/runbook-system.e2e.mjs',
+    p_source_system=>'manual',p_source_ref=>'server/test/runbook-system.e2e.mjs',
     p_evidence=>$6::jsonb,p_next_action=>'Continue isolated acceptance') as id`,[project,project+'-E2E',summary,result,outcome,JSON.stringify([{kind:'test',ref:'isolated-e2e',note:'Synthetic <img src=x onerror=alert(1)> evidence'}])]);
    await client.query('commit');return row.rows[0].id;
   }catch(error){await client.query('rollback');throw error;}finally{client.release();}
  };
+ const invalidBefore=(await admin.query('select count(*)::int as n from comind_pm.pm_events')).rows[0].n;
+ await assert.rejects(admin.query(`select comind_pm.record_runbook_event(p_project_key=>'COMIND',p_event_type=>'test',
+  p_actor=>'isolated system test',p_summary=>'Invalid source must be rejected',p_source_system=>'isolated-e2e')`),e=>e.code==='23514');
+ assert.equal((await admin.query('select count(*)::int as n from comind_pm.pm_events')).rows[0].n,invalidBefore);
+ check('invalid capture source is rejected without a partial event');
  const eventId=await capture('COMIND','Test RunBook capture accepted');
  await capture('OTHER','Denied project event must never reach this browser');
  check('actual migrations and service_role capture function, synthetic records only');

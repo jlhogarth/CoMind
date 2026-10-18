@@ -1,5 +1,5 @@
 import {mountCockpit} from './cockpit.mjs';
-import {createLaneReadController,createTrustedReadController,readTrustedDecisions} from './trusted-reader.mjs';
+import {createLaneReadController,createTrustedReadController,readTrustedDecisions,readTrustedFoundryRequests} from './trusted-reader.mjs';
 const root=document.querySelector('main'),status=document.querySelector('#read-status');
 const decisionStatus=document.querySelector('#decision-status'),decisionList=document.querySelector('#decision-list');
 let unmount=()=>{};
@@ -25,15 +25,45 @@ function showDecisions(state){
  }
 }
 let decisionController=createTrustedReadController({onState:showDecisions,read:readTrustedDecisions});
+const foundryStatus=document.querySelector('#foundry-status'),foundryList=document.querySelector('#foundry-list');
+function showFoundry(state){
+ foundryStatus.textContent=state.status==='ready'
+  ?`Received ${state.envelope.data.length} Foundry authorization request records. Observation time: ${state.envelope.retrieved_at}. More available: ${state.envelope.more_available?'yes':'no'}.`
+  :state.reason;
+ foundryList.replaceChildren();
+ if(state.status!=='ready')return;
+ const doc=foundryList.ownerDocument,records=state.envelope.data;
+ if(records.length===0){const empty=doc.createElement('p');empty.textContent='The source returned a successful empty page.';foundryList.append(empty);return;}
+ for(const row of records){
+  const article=doc.createElement('article'),heading=doc.createElement('h3'),list=doc.createElement('dl');
+  heading.textContent=`${row.authority_level} ${row.status} request: ${row.target_kind}`;article.append(heading);
+  for(const [label,value] of [['Canonical Foundry request ID',row.authorization_request_id],['Foundry project UUID',row.project_id],
+   ['Requesting profile ID',row.requesting_profile_id],['Requesting actor ID',row.requesting_actor_id],['Capability ID',row.capability_id],
+   ['Task ID',row.task_id],['Environment source value',row.environment],['Target reference',row.target_ref],['Reason',row.reason],
+   ['Evidence references source JSON',JSON.stringify(row.evidence_refs)],['Requested at',row.requested_at],['Expires at',row.expires_at]]){
+   const term=doc.createElement('dt'),description=doc.createElement('dd');term.textContent=label;description.textContent=value??'Not recorded';list.append(term,description);
+  }
+  article.append(list);foundryList.append(article);
+ }
+}
+let foundryController=createTrustedReadController({onState:showFoundry,read:readTrustedFoundryRequests});
 const form=document.querySelector('#read-scope');
 form.addEventListener('submit',event=>{
   event.preventDefault();if(!form.reportValidity())return;
   // The request project is a lookup key, never an authorization assertion.
   const project=document.querySelector('#project').value;
+  foundryController.clear('Foundry results cleared because a different source was requested.');
   if(event.submitter?.value==='decisions'){controller.clear('Lane results cleared because a different source was requested.');void decisionController.refresh(project);}
   else{decisionController.clear('Decision results cleared because a different source was requested.');void controller.refresh(project);}
 });
+document.querySelector('#foundry-scope').addEventListener('submit',event=>{
+ event.preventDefault();const foundryProject=document.querySelector('#foundry-project').value;
+ if(!event.currentTarget.reportValidity())return;
+ controller.clear('Lane results cleared because a Foundry source was requested.');
+ decisionController.clear('Decision results cleared because a Foundry source was requested.');
+ void foundryController.refresh(foundryProject);
+});
 document.querySelector('.skip').addEventListener('click',event=>{event.preventDefault();root.focus();});
-window.addEventListener('pagehide',()=>{controller.stop();decisionController.stop();unmount();});
+window.addEventListener('pagehide',()=>{controller.stop();decisionController.stop();foundryController.stop();unmount();});
 // A restored bfcache page must start again with no retained source or session assertion.
 window.addEventListener('pageshow',event=>{if(event.persisted)window.location.reload();});

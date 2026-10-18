@@ -7,16 +7,27 @@ export const principalSchema = z.object({
   id: z.string().regex(/^[A-Za-z0-9_.-]{1,64}$/),
   token: z.string().min(32).max(256),
   projects: z.array(z.string().regex(/^[A-Z0-9_-]{1,64}$/)).min(1).max(100),
+  foundryProjectIds: z.array(z.string().uuid()).max(100).optional(),
   expiresAt: z.string().datetime({ offset: true }),
   disabled: z.boolean().optional(),
 }).strict();
 export type Principal = z.infer<typeof principalSchema>;
+const foundryPrincipalSchema=z.object({id:z.string().regex(/^[A-Za-z0-9_.-]{1,64}$/),token:z.string().min(32).max(256),
+  projectIds:z.array(z.string().uuid()).min(1).max(100),expiresAt:z.string().datetime({offset:true}),disabled:z.boolean().optional()}).strict();
+export type FoundryPrincipal=z.infer<typeof foundryPrincipalSchema>;
 export function validatePrincipals(value: unknown): Principal[] {
   const list = z.array(principalSchema).min(1).max(64).parse(value);
-  if (new Set(list.map(p => p.id)).size !== list.length || new Set(list.map(p => p.token)).size !== list.length) {
+  if (new Set(list.map(p => p.id)).size !== list.length || new Set(list.map(p => p.token)).size !== list.length
+    || list.some(p=>p.foundryProjectIds&&new Set(p.foundryProjectIds.map(x=>x.toLowerCase())).size!==p.foundryProjectIds.length)) {
     throw new Error('Duplicate RunBook principal configuration');
   }
   return list;
+}
+export function validateFoundryPrincipals(value:unknown):FoundryPrincipal[]{
+ const list=z.array(foundryPrincipalSchema).min(1).max(64).parse(value);
+ if(new Set(list.map(p=>p.id)).size!==list.length||new Set(list.map(p=>p.token)).size!==list.length
+  ||list.some(p=>new Set(p.projectIds.map(x=>x.toLowerCase())).size!==p.projectIds.length))throw new Error('Duplicate Foundry principal configuration');
+ return list;
 }
 async function privateFile(path: string, flags: number, maximum: number) {
   if (!isAbsolute(path)) throw new Error('RunBook private file must use an absolute path');
@@ -34,9 +45,13 @@ export async function loadPrivatePrincipals(path: string): Promise<Principal[]> 
   try { return validatePrincipals(JSON.parse(await file.readFile('utf8'))); }
   finally { await file.close(); }
 }
+export async function loadPrivateFoundryPrincipals(path:string):Promise<FoundryPrincipal[]>{
+ const file=await privateFile(path,constants.O_RDONLY,65536);
+ try{return validateFoundryPrincipals(JSON.parse(await file.readFile('utf8')));}finally{await file.close();}
+}
 export type AccessAudit = {
   request_id: string; observed_at: string; principal_id: string | null;
-  operation: 'pi.lanes' | 'pi.decisions' | 'runbook.query' | 'unsupported' | 'service.start'; status: number;
+  operation: 'pi.lanes' | 'pi.decisions' | 'pi.foundry' | 'runbook.query' | 'unsupported' | 'service.start'; status: number;
   project: string | null; kind: string | null;
 };
 export function createFileAudit(path: string, maximumBytes = 50 * 1024 * 1024) {

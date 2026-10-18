@@ -9,8 +9,8 @@ const directory=await mkdtemp(join(tmpdir(),'pi-reader-browser-')),base=resolve(
 let browser,drb,gateway,web;
 try{
  const backend={id:'drb-fixture',token:randomBytes(32).toString('hex'),expiresAt:'2099-01-01T00:00:00Z',projects:['COMIND']};
- const operator={...backend,id:'operator-fixture',token:randomBytes(32).toString('hex')};
- const id=randomUUID(),decisionId=randomUUID(),workItemId=randomUUID(),projectId=randomUUID(),sessions=join(directory,'sessions.json'),credentials=join(directory,'backend.json');
+ const foundryProjectId=randomUUID(),operator={...backend,id:'operator-fixture',token:randomBytes(32).toString('hex'),foundryProjectIds:[foundryProjectId]};
+ const id=randomUUID(),decisionId=randomUUID(),workItemId=randomUUID(),projectId=randomUUID(),requestId=randomUUID(),profileId=randomUUID(),actorId=randomUUID(),capabilityId=randomUUID(),sessions=join(directory,'sessions.json'),credentials=join(directory,'backend.json');
  await writeFile(sessions,JSON.stringify([operator]),{mode:0o600});await writeFile(credentials,JSON.stringify([backend]),{mode:0o600});
  drb=buildRunbookQueryService(async(sql)=>({rows:sql.includes('pm_decision_records')?[{id:decisionId,work_item_id:workItemId,project_id:projectId,
   project_key:'COMIND',item_type:'lane',work_key:'PI-FIXTURE',decision_needed:'Synthetic project decision',options_json:'["<img src=x onerror=alert(1)>"]',
@@ -28,7 +28,11 @@ try{
   }catch{res.statusCode=404;res.end('Unavailable');}
  });
  await new Promise(r=>web.listen(0,'127.0.0.1',r));const origin=`http://127.0.0.1:${web.address().port}`;
- gateway=await buildPiReadGateway({upstream,origin,backendId:backend.id,loadSessions:()=>loadPrivatePrincipals(sessions),loadBackend:()=>loadPrivatePrincipals(credentials),audit:createFileAudit(join(directory,'pi-audit.jsonl'))});
+ gateway=await buildPiReadGateway({upstream,origin,backendId:backend.id,loadSessions:()=>loadPrivatePrincipals(sessions),loadBackend:()=>loadPrivatePrincipals(credentials),audit:createFileAudit(join(directory,'pi-audit.jsonl')),
+  readFoundry:async(project)=>({moreAvailable:false,rows:project===foundryProjectId?[{authorization_request_id:requestId,requesting_profile_id:profileId,
+   requesting_actor_id:actorId,capability_id:capabilityId,project_id:foundryProjectId,task_id:null,authority_level:'C1',environment:'isolated',
+   target_kind:'github_issue',target_ref:'142',reason:'Synthetic <img src=x onerror=alert(1)> reason',evidence_refs:[{kind:'issue',ref:'142'}],
+   status:'pending',requested_at:new Date().toISOString(),expires_at:null,private:backend.token}]:[]})});
  browser=await chromium.launch({headless:true});const context=await browser.newContext({viewport:{width:390,height:844}});
  await context.addCookies([{name:'__Host-comind_pi',value:operator.token,domain:'127.0.0.1',path:'/',httpOnly:true,secure:true,sameSite:'Strict'}]);
  const page=await context.newPage(),requests=[];page.on('request',r=>requests.push({url:r.url(),headers:r.headers()}));
@@ -48,6 +52,15 @@ try{
  await page.getByRole('heading',{name:'PI-FIXTURE: Synthetic project decision',exact:true}).waitFor();
  await page.getByText(decisionId,{exact:true}).waitFor();
  await page.getByText('["<img src=x onerror=alert(1)>"]',{exact:true}).waitFor();
+ await page.getByLabel('Foundry project UUID').fill(foundryProjectId);
+ await page.getByRole('button',{name:'Read Foundry requests',exact:true}).click();
+ await page.getByText('Received 1 Foundry authorization request records.',{exact:false}).waitFor();
+ await page.getByRole('heading',{name:'Development lanes unavailable',exact:true}).waitFor();
+ await page.getByText(requestId,{exact:true}).waitFor();
+ await page.getByText('Synthetic <img src=x onerror=alert(1)> reason',{exact:true}).waitFor();
+ assert.equal(await page.locator('#foundry-list img').count(),0);
+ assert.equal(await page.getByRole('heading',{name:/C1 pending request/}).count(),1);
+ assert.equal(await page.getByRole('button',{name:/approve|reject|hold/i}).count(),0);
  assert.equal(await page.locator('#decision-list img').count(),0);
  assert.equal(await page.getByRole('button',{name:/approve|reject|hold/i}).count(),0);
  assert.equal((await page.content()).includes(backend.token),false);
@@ -64,5 +77,5 @@ try{
  await page.getByText('Project read denied.',{exact:true}).waitFor();
  assert.equal(await page.getByText('Synthetic connected lane',{exact:true}).count(),0);
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
- console.log('Trusted browser read passed: HttpOnly session, server-only DRB token, scoped read, canonical detail and revocation clears data. Synthetic DB fixture only.');
+ console.log('Trusted browser read passed: HttpOnly session, server-only PM credential, native Foundry UUID scope, canonical detail and revocation clears data. Synthetic source fixtures only.');
 }finally{await browser?.close();if(web){web.closeAllConnections();await new Promise(r=>web.close(r));}await gateway?.close();await drb?.close();await rm(directory,{recursive:true,force:true});}

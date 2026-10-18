@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {readTrustedLanes,readTrustedDecisions,createTrustedReadController} from '../src/trusted-reader.mjs';
+import {readTrustedLanes,readTrustedDecisions,readTrustedFoundryRequests,createTrustedReadController} from '../src/trusted-reader.mjs';
 test('browser reader uses only fixed same-origin cookie transport, never a DRB credential',async()=>{
  const out=await readTrustedLanes('COMIND',{fetchImpl:async(url,options)=>{
   assert.equal(url,'/api/pi/lanes?project=COMIND&limit=25');assert.equal(options.credentials,'same-origin');
@@ -55,6 +55,20 @@ test('decision reader uses only the same-origin cookie route and validates sourc
  assert.equal(request.options.cache,'no-store');assert.equal(request.options.redirect,'error');assert.equal(result.status,'ready');
  const wrong=await readTrustedDecisions('COMIND',{fetchImpl:async()=>({ok:true,json:async()=>({project:'OTHER'})})});assert.equal(wrong.status,'failed');
  await assert.rejects(readTrustedDecisions('COMIND',{limit:101}),/Invalid decision read scope/);
+});
+test('Foundry reader sends only native UUID lookup to a same-origin route and validates scope',async()=>{
+ const projectId='11111111-1111-4111-8111-111111111111';let request;
+ const result=await readTrustedFoundryRequests(projectId,{limit:1,fetchImpl:async(url,options)=>{
+  request={url,options};return {ok:true,json:async()=>({version:'pi-foundry.v1',source:'comind.cm_foundry_authorization_request',
+   source_relations:['comind.cm_foundry_authorization_request'],request_id:'66666666-6666-4666-8666-666666666666',
+   project_id:projectId,limit:1,more_available:false,retrieved_at:'2026-10-18T01:00:00Z',data:[]})};
+ }});
+ assert.equal(request.url,`/api/pi/foundry-requests?project_id=${projectId}&limit=1`);
+ assert.equal(request.options.credentials,'same-origin');assert.equal(request.options.cache,'no-store');
+ assert.equal(request.options.headers,undefined);assert.equal(result.status,'ready');assert.equal(result.projection.coverage.total,null);
+ const wrong=await readTrustedFoundryRequests(projectId,{fetchImpl:async()=>({ok:true,json:async()=>({project_id:'77777777-7777-4777-8777-777777777777'})})});
+ assert.equal(wrong.status,'failed');
+ await assert.rejects(readTrustedFoundryRequests('not-a-uuid'),/Invalid Foundry project read scope/);
 });
 test('shared reader controller drops superseded decision results',async()=>{
  const replies=[];let latest;const c=createTrustedReadController({onState:s=>latest=s,read:()=>new Promise(resolve=>replies.push(resolve))});

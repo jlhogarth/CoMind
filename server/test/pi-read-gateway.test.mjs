@@ -51,6 +51,27 @@ test('project decisions use the same trusted session boundary and preserve sourc
   assert.equal((await x.app.inject({url:'/api/pi/decisions?project=OTHER',headers})).statusCode,403);assert.equal(calls,1);
  }finally{await x.close();}
 });
+test('Foundry request read uses native UUID scope, separate session allowlist and reviewed fields',async()=>{
+ const projectId=randomUUID(),requestId=randomUUID(),profileId=randomUUID(),actorId=randomUUID(),capabilityId=randomUUID();
+ const foundrySession={...session,foundryProjectIds:[projectId]};let reads=0;
+ const x=await setup(undefined,{loadSessions:async()=>[foundrySession],readFoundry:async(project,limit)=>{
+  reads++;assert.equal(project,projectId);assert.equal(limit,25);
+  return {moreAvailable:false,rows:[{authorization_request_id:requestId,requesting_profile_id:profileId,
+   requesting_actor_id:actorId,capability_id:capabilityId,project_id:projectId,task_id:null,authority_level:'C1',
+   environment:'isolated',target_kind:'github_issue',target_ref:'142',reason:'Synthetic reason',
+   evidence_refs:[{kind:'issue',ref:'142'}],status:'pending',requested_at:new Date().toISOString(),expires_at:null,unreviewed_private:'secret'}]};
+ }});
+ try{
+  const out=await x.app.inject({url:'/api/pi/foundry-requests?project_id='+projectId,headers});
+  assert.equal(out.statusCode,200);assert.equal(out.json().source,'comind.cm_foundry_authorization_request');
+  assert.equal(out.json().data[0].authorization_request_id,requestId);assert.equal(out.json().data[0].project_id,projectId);
+  assert.equal(out.json().data[0].unreviewed_private,undefined);assert.equal(out.json().data[0].decisionEnabled,undefined);
+  assert.equal(x.audit.at(-1).operation,'pi.foundry');assert.equal(x.audit.at(-1).project,projectId);
+  assert.equal((await x.app.inject({url:'/api/pi/foundry-requests?project_id='+randomUUID(),headers})).statusCode,403);
+  assert.equal((await x.app.inject({url:'/api/pi/foundry-requests?project_id=not-a-uuid',headers})).statusCode,400);
+  assert.equal(reads,1);
+ }finally{await x.close();}
+});
 test('decision source mismatch, redirect and audit failure withhold the entire result',async()=>{
  const id=randomUUID(),body={version:'drb-002.v1',request_id:id,retrieved_at:new Date().toISOString(),
   source:'comind_pm.pm_decision_records',source_relations:['comind_pm.pm_decision_records','comind_pm.pm_work_items','comind_pm.pm_projects'],

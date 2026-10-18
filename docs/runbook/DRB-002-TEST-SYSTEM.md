@@ -1,0 +1,57 @@
+# DRB-002 database, RunBook and application system proof
+
+## Objective and authority
+
+Joseph directed an end-to-end tested system before any production-platform decision, then authorized development that benefits the Test database, RunBook and CoMind application. Production selection is not a prerequisite for this isolated proof. It remains a prerequisite for the later host-specific production proposal. Earlier broad authority is not used to create paid infrastructure or activate production.
+
+T1 reversible isolated implementation and synthetic Test database mutations; T2 scoped repository publication and existing RunBook append. Proposed NIST AC-3/AC-6/AU-3/AU-9/CP-10 mappings only. Affected identities: temporary Test capture role service_role, dedicated comind_runbook_query_login and generated Test backend/operator identities. No production identity or grant changes. No exceptions. Recovery: stop isolated processes, retain acceptance evidence, discard the dedicated CI service through normal runner teardown or revert the scoped development commit. No live database rollback is involved.
+
+## Application advantage
+
+The opt-in reader now exposes RunBook history alongside lanes, PM decisions and native-UUID Foundry reads. GET /api/pi/events uses the same server-owned credentials, current private-file operator session, fixed query allowlist, project checks, limits and audit boundary. It adds no browser database credential and no write endpoint. Events display canonical UUID, occurrence time, action/result, outcome, next action and source/evidence references as text. All evidence remains source data, not instructions or verified authority. Optional lane filtering applies to lanes, PM decisions and events. Switching source or starting another read clears old data.
+
+A successful page is a bounded window, not a full archive or lossless feed. An empty page, denial and unavailable reader are distinct. Foundry and PM projects remain separate; no cross-domain mapping is inferred. The disconnected default index remains unchanged.
+
+## Database and RunBook advantage
+
+server/test/runbook-system.e2e.mjs requires a fresh loopback database named drb_system_test and PostgreSQL 17 or later. It refuses another database, remote host, URL options or existing application tables before applying schema changes. It applies actual repository PM and DRB-001 migrations plus the existing disposable reader fixture. It captures synthetic operational events through record_runbook_event under SET LOCAL ROLE service_role, rather than manufacturing query results. This uses the existing Test capture authority, not a new production writer design.
+
+The restricted reader is a separate login with generated temporary password and existing COMIND-only fixture RLS. Operator and backend identities are distinct, expire after one hour, and are stored in temporary owner-only files. The browser receives only the HttpOnly operator cookie through Playwright fixture provisioning. That is not a production login/session issuer.
+
+The proof connects a real browser to the actual reader page, same-origin PI gateway, loopback RunBook HTTP service and actual PostgreSQL read-only transaction adapter. Its local HTTP fixture server serves only allowlisted application assets and the PI routes. No external listener, cloud endpoint or paid provider is created.
+
+## Required acceptance
+
+The test fails rather than skips when DRB_SYSTEM_ADMIN_URL is missing. CI provides a dedicated disposable PostgreSQL service. Acceptance includes:
+
+- real function capture and automatic canonical lane-summary projection;
+- browser event UUID/source/result and matching lane UUID;
+- literal evidence rendering without injected HTML;
+- database RLS excludes OTHER even when the backend HTTP identity allows OTHER;
+- application project denial, no reader writes and append-only UPDATE/DELETE rejection;
+- failure and corrective recovery events retained together;
+- operator/backend revocation and unsafe DRB/PI audit files clear displayed results;
+- real reader connection loss and real SQL lock timeout fail closed, then recover;
+- reader service stop/restart recovers the original database history and audit paths;
+- no source mutation from reads, payload-free audits and no backend secret/direct DRB request in browser traffic.
+
+These are synthetic event contents in a real Test database. They do not establish production readiness, full CoMind feature acceptance, independent security approval, backup/disaster recovery, or a deployed operational environment. The Test database login-loss case is not a database-server power-loss test. Service restart is in-process server teardown/recreation, not host reboot. Startup execution and certificate/session issuance remain separately unproven.
+
+## Reproduce and inspect
+
+Primary Interface CI builds server code, installs pinned Playwright, creates fresh postgres:17 and runs both the earlier isolated proofs and the new combined system proof. The latter runs:
+
+```sh
+cd server
+node test/runbook-system.e2e.mjs
+```
+
+Required environment: DRB_SYSTEM_ADMIN_URL is a direct administrator URL for the fresh dedicated loopback Test database. PI_PLAYWRIGHT_MODULE points to the installed Playwright module. DRB_SYSTEM_ARTIFACT_DIR chooses the evidence directory outside the temporary credential directory. Do not supply live credentials. The proof refuses to reset an existing database; recreate only disposable infrastructure through its owner-controlled workflow.
+
+CI uploads drb-test-system-evidence for 14 days. acceptance.json records executed checks and synthetic event UUIDs; runbook-test-timeline.png shows the rendered actual Test rows. Neither contains credential files. Durable provenance records the CI run links because runner artifacts expire. Browser and database helpers terminate in finally; no background monitor or persistent user-accessible deployment is created.
+
+## Dependencies and continuation
+
+The integration branch is stacked on PR #147 at inspected head 6ffcabc1cad349241149286af5ea2a44c8edebd0. It preserves the separate #143/#139 stack, #145 and #119. DRB #145 has newer deployment documentation at 19b7cf8; no runtime difference was observed there. Do not merge predecessor branches or retarget for convenience.
+
+Next: verify exact-head CI and diagnose failures before claiming acceptance. Review/adopt the Test integration with the current PI lane without overwriting concurrent work. After acceptance, expand toward a reusable operator Test environment and any remaining attention/evidence contracts. Production decisions, host-specific grants, independent security review and explicit activation authority remain separate. Read current AGENTS.md, remote heads, this guide and live RunBook before resuming. Update this continuation and provenance at each material checkpoint.

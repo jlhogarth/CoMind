@@ -97,3 +97,8 @@ Local build, complete server suite (210 passed, 8 database-dependent skips), PI 
 Production Foundry reads remain blocked on a reviewed production login and row policy, operator UUID assignments, host/TLS/session issuer, persistent audit review, independent security review and explicit production authority. No production database connection, data read, grant, migration, or RunBook capture occurred.
 
 Next: verify current #147 remote head before publishing, run exact-head PostgreSQL and browser jobs, diagnose any failures, then record terminal results in this continuation and provenance. Preserve #143's BRAND dependency and #119 ownership. The cross-domain project mapping and complete attention evidence/revision/RunBook contract remain open. No user action is currently required.
+
+
+## DRB Test system integration candidate
+
+Joseph now requires end-to-end Test acceptance before production-platform selection. Continued on a separate branch from inspected #147 head 6ffcabc1cad349241149286af5ea2a44c8edebd0. Adds read-only RunBook events, optional lane filter and a mandatory actual PostgreSQL capture-to-browser acceptance proof. Read docs/runbook/DRB-002-TEST-SYSTEM.md for exact boundaries, reproduction and evidence outputs. Production deferral does not block this isolated development. No predecessor branch, production schema or live grant changed. Local build and focused projection/gateway tests passed; PostgreSQL/browser proof must pass on the candidate's exact head before acceptance. Reinspect remote heads before adoption; coordinate with PI through the stacked reviewable diff. No recurring service or monitor is installed.

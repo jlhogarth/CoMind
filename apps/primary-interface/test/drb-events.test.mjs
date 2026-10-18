@@ -35,7 +35,7 @@ test('event transport fixes route, carries no backend secret and rejects source/
  assert.equal(result.status,'ready');assert.equal(result.projection.domain,'events');assert.equal(request.url,'/api/pi/events?project=COMIND&limit=1&lane=DRB-E2E');
  assert.equal(request.options.credentials,'same-origin');assert.equal(request.options.headers,undefined);
  assert.equal(request.options.cache,'no-store');assert.equal(request.options.redirect,'error');
- assert.equal((await readTrustedEvents('COMIND',{fetchImpl:async()=>({ok:true,json:async()=>input})})).status,'failed');
+ assert.equal((await readTrustedEvents('COMIND',{fetchImpl:async()=>({ok:true,json:async()=>input})} )).status,'malformed');
  for(const code of [401,403,429,503])assert.equal((await readTrustedEvents('COMIND',{fetchImpl:async()=>({ok:false,status:code})})).envelope,undefined);
  await assert.rejects(readTrustedEvents('COMIND',{lane:'bad/sql'}));
 });

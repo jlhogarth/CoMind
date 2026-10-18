@@ -77,7 +77,7 @@ export function createTrustedReadController({onState,read=readTrustedLanes}={}) 
       catch{state={status:'failed',project,reason:'Trusted reader failed. No previous source snapshot is retained.'};}
       if(stopped||current!==generation||request.signal.aborted)return;
       // Keep source identity pinned to the requested project even with a custom test reader.
-      if(!state||state.project!==project||!['ready','failed','forbidden'].includes(state.status))state={status:'failed',project,reason:'Reader returned an invalid state.'};
+      if(!state||state.project!==project||!['ready','failed','forbidden','unavailable','malformed'].includes(state.status))state={status:'failed',project,reason:'Reader returned an invalid state.'};
       active=null;onState(state);
     },
     stop(){if(stopped)return;stopped=true;generation++;active?.abort();active=null;},

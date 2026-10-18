@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {readTrustedLanes,readTrustedDecisions,readTrustedFoundryRequests,createTrustedReadController} from '../src/trusted-reader.mjs';
+import {readTrustedLanes,readTrustedEvents,readTrustedDecisions,readTrustedFoundryRequests,createTrustedReadController} from '../src/trusted-reader.mjs';
 test('browser reader uses only fixed same-origin cookie transport, never a DRB credential',async()=>{
  const out=await readTrustedLanes('COMIND',{fetchImpl:async(url,options)=>{
   assert.equal(url,'/api/pi/lanes?project=COMIND&limit=25');assert.equal(options.credentials,'same-origin');
@@ -8,7 +8,7 @@ test('browser reader uses only fixed same-origin cookie transport, never a DRB c
 });
 test('failure and revoked reads never retain a previous successful snapshot',async()=>{
  for(const status of [403,429,503])assert.equal((await readTrustedLanes('COMIND',{fetchImpl:async()=>({ok:false,status})})).envelope,undefined);
- assert.equal((await readTrustedLanes('COMIND',{fetchImpl:async()=>{throw Error('private detail');}})).status,'failed');
+ assert.equal((await readTrustedLanes('COMIND',{fetchImpl:async()=>{throw Error('private detail');}})).status,'unavailable');
  await assert.rejects(readTrustedLanes('COMIND',{lane:'bad/sql'}));
 });
 
@@ -53,7 +53,7 @@ test('decision reader uses only the same-origin cookie route and validates sourc
  }});
  assert.equal(request.url,'/api/pi/decisions?project=COMIND&limit=1&lane=PI-001');assert.equal(request.options.credentials,'same-origin');
  assert.equal(request.options.cache,'no-store');assert.equal(request.options.redirect,'error');assert.equal(result.status,'ready');
- const wrong=await readTrustedDecisions('COMIND',{fetchImpl:async()=>({ok:true,json:async()=>({project:'OTHER'})})});assert.equal(wrong.status,'failed');
+ const wrong=await readTrustedDecisions('COMIND',{fetchImpl:async()=>({ok:true,json:async()=>({project:'OTHER'})})});assert.equal(wrong.status,'malformed');
  await assert.rejects(readTrustedDecisions('COMIND',{limit:101}),/Invalid decision read scope/);
 });
 test('Foundry reader sends only native UUID lookup to a same-origin route and validates scope',async()=>{
@@ -67,7 +67,7 @@ test('Foundry reader sends only native UUID lookup to a same-origin route and va
  assert.equal(request.options.credentials,'same-origin');assert.equal(request.options.cache,'no-store');
  assert.equal(request.options.headers,undefined);assert.equal(result.status,'ready');assert.equal(result.projection.coverage.total,null);
  const wrong=await readTrustedFoundryRequests(projectId,{fetchImpl:async()=>({ok:true,json:async()=>({project_id:'77777777-7777-4777-8777-777777777777'})})});
- assert.equal(wrong.status,'failed');
+ assert.equal(wrong.status,'malformed');
  await assert.rejects(readTrustedFoundryRequests('not-a-uuid'),/Invalid Foundry project read scope/);
 });
 test('shared reader controller drops superseded decision results',async()=>{

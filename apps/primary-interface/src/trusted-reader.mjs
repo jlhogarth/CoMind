@@ -7,52 +7,56 @@ export async function readTrustedLanes(project, { lane, limit=25, fetchImpl=glob
   if(typeof project!=='string'||!/^[A-Z0-9_-]{1,64}$/.test(project)||!Number.isInteger(limit)||limit<1||limit>100
     ||(lane!==undefined&&(typeof lane!=='string'||!/^[A-Z0-9_-]{1,64}$/.test(lane))))throw new TypeError('Invalid lane read scope');
   const params=new URLSearchParams({project,limit:String(limit)});if(lane!==undefined)params.set('lane',lane);
+  let stage='transport';
   try{
     const response=await fetchImpl(`/api/pi/lanes?${params}`,{method:'GET',credentials:'same-origin',cache:'no-store',redirect:'error',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(7000)]):AbortSignal.timeout(7000)});
-    if(!response.ok)return {status:response.status===401||response.status===403?'forbidden':'failed',project,reason:response.status===401?'Operator session missing, expired or revoked.':response.status===403?'Project read denied.':'Trusted reader unavailable.'};
-    const envelope=await response.json();projectRunbookLanes(envelope,project);
+    if(!response.ok)return {status:response.status===401||response.status===403?'forbidden':'unavailable',project,reason:response.status===401?'Operator session missing, expired or revoked.':response.status===403?'Project read denied.':'Trusted reader unavailable.'};
+    stage='payload';const envelope=await response.json();stage='validation';projectRunbookLanes(envelope,project);
     if(envelope.limit!==limit||envelope.lane!==(lane??null))throw Error('Source scope mismatch');
     return {status:'ready',project,envelope};
-  }catch{return {status:'failed',project,reason:'Trusted reader failed or returned invalid source data.'};}
+  }catch{return {status:stage==='transport'?'unavailable':'malformed',project,reason:stage==='transport'?'Trusted reader unavailable.':'Trusted reader returned malformed or out-of-scope data.'};}
 }
 
 export async function readTrustedDecisions(project, { lane, limit=25, fetchImpl=globalThis.fetch, signal }={}) {
   if(typeof project!=='string'||!/^[A-Z0-9_-]{1,64}$/.test(project)||!Number.isInteger(limit)||limit<1||limit>100
     ||(lane!==undefined&&(typeof lane!=='string'||!/^[A-Z0-9_-]{1,64}$/.test(lane))))throw new TypeError('Invalid decision read scope');
   const params=new URLSearchParams({project,limit:String(limit)});if(lane!==undefined)params.set('lane',lane);
+  let stage='transport';
   try{
     const response=await fetchImpl(`/api/pi/decisions?${params}`,{method:'GET',credentials:'same-origin',cache:'no-store',redirect:'error',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(7000)]):AbortSignal.timeout(7000)});
-    if(!response.ok)return {status:response.status===401||response.status===403?'forbidden':'failed',project,reason:response.status===401?'Operator session missing, expired or revoked.':response.status===403?'Project read denied.':'Trusted reader unavailable.'};
-    const envelope=await response.json();projectRunbookDecisions(envelope,project);
+    if(!response.ok)return {status:response.status===401||response.status===403?'forbidden':'unavailable',project,reason:response.status===401?'Operator session missing, expired or revoked.':response.status===403?'Project read denied.':'Trusted reader unavailable.'};
+    stage='payload';const envelope=await response.json();stage='validation';projectRunbookDecisions(envelope,project);
     if(envelope.limit!==limit||envelope.lane!==(lane??null))throw Error('Source scope mismatch');
     return {status:'ready',project,envelope};
-  }catch{return {status:'failed',project,reason:'Trusted reader failed or returned invalid source data.'};}
+  }catch{return {status:stage==='transport'?'unavailable':'malformed',project,reason:stage==='transport'?'Trusted reader unavailable.':'Trusted reader returned malformed or out-of-scope data.'};}
 }
 
 export async function readTrustedEvents(project, { lane, limit=25, fetchImpl=globalThis.fetch, signal }={}) {
   if(typeof project!=='string'||!/^[A-Z0-9_-]{1,64}$/.test(project)||!Number.isInteger(limit)||limit<1||limit>100
     ||(lane!==undefined&&(typeof lane!=='string'||!/^[A-Z0-9_-]{1,64}$/.test(lane))))throw new TypeError('Invalid RunBook event read scope');
   const params=new URLSearchParams({project,limit:String(limit)});if(lane!==undefined)params.set('lane',lane);
+  let stage='transport';
   try{
     const response=await fetchImpl(`/api/pi/events?${params}`,{method:'GET',credentials:'same-origin',cache:'no-store',redirect:'error',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(7000)]):AbortSignal.timeout(7000)});
-    if(!response.ok)return {status:response.status===401||response.status===403?'forbidden':'failed',project,reason:response.status===401?'Operator session missing, expired or revoked.':response.status===403?'Project read denied.':'Trusted reader unavailable.'};
-    const envelope=await response.json();const projection=projectRunbookEvents(envelope,project);
+    if(!response.ok)return {status:response.status===401||response.status===403?'forbidden':'unavailable',project,reason:response.status===401?'Operator session missing, expired or revoked.':response.status===403?'Project read denied.':'Trusted reader unavailable.'};
+    stage='payload';const envelope=await response.json();stage='validation';const projection=projectRunbookEvents(envelope,project);
     if(envelope.limit!==limit||envelope.lane!==(lane??null))throw Error('Source scope mismatch');
     return {status:'ready',project,envelope,projection};
-  }catch{return {status:'failed',project,reason:'Trusted reader failed or returned invalid source data.'};}
+  }catch{return {status:stage==='transport'?'unavailable':'malformed',project,reason:stage==='transport'?'Trusted reader unavailable.':'Trusted reader returned malformed or out-of-scope data.'};}
 }
 
 export async function readTrustedFoundryRequests(projectId, { limit=25, fetchImpl=globalThis.fetch, signal }={}) {
   if(typeof projectId!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(projectId)
     ||!Number.isInteger(limit)||limit<1||limit>100)throw new TypeError('Invalid Foundry project read scope');
   const params=new URLSearchParams({project_id:projectId,limit:String(limit)});
+  let stage='transport';
   try{
     const response=await fetchImpl(`/api/pi/foundry-requests?${params}`,{method:'GET',credentials:'same-origin',cache:'no-store',redirect:'error',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(7000)]):AbortSignal.timeout(7000)});
-    if(!response.ok)return {status:response.status===401||response.status===403?'forbidden':'failed',project:projectId,reason:response.status===401?'Operator session missing, expired or revoked.':response.status===403?'Foundry project read denied.':'Trusted Foundry reader unavailable.'};
-    const envelope=await response.json();const projection=projectFoundryRequests(envelope,projectId);
+    if(!response.ok)return {status:response.status===401||response.status===403?'forbidden':'unavailable',project:projectId,reason:response.status===401?'Operator session missing, expired or revoked.':response.status===403?'Foundry project read denied.':'Trusted Foundry reader unavailable.'};
+    stage='payload';const envelope=await response.json();stage='validation';const projection=projectFoundryRequests(envelope,projectId);
     if(envelope.limit!==limit)throw Error('Source scope mismatch');
     return {status:'ready',project:projectId,envelope,projection};
-  }catch{return {status:'failed',project:projectId,reason:'Trusted Foundry reader failed or returned invalid source data.'};}
+  }catch{return {status:stage==='transport'?'unavailable':'malformed',project:projectId,reason:stage==='transport'?'Trusted Foundry reader unavailable.':'Trusted Foundry reader returned malformed or out-of-scope data.'};}
 }
 
 // One controller owns the displayed source. Late or canceled completions cannot republish data.

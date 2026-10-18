@@ -64,3 +64,10 @@ Exact-head PostgreSQL and browser CI must prove this extension before acceptance
 ## UUID gap resolved in development
 
 Integration #146 merged into DRB development at 720209a518e440f29d2418145b962ba8232ca164. A fixed read-only join on globally unique work_key now supplies canonical work-item/project UUIDs, type, owner, priority and updated_at without changing schemas or grants. The earlier missing-field blocker is resolved for that development contract. Restricted PostgreSQL-to-DRB-to-PI proof passed at 695b920: https://github.com/jlhogarth/CoMind/actions/runs/39069689578 . This is isolated proof, not deployed access. PI adopts the same adapter and now renders lane list/detail from supplied envelopes. Missing complete authority/dependency/evidence relationships do not block read-only inspection; they remain visibly unknown.
+
+
+## Failure, coverage and freshness display review
+
+The opt-in reader presents successful empty pages separately from denied, unavailable and malformed responses. A successful page with `more_available` is visibly bounded; `more_available=false` still does not assert complete archive coverage. Every refresh clears the previous result before requesting new data. Retrieval timestamps are shown as observations. No freshness threshold is defined, so the UI does not classify records as stale based on age. Malformed or out-of-scope payloads fail closed and are not rendered.
+
+The reader page places its forms and source results inside one primary `main` landmark. Status messages use polite live regions; source fields render as text. The skip link targets the main region. Browser automation verifies these behaviors as synthetic UI acceptance, not assistive-technology certification.

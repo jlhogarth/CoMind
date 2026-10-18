@@ -10,7 +10,7 @@ function show(lanes){
 show({status:'missing',reason:'No project read requested.'});
 const controller=createLaneReadController({onState:show});
 function showDecisions(state){
- decisionStatus.textContent=state.status==='ready'?`Received ${state.envelope.data.length} project decision records. Observation time: ${state.envelope.retrieved_at}. More available: ${state.envelope.more_available?'yes':'no'}.`:state.reason;
+ decisionStatus.textContent=state.status==='ready'?`Received ${state.envelope.data.length} project decision records. Observation time: ${state.envelope.retrieved_at}. More available: ${state.envelope.more_available?'yes':'no'}. Bounded page, not a completeness claim.`:state.reason;
  decisionList.replaceChildren();
  if(state.status!=='ready')return;
  const doc=decisionList.ownerDocument,records=state.envelope.data;
@@ -28,7 +28,7 @@ let decisionController=createTrustedReadController({onState:showDecisions,read:r
 const foundryStatus=document.querySelector('#foundry-status'),foundryList=document.querySelector('#foundry-list');
 function showFoundry(state){
  foundryStatus.textContent=state.status==='ready'
-  ?`Received ${state.envelope.data.length} Foundry authorization request records. Observation time: ${state.envelope.retrieved_at}. More available: ${state.envelope.more_available?'yes':'no'}.`
+  ?`Received ${state.envelope.data.length} Foundry authorization request records. Observation time: ${state.envelope.retrieved_at}. More available: ${state.envelope.more_available?'yes':'no'}. Bounded page, not a completeness claim.`
   :state.reason;
  foundryList.replaceChildren();
  if(state.status!=='ready')return;

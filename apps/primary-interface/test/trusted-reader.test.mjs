@@ -82,3 +82,31 @@ test('clearing a source cancels it and rejects a late successful result',async()
  const pending=c.refresh('COMIND');c.clear('Source switched.');finish({status:'ready',project:'COMIND',envelope:{data:[{id:'stale'}]}});await pending;
  assert.equal(calls,1);assert.equal(states.at(-1).status,'missing');assert.equal(states.at(-1).project,null);c.stop();
 });
+
+
+test('reader separates denied, unavailable, malformed, empty and bounded results without retaining old data',async()=>{
+ const id='00000000-0000-4000-8000-000000000001';
+ const good={version:'drb-002.v1',kind:'events',source:'comind_pm.v_runbook_timeline',source_relations:['comind_pm.v_runbook_timeline'],
+  project:'COMIND',lane:null,limit:1,more_available:true,request_id:id,retrieved_at:'2026-10-18T21:00:00Z',data:[]};
+ const read=async(response)=>readTrustedEvents('COMIND',{limit:1,fetchImpl:async()=>response});
+ assert.equal((await read({ok:false,status:403})).status,'forbidden');
+ assert.equal((await read({ok:false,status:503})).status,'unavailable');
+ assert.equal((await read({ok:true,json:async()=>{throw Error('bad JSON');}})).status,'malformed');
+ assert.equal((await read({ok:true,json:async()=>({...good,project:'OTHER'})})).status,'malformed');
+ const empty=await read({ok:true,json:async()=>good});
+ assert.equal(empty.status,'ready');assert.equal(empty.projection.coverage.returned,0);
+ assert.equal(empty.projection.coverage.moreAvailable,true);
+ assert.equal(empty.projection.observedAt,good.retrieved_at);
+});
+
+test('a failed refresh clears previous records without inferring a stale threshold',async()=>{
+ const states=[],replies=[];
+ const c=createTrustedReadController({onState:s=>states.push(s),read:()=>new Promise(resolve=>replies.push(resolve))});
+ const first=c.refresh('COMIND');
+ replies[0]({status:'ready',project:'COMIND',envelope:{data:[{event_id:'synthetic'}],retrieved_at:'2026-10-18T20:00:00Z'}});await first;
+ const next=c.refresh('COMIND');
+ assert.equal(states.at(-1).status,'loading');assert.equal(states.at(-1).envelope,undefined);
+ replies[1]({status:'unavailable',project:'COMIND',reason:'Trusted reader unavailable.'});await next;
+ assert.equal(states.at(-1).status,'unavailable');assert.equal(states.at(-1).envelope,undefined);
+ c.stop();
+});

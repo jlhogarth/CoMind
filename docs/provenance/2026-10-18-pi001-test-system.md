@@ -82,3 +82,14 @@ Implementation candidate `d9d1e634622a92f9068bc8f390a00316e110e253` passed all 1
 The reader now distinguishes denied, unavailable, and malformed/out-of-scope responses. Successful empty remains a successful zero-row page. Previous results clear at refresh; bounded coverage remains bounded, even when no further page is reported. Observation time is shown without inventing a staleness threshold. The skip link targets the primary content landmark, source sections remain independently labeled, status updates use polite live regions, and lane rendering is isolated to its child host.
 
 No database, RunBook, production roles, grants, deployment, activation, or production authorization changed. The Foundry UUID to PM project crosswalk remains an explicit blocker pending source-owner reviewed mapping, cardinality, lifecycle, read access policy, provenance and verification semantics. Lane, attention, revision, event relationship and evidence verification semantics remain incomplete; no unified operational assessment is claimed.
+
+
+## Crosswalk contract review and current-head readback
+
+At this checkpoint, remote PR #147 is `5026c26cea1f0e433e76aca0f580e6e1453ebccb`, draft/open/unmerged/mergeable, with no submitted reviews. Its 11 returned exact-head workflows succeeded. Primary Interface run 39178082601 passed browser and actual PostgreSQL 17 capture-to-RunBook-to-browser acceptance; DRB Query Contract 39178082577, CI 39178082610, and No Placeholder Policy 39178082768 also passed. The evidence artifact is retained through 2026-11-01 23:50 UTC.
+
+The canonical contracts and source code were reviewed for cross-domain project identity. Foundry uses `comind.cm_project.project_id`; PM uses `comind_pm.pm_projects.id` and `project_key`. There is no declared key between them. Free-form source references and external IDs do not constitute a crosswalk. No source-owner-reviewed cardinality, lifecycle, access policy or provenance record was found.
+
+Resolution gate: PI, Foundry and PM owners must approve a durable relation that identifies both keys, explicitly selects cardinality, defines effective/inactive/revoked lifecycle, records accountable authority, provenance and immutable revision, and specifies scoped read access independently for the mapping and each source. Zero, ambiguous, inactive, expired or unauthorized mapping results fail closed. Identifier similarity, project labels, first-match selection and free-form references are not evidence. No cardinality value is invented here.
+
+No code or source query changed in this checkpoint. Foundry UUID and PM project reads remain distinct; the crosswalk blocker remains open. No unified operational assessment, production read, grant, deployment, activation or production authorization is claimed. #147 remains stacked on #143/#139; #145 and #119 remain separate.

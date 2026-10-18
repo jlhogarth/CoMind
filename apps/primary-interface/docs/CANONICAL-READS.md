@@ -71,3 +71,12 @@ Integration #146 merged into DRB development at 720209a518e440f29d2418145b962ba8
 The opt-in reader presents successful empty pages separately from denied, unavailable and malformed responses. A successful page with `more_available` is visibly bounded; `more_available=false` still does not assert complete archive coverage. Every refresh clears the previous result before requesting new data. Retrieval timestamps are shown as observations. No freshness threshold is defined, so the UI does not classify records as stale based on age. Malformed or out-of-scope payloads fail closed and are not rendered.
 
 The reader page places its forms and source results inside one primary `main` landmark. Status messages use polite live regions; source fields render as text. The skip link targets the main region. Browser automation verifies these behaviors as synthetic UI acceptance, not assistive-technology certification.
+
+
+## Foundry-to-PM crosswalk owner review gate
+
+Repository review at #147 head `5026c26cea1f0e433e76aca0f580e6e1453ebccb` reconfirmed the lack of a declared cross-domain relationship. Foundry request scope is `comind.cm_project.project_id` (UUID); PM project identity is `comind_pm.pm_projects.id` (UUID) with `project_key` (text). PM `source_ref` and `pm_links.external_id` are not constrained to Foundry project IDs and are not evidence of identity.
+
+Do not implement or populate a crosswalk until the PI, Foundry and PM source owners review a durable mapping contract that records both canonical source keys; an explicit cardinality choice; effective, inactive and revoked lifecycle rules; mapping authority and immutable revision; provenance and owner approval; and a mapping read policy. Authorize access independently for the mapping, Foundry rows and PM rows. A valid match conveys no source access. Fail closed on zero, ambiguous, inactive, expired or unauthorized mappings. Never choose a match by identifier similarity, first-row ordering, project name or free-form reference.
+
+The required cardinality is an owner decision and remains unresolved. These gates preserve source domains as distinct claims; they do not assert a one-to-one or one-to-many policy. Until owner evidence exists, the only supported behavior is separate native-scope reads and an explicit blocker on any unified assessment.

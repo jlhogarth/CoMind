@@ -1,0 +1,6 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>CoMind | Connected lane reader</title><link rel="stylesheet" href="../../brand/comind-brand.css"><link rel="stylesheet" href="./interface.css"></head>
+<body><a class="skip" href="#content">Skip to content</a><header><p>CoMind / Operator Cockpit</p><h1>Connected lane reader</h1><p>Read-only development surface. An operator session and configured read service are required.</p></header>
+<form id="read-scope"><label>Project <input id="project" name="project" required pattern="[A-Z0-9_-]{1,64}" maxlength="64" autocomplete="off" aria-describedby="project-help"></label><p id="project-help">Enter the canonical project key you are authorized to inspect.</p><button type="submit">Read project lanes</button></form>
+<p id="read-status" role="status" aria-live="polite">No project read requested.</p>
+<nav aria-label="Primary"><a href="#/lanes">Development lanes</a><a href="./index.html#/attention">Attention</a></nav><main id="content" tabindex="-1"></main><script type="module" src="./src/reader-entry.mjs"></script></body></html>

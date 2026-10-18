@@ -32,10 +32,9 @@ try{
  await page.goto(origin+'/apps/primary-interface/index.html#/lanes');
  await page.getByRole('heading',{name:'Development lanes unavailable',exact:true}).waitFor();
  assert.equal(await page.evaluate(()=>document.cookie),'');
- await page.evaluate(async()=>{
-  const {readTrustedLanes}=await import('./src/trusted-reader.mjs'),{mountCockpit}=await import('./src/cockpit.mjs');
-  const lanes=await readTrustedLanes('COMIND');window.connectedUnmount=mountCockpit(document.querySelector('main'),{lanes});
- });
+ await page.goto(origin+'/apps/primary-interface/reader.html#/lanes');
+ await page.getByLabel('Project',{exact:true}).fill('COMIND');
+ await page.getByRole('button',{name:'Read project lanes',exact:true}).click();
  await page.getByRole('link',{name:'PI-FIXTURE: Synthetic connected lane',exact:true}).click();
  await page.getByRole('heading',{name:'Development lane detail',exact:true}).waitFor();
  await page.getByText(id,{exact:true}).waitFor();
@@ -43,12 +42,15 @@ try{
  assert.equal(requests.some(r=>JSON.stringify(r).includes(backend.token)),false);
  assert.equal(requests.some(r=>r.url.startsWith(upstream)),false);
  await writeFile(sessions,JSON.stringify([{...operator,disabled:true}]));
- await page.evaluate(async()=>{
-  window.connectedUnmount();const {readTrustedLanes}=await import('./src/trusted-reader.mjs'),{mountCockpit}=await import('./src/cockpit.mjs');
-  const lanes=await readTrustedLanes('COMIND');window.connectedUnmount=mountCockpit(document.querySelector('main'),{lanes});
- });
+ await page.getByRole('button',{name:'Read project lanes',exact:true}).click();
  await page.getByRole('heading',{name:'Development lanes unavailable',exact:true}).waitFor();
  assert.equal(await page.getByText('Synthetic connected lane',{exact:true}).count(),0);
  assert.equal(await page.locator('a.metric').count(),0);
+ await writeFile(sessions,JSON.stringify([operator]));
+ await page.getByLabel('Project',{exact:true}).fill('OTHER');
+ await page.getByRole('button',{name:'Read project lanes',exact:true}).click();
+ await page.getByText('Project read denied.',{exact:true}).waitFor();
+ assert.equal(await page.getByText('Synthetic connected lane',{exact:true}).count(),0);
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
  console.log('Trusted browser read passed: HttpOnly session, server-only DRB token, scoped read, canonical detail and revocation clears data. Synthetic DB fixture only.');
 }finally{await browser?.close();if(web){web.closeAllConnections();await new Promise(r=>web.close(r));}await gateway?.close();await drb?.close();await rm(directory,{recursive:true,force:true});}

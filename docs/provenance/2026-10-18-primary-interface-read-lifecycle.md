@@ -1,0 +1,13 @@
+# PI trusted read lifecycle review
+
+Review date: 2026-10-18 UTC, 2026-10-17 in Joseph's Indianapolis timezone. Human owner Joseph Hogarth. Authority: explicit continue instruction for isolated PI development. T1 reversible development; no live resources, credentials, production authority, schema/grants, VE activation or paid commitment. No exception. Proposed NIST AC-3/AC-6/AU-3 human oversight traceability, not assessed conformity.
+
+Re-read remote #147 (dd946ce), DRB #145 (5331d4), local gateway/browser transport and continuation. Sources unchanged. DRB deployment remains deferred pending PDP-001, issue #140 / PR #141 per Joseph's production decision. This review does not independently verify the live RunBook event or claim new Supabase capture.
+
+Found a missing lifecycle guard for overlapping browser reads: callers could otherwise publish an older completion after a newer denial. Existing opt-in transport had no request controller and browser proof manually mounted completed responses. Added explicit request controller with generation fencing, abort signaling, immediate old-snapshot clearing, pinned result project, stop semantics and unavailable result on thrown/invalid reads. A regression initially failed because the proposed controller API did not exist, then passed after implementation; no deployed race incident is claimed.
+
+Added reader.html and reader-entry.mjs for actual operator project-form interaction. No read until explicit submit, no credentials/backend configuration in UI. Default index remains disconnected. Pagehide clears state/stops requests; bfcache restore reloads. Expanded browser proof exercises actual page/form, revoked session data removal, project scope denial and mobile overflow. Test records remain synthetic.
+
+Executed local validation: 40 PI contract/routing/transport tests passed, no-placeholder and whitespace checks passed. New browser proof requires exact-head CI before acceptance. Previous gateway/PostgreSQL/browser success at dd946ce remains predecessor evidence only. This is the implementing agent's engineering review, not independent security approval.
+
+Recovery: revert the PI reader/controller change on #147; no database rollback. No new package/model/provider cost. At most one current browser request per controller; superseded in-flight server work may finish within existing timeout/authority semantics. Production host/TLS/session issuer/audit retention/grant review and independent sign-off remain open. Continuation in apps/primary-interface/CONTINUE.md and current #147 exact-head evidence. Do not leave CI silently running after a turn ends.

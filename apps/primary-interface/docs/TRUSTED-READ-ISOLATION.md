@@ -44,3 +44,11 @@ Recovery: stop isolated processes and revoke their fixture credentials. Preserve
 Integration branch combines PI d889f23 and DRB 5331d4 for reproducible isolated testing. Neither dependency PR was merged to main or force-updated. Re-read current heads before adoption, preserve concurrent DRB changes, and review the narrow gateway changes independently of inherited files. OC-002 remains untouched.
 
 Blocked operation: live browser activation. Necessary inputs: confirmed host/TLS/same-origin proxy, trusted operator session issuer, reviewed production restricted role and project associations, persistent private audit mount/retention, gateway limits/alarms and independent security review. Resolvers: PI/DRB security and deployment owners with Joseph for actual activation authority. Supporting evidence: AGENTS.md production C4 boundary and DRB-002 activation checklist. Missing inputs block deployment, not isolated implementation.
+
+## Connected reader interaction hardening
+
+reader.html is an explicit opt-in page. It makes no read until the operator submits a canonical project key; there is no token/password input or backend URL setting. The fixed same-origin transport retains server authorization. index.html stays disconnected. The reader has a polite status region, labeled project input, keyboard-submit form and separate lane filters/detail navigation.
+
+A single request controller owns displayed source state. Starting a read clears the old snapshot, aborts the prior fetch and increments a generation counter. Only the current generation may publish a result, even if an upstream/test reader ignores cancellation. A late earlier success cannot replace a newer denial or another project's result. Pagehide stops the controller and clears the rendered source; bfcache restoration reloads the page so retained DOM does not imply a current session. Stopping the controller prevents new requests and late updates. No automatic polling is introduced.
+
+This is engineering hardening of read lifecycle, not independent production security review. The production-platform decision remains deferred under PDP-001 #140 / #141. No host selection or activation is inferred from this page. Session issuer/TLS/proxy/production role/audit-storage requirements remain unresolved and block live deployment only.

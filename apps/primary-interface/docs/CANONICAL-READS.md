@@ -6,13 +6,15 @@ T1 isolated development under Joseph's continuation authority. No production rea
 
 | Domain | Canonical identity | Established mapping | Explicitly unresolved |
 | --- | --- | --- | --- |
-| Foundry attention | cm_foundry_authorization_request.authorization_request_id | Preserve pending/approved/denied/cancelled/expired verbatim; preserve reason and requested authority/environment/target separately | A request reason is not proof work stopped. Requested authority is not granted authority. No lane FK, PI revision, recommendation, consequences or verified evidence policy |
+| Foundry attention | cm_foundry_authorization_request.authorization_request_id | Preserve pending/approved/denied/cancelled/expired verbatim; preserve reason and requested authority/environment/target separately | A request reason is not proof work stopped. Requested authority is not granted authority. No lane FK, PI revision, recommendation, consequences or verified evidence policy. Its `cm_project.project_id` is not related to `pm_projects.id` by a declared cross-domain key |
 | Project decisions | pm_decision_records.id | Preserve work_item_id, project_id, project_key, item_type, work_key and recorded selection/rationale/time through declared UUID joins | A selected option is not Foundry approval. No common lifecycle or optimistic concurrency revision |
 | Development lanes | pm_work_items.id, item_type=lane | Preserve work_key, project_id, status, owner and current summary | No inference of running chat/VE, dependencies, GitHub checks or next authority boundary |
 
 IDs namespace the original database key by relation; original key remains separately available. Unknown scalar values stay visible. Unknown status adds an explicit blocker. Null is unknown, never an invented value. Unknown fields, free-form metadata and evidence JSON are excluded pending field-level review, rather than exposed wholesale. No input record is silently dropped: malformed or duplicate identifiers invalidate the page. Errors must become failed source state at an eventual caller boundary, not successful empty results.
 
 Foundry decisions join only by authorization_request_id, PM decisions by work_item_id. Foundry project/task keys belong to comind, while PM keys belong to comind_pm. No cross-domain equivalence is established. This slice does not perform joins or claim decision/request consistency. Raw times are source claims, not freshness guarantees. revision=null is deliberate: timestamps and observation time are not concurrency tokens. All decisions remain disabled.
+
+Repository source inspection confirms the mapping gap: Foundry authorization requests reference `comind.cm_project.project_id` (UUID); PM lanes/decisions reference `comind_pm.pm_projects.id` (UUID) and expose `project_key` (text). The PM `source_system`/`source_ref` and `pm_links.external_id` columns are not constrained to Foundry project identifiers, so they do not establish a mapping by themselves. Required input is an owner-reviewed, durable cross-domain project mapping with cardinality and lifecycle rules. Resolver: PI/Foundry/PM source owners together. Until that mapping and a read role scoped to it are evidenced, Foundry requests must not be filtered by a PM project key or mixed into the PM reader.
 
 ## Envelope and bounded retrieval
 
@@ -30,6 +32,7 @@ DRB-002 lane responses were extended in development to return canonical work-ite
 | --- | --- | --- | --- |
 | Production browser reads | Operator identity, project scope, TLS/session policy, production restricted database role and production denial proof | PI security owner with Joseph for activation authority | AGENTS.md; DRB-002 activation checklist; private schema revokes in DRB-001 |
 | Production project-decision source access | Reviewed SELECT grant and project RLS policy for `pm_decision_records`, plus host-specific PI/DRB credential setup | DRB database owner with PI security owner | `db/test/drb_002_reader.sql` is test-only; PM ledger RLS and decision-record FK definitions |
+| Foundry request read scoped from a PM project | Owner-reviewed crosswalk from Foundry project UUID to PM project key/UUID, with cardinality and lifecycle semantics, plus a read role and row policy | PI, Foundry and PM source owners | `20261008_006_foundry_agent_substrate.sql` request FK; `20261006_001_comind_pm_ledger.sql` project key/source-reference definitions; no declared cross-domain FK |
 | Complete attention assessment | Authored recommendation/consequences, canonical lane/RunBook links, revision and evidence policy | Foundry/DRB owners with PI | 006 substrate and PM ledger definitions; SOURCE-MAP.md |
 | Current lane dependencies and checks | Explicit FK edges, repository/head-bound verification, observation coverage | PM/DRB integration owner | pm_work_item_dependencies; pm_links; pm_verifications |
 

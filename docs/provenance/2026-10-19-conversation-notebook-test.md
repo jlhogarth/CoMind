@@ -38,15 +38,23 @@ Approval spans the existing memory API and the Notebook review fixture, so the t
 
 ## Verification status
 
-Pending execution on the feature branch. The local environment has Node.js 24 but does not provide Docker, `psql`, or a local PostgreSQL server. The database proof must run in the repository's disposable PostgreSQL 17 CI job before acceptance. Record exact commit, workflow run, database check result, and remaining limitations here and in the Durable RunBook after CI completes.
+The local environment has Node.js 24 but does not provide Docker, `psql`, or a local PostgreSQL server. Local build and unit verification passed: `npm run build`; `npm test` reported 202 passed, 7 database-dependent tests skipped, 0 failed. The prototype script syntax check, embedded SQL fixture equality, and `git diff --check` also passed.
 
-Local commit `d119ebbd504ffc42027334fad6af38f1c6a3d58a` contains the implementation. An attempt to push the branch was rejected by automatic approval review because the request authorized isolated Test development but did not explicitly authorize publishing repository contents to GitHub. No push, pull request, or CI run was created. The branch remains local while the PostgreSQL proof is pending.
+After the automatic approval review initially blocked external publication, Joseph explicitly authorized publishing Test implementations to GitHub. The first shell push then failed because the local shell had no GitHub credentials; no credential workaround was used. The connected GitHub repository app published the three local milestones to `notebook-001-capture-review-test` and opened draft PR [#152](https://github.com/jlhogarth/CoMind/pull/152), head `fee27936f7155a34b53723ecf964da19a364a0bc`. Its final tree matches the local branch tree. The PR remains draft and unmerged.
+
+Exact-head PostgreSQL CI first ran `server/test/integration/conversation-notebook.test.mjs`: 22 passed, 1 failed, 1 skipped. The failure was an overbroad test assertion: it searched the complete provider request, which correctly includes original conversation messages, while asserting that a rejected sentence was absent from durable memory. The canonical table check already found no memory for the rejected message. The test now isolates the explicit `cm_memory_node` context block and runs a rejected-content retrieval query that checks both empty memory context and selected-memory IDs. This is a test correction, not a runtime or schema change. The correction is being sent to PR #152 for another exact-head run.
+
+The current CI run for this correction is the acceptance gate. Do not claim the end-to-end PostgreSQL sequence passed until the rerun completes successfully. The exercised environment is ephemeral PostgreSQL 17 in GitHub Actions, with synthetic fixtures and no live Supabase Notebook schema or production access.
 
 ## Durable RunBook references
 
 - `d035322b-d17d-4202-ba88-92822ff298c5`: prototype recovery and canonical contract reconciliation.
 - `27714818-009c-4a6d-aefb-96356cb0327c`: local implementation and validation results; PostgreSQL proof pending.
 - `076daa79-2dce-4397-bd63-2df642ab22c7`: automatic review block on external branch publication.
+- `968a308c-8118-4525-a515-f584699d3a6b`: GitHub publication and draft PR #152.
+- `38bdc55f-46e0-466e-9425-8136450fe803`: exact-head CI queued and initial workflow status.
+- `b180cc64-dfea-49a3-b53a-45b4aaaa19bf`: PostgreSQL integration failure, diagnosis, and correction plan.
+- `27b9ed34-0932-4835-877d-5bee8578bbc4`: local GitHub shell authentication failure and app-based recovery.
 
 ## Recovery
 

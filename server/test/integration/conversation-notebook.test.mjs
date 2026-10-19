@@ -235,7 +235,11 @@ async function retrieve(projectId, conversationId, queryText) {
     [projectId, approvedMemoryId]
   );
   assert.equal(memory.rows.length, projectId === targetProjectId ? 1 : 0);
-  return { response: response.json(), context: request.messages.map(message => message.content).join('\n') };
+  const memoryContext = request.messages
+    .filter(message => message.role === 'system' && message.content.startsWith('CoMind retrieved memory context follows.'))
+    .map(message => message.content)
+    .join('\n');
+  return { response: response.json(), memoryContext };
 }
 
 before(async () => {
@@ -403,6 +407,14 @@ test('Notebook capture, exact evidence, explicit review, canonical project promo
   );
   assert.equal(rejectedMemory.rows.length, 0, 'rejected candidate never becomes canonical memory');
 
+  const rejectedRetrieval = await retrieve(
+    targetProjectId,
+    projectConversation,
+    'What does the rust meadow protocol say about skipping review?'
+  );
+  assert.equal(rejectedRetrieval.memoryContext, '', 'rejected source text is not present in canonical memory context');
+  assert.deepEqual(rejectedRetrieval.response.meta.memory_retrieval.selected_memory_ids, []);
+
   const reviewMutation = databaseQuery(
     `UPDATE comind_notebook.review_events SET note='rewritten' WHERE finding_id=$1`,
     [rejectedFinding]
@@ -453,7 +465,7 @@ test('Notebook capture, exact evidence, explicit review, canonical project promo
     projectConversation,
     'What does the cobalt orchard protocol say about provenance?'
   );
-  assert.match(targetRetrieval.context, /cobalt orchard protocol preserves/);
+  assert.match(targetRetrieval.memoryContext, /cobalt orchard protocol preserves/);
   assert.equal(targetRetrieval.response.meta.memory_retrieval.selected_memory_ids.includes(approvedMemoryId), true);
 
   const otherRetrieval = await retrieve(
@@ -461,7 +473,7 @@ test('Notebook capture, exact evidence, explicit review, canonical project promo
     otherConversation,
     'What does the cobalt orchard protocol say about provenance?'
   );
-  assert.doesNotMatch(otherRetrieval.context, /cobalt orchard protocol preserves/);
+  assert.doesNotMatch(otherRetrieval.memoryContext, /cobalt orchard protocol preserves/);
   assert.equal(otherRetrieval.response.meta.memory_retrieval.selected_memory_ids.includes(approvedMemoryId), false);
 
   const archive = await app.inject({
@@ -475,7 +487,7 @@ test('Notebook capture, exact evidence, explicit review, canonical project promo
     projectConversation,
     'What does the cobalt orchard protocol say about provenance?'
   );
-  assert.doesNotMatch(archivedRetrieval.context, /cobalt orchard protocol preserves/);
+  assert.doesNotMatch(archivedRetrieval.memoryContext, /cobalt orchard protocol preserves/);
   assert.equal(archivedRetrieval.response.meta.memory_retrieval.selected_memory_ids.includes(approvedMemoryId), false);
 
   const restore = await app.inject({
@@ -489,7 +501,7 @@ test('Notebook capture, exact evidence, explicit review, canonical project promo
     projectConversation,
     'What does the cobalt orchard protocol say about provenance?'
   );
-  assert.match(restoredRetrieval.context, /cobalt orchard protocol preserves/);
+  assert.match(restoredRetrieval.memoryContext, /cobalt orchard protocol preserves/);
   assert.equal(restoredRetrieval.response.meta.memory_retrieval.selected_memory_ids.includes(approvedMemoryId), true);
 
   const finalCounts = await databaseQuery(

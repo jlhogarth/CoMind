@@ -32,7 +32,7 @@ The live Supabase verification SQL at `db/test/verify_activity_hud_test.sql` com
 - Update and delete attempts against the append-only fixture records were rejected.
 - `git diff --check` passed for the local repository changes.
 
-The repository includes a PostgreSQL 17 workflow using a synthetic RunBook source fixture. At PR head `cae5f091fa4fd75829865c3187fd26ace3928273`, Activity HUD Test workflow `39330235923` passed. The following exact-head workflows also passed: DRB-002 Query Contract `39330236049`; Foundry Runtime Orchestration `39330236021`; CoMind Repository Configuration `39330235845`; No Placeholder Policy `39330235794`; Live Foundry LF-3 Readiness `39330235800`; Foundry Work Lease Kernel `39330235932`; Governed Provider Execution `39330235922`; Live Foundry Stage 1 Readiness `39330235781`; Live Foundry LF-2 Readiness `39330235807`; Runtime Budget Authority Adapter `39330235797`. CI workflow `39330235956` was still in progress at the last check. PR #154 remains open and draft.
+The repository includes a PostgreSQL 17 workflow using a synthetic RunBook source fixture. All 12 returned workflows passed at PR head `b8d1c9290edda4020918ae1a96934a813014a289`: CI `39330475724`; DRB-002 Query Contract `39330475720`; Foundry Runtime Orchestration `39330475851`; CoMind Repository Configuration `39330475773`; No Placeholder Policy `39330476249`; Activity HUD Test `39330476073`; Live Foundry LF-3 Readiness `39330475727`; Foundry Work Lease Kernel `39330475820`; Governed Provider Execution `39330475780`; Live Foundry Stage 1 Readiness `39330475732`; Live Foundry LF-2 Readiness `39330475721`; Runtime Budget Authority Adapter `39330475794`. The PR remains open, draft, and unmerged.
 
 ## Limitations
 
@@ -49,7 +49,6 @@ The RunBook timeline remains its own source stream. The HUD does not infer UUID/
 
 ## Next steps
 
-1. Finish and record CI workflow `39330235956` at exact PR head `cae5f091fa4fd75829865c3187fd26ace3928273`.
-2. Add and deploy a visual Test HUD after defining a Test-only sign-in and server data path for the private views.
-3. Instrument supported CoMind/GitHub/provider adapters so tracked jobs append observations and terminal evidence.
-4. Reimplement the deferred formal security review before adding production data, live endpoints, or production access.
+1. Add and deploy a visual Test HUD after defining a Test-only sign-in and server data path for the private views.
+2. Instrument supported CoMind/GitHub/provider adapters so tracked jobs append observations and terminal evidence.
+3. Reimplement the deferred formal security review before adding production data, live endpoints, or production access.

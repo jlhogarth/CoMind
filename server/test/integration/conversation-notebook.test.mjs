@@ -412,8 +412,8 @@ test('Notebook capture, exact evidence, explicit review, canonical project promo
     projectConversation,
     'What does the rust meadow protocol say about skipping review?'
   );
-  assert.equal(rejectedRetrieval.memoryContext, '', 'rejected source text is not present in canonical memory context');
-  assert.deepEqual(rejectedRetrieval.response.meta.memory_retrieval.selected_memory_ids, []);
+  assert.doesNotMatch(rejectedRetrieval.memoryContext, /rust meadow protocol skips human review/,
+    'rejected finding text is not present in canonical memory context');
 
   const reviewMutation = databaseQuery(
     `UPDATE comind_notebook.review_events SET note='rewritten' WHERE finding_id=$1`,

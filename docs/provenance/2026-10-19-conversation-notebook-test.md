@@ -42,9 +42,9 @@ The local environment has Node.js 24 but does not provide Docker, `psql`, or a l
 
 After the automatic approval review initially blocked external publication, Joseph explicitly authorized publishing Test implementations to GitHub. The first shell push then failed because the local shell had no GitHub credentials; no credential workaround was used. The connected GitHub repository app published the three local milestones to `notebook-001-capture-review-test` and opened draft PR [#152](https://github.com/jlhogarth/CoMind/pull/152), head `fee27936f7155a34b53723ecf964da19a364a0bc`. Its final tree matches the local branch tree. The PR remains draft and unmerged.
 
-Exact-head PostgreSQL CI first ran `server/test/integration/conversation-notebook.test.mjs`: 22 passed, 1 failed, 1 skipped. The failure was an overbroad test assertion: it searched the complete provider request, which correctly includes original conversation messages, while asserting that a rejected sentence was absent from durable memory. The canonical table check already found no memory for the rejected message. The test now isolates the explicit `cm_memory_node` context block and runs a rejected-content retrieval query that checks both empty memory context and selected-memory IDs. This is a test correction, not a runtime or schema change. The correction is being sent to PR #152 for another exact-head run.
+Exact-head PostgreSQL CI first ran `server/test/integration/conversation-notebook.test.mjs`: 22 passed, 1 failed, 1 skipped. The failure was an overbroad test assertion: it searched the complete provider request, which correctly includes original conversation messages, while asserting that a rejected sentence was absent from durable memory. The canonical table check already found no memory for the rejected message. The first correction isolated the explicit `cm_memory_node` context block, but the next run exposed another overstrict assertion: a query mentioning “protocol” may legitimately retrieve the separate approved cobalt memory through lexical matching. The assertion now permits unrelated approved memory and checks that the rejected excerpt itself is absent from canonical memory context. The explicit zero-row query for the rejected source message remains. These are test corrections, not runtime or schema changes.
 
-The current CI run for this correction is the acceptance gate. Do not claim the end-to-end PostgreSQL sequence passed until the rerun completes successfully. The exercised environment is ephemeral PostgreSQL 17 in GitHub Actions, with synthetic fixtures and no live Supabase Notebook schema or production access.
+The corrected test is being sent to PR #152 for another exact-head run. Do not claim the end-to-end PostgreSQL sequence passed until that rerun completes successfully. The exercised environment is ephemeral PostgreSQL 17 in GitHub Actions, with synthetic fixtures and no live Supabase Notebook schema or production access.
 
 ## Durable RunBook references
 
@@ -55,6 +55,8 @@ The current CI run for this correction is the acceptance gate. Do not claim the 
 - `38bdc55f-46e0-466e-9425-8136450fe803`: exact-head CI queued and initial workflow status.
 - `b180cc64-dfea-49a3-b53a-45b4aaaa19bf`: PostgreSQL integration failure, diagnosis, and correction plan.
 - `27b9ed34-0932-4835-877d-5bee8578bbc4`: local GitHub shell authentication failure and app-based recovery.
+- `d4fb74ce-5c6a-4c1c-bb4b-5b26a591eb7a`: first retrieval assertion correction and CI rerun.
+- `49ffbfdf-1977-42d3-9f99-339945e6ceea`: second overstrict retrieval assertion and narrowed correction.
 
 ## Recovery
 

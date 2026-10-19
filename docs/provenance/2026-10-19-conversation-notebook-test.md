@@ -42,6 +42,12 @@ Pending execution on the feature branch. The local environment has Node.js 24 bu
 
 Local commit `d119ebbd504ffc42027334fad6af38f1c6a3d58a` contains the implementation. An attempt to push the branch was rejected by automatic approval review because the request authorized isolated Test development but did not explicitly authorize publishing repository contents to GitHub. No push, pull request, or CI run was created. The branch remains local while the PostgreSQL proof is pending.
 
+## Durable RunBook references
+
+- `d035322b-d17d-4202-ba88-92822ff298c5`: prototype recovery and canonical contract reconciliation.
+- `27714818-009c-4a6d-aefb-96356cb0327c`: local implementation and validation results; PostgreSQL proof pending.
+- `076daa79-2dce-4397-bd63-2df642ab22c7`: automatic review block on external branch publication.
+
 ## Recovery
 
 The change is confined to a feature branch and Test-only files. Recovery is to revert the branch delta. CI destroys the disposable database at job completion. If a project-memory API call succeeds but final Notebook linking fails, retry the same source-message promotion, resolve the existing memory ID, then record the review/link once; never create a second memory row.

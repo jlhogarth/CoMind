@@ -53,7 +53,7 @@ try{
  check('invalid capture source is rejected without a partial event');
  const tiedAt=new Date(Date.now()+1000).toISOString();
  const eventId=await capture('COMIND','Test RunBook capture accepted','pass','Captured in the Test RunBook',tiedAt);
- const tiedEventIds=[eventId,await capture('COMIND','Same-time event B','pass','Same timestamp fixture',tiedAt),await capture('COMIND','Same-time event C','pass','Same timestamp fixture',tiedAt)];
+ const tiedEventIds=[eventId,await capture('COMIND','Same-time event B','pass','Captured in the Test RunBook',tiedAt),await capture('COMIND','Same-time event C','pass','Captured in the Test RunBook',tiedAt)];
  await capture('OTHER','Denied project event must never reach this browser');
  check('actual migrations and service_role capture function, synthetic records only');
  const snapshot=async()=> (await admin.query("select jsonb_agg(to_jsonb(e) order by id)::text as ledger from comind_pm.pm_events e")).rows[0].ledger;

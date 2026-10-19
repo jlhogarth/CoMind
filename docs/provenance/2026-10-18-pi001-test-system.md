@@ -107,3 +107,42 @@ Verification planned: focused PI event projection and query tests; PostgreSQL 17
 
 Open: exact-head CI, review and mergeability after the change; accepted event pagination remains bounded and not a complete or lossless feed; decision/authorization/verification relationship joins and evidence verification policy remain separate gaps; Foundry-to-PM project crosswalk remains unresolved. Preserve each source domain and disabled decision controls.
 
+
+
+## Exact-head verified checkpoint and RunBook evidence #006, 2026-10-19
+
+PR #147 implementation head `976de5bf8f2dc30456ca7936b14a0bad7db05eef` is open, draft, unmerged and mergeable. Its base is #143 head `d889f2395648af90bb0b8235c43226168d2c4534`; #143 remains on BRAND #139 head `c5fc5d8bfd818a3feb22f5585bde93059a255658`. DRB #145 remains separate at `19b7cf8ad9e38dc1f6738925b6f7b4a09f09359a`; #146 remains closed and merged. PR #147 has no submitted review or inline review thread.
+
+The fixed event query joins `comind_pm.v_runbook_timeline` to `comind_pm.pm_events` by event UUID and to `comind_pm.pm_work_items` by the declared `work_item_id` foreign key. It projects the canonical project UUID, optional event project UUID, optional work-item UUID, linked work-item project UUID, item type and all three source relations. No schema or grant was added. The opt-in browser renders these as text and distinguishes UUIDs from work keys. A mismatched event/work-item project remains visible with an explicit blocker. An event without a work item remains representable.
+
+### Exact-head verification
+
+All 11 returned workflows passed on exact implementation head `976de5b`:
+
+- Primary Interface: [run 39179222357](https://github.com/jlhogarth/CoMind/actions/runs/39179222357)
+- DRB-002 Query Contract: [run 39179222114](https://github.com/jlhogarth/CoMind/actions/runs/39179222114)
+- Main CI: [run 39179222204](https://github.com/jlhogarth/CoMind/actions/runs/39179222204)
+- No Placeholder Policy: [run 39179222117](https://github.com/jlhogarth/CoMind/actions/runs/39179222117)
+- Foundry Runtime Orchestration: [run 39179222225](https://github.com/jlhogarth/CoMind/actions/runs/39179222225)
+- Governed Provider Execution: [run 39179222246](https://github.com/jlhogarth/CoMind/actions/runs/39179222246)
+- Runtime Budget Authority Adapter: [run 39179222257](https://github.com/jlhogarth/CoMind/actions/runs/39179222257)
+- Foundry Work Lease Kernel: [run 39179222167](https://github.com/jlhogarth/CoMind/actions/runs/39179222167)
+- Live Foundry LF-3 Readiness: [run 39179222146](https://github.com/jlhogarth/CoMind/actions/runs/39179222146)
+- Live Foundry LF-2 Readiness: [run 39179222119](https://github.com/jlhogarth/CoMind/actions/runs/39179222119)
+- Live Foundry Stage 1 Readiness: [run 39179222133](https://github.com/jlhogarth/CoMind/actions/runs/39179222133)
+
+The Primary Interface job passed the PI contracts, browser navigation, trusted-reader browser test, and real PostgreSQL 17.11 capture-to-RunBook-to-PI-to-Chromium proof. Its 13 acceptance checks passed: invalid source rollback; actual migrations and capture function; append-only UPDATE/DELETE denial; RLS excludes OTHER despite broader backend HTTP scope; real event UUID/source/result/evidence rendering; canonical lane summary update and read-only source preservation; append-only failure plus recovery; operator/backend revocation; audit-file failure; database connection loss and recovery; SQL timeout and recovery; service restart retaining history and audit; project denial, payload-free audit, server-only credentials, and unchanged ledger.
+
+Evidence artifact `drb-test-system-evidence`, ID `12154873581`, has SHA-256 `a159e10831c39f624ec0a81cc801090e1c983437f8674fa409804ba13964ae8b` and was retained through 2026-11-02 00:06:51 UTC. The database rows and identities are synthetic, the PostgreSQL service is disposable, and this is Test evidence only.
+
+### Failure and correction record
+
+Candidate `d9455a6e88da3339bed778e6f4c6022100d1950a` failed because an empty-event reader fixture and the trusted-gateway fixture still used the prior one-relation event envelope. A new SQL test also used a regex that expected identifiers to be adjacent despite the project UUID COALESCE expression. The runtime correctly failed closed. Concurrent commit `976de5b` updated both fixtures and narrowed the SQL assertions to check the expression and FK fields separately. The PI unit suite, DRB query contract, broad server suites, and other workflows then passed. No runtime guard was weakened. The failed head did not complete browser or PostgreSQL acceptance; the repaired exact head did.
+
+### Append-only RunBook event and scope
+
+Live RunBook event `668a64e1-2a8f-499b-81a6-6e8a4473bd9e` was appended and read back from `comind_pm.v_runbook_timeline` with `project_key=COMIND`, `work_key=null`, type `verification`, outcome `pass`, and source ref PR #147. The live RunBook is on active Supabase project `sbgfuanxiqepcoboxzcl`, PostgreSQL 17.11. No PI-001 PM work item exists in the current COMIND ledger; therefore the event is project-scoped and no association to DRB-002 or another lane was inferred.
+
+### Open boundary and next action
+
+The Foundry UUID to PM project crosswalk remains unresolved. The event window remains bounded with no cursor; timestamp-only `since` can omit ties at the same timestamp. Next isolated Test improvement: stable tuple-cursor pagination on `(occurred_at,event_id)`, verified against same-timestamp rows, limit overflow, project isolation and browser navigation. Decision/authorization/verification relationship joins and evidence verification are still separate gaps. No production grant, role, schema, identity, migration, host, routing, paid resource, deployment or activation changed. Production remains deferred pending platform choice, independent security review and explicit C4 authorization.

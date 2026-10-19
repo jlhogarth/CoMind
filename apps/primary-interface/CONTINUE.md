@@ -178,3 +178,29 @@ Resume PR #147, branch `pi-trusted-read-isolation`, from the current remote head
 
 Read `AGENTS.md`, `apps/primary-interface/docs/CANONICAL-READS.md`, `apps/primary-interface/docs/TRUSTED-READ-ISOLATION.md`, `docs/runbook/DRB-002-TEST-SYSTEM.md`, and the newest `docs/provenance/2026-10-18-pi001-test-system.md` section. Then inspect current PR #147/#143/#145/#146 heads, reviews, mergeability and exact-head checks before continuing. Test work is synthetic and disposable. Production remains staged pending platform decision, independent security review and explicit C4 authorization. PM decisions, RunBook events, Foundry requests and human-action assessment remain distinct.
 
+
+
+## Current verified continuation, PI-001 Canonical Read Projections and Test System #006
+
+**Latest verified implementation head:** `976de5bf8f2dc30456ca7936b14a0bad7db05eef`  
+**PR:** https://github.com/jlhogarth/CoMind/pull/147  
+**Branch:** `pi-trusted-read-isolation`  
+**State:** open, draft, unmerged, mergeable, based on PI foundation #143 at `d889f2395648af90bb0b8235c43226168d2c4534`. No submitted reviews or inline review threads.
+
+The event projection now carries canonical PM project and event UUIDs, optional linked work-item UUID and project UUID, and item type. The trusted query uses the declared `pm_events.work_item_id` foreign key to `pm_work_items.id`. The opt-in browser displays UUIDs distinctly from work keys. Events without a linked item remain explicit; project mismatch produces a blocker. PM decisions, RunBook events, Foundry authorization requests, and human-action assessments remain separate.
+
+All 11 returned exact-head workflows passed on `976de5b`, including Primary Interface, DRB-002 Query Contract, main CI, and No Placeholder Policy. The Primary Interface job passed browser navigation, trusted-reader browser proof, and actual PostgreSQL 17.11 capture-to-RunBook-to-PI-to-Chromium acceptance. The system proof passed 13 checks covering capture validation, actual migrations, append-only behavior, RLS/project isolation, canonical event and lane UUIDs, browser text rendering, revocation, audit failure, database loss, SQL timeout, recovery, service restart, and unchanged source data. All rows and identities were synthetic and confined to disposable Test infrastructure.
+
+Acceptance artifact: https://github.com/jlhogarth/CoMind/actions/runs/39179222357/artifacts/12154873581 (SHA-256 `a159e10831c39f624ec0a81cc801090e1c983437f8674fa409804ba13964ae8b`, retained through 2026-11-02 00:06:51 UTC).
+
+The first candidate `d9455a6` failed on stale test fixtures and an overly narrow SQL assertion. A concurrent commit `976de5b` updated the reader and gateway fixtures to the three-relation event envelope and corrected the assertion to test the COALESCE expression and selected FK fields separately. Runtime validation stayed strict. All 11 workflows passed after these repairs.
+
+Append-only live RunBook event: `668a64e1-2a8f-499b-81a6-6e8a4473bd9e`. It was read back from `comind_pm.v_runbook_timeline` with outcome pass. It is attached to COMIND project scope with null `work_key`: the live ledger contains no PI-001 work item, so no lane association was invented. Existing RunBook state is on active Supabase project `sbgfuanxiqepcoboxzcl`, PostgreSQL 17.11.
+
+Dependencies at this checkpoint: #143 remains draft on BRAND #139 head `c5fc5d8`; #145 remains separate and draft at `19b7cf8`; #146 is closed and merged into its DRB development history. PR #147 remains stacked on #143. No source dependency was overwritten.
+
+**Open:** the Foundry UUID to PM project crosswalk is still unresolved; no unified cross-domain assessment is allowed. Event coverage is still bounded and has no cursor. Timestamp-only `since` filtering can omit same-timestamp ties, so the next useful T1 task is stable tuple-cursor pagination using `(occurred_at,event_id)`, with same-timestamp, overflow, project-scope, and browser tests. Decision/authorization/verification relationship semantics and evidence verification remain explicit gaps.
+
+Production remains staged pending platform selection, independent security review, host/TLS/session issuer and durable audit review, and explicit C4 authorization. No production grants, identities, migrations, routing, paid resources, deployment, or activation changed here.
+
+Resume by re-reading current #147/#143/#145/#139 heads, reviews, mergeability and exact-head checks before editing. Preserve the project-only RunBook event and the separate domain reads. Continue with the bounded event cursor only in isolated Test; do not infer the Foundry crosswalk or create a production path.

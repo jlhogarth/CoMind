@@ -118,7 +118,7 @@ try{
  assert.equal(projectIsolation.statusCode,200);assert.deepEqual(projectIsolation.json().data,[]);
  check('project isolation excludes records belonging to OTHER');
  const readEvents=async()=>{await page.getByRole('button',{name:'Read RunBook events',exact:true}).click();};
- await page.getByLabel('Events per page',{exact:true}).selectOption('2');
+ await page.locator('#event-limit').selectOption('2');
  await readEvents();
  for(const id of pageOne.json().data.map(row=>row.event_id))await page.locator('#event-list').getByText(id,{exact:true}).waitFor();
  await page.getByRole('button',{name:'Read older events',exact:true}).click();
@@ -127,7 +127,7 @@ try{
  await page.goBack();
  for(const id of pageOne.json().data.map(row=>row.event_id))await page.locator('#event-list').getByText(id,{exact:true}).waitFor();
  check('browser history returns from the older event page to the prior cursor page');
- await page.getByLabel('Events per page',{exact:true}).selectOption('25');
+ await page.locator('#event-limit').selectOption('25');
  await readEvents();await page.locator('#event-list').getByText('Test RunBook capture accepted',{exact:true}).waitFor();
  await page.locator('#event-list').getByText(work.id,{exact:true}).waitFor();
  assert.equal(await page.locator('#event-list img').count(),0);

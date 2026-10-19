@@ -108,8 +108,8 @@ test('untrusted upstream origins and repeated unauthenticated requests are rejec
 });
 test('RunBook timeline preserves canonical event scope, strips extras and enforces session boundary',async()=>{
  const eventId=randomUUID(),body={version:'drb-002.v1',request_id:randomUUID(),retrieved_at:new Date().toISOString(),
-  source:'comind_pm.v_runbook_timeline',source_relations:['comind_pm.v_runbook_timeline'],project:'COMIND',lane:'DRB-E2E',kind:'events',limit:1,
-  more_available:true,data:[{event_id:eventId,project_key:'COMIND',work_key:'DRB-E2E',occurred_at:new Date().toISOString(),action_summary:'Synthetic event',
+  source:'comind_pm.v_runbook_timeline',source_relations:['comind_pm.v_runbook_timeline','comind_pm.pm_events','comind_pm.pm_work_items'],project:'COMIND',lane:'DRB-E2E',kind:'events',limit:1,
+  more_available:true,data:[{event_id:eventId,project_id:randomUUID(),event_project_id:null,work_item_id:null,work_item_project_id:null,item_type:null,project_key:'COMIND',work_key:'DRB-E2E',occurred_at:new Date().toISOString(),action_summary:'Synthetic event',
    result_summary:'Recorded',outcome:'pass',next_action:null,source_system:'test',source_ref:'test-reference',evidence:[],private:backend.token}]};
  let calls=0;const x=await setup(async(req,res)=>{
   calls++;assert.equal(req.headers.authorization,'Bearer '+backend.token);let request='';for await(const part of req)request+=part;

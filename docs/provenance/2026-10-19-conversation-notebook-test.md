@@ -62,3 +62,14 @@ Exact-head PostgreSQL CI passed on code head `0d41d0e0b94bbfbd02235f65b2b0a71e60
 ## Recovery
 
 The change is confined to a feature branch and Test-only files. Recovery is to revert the branch delta. CI destroys the disposable database at job completion. If a project-memory API call succeeds but final Notebook linking fails, retry the same source-message promotion, resolve the existing memory ID, then record the review/link once; never create a second memory row.
+
+## Saved conversation review follow-up
+
+The local prototype now includes a Saved conversations view backed by the existing `comind-notebook-sources` browser storage key. It lists already-analyzed source conversations, supports title/origin/text search and newest, oldest, title A to Z, title Z to A, longest, and shortest ordering, and reloads the exact saved source text into the intake. The source badge hydrates on page load. Candidate and approved counts remain visible per source. Existing local data keys and the canonical CoMind project memory boundary are unchanged.
+
+Follow-up verification: `npm test` passed 202, skipped 7 database-dependent tests, and failed 0; `npm run build` passed; the Notebook prototype contract and script syntax test passed; `git diff --check` passed. This UI behavior is local browser functionality and does not change the isolated PostgreSQL or production database state.
+
+Durable RunBook follow-up events:
+
+- `945983bb-7a79-4add-967d-456af13388d5`: append constraint failure and recovery after unsupported `source_system=codex`; no partial event was inserted, and retry used the existing allowed `chatgpt` classification.
+- `ed8e01d1-2b15-4964-b276-a59c5914b562`: saved conversations browser implementation and successful local verification.

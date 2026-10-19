@@ -16,6 +16,14 @@ test('Notebook prototype keeps its review loop local and embeds the exact Test-o
   assert.match(fixture, /REFERENCES comind\.cm_memory_node\(memory_id\)/);
   assert.match(html, /Canonical CoMind promotion is not called here/);
   assert.match(html, /code points \$\{f\.evidenceStart\}/);
+  assert.match(html, /id="sourcesView"/);
+  assert.match(html, /id="sourceSort"/);
+  assert.match(html, /value="title-asc"/);
+  assert.match(html, /value="longest"/);
+  assert.match(html, /comind-notebook-source-sort/);
+  assert.match(html, /function openSource\(id\)/);
+  assert.match(html, /function renderSources\(\)/);
+  assert.match(html, /data-open-source/);
 
   const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
   assert.equal(scripts.length, 1);

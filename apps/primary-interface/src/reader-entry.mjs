@@ -77,7 +77,7 @@ function showEvents(state){
 const eventController=createTrustedReadController({onState:showEvents,read:readTrustedEvents});
 function setEventHistory(pageIndex,replace=false){
  const url=new URL(window.location.href);url.searchParams.set('pi_event_page',String(pageIndex));
- const state={piEventPage:pageIndex,piEventProject:eventContext.project,piEventOptions:eventContext.options};
+ const state={piEventPage:pageIndex,piEventProject:eventContext.project,piEventOptions:eventContext.options,piEventCursor:eventPageCursors[pageIndex]??null};
  window.history[replace?'replaceState':'pushState'](state,'',url);
 }
 eventOlder.addEventListener('click',()=>{
@@ -88,9 +88,9 @@ eventOlder.addEventListener('click',()=>{
 eventNewer.addEventListener('click',()=>{if(eventPageIndex>0)window.history.back();});
 window.addEventListener('popstate',event=>{
  const state=event.state;if(!state||!Number.isInteger(state.piEventPage)||typeof state.piEventProject!=='string')return;
- const cursor=eventPageCursors[state.piEventPage];if(state.piEventPage>0&&!cursor)return;
- eventPageIndex=state.piEventPage;eventContext={project:state.piEventProject,options:state.piEventOptions??{}};
- const options={...eventContext.options};if(cursor)options.cursor=cursor;
+ const cursor=state.piEventCursor??eventPageCursors[state.piEventPage];if(state.piEventPage>0&&!cursor)return;
+ eventPageIndex=state.piEventPage;eventPageCursors[state.piEventPage]=cursor??null;eventContext={project:state.piEventProject,options:state.piEventOptions??{}};
+ const options={...eventContext.options};if(cursor)options.cursor=cursor;else delete options.cursor;
  void eventController.refresh(eventContext.project,options);
 });
 const form=document.querySelector('#read-scope');
@@ -103,7 +103,8 @@ form.addEventListener('submit',event=>{
   if(event.submitter?.value==='events'){
    controller.clear('Lane results cleared because a different source was requested.');decisionController.clear('Decision results cleared because a different source was requested.');
    eventPageIndex=0;eventPageCursors=[null];eventContext={project,options:{...options,limit:Number(document.querySelector('#event-limit').value)}};
-   setEventHistory(0,true);void eventController.refresh(project,eventContext.options);return;
+   const replaceCurrentHistory=!Number.isInteger(window.history.state?.piEventPage);
+   setEventHistory(0,replaceCurrentHistory);void eventController.refresh(project,eventContext.options);return;
   }
   eventController.clear('RunBook results cleared because a different source was requested.');
   if(event.submitter?.value==='decisions'){controller.clear('Lane results cleared because a different source was requested.');void decisionController.refresh(project,options);}

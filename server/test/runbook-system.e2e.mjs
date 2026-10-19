@@ -53,7 +53,7 @@ try{
  check('invalid capture source is rejected without a partial event');
  const tiedAt=new Date(Date.now()+1000).toISOString();
  const eventId=await capture('COMIND','Test RunBook capture accepted','pass','Captured in the Test RunBook',tiedAt);
- const tiedEventIds=[eventId,await capture('COMIND','Same-time event B','pass','Captured in the Test RunBook',tiedAt),await capture('COMIND','Same-time event C','pass','Captured in the Test RunBook',tiedAt)];
+ const tiedEventIds=[eventId,await capture('COMIND','Same-time event B','pass','Captured in the Test RunBook',tiedAt),await capture('COMIND','Same-time event C','pass','Captured in the Test RunBook',tiedAt),await capture('COMIND','Same-time event D','pass','Captured in the Test RunBook',tiedAt),await capture('COMIND','Same-time event E','pass','Captured in the Test RunBook',tiedAt)];
  await capture('OTHER','Denied project event must never reach this browser');
  check('actual migrations and service_role capture function, synthetic records only');
  const snapshot=async()=> (await admin.query("select jsonb_agg(to_jsonb(e) order by id)::text as ledger from comind_pm.pm_events e")).rows[0].ledger;
@@ -124,14 +124,26 @@ try{
  for(const id of pageOne.json().data.map(row=>row.event_id))await page.locator('#event-list').getByText(id,{exact:true}).waitFor();
  await page.getByRole('button',{name:'Read older events',exact:true}).click();
  for(const id of pageTwo.json().data.map(row=>row.event_id))await page.locator('#event-list').getByText(id,{exact:true}).waitFor();
+ await page.getByRole('button',{name:'Read older events',exact:true}).click();
+ const pageThreeIds=tiedEventIds.slice().sort().reverse().slice(4);
+ for(const id of pageThreeIds)await page.locator('#event-list').getByText(id,{exact:true}).waitFor();
  await page.getByText('No next page is reported for this bounded response.',{exact:false}).waitFor();
  await page.getByRole('button',{name:'Back to newer events',exact:true}).click();
- await page.waitForFunction(()=>document.querySelector('#event-status')?.textContent.startsWith('Page 1:')
+ await page.waitForFunction(()=>document.querySelector('#event-status')?.textContent.startsWith('Page 2:')
   ||document.querySelector('#event-status')?.textContent.startsWith('Trusted reader'));
- assert.match(await page.locator('#event-status').innerText(),/^Page 1:/,
-  `browser did not restore page 1: url=${page.url()} state=${JSON.stringify(await page.evaluate(()=>history.state))} responses=${JSON.stringify(eventResponses)} errors=${JSON.stringify(errors)}`);
- for(const id of pageOne.json().data.map(row=>row.event_id))await page.locator('#event-list').getByText(id,{exact:true}).waitFor();
- check('browser history returns from the older event page to the prior cursor page');
+ assert.match(await page.locator('#event-status').innerText(),/^Page 2:/,
+  `browser did not restore page 2: url=${page.url()} state=${JSON.stringify(await page.evaluate(()=>history.state))} responses=${JSON.stringify(eventResponses)} errors=${JSON.stringify(errors)}`);
+ for(const id of pageTwo.json().data.map(row=>row.event_id))await page.locator('#event-list').getByText(id,{exact:true}).waitFor();
+ check('browser Back restores the prior event cursor after reading an older page');
+ await page.locator('#lane').fill('');await readEvents();
+ await page.getByText('Page 1:',{exact:false}).waitFor();
+ await page.evaluate(()=>window.history.back());
+ await page.waitForFunction(()=>document.querySelector('#event-status')?.textContent.startsWith('Page 2:')
+  ||document.querySelector('#event-status')?.textContent.startsWith('Trusted reader'));
+ assert.match(await page.locator('#event-status').innerText(),/^Page 2:/,
+  `browser did not restore previous event scope: url=${page.url()} state=${JSON.stringify(await page.evaluate(()=>history.state))} responses=${JSON.stringify(eventResponses)} errors=${JSON.stringify(errors)}`);
+ for(const id of pageTwo.json().data.map(row=>row.event_id))await page.locator('#event-list').getByText(id,{exact:true}).waitFor();
+ check('event context switch preserves the previous page cursor in browser history');
  await page.locator('#event-limit').selectOption('25');
  await readEvents();await page.locator('#event-list').getByText('Test RunBook capture accepted',{exact:true}).waitFor();
  await page.locator('#event-list').getByText(work.id,{exact:true}).first().waitFor();

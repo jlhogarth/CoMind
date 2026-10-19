@@ -71,6 +71,10 @@ PR #147 merged into PI branch #143 at `b245ebc0b650baf7b7c289d189d347b07c9e81d6`
 
 PR #149 adds a separate operator-history regression for cursor restoration after changing event context. See `docs/provenance/2026-10-19-primary-interface-event-history-context.md`; final exact-head CI and artifact details will be recorded there after runs complete.
 
+## PI-001 event window under concurrent append
+
+At implementation head `6ca3756a130cdbfc073b743bc06ada19332ef922`, the actual reader status states that event pages independently observe a changing source and do not share a snapshot. The PostgreSQL 17.11/Chromium acceptance appends a newer synthetic event after page one, follows the original cursor, then refreshes page one and observes the append. Primary Interface run `39313866078` passed 20 checks; artifact `12216853647`, SHA-256 `918197845c6ca89d685523713d693c450fff8a276ed3acb8cd3b19aecc59a209`. Exact workflow status and the remaining pending run are recorded in the event-history provenance. This is one bounded test case, not proof of a complete or lossless feed.
+
 
 ## PI-001 event-history context verification
 

@@ -103,6 +103,8 @@ The #007 tuple cursor remains bounded keyset navigation: requests independently 
 
 PR #149 adds the cursor to each history state and a PostgreSQL 17/Chromium regression with five same-timestamp synthetic events. It traverses three pages, changes the lane filter, then uses Back to restore the prior page and scope. A separate acceptance appends a newer synthetic event between the first and next-page requests. Continuation stays bounded to the submitted cursor, and a refreshed first page sees the append. The reader states that each page observes the changing source independently and that pages do not share a snapshot. This demonstrates bounded changing observations; it does not claim snapshot consistency or lossless history. PM decisions, RunBook events, Foundry requests and human-action assessments remain separate.
 
+On implementation head `6ca3756a130cdbfc073b743bc06ada19332ef922`, Primary Interface run [39313866078](https://github.com/jlhogarth/CoMind/actions/runs/39313866078) passed 20 PostgreSQL 17.11/Chromium checks. Artifact [12216853647](https://github.com/jlhogarth/CoMind/actions/runs/39313866078/artifacts/12216853647), SHA-256 `918197845c6ca89d685523713d693c450fff8a276ed3acb8cd3b19aecc59a209`, retained until 2026-11-02 19:48:15 UTC. The exact-head result of the other workflows and the current pending Runtime Budget run are recorded in `docs/provenance/2026-10-19-primary-interface-event-history-context.md`.
+
 
 ## Event history context acceptance
 

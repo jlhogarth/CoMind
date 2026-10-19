@@ -134,7 +134,7 @@ try{
  check('browser history returns from the older event page to the prior cursor page');
  await page.locator('#event-limit').selectOption('25');
  await readEvents();await page.locator('#event-list').getByText('Test RunBook capture accepted',{exact:true}).waitFor();
- await page.locator('#event-list').getByText(work.id,{exact:true}).waitFor();
+ await page.locator('#event-list').getByText(work.id,{exact:true}).first().waitFor();
  assert.equal(await page.locator('#event-list img').count(),0);
  assert.equal(await page.locator('#event-list').getByText('Denied project event must never reach this browser',{exact:true}).count(),0);
  assert.equal(await page.evaluate(()=>document.cookie),'');

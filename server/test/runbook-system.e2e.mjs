@@ -57,7 +57,7 @@ try{
  await capture('OTHER','Denied project event must never reach this browser');
  check('actual migrations and service_role capture function, synthetic records only');
  const snapshot=async()=> (await admin.query("select jsonb_agg(to_jsonb(e) order by id)::text as ledger from comind_pm.pm_events e")).rows[0].ledger;
- const before=await snapshot();
+ let before=await snapshot();
  await assert.rejects(admin.query('update comind_pm.pm_events set summary=$1 where id=$2',['rewrite denied',eventId]),/append.only/i);
  await assert.rejects(admin.query('delete from comind_pm.pm_events where id=$1',[eventId]),/append.only/i);
  assert.equal(await snapshot(),before);check('append-only update/delete denial preserves original event');
@@ -125,8 +125,16 @@ try{
  await page.locator('#event-limit').selectOption('2');
  await readEvents();
  for(const id of pageOne.json().data.map(row=>row.event_id))await page.locator('#event-list').getByText(id,{exact:true}).waitFor();
+ await page.getByText('Each page request observes the changing source independently; pages do not share a snapshot.',{exact:false}).waitFor();
+ const arrivingEventId=await capture('COMIND','Synthetic event arrived between page requests','pass','Observed after the first bounded page',new Date(Date.parse(tiedAt)+10000).toISOString());
+ before=await snapshot();
+ check('reader labels each event page as an independent observation of a changing source');
  await page.getByRole('button',{name:'Read older events',exact:true}).click();
  for(const id of pageTwo.json().data.map(row=>row.event_id))await page.locator('#event-list').getByText(id,{exact:true}).waitFor();
+ assert.equal(await page.locator('#event-list').getByText(arrivingEventId,{exact:true}).count(),0,
+  'newer append must not be implied to belong to the continuation of the earlier page cursor');
+ assert.match(await page.locator('#event-status').innerText(),/independently; pages do not share a snapshot/);
+ check('a newer append between requests does not change the earlier cursor window or imply snapshot consistency');
  await page.getByRole('button',{name:'Read older events',exact:true}).click();
  const pageThreeIds=pageThree.json().data.map(row=>row.event_id);
  for(const id of pageThreeIds)await page.locator('#event-list').getByText(id,{exact:true}).waitFor();
@@ -140,6 +148,7 @@ try{
  check('browser Back restores the prior event cursor after reading an older page');
  await page.locator('#lane').fill('');await readEvents();
  await page.getByText('Page 1:',{exact:false}).waitFor();
+ await page.locator('#event-list').getByText(arrivingEventId,{exact:true}).waitFor();
  await page.evaluate(()=>window.history.back());
  await page.waitForFunction(()=>document.querySelector('#event-status')?.textContent.startsWith('Page 2:')
   ||document.querySelector('#event-status')?.textContent.startsWith('Trusted reader'));

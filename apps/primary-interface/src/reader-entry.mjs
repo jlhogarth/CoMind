@@ -54,7 +54,7 @@ function showEvents(state){
  eventLastState=state;
  eventList.replaceChildren();
  eventStatus.textContent=state.status==='ready'
-  ?`Page ${eventPageIndex+1}: received ${state.projection.coverage.returned} RunBook events. Observation time: ${state.projection.observedAt}. ${state.projection.coverage.moreAvailable?'A next page is available.':'No next page is reported for this bounded response.'} This window is not a complete archive.`
+  ?`Page ${eventPageIndex+1}: received ${state.projection.coverage.returned} RunBook events. Observation time: ${state.projection.observedAt}. ${state.projection.coverage.moreAvailable?'A next page is available.':'No next page is reported for this bounded response.'} Each page request observes the changing source independently; pages do not share a snapshot. This window is not a complete archive.`
   :state.reason;
  eventPagination.hidden=state.status!=='ready';eventNewer.hidden=state.status!=='ready'||eventPageIndex===0;
  eventOlder.hidden=state.status!=='ready'||!state.projection.coverage.moreAvailable;

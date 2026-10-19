@@ -32,11 +32,11 @@ The live Supabase verification SQL at `db/test/verify_activity_hud_test.sql` com
 - Update and delete attempts against the append-only fixture records were rejected.
 - `git diff --check` passed for the local repository changes.
 
-The repository includes a PostgreSQL 17 workflow using a synthetic RunBook source fixture. Its exact-head CI result is pending until the branch is published.
+The repository includes a PostgreSQL 17 workflow using a synthetic RunBook source fixture. At PR head `cae5f091fa4fd75829865c3187fd26ace3928273`, Activity HUD Test workflow `39330235923` passed. The following exact-head workflows also passed: DRB-002 Query Contract `39330236049`; Foundry Runtime Orchestration `39330236021`; CoMind Repository Configuration `39330235845`; No Placeholder Policy `39330235794`; Live Foundry LF-3 Readiness `39330235800`; Foundry Work Lease Kernel `39330235932`; Governed Provider Execution `39330235922`; Live Foundry Stage 1 Readiness `39330235781`; Live Foundry LF-2 Readiness `39330235807`; Runtime Budget Authority Adapter `39330235797`. CI workflow `39330235956` was still in progress at the last check. PR #154 remains open and draft.
 
 ## Limitations
 
-This milestone is a live Supabase Test data model and queryable projection, not a hosted visual page or an automatic all-source collector. New activities appear only when a CoMind or source adapter appends observations. GitHub Actions, OpenAI API jobs, Drive writes, and other operations are not yet automatically ingested. Native ChatGPT iOS conversations are not observable through this interface. Lack of a terminal report remains `stale_unknown`; the projection does not claim complete history, a lossless feed, or snapshot consistency.
+This milestone is a live Supabase Test data model and queryable projection, not a hosted visual page or an automatic all-source collector. There is no CoMind Vercel project connected, and the existing Operator Console has no live data provider. The private Test views remain owner-queryable in Supabase; a browser HUD needs a Test-only sign-in and server data path. New activities appear only when a CoMind or source adapter appends observations. GitHub Actions, OpenAI API jobs, Drive writes, and other operations are not yet automatically ingested. Native ChatGPT iOS conversations are not observable through this interface. Lack of a terminal report remains `stale_unknown`; the projection does not claim complete history, a lossless feed, or snapshot consistency.
 
 The RunBook timeline remains its own source stream. The HUD does not infer UUID/project/lane associations or join PM decisions, Foundry authorization requests, verification records, and human-action assessments into a single authority.
 
@@ -49,7 +49,7 @@ The RunBook timeline remains its own source stream. The HUD does not infer UUID/
 
 ## Next steps
 
-1. Publish the repository Test fixture and PostgreSQL 17 workflow; inspect exact-head CI.
-2. Add a visual Operator HUD that reads these private views through a Test-only server path without exposing privileged credentials to the browser.
+1. Finish and record CI workflow `39330235956` at exact PR head `cae5f091fa4fd75829865c3187fd26ace3928273`.
+2. Add and deploy a visual Test HUD after defining a Test-only sign-in and server data path for the private views.
 3. Instrument supported CoMind/GitHub/provider adapters so tracked jobs append observations and terminal evidence.
 4. Reimplement the deferred formal security review before adding production data, live endpoints, or production access.

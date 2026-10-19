@@ -1,0 +1,45 @@
+# Conversation Notebook isolated Test slice
+
+Date: 2026-10-19 America/Indiana/Indianapolis
+
+## Scope and authority
+
+T1 reversible repository and disposable PostgreSQL 17 development. This slice resumes the browser-local Conversation Notebook prototype and verifies its evidence-linked review loop with synthetic records. It does not apply a Notebook migration to the active CoMind Supabase project, expose a new service, grant access, or make a production deployment decision.
+
+## Reconciled contracts
+
+- `comind.cm_project.project_id` is the project identity. The draft's free-form `project_key` and `auth.users` owner model are not used by this Test slice.
+- A captured CoMind project conversation is associated with a canonical `comind.cm_conversation` and persisted `comind.cm_message` in the disposable Test database.
+- A project finding approved by the human reviewer uses the existing `POST /api/messages/:id/promote-memory` route. That route copies the canonical source message into `comind.cm_memory_node`, derives project scope from the source conversation, records source conversation/message provenance, and is idempotent by source message.
+- The Notebook review record stores only candidate text, exact evidence, review history, and the resulting canonical `memory_id` link. It does not create `memory_entries` or another project-memory authority.
+- Canonical retrieval and reversible archive/restore remain owned by CoMind's existing project-scoped memory routes and retrieval path.
+- Personal continuity remains in the artifact's separate browser-local Personal notebook. The Test fixture can exercise its routing with synthetic state, but it does not claim a canonical CoMind Personal memory contract.
+- Project identity and source/reviewer identities in the fixture are generated synthetic rows. This does not establish production identity, authorization, or RLS behavior.
+
+## Test-only storage
+
+`db/test/conversation_notebook_fixture.sql` creates `comind_notebook` only after the disposable CI database has loaded CoMind's canonical schema. The integration script drops and recreates that schema for each test run. The fixture is not included in `db/sql/v2`, `db/migrations`, production deployment scripts, or runtime startup.
+
+The integration launcher and Notebook integration test both refuse any database URL except local PostgreSQL database `comind_ci`. This keeps the destructive fixture reset and synthetic rows from targeting a remote project or a differently named database.
+
+The model holds source records with content hashes, candidate findings, exact evidence offsets, append-only review events, and an optional foreign key to `comind.cm_memory_node`. Project and Personal scope checks are explicit. Source, evidence, and review records reject mutation; a finding can transition only once from candidate to approved or rejected. No standalone `memory_entries` table is present.
+
+Approval spans the existing memory API and the Notebook review fixture, so the two writes are not one database transaction. A retry is safe because CoMind's memory promotion returns the already-created canonical memory for the same source message. The Test proof must check that behavior and ensure a failure cannot create a second project memory.
+
+## Acceptance sequence
+
+1. Capture a synthetic source under a canonical project or the separate Personal scope; repeat capture and resolve the same source by hash.
+2. Create candidate findings with a versioned deterministic extractor label and exact code-point evidence offsets.
+3. Verify each excerpt equals the corresponding source-text slice.
+4. Require an explicit synthetic human reviewer decision. Rejection leaves no canonical memory. Personal approval stays in the Personal destination without writing `cm_memory_node`.
+5. For project approval, promote the exact persisted source message through CoMind's existing route, record the canonical memory ID, and retry promotion to verify idempotency.
+6. Retrieve the approved project memory through the existing assistant retrieval path; prove another project cannot retrieve it.
+7. Archive and restore the canonical memory using existing lifecycle routes and verify retrieval eligibility changes while source provenance remains intact.
+
+## Verification status
+
+Pending execution on the feature branch. The local environment has Node.js 24 but does not provide Docker, `psql`, or a local PostgreSQL server. The database proof must run in the repository's disposable PostgreSQL 17 CI job before acceptance. Record exact commit, workflow run, database check result, and remaining limitations here and in the Durable RunBook after CI completes.
+
+## Recovery
+
+The change is confined to a feature branch and Test-only files. Recovery is to revert the branch delta. CI destroys the disposable database at job completion. If a project-memory API call succeeds but final Notebook linking fails, retry the same source-message promotion, resolve the existing memory ID, then record the review/link once; never create a second memory row.

@@ -286,7 +286,7 @@ begin
         v_existing.event_record_id, p_payload,
         v_payload_sha256, v_content_sha256
     )
-    on conflict (event_record_id, attempted_content_sha256) do nothing;
+    on conflict on constraint integrity_conflict_attempt_uq do nothing;
 
     return query select 'conflict'::text, v_existing.event_record_id, v_existing.payload_sha256;
 end;

@@ -1,0 +1,42 @@
+name: Activity HUD Test
+
+on:
+  pull_request:
+    paths:
+      - 'db/test/activity_hud_*.sql'
+      - 'db/test/verify_activity_hud_test.sql'
+      - '.github/workflows/activity-hud-test.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  postgres-17:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: activity_hud_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: activity_hud_ci_only
+        ports:
+          - '5432:5432'
+        options: >-
+          --health-cmd "pg_isready -U postgres -d activity_hud_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Load synthetic RunBook source contract
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/test/activity_hud_runbook_fixture.sql
+        env:
+          DATABASE_URL: postgres://postgres:activity_hud_ci_only@127.0.0.1:5432/activity_hud_ci
+      - name: Apply synthetic Activity HUD fixture
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/test/activity_hud_test.sql
+        env:
+          DATABASE_URL: postgres://postgres:activity_hud_ci_only@127.0.0.1:5432/activity_hud_ci
+      - name: Verify states, source separation, and append-only evidence
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/test/verify_activity_hud_test.sql
+        env:
+          DATABASE_URL: postgres://postgres:activity_hud_ci_only@127.0.0.1:5432/activity_hud_ci

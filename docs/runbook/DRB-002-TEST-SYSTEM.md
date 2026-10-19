@@ -146,3 +146,12 @@ No local checkout is present in the work environment, so local build or local Po
 ## Limits and next step
 
 Tuple cursor navigation remains bounded and non-snapshot across page requests. It is not complete history, a lossless feed, or protection from concurrent source changes. The e2e proof uses only synthetic rows and disposable PostgreSQL/Test identities. It is not live Supabase or production readiness. Next: resolve any exact-head CI failures, inspect actual browser and DB acceptance artifacts, then update this provenance and CONTINUE.md with final verification. Keep PR #149 draft, separate from decisions to merge/ready. Production platform, identity, security review and C4 activation authority stay deferred.
+
+
+## PI-001 event-history context #008 acceptance
+
+Implementation head dc5abd25f55b9a3f126ca1fb190ccdb2bb4e25cc passed all 17 returned exact-head workflows. Primary Interface system proof run 39311073401 passed 18 checks on PostgreSQL 17.11 and Chromium; artifact ID 12215094538, retained through 2026-11-02 19:27:57 UTC, SHA-256 c7329466ed31846d830e46d41e688f8000707298b08c66b2c296c306b0c5dfea. All 17 returned workflows passed on implementation head dc5abd25f55b9a3f126ca1fb190ccdb2bb4e25cc. Primary Interface e2e run 39311073401; DRB Query Contract 39311073332; CI/build 39311073284; No Placeholder 39311073311; remaining workflow runs: 39311074531, 39311073486, 39311073476, 39311073517, 39311073359, 39311073428, 39311073344, with the other jobs included in 39311073284. The acceptance completed 18 checks. Artifact drb-test-system-evidence ID 12215094538, retained until 2026-11-02 19:27:57 UTC; SHA-256 zip digest c7329466ed31846d830e46d41e688f8000707298b08c66b2c296c306b0c5dfea.
+
+The proof adds five same-timestamp synthetic events, walks three pages using the canonical tuple cursor, changes the lane filter, and uses browser Back to restore the prior cursor and source scope. Capture, append-only, project isolation, revocation, audit denial, DB loss/timeout recovery, restart, and no-mutation checks remain in the same disposable acceptance.
+
+The first candidate failed at server/test/runbook-system.e2e.mjs:113 because its expected second page still assumed only three tied events. Unit/browser checks passed, but the system proof stopped before the new context-switch scenario; artifact 12216555648 is diagnostic only. The fixed three-page direct DB assertions are in the verified implementation head above. No persistent Test or production resource was affected.

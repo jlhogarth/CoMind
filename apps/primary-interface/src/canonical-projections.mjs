@@ -5,10 +5,13 @@ const SOURCES = Object.freeze({
     fields: ['authorization_request_id','status','reason','authority_level','environment','target_kind','target_ref','requested_at','expires_at'],
     statuses: ['pending','approved','denied','cancelled','expired'] },
   project: { relation: 'comind_pm.pm_decision_records', key: 'id',
-    fields: ['id','work_item_id','decision_needed','selected_option','rationale','decided_at','created_at','updated_at'] },
+    fields: ['id','work_item_id','project_id','project_key','item_type','work_key','decision_needed','options_json','selected_option','rationale','reversibility','decided_by','decided_at','created_at','updated_at'] },
   lanes: { relation: 'comind_pm.pm_work_items', key: 'id',
     fields: ['id','project_id','work_key','item_type','title','status','owner','current_summary','last_event_at','updated_at'],
     statuses: ['backlog','ready','in_progress','blocked','review','done','canceled','deferred'] },
+  events: { relation: 'comind_pm.v_runbook_timeline', key: 'event_id',
+    fields: ['event_id','project_id','event_project_id','work_item_id','work_item_project_id','item_type','project_key','work_key','occurred_at','action_summary','result_summary','outcome','next_action','source_system','source_ref','evidence'],
+    arrays: ['evidence'] },
 });
 const nonempty = x => typeof x === 'string' && x.trim().length > 0;
 const uuid = x => typeof x === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(x);
@@ -36,17 +39,24 @@ export function projectCanonicalPage(domain, page) {
     if (domain === 'lanes' && row.item_type !== 'lane') throw new TypeError('Lane source contains non-lane row');
     const source = Object.fromEntries(spec.fields.map(field => {
       const value = row[field] ?? null;
+      if (spec.arrays?.includes(field)) {
+        if (!Array.isArray(value) || value.length > 100) throw new TypeError(`Invalid array ${field}`);
+        return [field, structuredClone(value)];
+      }
       if (value !== null && typeof value !== 'string') throw new TypeError(`Invalid scalar ${field}`);
       return [field, value];
     }));
     const gaps = domain === 'lanes'
       ? ['dependencies','issue/PR/head verification','next authority boundary','RunBook event identity']
-      : ['canonical lane and RunBook joins','concurrency revision','recommendation and consequence provenance','verified evidence expiry and conflict policy'];
-    const blockers = gaps.map(input => blocker('complete read-only detail', input, domain === 'foundry' ? 'PI/Foundry integration owner' : 'PI/DRB integration owner', spec.relation));
+      : domain === 'events'
+        ? ['decision, authorization and verification relationships','source-revision token','evidence verification, expiry and conflict policy']
+        : ['canonical lane and RunBook joins','concurrency revision','recommendation and consequence provenance','verified evidence expiry and conflict policy'];
+    const blockers = gaps.map(input => blocker('complete read-only detail', input,
+      domain === 'foundry' ? 'PI/Foundry integration owner' : domain === 'events' ? 'PI/DRB integration owner' : 'PI/DRB integration owner', spec.relation));
     if (spec.statuses && !spec.statuses.includes(row.status)) blockers.push(blocker('interpret lifecycle', 'recognized canonical status', 'canonical source owner', `${spec.relation}.status`));
     return { id: `${spec.relation}:${row[spec.key]}`, sourceRelation: spec.relation,
       sourceId: row[spec.key], source, observedAt: page.observedAt,
-      lifecycle: domain === 'project' ? null : source.status,
+      lifecycle: ['foundry','lanes'].includes(domain) ? source.status : null,
       revision: null, decisionEnabled: false, blockers };
   });
   return { version: 'pi-canonical-read.v1', domain, sourceRelation: spec.relation,

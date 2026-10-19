@@ -40,6 +40,8 @@ Approval spans the existing memory API and the Notebook review fixture, so the t
 
 Pending execution on the feature branch. The local environment has Node.js 24 but does not provide Docker, `psql`, or a local PostgreSQL server. The database proof must run in the repository's disposable PostgreSQL 17 CI job before acceptance. Record exact commit, workflow run, database check result, and remaining limitations here and in the Durable RunBook after CI completes.
 
+Local commit `d119ebbd504ffc42027334fad6af38f1c6a3d58a` contains the implementation. An attempt to push the branch was rejected by automatic approval review because the request authorized isolated Test development but did not explicitly authorize publishing repository contents to GitHub. No push, pull request, or CI run was created. The branch remains local while the PostgreSQL proof is pending.
+
 ## Recovery
 
 The change is confined to a feature branch and Test-only files. Recovery is to revert the branch delta. CI destroys the disposable database at job completion. If a project-memory API call succeeds but final Notebook linking fails, retry the same source-message promotion, resolve the existing memory ID, then record the review/link once; never create a second memory row.

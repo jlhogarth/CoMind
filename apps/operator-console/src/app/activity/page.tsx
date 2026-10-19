@@ -209,6 +209,8 @@ export default function ActivityHudPage() {
         }
       } catch (error) {
         if (active) {
+          setRows([]);
+          setReportedTotal(0);
           setSourceError(error instanceof Error ? error.message : "Unknown Supabase read error");
         }
       } finally {
@@ -266,7 +268,7 @@ export default function ActivityHudPage() {
         <header className="hud-topbar">
           <div className="hud-breadcrumb">CoMind <span>/</span> Operator Console <span>/</span> <b>Activity HUD</b></div>
           <div className={`hud-source-state ${sourceError ? "source-error" : "source-connected"}`}>
-            <i /> {sourceError ? "Supabase Test read failed" : "Supabase Test · read-only synthetic view"}
+            <i /> {sourceError ? "Supabase Test read failed" : isLoading ? "Connecting to Supabase Test" : "Supabase Test · read-only synthetic view"}
           </div>
         </header>
 

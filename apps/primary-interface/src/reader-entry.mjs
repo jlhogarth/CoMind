@@ -90,7 +90,8 @@ window.addEventListener('popstate',event=>{
  const state=event.state;if(!state||!Number.isInteger(state.piEventPage)||typeof state.piEventProject!=='string')return;
  const cursor=eventPageCursors[state.piEventPage];if(state.piEventPage>0&&!cursor)return;
  eventPageIndex=state.piEventPage;eventContext={project:state.piEventProject,options:state.piEventOptions??{}};
- void eventController.refresh(eventContext.project,{...eventContext.options,cursor});
+ const options={...eventContext.options};if(cursor)options.cursor=cursor;
+ void eventController.refresh(eventContext.project,options);
 });
 const form=document.querySelector('#read-scope');
 form.addEventListener('submit',event=>{

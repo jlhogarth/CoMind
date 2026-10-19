@@ -31,15 +31,18 @@ export async function readTrustedDecisions(project, { lane, limit=25, fetchImpl=
   }catch{return {status:stage==='transport'?'unavailable':'malformed',project,reason:stage==='transport'?'Trusted reader unavailable.':'Trusted reader returned malformed or out-of-scope data.'};}
 }
 
-export async function readTrustedEvents(project, { lane, limit=25, fetchImpl=globalThis.fetch, signal }={}) {
+export async function readTrustedEvents(project, { lane, limit=25, cursor, fetchImpl=globalThis.fetch, signal }={}) {
   if(typeof project!=='string'||!/^[A-Z0-9_-]{1,64}$/.test(project)||!Number.isInteger(limit)||limit<1||limit>100
-    ||(lane!==undefined&&(typeof lane!=='string'||!/^[A-Z0-9_-]{1,64}$/.test(lane))))throw new TypeError('Invalid RunBook event read scope');
+    ||(lane!==undefined&&(typeof lane!=='string'||!/^[A-Z0-9_-]{1,64}$/.test(lane)))
+    ||(cursor!==undefined&&(!cursor||typeof cursor!=='object'||typeof cursor.occurred_at!=='string'||!Number.isFinite(Date.parse(cursor.occurred_at))
+      ||typeof cursor.event_id!=='string'||!/^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.test(cursor.event_id))))throw new TypeError('Invalid RunBook event read scope');
   const params=new URLSearchParams({project,limit:String(limit)});if(lane!==undefined)params.set('lane',lane);
+  if(cursor){params.set('cursor_occurred_at',cursor.occurred_at);params.set('cursor_event_id',cursor.event_id);}
   let stage='transport';
   try{
     const response=await fetchImpl(`/api/pi/events?${params}`,{method:'GET',credentials:'same-origin',cache:'no-store',redirect:'error',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(7000)]):AbortSignal.timeout(7000)});
     if(!response.ok)return {status:response.status===401||response.status===403?'forbidden':'unavailable',project,reason:response.status===401?'Operator session missing, expired or revoked.':response.status===403?'Project read denied.':'Trusted reader unavailable.'};
-    stage='payload';const envelope=await response.json();stage='validation';const projection=projectRunbookEvents(envelope,project);
+    stage='payload';const envelope=await response.json();stage='validation';const projection=projectRunbookEvents(envelope,project,cursor);
     if(envelope.limit!==limit||envelope.lane!==(lane??null))throw Error('Source scope mismatch');
     return {status:'ready',project,envelope,projection};
   }catch{return {status:stage==='transport'?'unavailable':'malformed',project,reason:stage==='transport'?'Trusted reader unavailable.':'Trusted reader returned malformed or out-of-scope data.'};}

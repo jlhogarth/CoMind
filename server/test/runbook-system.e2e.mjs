@@ -36,13 +36,13 @@ try{
  await admin.query(`CREATE ROLE comind_runbook_query_login LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`);
  await admin.query(await readFile(join(base,'db/test/drb_002_reader.sql'),'utf8'));
  await admin.query("insert into comind_pm.pm_projects(project_key,name) values ('OTHER','Synthetic denied project'); insert into comind_pm.pm_work_items(project_id,work_key,title,item_type,status) select id,project_key||'-E2E','Isolated system test lane','lane','in_progress' from comind_pm.pm_projects where project_key in ('COMIND','OTHER')");
- const capture=async(project,summary,outcome='pass',result='Captured in the Test RunBook')=>{
+ const capture=async(project,summary,outcome='pass',result='Captured in the Test RunBook',occurredAt=null)=>{
   const client=await admin.connect();try{
    await client.query('begin');await client.query('set local role service_role');
    const row=await client.query(`select comind_pm.record_runbook_event(p_project_key=>$1,p_work_key=>$2,p_event_type=>'verification',
     p_actor=>'isolated system test',p_actor_type=>'system',p_summary=>$3,p_result_summary=>$4,p_outcome=>$5,
     p_source_system=>'manual',p_source_ref=>'server/test/runbook-system.e2e.mjs',
-    p_evidence=>$6::jsonb,p_next_action=>'Continue isolated acceptance') as id`,[project,project+'-E2E',summary,result,outcome,JSON.stringify([{kind:'test',ref:'isolated-e2e',note:'Synthetic <img src=x onerror=alert(1)> evidence'}])]);
+    p_occurred_at=>COALESCE($6::timestamptz,now()),p_evidence=>$7::jsonb,p_next_action=>'Continue isolated acceptance') as id`,[project,project+'-E2E',summary,result,outcome,occurredAt,JSON.stringify([{kind:'test',ref:'isolated-e2e',note:'Synthetic <img src=x onerror=alert(1)> evidence'}])]);
    await client.query('commit');return row.rows[0].id;
   }catch(error){await client.query('rollback');throw error;}finally{client.release();}
  };
@@ -51,7 +51,9 @@ try{
   p_actor=>'isolated system test',p_summary=>'Invalid source must be rejected',p_source_system=>'isolated-e2e')`),e=>e.code==='23514');
  assert.equal((await admin.query('select count(*)::int as n from comind_pm.pm_events')).rows[0].n,invalidBefore);
  check('invalid capture source is rejected without a partial event');
- const eventId=await capture('COMIND','Test RunBook capture accepted');
+ const tiedAt=new Date(Date.now()+1000).toISOString();
+ const eventId=await capture('COMIND','Test RunBook capture accepted','pass','Captured in the Test RunBook',tiedAt);
+ const tiedEventIds=[eventId,await capture('COMIND','Same-time event B','pass','Same timestamp fixture',tiedAt),await capture('COMIND','Same-time event C','pass','Same timestamp fixture',tiedAt)];
  await capture('OTHER','Denied project event must never reach this browser');
  check('actual migrations and service_role capture function, synthetic records only');
  const snapshot=async()=> (await admin.query("select jsonb_agg(to_jsonb(e) order by id)::text as ledger from comind_pm.pm_events e")).rows[0].ledger;
@@ -102,9 +104,31 @@ try{
  const canonicalEvent=eventRead.json().data.find(row=>row.event_id===eventId);assert.ok(canonicalEvent);
  assert.equal(canonicalEvent.project_id,work.project_id);assert.equal(canonicalEvent.work_item_id,work.id);
  assert.equal(canonicalEvent.work_item_project_id,work.project_id);assert.equal(canonicalEvent.item_type,'lane');
+ const pageOne=await drb.inject({method:'POST',url:'/v1/runbook/query',headers:{authorization:'Bearer '+backend.token},payload:{kind:'events',project:'COMIND',lane:'COMIND-E2E',limit:2}});
+ assert.equal(pageOne.statusCode,200);assert.equal(pageOne.json().more_available,true);assert.equal(pageOne.json().data.length,2);
+ assert.ok(pageOne.json().data.every(row=>Date.parse(row.occurred_at)===Date.parse(tiedAt)));
+ const pageTwo=await drb.inject({method:'POST',url:'/v1/runbook/query',headers:{authorization:'Bearer '+backend.token},payload:{kind:'events',project:'COMIND',lane:'COMIND-E2E',limit:2,
+  cursor_occurred_at:pageOne.json().next_cursor.occurred_at,cursor_event_id:pageOne.json().next_cursor.event_id}});
+ assert.equal(pageTwo.statusCode,200);assert.equal(pageTwo.json().more_available,false);assert.equal(pageTwo.json().data.length,1);
+ const pagedIds=[...pageOne.json().data,...pageTwo.json().data].map(row=>row.event_id);
+ assert.deepEqual(pagedIds,tiedEventIds.slice().sort().reverse());assert.equal(new Set(pagedIds).size,3);
+ check('same-timestamp event rows use descending event UUID order and keyset continuation without omissions or duplicates');
+ check('limit plus one reports overflow on the first page and no next page on the final bounded page');
+ const projectIsolation=await drb.inject({method:'POST',url:'/v1/runbook/query',headers:{authorization:'Bearer '+backend.token},payload:{kind:'events',project:'OTHER',lane:'OTHER-E2E',limit:2}});
+ assert.equal(projectIsolation.statusCode,200);assert.deepEqual(projectIsolation.json().data,[]);
+ check('project isolation excludes records belonging to OTHER');
  const readEvents=async()=>{await page.getByRole('button',{name:'Read RunBook events',exact:true}).click();};
- await readEvents();await page.locator('#event-list').getByText(eventId,{exact:true}).waitFor();
- await page.locator('#event-list').getByText('Test RunBook capture accepted',{exact:true}).waitFor();
+ await page.getByLabel('Events per page',{exact:true}).selectOption('2');
+ await readEvents();
+ for(const id of pageOne.json().data.map(row=>row.event_id))await page.locator('#event-list').getByText(id,{exact:true}).waitFor();
+ await page.getByRole('button',{name:'Read older events',exact:true}).click();
+ for(const id of pageTwo.json().data.map(row=>row.event_id))await page.locator('#event-list').getByText(id,{exact:true}).waitFor();
+ await page.getByText('No next page is reported for this bounded response.',{exact:false}).waitFor();
+ await page.goBack();
+ for(const id of pageOne.json().data.map(row=>row.event_id))await page.locator('#event-list').getByText(id,{exact:true}).waitFor();
+ check('browser history returns from the older event page to the prior cursor page');
+ await page.getByLabel('Events per page',{exact:true}).selectOption('25');
+ await readEvents();await page.locator('#event-list').getByText('Test RunBook capture accepted',{exact:true}).waitFor();
  await page.locator('#event-list').getByText(work.id,{exact:true}).waitFor();
  assert.equal(await page.locator('#event-list img').count(),0);
  assert.equal(await page.locator('#event-list').getByText('Denied project event must never reach this browser',{exact:true}).count(),0);
@@ -157,7 +181,7 @@ try{
  check('project denial, payload-free audits, server-only credential and unchanged ledger verified');
  await writeFile(join(output,'acceptance.json'),JSON.stringify({version:'drb-test-system.v1',status:'pass',
   observed_at:new Date().toISOString(),commit:process.env.GITHUB_SHA??null,
-  environment:'fresh loopback PostgreSQL 17; synthetic records; no production resources',event_ids:[eventId,failedId,recoveredId],checks},null,2));
+  environment:'fresh loopback PostgreSQL 17; synthetic records; no production resources',event_ids:[...tiedEventIds,failedId,recoveredId],checks},null,2));
  console.log('System proof completed. Production remains deferred.');
 }catch(error){
  await writeFile(join(output,'acceptance.json'),JSON.stringify({version:'drb-test-system.v1',status:'failed',observed_at:new Date().toISOString(),checks},null,2));

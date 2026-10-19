@@ -7,18 +7,19 @@ const payload={project:'COMIND',kind:'events'};
 test('authentication, scope and strict bounds precede DB access',async()=>{
  let calls=0;const app=buildRunbookQueryService(async()=>{calls++;return {rows:[]};},principals);
  try{for(const [h,p,status] of [[{},payload,401],[headers,{...payload,project:'OTHER'},403],
- [headers,{...payload,sql:'delete'},400],[headers,{...payload,limit:101},400],[headers,{...payload,since:'yesterday'},400]]){
+ [headers,{...payload,sql:'delete'},400],[headers,{...payload,limit:101},400],[headers,{...payload,since:'yesterday'},400],
+ [headers,{...payload,cursor_event_id:'00000000-0000-4000-8000-000000000001'},400],[headers,{...payload,since:'2026-10-17T00:00:00Z'},400]]){
  assert.equal((await app.inject({method:'POST',url:'/v1/runbook/query',headers:h,payload:p})).statusCode,status);
  }assert.equal(calls,0);}finally{await app.close();}
 });
 test('fixed parameterized SQL, explicit projections, provenance and truncation',async()=>{
  const app=buildRunbookQueryService(async(sql,params)=>{
  assert.match(sql,/FROM comind_pm.v_runbook_timeline/);assert.doesNotMatch(sql,/SELECT \*/);
- assert.deepEqual(params,['COMIND','DRB-002',null,2]);return {rows:[{event_id:'fixture-1'},{event_id:'fixture-2'}]};},principals);
+ assert.deepEqual(params,['COMIND','DRB-002',null,null,2]);return {rows:[{event_id:'00000000-0000-4000-8000-000000000002',occurred_at:'2026-10-17T00:00:00.000000Z'},{event_id:'00000000-0000-4000-8000-000000000001',occurred_at:'2026-10-17T00:00:00.000000Z'}]};},principals);
  try{const res=await app.inject({method:'POST',url:'/v1/runbook/query',headers,payload:{...payload,lane:'DRB-002',limit:1}});
  assert.equal(res.statusCode,200);assert.equal(res.headers['cache-control'],'no-store');
  assert.equal(res.json().data.length,1);assert.equal(res.json().more_available,true);
- assert.equal(res.json().source,'comind_pm.v_runbook_timeline');}finally{await app.close();}
+ assert.equal(res.json().source,'comind_pm.v_runbook_timeline');assert.deepEqual(res.json().next_cursor,{occurred_at:'2026-10-17T00:00:00.000000Z',event_id:'00000000-0000-4000-8000-000000000002'});}finally{await app.close();}
 });
 test('database failure and oversized evidence fail closed',async()=>{
  for(const [read,status] of [[async()=>{throw Error('secret URL');},503],[async()=>({rows:[{evidence:'x'.repeat(262145)}]}),413]]){
@@ -36,7 +37,7 @@ test('per principal rate control resets',async()=>{
  }finally{await app.close();}
 });
 test('all query surfaces select the expected canonical source',async()=>{
- for(const [kind,source] of [['lanes','v_runbook_lane_state'],['events','v_runbook_timeline'],['authority','v_runbook_authority'],['verifications','v_runbook_verification'],['decisions','pm_decision_records']]){
+ for(const [kind,source] of [['lanes','v_runbook_lane_state'],['authority','v_runbook_authority'],['verifications','v_runbook_verification'],['decisions','pm_decision_records']]){
  const app=buildRunbookQueryService(async(sql,params)=>{assert.match(sql,new RegExp('comind_pm\\.'+source));
  assert.equal(params[2],'2026-10-17T00:00:00Z');return {rows:[]};},principals);
  try{assert.equal((await app.inject({method:'POST',url:'/v1/runbook/query',headers,payload:{...payload,kind,since:'2026-10-17T00:00:00Z'}})).statusCode,200);
@@ -62,10 +63,31 @@ test('event query joins the RunBook UUID to canonical PM event and work-item rel
   assert.match(sql,/LEFT JOIN comind_pm\.pm_events e ON e\.id = s\.event_id/);
   assert.match(sql,/LEFT JOIN comind_pm\.pm_work_items w ON w\.id = e\.work_item_id/);
   assert.match(sql,/s\.project_key = \$1/);assert.match(sql,/s\.work_key = \$2/);
-  assert.doesNotMatch(sql,/metadata|SELECT \*/);assert.deepEqual(params,['COMIND','PI-001',null,2]);return {rows:[]};
+  assert.doesNotMatch(sql,/metadata|SELECT \*/);assert.match(sql,/\(s\.occurred_at, s\.event_id\) < \(\$3::timestamptz, \$4::uuid\)/);
+  assert.match(sql,/ORDER BY s\.occurred_at DESC NULLS LAST, s\.event_id DESC LIMIT \$5/);assert.deepEqual(params,['COMIND','PI-001',null,null,2]);return {rows:[]};
  },principals);
  try{const res=await app.inject({method:'POST',url:'/v1/runbook/query',headers,payload:{project:'COMIND',kind:'events',lane:'PI-001',limit:1}});
   assert.equal(res.statusCode,200);assert.deepEqual(res.json().source_relations,['comind_pm.v_runbook_timeline','comind_pm.pm_events','comind_pm.pm_work_items']);
+ }finally{await app.close();}
+});
+test('event keyset pages use timestamp and UUID together for equal timestamps',async()=>{
+ const ids=['00000000-0000-4000-8000-000000000003','00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000001'];let call=0;
+ const app=buildRunbookQueryService(async(sql,params)=>{
+  assert.match(sql,/\(s\.occurred_at, s\.event_id\) < \(\$3::timestamptz, \$4::uuid\)/);
+  if(call++===0){assert.deepEqual(params,['COMIND',null,null,null,3]);return {rows:ids.slice(0,3).map(id=>({event_id:id,occurred_at:'2026-10-17T00:00:00.000000Z'}))};}
+  assert.deepEqual(params,['COMIND',null,'2026-10-17T00:00:00.000000Z',ids[1],3]);
+  return {rows:[{event_id:ids[2],occurred_at:'2026-10-17T00:00:00.000000Z'}]};
+ },principals);
+ try{
+  const first=await app.inject({method:'POST',url:'/v1/runbook/query',headers,payload:{project:'COMIND',kind:'events',limit:2}});
+  assert.equal(first.statusCode,200);assert.deepEqual(first.json().data.map(row=>row.event_id),ids.slice(0,2));
+  assert.equal(first.json().more_available,true);assert.deepEqual(first.json().next_cursor,{occurred_at:'2026-10-17T00:00:00.000000Z',event_id:ids[1]});
+  const second=await app.inject({method:'POST',url:'/v1/runbook/query',headers,payload:{project:'COMIND',kind:'events',limit:2,
+   cursor_occurred_at:first.json().next_cursor.occurred_at,cursor_event_id:first.json().next_cursor.event_id}});
+  assert.equal(second.statusCode,200);assert.deepEqual(second.json().data.map(row=>row.event_id),[ids[2]]);
+  assert.equal(second.json().more_available,false);assert.equal(second.json().next_cursor,null);
+  const invalid=await app.inject({method:'POST',url:'/v1/runbook/query',headers,payload:{project:'COMIND',kind:'events',cursor_event_id:ids[1]}});
+  assert.equal(invalid.statusCode,400);
  }finally{await app.close();}
 });
 test('concurrent capacity rejects the fifth query',async()=>{

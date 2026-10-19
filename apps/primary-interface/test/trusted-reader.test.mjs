@@ -87,7 +87,7 @@ test('clearing a source cancels it and rejects a late successful result',async()
 test('reader separates denied, unavailable, malformed, empty and bounded results without retaining old data',async()=>{
  const id='00000000-0000-4000-8000-000000000001';
  const good={version:'drb-002.v1',kind:'events',source:'comind_pm.v_runbook_timeline',source_relations:['comind_pm.v_runbook_timeline','comind_pm.pm_events','comind_pm.pm_work_items'],
-  project:'COMIND',lane:null,limit:1,more_available:true,request_id:id,retrieved_at:'2026-10-18T21:00:00Z',data:[]};
+  project:'COMIND',lane:null,limit:1,more_available:false,next_cursor:null,request_id:id,retrieved_at:'2026-10-18T21:00:00Z',data:[]};
  const read=async(response)=>readTrustedEvents('COMIND',{limit:1,fetchImpl:async()=>response});
  assert.equal((await read({ok:false,status:403})).status,'forbidden');
  assert.equal((await read({ok:false,status:503})).status,'unavailable');
@@ -95,7 +95,7 @@ test('reader separates denied, unavailable, malformed, empty and bounded results
  assert.equal((await read({ok:true,json:async()=>({...good,project:'OTHER'})})).status,'malformed');
  const empty=await read({ok:true,json:async()=>good});
  assert.equal(empty.status,'ready');assert.equal(empty.projection.coverage.returned,0);
- assert.equal(empty.projection.coverage.moreAvailable,true);
+ assert.equal(empty.projection.coverage.moreAvailable,false);
  assert.equal(empty.projection.observedAt,good.retrieved_at);
 });
 

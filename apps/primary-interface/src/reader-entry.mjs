@@ -48,11 +48,17 @@ function showFoundry(state){
 }
 let foundryController=createTrustedReadController({onState:showFoundry,read:readTrustedFoundryRequests});
 const eventStatus=document.querySelector('#event-status'),eventList=document.querySelector('#event-list');
+const eventPagination=document.querySelector('#event-pagination'),eventOlder=document.querySelector('#event-older'),eventNewer=document.querySelector('#event-newer');
+let eventPageIndex=0,eventPageCursors=[null],eventContext=null,eventLastState=null;
 function showEvents(state){
+ eventLastState=state;
  eventList.replaceChildren();
  eventStatus.textContent=state.status==='ready'
-  ?`Received ${state.projection.coverage.returned} RunBook events. Observation time: ${state.projection.observedAt}. More available: ${state.projection.coverage.moreAvailable?'yes':'no'}. This window is not a complete archive.`
+  ?`Page ${eventPageIndex+1}: received ${state.projection.coverage.returned} RunBook events. Observation time: ${state.projection.observedAt}. ${state.projection.coverage.moreAvailable?'A next page is available.':'No next page is reported for this bounded response.'} This window is not a complete archive.`
   :state.reason;
+ eventPagination.hidden=state.status!=='ready';eventNewer.hidden=state.status!=='ready'||eventPageIndex===0;
+ eventOlder.hidden=state.status!=='ready'||!state.projection.coverage.moreAvailable;
+ eventOlder.disabled=state.status!=='ready'||!state.envelope.next_cursor;
  if(state.status!=='ready')return;
  const doc=eventList.ownerDocument;
  if(!state.projection.records.length){const empty=doc.createElement('p');empty.textContent='The source returned a successful empty page.';eventList.append(empty);return;}
@@ -69,6 +75,23 @@ function showEvents(state){
  }
 }
 const eventController=createTrustedReadController({onState:showEvents,read:readTrustedEvents});
+function setEventHistory(pageIndex,replace=false){
+ const url=new URL(window.location.href);url.searchParams.set('pi_event_page',String(pageIndex));
+ const state={piEventPage:pageIndex,piEventProject:eventContext.project,piEventOptions:eventContext.options};
+ window.history[replace?'replaceState':'pushState'](state,'',url);
+}
+eventOlder.addEventListener('click',()=>{
+ if(eventLastState?.status!=='ready'||!eventLastState.envelope.next_cursor)return;
+ eventPageIndex++;eventPageCursors[eventPageIndex]=eventLastState.envelope.next_cursor;
+ setEventHistory(eventPageIndex);void eventController.refresh(eventContext.project,{...eventContext.options,cursor:eventPageCursors[eventPageIndex]});
+});
+eventNewer.addEventListener('click',()=>{if(eventPageIndex>0)window.history.back();});
+window.addEventListener('popstate',event=>{
+ const state=event.state;if(!state||!Number.isInteger(state.piEventPage)||typeof state.piEventProject!=='string')return;
+ const cursor=eventPageCursors[state.piEventPage];if(state.piEventPage>0&&!cursor)return;
+ eventPageIndex=state.piEventPage;eventContext={project:state.piEventProject,options:state.piEventOptions??{}};
+ void eventController.refresh(eventContext.project,{...eventContext.options,cursor});
+});
 const form=document.querySelector('#read-scope');
 form.addEventListener('submit',event=>{
   event.preventDefault();if(!form.reportValidity())return;
@@ -76,7 +99,11 @@ form.addEventListener('submit',event=>{
   const project=document.querySelector('#project').value;
   const lane=document.querySelector('#lane').value;const options=lane?{lane}:{};
   foundryController.clear('Foundry results cleared because a different source was requested.');
-  if(event.submitter?.value==='events'){controller.clear('Lane results cleared because a different source was requested.');decisionController.clear('Decision results cleared because a different source was requested.');void eventController.refresh(project,options);return;}
+  if(event.submitter?.value==='events'){
+   controller.clear('Lane results cleared because a different source was requested.');decisionController.clear('Decision results cleared because a different source was requested.');
+   eventPageIndex=0;eventPageCursors=[null];eventContext={project,options:{...options,limit:Number(document.querySelector('#event-limit').value)}};
+   setEventHistory(0,true);void eventController.refresh(project,eventContext.options);return;
+  }
   eventController.clear('RunBook results cleared because a different source was requested.');
   if(event.submitter?.value==='decisions'){controller.clear('Lane results cleared because a different source was requested.');void decisionController.refresh(project,options);}
   else{decisionController.clear('Decision results cleared because a different source was requested.');void controller.refresh(project,options);}

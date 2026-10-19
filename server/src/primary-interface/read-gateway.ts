@@ -4,7 +4,11 @@ import { z } from 'zod';
 import { type Principal, type AccessAudit, validatePrincipals } from '../runbook/security.js';
 
 const querySchema = z.object({project:z.string().regex(/^[A-Z0-9_-]{1,64}$/),
-  lane:z.string().regex(/^[A-Z0-9_-]{1,64}$/).optional(),limit:z.coerce.number().int().min(1).max(100).default(25)}).strict();
+  lane:z.string().regex(/^[A-Z0-9_-]{1,64}$/).optional(),limit:z.coerce.number().int().min(1).max(100).default(25),
+  cursor_occurred_at:z.string().datetime({offset:true}).optional(),cursor_event_id:z.string().uuid().optional()})
+  .strict().superRefine((value,context)=>{
+    if((value.cursor_occurred_at===undefined)!==(value.cursor_event_id===undefined))context.addIssue({code:'custom',message:'event cursor requires both fields'});
+  });
 const text=z.string().max(65536).nullable().optional();
 const rowSchema=z.object({id:z.string().uuid(),project_id:z.string().uuid(),project_key:z.string(),item_type:z.literal('lane'),
   work_key:z.string(),title:text,status:text,owner:text,current_summary:text,last_event_at:text,updated_at:text,priority:text,next_action:text});
@@ -24,7 +28,8 @@ const eventRowSchema=z.object({event_id:z.string().uuid(),project_id:z.string().
   source_system:text,source_ref:text,evidence:z.array(z.unknown())});
 const eventEnvelopeSchema=z.object({version:z.literal('drb-002.v1'),request_id:z.string().uuid(),retrieved_at:z.string().datetime({offset:true}),
   source:z.literal('comind_pm.v_runbook_timeline'),project:z.string(),lane:z.string().nullable(),kind:z.literal('events'),limit:z.number().int(),
-  source_relations:z.tuple([z.literal('comind_pm.v_runbook_timeline'),z.literal('comind_pm.pm_events'),z.literal('comind_pm.pm_work_items')]),more_available:z.boolean(),data:z.array(eventRowSchema).max(100)});
+  source_relations:z.tuple([z.literal('comind_pm.v_runbook_timeline'),z.literal('comind_pm.pm_events'),z.literal('comind_pm.pm_work_items')]),
+  more_available:z.boolean(),next_cursor:z.object({occurred_at:z.string().datetime({offset:true}),event_id:z.string().uuid()}).nullable(),data:z.array(eventRowSchema).max(100)});
 const foundryQuerySchema=z.object({project_id:z.string().uuid(),limit:z.coerce.number().int().min(1).max(100).default(25)}).strict();
 const foundryRowSchema=z.object({authorization_request_id:z.string().uuid(),requesting_profile_id:z.string().uuid().nullable(),
   requesting_actor_id:z.string().uuid(),capability_id:z.string().uuid(),project_id:z.string().uuid(),task_id:z.string().uuid().nullable(),
@@ -79,6 +84,7 @@ export async function buildPiReadGateway(options:GatewayOptions){
     audits.get(req)!.principal_id=session.id;
     const parsed=querySchema.safeParse(req.query);if(!parsed.success)return fail(400,'invalid_query');
     const input=parsed.data;audits.get(req)!.project=input.project;audits.get(req)!.kind='lanes';
+    if(input.cursor_event_id!==undefined||input.cursor_occurred_at!==undefined)return fail(400,'invalid_query');
     if(!session.projects.includes(input.project))return fail(403,'forbidden');
     let backend:Principal|undefined;
     try{backend=validatePrincipals(await options.loadBackend()).find(p=>p.id===options.backendId);}catch{return fail(503,'reader_unavailable');}
@@ -112,6 +118,7 @@ export async function buildPiReadGateway(options:GatewayOptions){
     audits.get(req)!.principal_id=session.id;
     const parsed=querySchema.safeParse(req.query);if(!parsed.success)return fail(400,'invalid_query');
     const input=parsed.data;audits.get(req)!.project=input.project;audits.get(req)!.kind='decisions';
+    if(input.cursor_event_id!==undefined||input.cursor_occurred_at!==undefined)return fail(400,'invalid_query');
     if(!session.projects.includes(input.project))return fail(403,'forbidden');
     let backend:Principal|undefined;
     try{backend=validatePrincipals(await options.loadBackend()).find(p=>p.id===options.backendId);}catch{return fail(503,'reader_unavailable');}
@@ -158,7 +165,8 @@ export async function buildPiReadGateway(options:GatewayOptions){
       const decoder=new TextDecoder();try{for(;;){const part=await reader.read();if(part.done)break;bytes+=part.value.byteLength;if(bytes>262144){await reader.cancel();return fail(502,'invalid_source');}body+=decoder.decode(part.value,{stream:true});}}finally{reader.releaseLock();}body+=decoder.decode();
       const envelope=eventEnvelopeSchema.parse(JSON.parse(body));
       if(envelope.project!==input.project||envelope.lane!==(input.lane??null)||envelope.limit!==input.limit)throw Error('Source scope mismatch');
-      projectRunbookEvents(envelope,input.project);
+      if(envelope.more_available!==(envelope.next_cursor!==null))throw Error('Invalid event pagination state');
+      projectRunbookEvents(envelope,input.project,input.cursor_event_id?{occurred_at:input.cursor_occurred_at!,event_id:input.cursor_event_id}:undefined);
       return reply.send(envelope);
     }catch{return fail(503,'reader_unavailable');}finally{active--;}
   });

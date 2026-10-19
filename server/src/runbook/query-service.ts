@@ -9,8 +9,16 @@ const requestSchema = z.object({
   lane: z.string().regex(/^[A-Z0-9_-]{1,64}$/).optional(),
   kind: z.enum(['lanes', 'events', 'authority', 'verifications', 'decisions']),
   since: z.string().datetime({ offset: true }).optional(),
+  cursor_occurred_at: z.string().datetime({ offset: true }).optional(),
+  cursor_event_id: z.string().uuid().optional(),
   limit: z.number().int().min(1).max(100).default(25),
-}).strict();
+}).strict().superRefine((value, context) => {
+  const hasTimestamp = value.cursor_occurred_at !== undefined;
+  const hasEventId = value.cursor_event_id !== undefined;
+  if (hasTimestamp !== hasEventId) context.addIssue({ code: 'custom', message: 'event cursor must include timestamp and id' });
+  if (hasTimestamp && value.kind !== 'events') context.addIssue({ code: 'custom', message: 'event cursor requires events kind' });
+  if (value.since !== undefined && value.kind === 'events') context.addIssue({ code: 'custom', message: 'events require tuple cursor pagination' });
+});
 export type ReadQuery = (sql: string, params: unknown[]) => Promise<{ rows: Record<string, unknown>[] }>;
 const sources = {
   lanes: ['v_runbook_lane_state', 'last_event_at', 'work_key'],
@@ -22,7 +30,8 @@ const sources = {
 // Explicit projection avoids leaking details/conditions or future columns through SELECT *.
 const columns = {
   lanes: 's.project_key,w.id,w.project_id,w.item_type,s.work_key,s.title,s.status,s.priority,s.owner,s.current_summary,s.last_event_at,s.next_action,w.updated_at',
-  events: 's.event_id,COALESCE(e.project_id,w.project_id) AS project_id,e.project_id AS event_project_id,e.work_item_id,w.project_id AS work_item_project_id,w.item_type,s.project_key,s.work_key,s.occurred_at,s.action_summary,s.result_summary,s.outcome,s.next_action,s.source_system,s.source_ref,s.evidence',
+  events: `s.event_id,COALESCE(e.project_id,w.project_id) AS project_id,e.project_id AS event_project_id,e.work_item_id,w.project_id AS work_item_project_id,w.item_type,s.project_key,s.work_key,
+    to_char(s.occurred_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS occurred_at,s.action_summary,s.result_summary,s.outcome,s.next_action,s.source_system,s.source_ref,s.evidence`,
   authority: 'authorization_id,project_key,work_key,effective_at,authorization_type,decision,scope,authorized_by,expires_at,source_system,source_ref,evidence',
   verifications: 'verification_id,project_key,work_key,verified_at,check_name,outcome,result_summary,verified_by,event_id,evidence',
   decisions: 'd.id,d.work_item_id,w.project_id,w.item_type,p.project_key,w.work_key,d.decision_needed,d.options::text AS options_json,d.selected_option,d.rationale,d.reversibility,d.decided_by,d.decided_at,d.created_at,d.updated_at',
@@ -117,14 +126,25 @@ export function buildRunbookQueryService(read: ReadQuery, principals: Principal[
     const tieColumn = input.kind === 'decisions' ? 'd.id' : `s.${tie}`;
     active++;
     try {
-      const result = await read(
-        `SELECT ${columns[input.kind]} FROM ${from}
-         WHERE ${projectColumn} = $1 AND ($2::text IS NULL OR ${laneColumn} = $2)
-         AND ($3::timestamptz IS NULL OR ${timestampColumn} > $3::timestamptz)
-         ORDER BY ${timestampColumn} DESC NULLS LAST, ${tieColumn} DESC LIMIT $4`,
-        [input.project, input.lane ?? null, input.since ?? null, input.limit + 1]);
+      const result = input.kind === 'events'
+        ? await read(
+          `SELECT ${columns[input.kind]} FROM ${from}
+           WHERE ${projectColumn} = $1 AND ($2::text IS NULL OR ${laneColumn} = $2)
+           AND ($3::timestamptz IS NULL OR (${timestampColumn}, ${tieColumn}) < ($3::timestamptz, $4::uuid))
+           ORDER BY ${timestampColumn} DESC NULLS LAST, ${tieColumn} DESC LIMIT $5`,
+          [input.project, input.lane ?? null, input.cursor_occurred_at ?? null, input.cursor_event_id ?? null, input.limit + 1])
+        : await read(
+          `SELECT ${columns[input.kind]} FROM ${from}
+           WHERE ${projectColumn} = $1 AND ($2::text IS NULL OR ${laneColumn} = $2)
+           AND ($3::timestamptz IS NULL OR ${timestampColumn} > $3::timestamptz)
+           ORDER BY ${timestampColumn} DESC NULLS LAST, ${tieColumn} DESC LIMIT $4`,
+          [input.project, input.lane ?? null, input.since ?? null, input.limit + 1]);
       const more = result.rows.length > input.limit;
       const data = result.rows.slice(0, input.limit);
+      const last = data.at(-1);
+      const nextCursor = input.kind === 'events' && more && last
+        ? { occurred_at: last.occurred_at, event_id: last.event_id }
+        : null;
       const body = { version: 'drb-002.v1', request_id: requestId,
         retrieved_at: new Date(now()).toISOString(), source: `comind_pm.${view}`,
         project: input.project, lane: input.lane ?? null, kind: input.kind,
@@ -133,7 +153,7 @@ export function buildRunbookQueryService(read: ReadQuery, principals: Principal[
           : ['lanes', 'decisions'].includes(input.kind)
             ? [`comind_pm.${view}`, 'comind_pm.pm_work_items', ...(input.kind === 'decisions' ? ['comind_pm.pm_projects'] : [])]
             : [`comind_pm.${view}`],
-        more_available: more, data };
+        more_available: more, data, ...(input.kind === 'events' ? { next_cursor: nextCursor } : {}) };
       if (Buffer.byteLength(JSON.stringify(body)) > 262144) return fail(413, 'result_too_large');
       return body;
     } catch {

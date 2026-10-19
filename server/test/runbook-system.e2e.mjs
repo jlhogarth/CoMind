@@ -96,9 +96,16 @@ try{
  page.on('pageerror',error=>errors.push(error.message));page.on('request',r=>requests.push({url:r.url(),headers:r.headers()}));
  await page.goto(origin+'/apps/primary-interface/reader.html#/lanes');
  await page.getByLabel('Project',{exact:true}).fill('COMIND');await page.getByLabel('Lane filter (optional)',{exact:true}).fill('COMIND-E2E');
+ const work=(await admin.query("select id,project_id,current_summary from comind_pm.pm_work_items where work_key='COMIND-E2E'")).rows[0];
+ const eventRead=await drb.inject({method:'POST',url:'/v1/runbook/query',headers:{authorization:'Bearer '+backend.token},payload:{kind:'events',project:'COMIND',lane:'COMIND-E2E'}});
+ assert.equal(eventRead.statusCode,200);
+ const canonicalEvent=eventRead.json().data.find(row=>row.event_id===eventId);assert.ok(canonicalEvent);
+ assert.equal(canonicalEvent.project_id,work.project_id);assert.equal(canonicalEvent.work_item_id,work.id);
+ assert.equal(canonicalEvent.work_item_project_id,work.project_id);assert.equal(canonicalEvent.item_type,'lane');
  const readEvents=async()=>{await page.getByRole('button',{name:'Read RunBook events',exact:true}).click();};
  await readEvents();await page.locator('#event-list').getByText(eventId,{exact:true}).waitFor();
  await page.locator('#event-list').getByText('Test RunBook capture accepted',{exact:true}).waitFor();
+ await page.locator('#event-list').getByText(work.id,{exact:true}).waitFor();
  assert.equal(await page.locator('#event-list img').count(),0);
  assert.equal(await page.locator('#event-list').getByText('Denied project event must never reach this browser',{exact:true}).count(),0);
  assert.equal(await page.evaluate(()=>document.cookie),'');
@@ -106,7 +113,6 @@ try{
  await page.getByRole('button',{name:'Read project lanes',exact:true}).click();
  await page.getByRole('link',{name:'COMIND-E2E: Isolated system test lane',exact:true}).click();
  await page.getByRole('heading',{name:'Development lane detail',exact:true}).waitFor();
- const work=(await admin.query("select id,current_summary from comind_pm.pm_work_items where work_key='COMIND-E2E'")).rows[0];
  await page.getByText(work.id,{exact:true}).waitFor();assert.equal(work.current_summary,'Captured in the Test RunBook');
  assert.equal(await snapshot(),before);check('capture updates canonical lane projection; application reads do not mutate RunBook');
  const failedId=await capture('COMIND','Synthetic test failure recorded','fail','Deliberate fixture failure');

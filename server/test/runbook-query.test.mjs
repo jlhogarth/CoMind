@@ -55,6 +55,18 @@ test('project decision read joins both canonical parents and selects reviewed fi
   assert.deepEqual(res.json().source_relations,['comind_pm.pm_decision_records','comind_pm.pm_work_items','comind_pm.pm_projects']);
  }finally{await app.close();}
 });
+test('event query joins the RunBook UUID to canonical PM event and work-item relations',async()=>{
+ const app=buildRunbookQueryService(async(sql,params)=>{
+  assert.match(sql,/s\.event_id,e\.project_id AS event_project_id,e\.work_item_id,w\.project_id AS work_item_project_id/);
+  assert.match(sql,/LEFT JOIN comind_pm\.pm_events e ON e\.id = s\.event_id/);
+  assert.match(sql,/LEFT JOIN comind_pm\.pm_work_items w ON w\.id = e\.work_item_id/);
+  assert.match(sql,/s\.project_key = \$1/);assert.match(sql,/s\.work_key = \$2/);
+  assert.doesNotMatch(sql,/metadata|SELECT \*/);assert.deepEqual(params,['COMIND','PI-001',null,2]);return {rows:[]};
+ },principals);
+ try{const res=await app.inject({method:'POST',url:'/v1/runbook/query',headers,payload:{project:'COMIND',kind:'events',lane:'PI-001',limit:1}});
+  assert.equal(res.statusCode,200);assert.deepEqual(res.json().source_relations,['comind_pm.v_runbook_timeline','comind_pm.pm_events','comind_pm.pm_work_items']);
+ }finally{await app.close();}
+});
 test('concurrent capacity rejects the fifth query',async()=>{
  const releases=[];const app=buildRunbookQueryService(()=>new Promise(resolve=>releases.push(()=>resolve({rows:[]}))),principals);
  try{await app.ready();const requests=Array.from({length:4},()=>app.inject({method:'POST',url:'/v1/runbook/query',headers,payload}));

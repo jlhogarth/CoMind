@@ -10,7 +10,7 @@ const SOURCES = Object.freeze({
     fields: ['id','project_id','work_key','item_type','title','status','owner','current_summary','last_event_at','updated_at'],
     statuses: ['backlog','ready','in_progress','blocked','review','done','canceled','deferred'] },
   events: { relation: 'comind_pm.v_runbook_timeline', key: 'event_id',
-    fields: ['event_id','project_key','work_key','occurred_at','action_summary','result_summary','outcome','next_action','source_system','source_ref','evidence'],
+    fields: ['event_id','project_id','event_project_id','work_item_id','work_item_project_id','item_type','project_key','work_key','occurred_at','action_summary','result_summary','outcome','next_action','source_system','source_ref','evidence'],
     arrays: ['evidence'] },
 });
 const nonempty = x => typeof x === 'string' && x.trim().length > 0;

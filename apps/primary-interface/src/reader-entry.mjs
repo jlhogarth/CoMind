@@ -60,8 +60,8 @@ function showEvents(state){
   const row=record.source;
   const article=doc.createElement('article'),heading=doc.createElement('h3'),list=doc.createElement('dl');
   heading.textContent=row.action_summary??'Event without summary';article.append(heading);
-  for(const [label,value] of [['Canonical event ID',record.sourceId],['Source relation',record.sourceRelation],['Observed at',record.observedAt],['Revision',record.revision??'Not supplied'],['Projection gaps',record.blockers.map(item=>item.input).join('; ')],['Project',row.project_key],['Lane',row.work_key],
-   ['Occurred at',row.occurred_at],['Result',row.result_summary],['Outcome source value',row.outcome],['Next action',row.next_action],
+  for(const [label,value] of [['Canonical event ID',record.sourceId],['Source relation',record.sourceRelation],['Observed at',record.observedAt],['Revision',record.revision??'Not supplied'],['Projection gaps',record.blockers.map(item=>item.input).join('; ')],['Project',row.project_key],['Project UUID',row.project_id],['Lane',row.work_key],['Work item UUID',row.work_item_id],['Work item type',row.item_type],
+   ['Event project UUID',row.event_project_id],['Work item project UUID',row.work_item_project_id],['Occurred at',row.occurred_at],['Result',row.result_summary],['Outcome source value',row.outcome],['Next action',row.next_action],
    ['Source system',row.source_system],['Source reference',row.source_ref],['Evidence references source JSON',JSON.stringify(row.evidence)]]){
    const term=doc.createElement('dt'),description=doc.createElement('dd');term.textContent=label;description.textContent=value??'Not recorded';list.append(term,description);
   }

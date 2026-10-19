@@ -99,3 +99,10 @@ Implementation candidate `d9d1e634622a92f9068bc8f390a00316e110e253` passed all 1
 The reader now distinguishes denied, unavailable, and malformed/out-of-scope responses. Successful empty remains a successful zero-row page. Previous results clear at refresh; bounded coverage remains bounded, even when no further page is reported. Observation time is shown without inventing a staleness threshold. The skip link targets the primary content landmark, source sections remain independently labeled, status updates use polite live regions, and lane rendering is isolated to its child host.
 
 No database, RunBook, production roles, grants, deployment, activation, or production authorization changed. The Foundry UUID to PM project crosswalk remains an explicit blocker pending source-owner reviewed mapping, cardinality, lifecycle, read access policy, provenance and verification semantics. Lane, attention, revision, event relationship and evidence verification semantics remain incomplete; no unified operational assessment is claimed.
+
+
+## Canonical event-to-work-item identity
+
+The bounded event projection returns the canonical event UUID, project UUID, nullable event project UUID, nullable work-item UUID, nullable linked work-item project UUID, and nullable item type. Its SQL follows the declared PM foreign key from `pm_events.work_item_id` to `pm_work_items.id`; the text work key remains a display/filter value. The response lineage names the timeline view and both base relations. Existing restricted Test-reader grants and RLS policies cover the joins, so no migration or grant change is needed.
+
+A row with no linked work item stays readable with null relationship fields. A conflicting event/work-item project association is surfaced as a blocker with both UUIDs retained. No PM-to-Foundry mapping or authority is inferred. Acceptance must compare the actual PostgreSQL FK result through the gateway and browser against the canonical work-item row.

@@ -18,12 +18,13 @@ const decisionEnvelopeSchema=z.object({version:z.literal('drb-002.v1'),request_i
   source:z.literal('comind_pm.pm_decision_records'),project:z.string(),lane:z.string().nullable(),kind:z.literal('decisions'),limit:z.number().int(),
   source_relations:z.tuple([z.literal('comind_pm.pm_decision_records'),z.literal('comind_pm.pm_work_items'),z.literal('comind_pm.pm_projects')]),
   more_available:z.boolean(),data:z.array(decisionRowSchema).max(100)});
-const eventRowSchema=z.object({event_id:z.string().uuid(),project_key:z.string(),work_key:text,
+const eventRowSchema=z.object({event_id:z.string().uuid(),project_id:z.string().uuid(),event_project_id:z.string().uuid().nullable(),
+  work_item_id:z.string().uuid().nullable(),work_item_project_id:z.string().uuid().nullable(),item_type:text,project_key:z.string(),work_key:text,
   occurred_at:z.string().datetime({offset:true}),action_summary:text,result_summary:text,outcome:text,next_action:text,
   source_system:text,source_ref:text,evidence:z.array(z.unknown())});
 const eventEnvelopeSchema=z.object({version:z.literal('drb-002.v1'),request_id:z.string().uuid(),retrieved_at:z.string().datetime({offset:true}),
   source:z.literal('comind_pm.v_runbook_timeline'),project:z.string(),lane:z.string().nullable(),kind:z.literal('events'),limit:z.number().int(),
-  source_relations:z.tuple([z.literal('comind_pm.v_runbook_timeline')]),more_available:z.boolean(),data:z.array(eventRowSchema).max(100)});
+  source_relations:z.tuple([z.literal('comind_pm.v_runbook_timeline'),z.literal('comind_pm.pm_events'),z.literal('comind_pm.pm_work_items')]),more_available:z.boolean(),data:z.array(eventRowSchema).max(100)});
 const foundryQuerySchema=z.object({project_id:z.string().uuid(),limit:z.coerce.number().int().min(1).max(100).default(25)}).strict();
 const foundryRowSchema=z.object({authorization_request_id:z.string().uuid(),requesting_profile_id:z.string().uuid().nullable(),
   requesting_actor_id:z.string().uuid(),capability_id:z.string().uuid(),project_id:z.string().uuid(),task_id:z.string().uuid().nullable(),

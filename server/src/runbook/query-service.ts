@@ -22,7 +22,7 @@ const sources = {
 // Explicit projection avoids leaking details/conditions or future columns through SELECT *.
 const columns = {
   lanes: 's.project_key,w.id,w.project_id,w.item_type,s.work_key,s.title,s.status,s.priority,s.owner,s.current_summary,s.last_event_at,s.next_action,w.updated_at',
-  events: 'event_id,project_key,work_key,occurred_at,action_summary,result_summary,outcome,next_action,source_system,source_ref,evidence',
+  events: 's.event_id,COALESCE(e.project_id,w.project_id) AS project_id,e.project_id AS event_project_id,e.work_item_id,w.project_id AS work_item_project_id,w.item_type,s.project_key,s.work_key,s.occurred_at,s.action_summary,s.result_summary,s.outcome,s.next_action,s.source_system,s.source_ref,s.evidence',
   authority: 'authorization_id,project_key,work_key,effective_at,authorization_type,decision,scope,authorized_by,expires_at,source_system,source_ref,evidence',
   verifications: 'verification_id,project_key,work_key,verified_at,check_name,outcome,result_summary,verified_by,event_id,evidence',
   decisions: 'd.id,d.work_item_id,w.project_id,w.item_type,p.project_key,w.work_key,d.decision_needed,d.options::text AS options_json,d.selected_option,d.rationale,d.reversibility,d.decided_by,d.decided_at,d.created_at,d.updated_at',
@@ -107,7 +107,10 @@ export function buildRunbookQueryService(read: ReadQuery, principals: Principal[
       ? " JOIN comind_pm.pm_work_items w ON w.work_key = s.work_key AND w.item_type = 'lane'" : '';
     const decisionJoin = input.kind === 'decisions'
       ? ' JOIN comind_pm.pm_work_items w ON w.id = d.work_item_id JOIN comind_pm.pm_projects p ON p.id = w.project_id' : '';
-    const from = input.kind === 'decisions' ? `comind_pm.${view} d${decisionJoin}` : `comind_pm.${view} s${laneJoin}`;
+    const eventJoin = input.kind === 'events'
+      ? ' LEFT JOIN comind_pm.pm_events e ON e.id = s.event_id LEFT JOIN comind_pm.pm_work_items w ON w.id = e.work_item_id' : '';
+    const from = input.kind === 'decisions' ? `comind_pm.${view} d${decisionJoin}`
+      : input.kind === 'events' ? `comind_pm.${view} s${eventJoin}` : `comind_pm.${view} s${laneJoin}`;
     const projectColumn = input.kind === 'decisions' ? 'p.project_key' : 's.project_key';
     const laneColumn = input.kind === 'decisions' ? 'w.work_key' : 's.work_key';
     const timestampColumn = input.kind === 'decisions' ? 'd.updated_at' : `s.${timestamp}`;
@@ -125,8 +128,11 @@ export function buildRunbookQueryService(read: ReadQuery, principals: Principal[
       const body = { version: 'drb-002.v1', request_id: requestId,
         retrieved_at: new Date(now()).toISOString(), source: `comind_pm.${view}`,
         project: input.project, lane: input.lane ?? null, kind: input.kind,
-        limit: input.limit, source_relations: ['lanes', 'decisions'].includes(input.kind)
-          ? [`comind_pm.${view}`, 'comind_pm.pm_work_items', ...(input.kind === 'decisions' ? ['comind_pm.pm_projects'] : [])] : [`comind_pm.${view}`],
+        limit: input.limit, source_relations: input.kind === 'events'
+          ? [`comind_pm.${view}`, 'comind_pm.pm_events', 'comind_pm.pm_work_items']
+          : ['lanes', 'decisions'].includes(input.kind)
+            ? [`comind_pm.${view}`, 'comind_pm.pm_work_items', ...(input.kind === 'decisions' ? ['comind_pm.pm_projects'] : [])]
+            : [`comind_pm.${view}`],
         more_available: more, data };
       if (Buffer.byteLength(JSON.stringify(body)) > 262144) return fail(413, 'result_too_large');
       return body;

@@ -80,3 +80,10 @@ Repository review at #147 head `5026c26cea1f0e433e76aca0f580e6e1453ebccb` reconf
 Do not implement or populate a crosswalk until the PI, Foundry and PM source owners review a durable mapping contract that records both canonical source keys; an explicit cardinality choice; effective, inactive and revoked lifecycle rules; mapping authority and immutable revision; provenance and owner approval; and a mapping read policy. Authorize access independently for the mapping, Foundry rows and PM rows. A valid match conveys no source access. Fail closed on zero, ambiguous, inactive, expired or unauthorized mappings. Never choose a match by identifier similarity, first-row ordering, project name or free-form reference.
 
 The required cardinality is an owner decision and remains unresolved. These gates preserve source domains as distinct claims; they do not assert a one-to-one or one-to-many policy. Until owner evidence exists, the only supported behavior is separate native-scope reads and an explicit blocker on any unified assessment.
+
+
+## RunBook event foreign-key projection
+
+The Test reader now carries a PM event's canonical project UUID, optional event project UUID, optional foreign-key work-item UUID, optional linked work-item project UUID, and linked item type. The server obtains these values from an explicit join of `v_runbook_timeline` to `pm_events` by event UUID and to `pm_work_items` by the declared `work_item_id` FK. It does not treat a text work key as the relational identity. Source provenance lists all three relations.
+
+Events without a linked work item remain valid and show null relationship fields. When an event's project UUID and its linked work item's project UUID disagree, both source values remain visible and the projection adds an explicit relationship blocker. It does not silently select a parent or construct a lane link. The Test fixture already grants the restricted reader SELECT on these RLS-protected relations; the change adds no role or grant. This remains PM/RunBook data and does not relate it to Foundry projects or authorizations.

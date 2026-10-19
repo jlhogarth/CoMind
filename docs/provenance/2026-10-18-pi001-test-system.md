@@ -93,3 +93,17 @@ The canonical contracts and source code were reviewed for cross-domain project i
 Resolution gate: PI, Foundry and PM owners must approve a durable relation that identifies both keys, explicitly selects cardinality, defines effective/inactive/revoked lifecycle, records accountable authority, provenance and immutable revision, and specifies scoped read access independently for the mapping and each source. Zero, ambiguous, inactive, expired or unauthorized mapping results fail closed. Identifier similarity, project labels, first-match selection and free-form references are not evidence. No cardinality value is invented here.
 
 No code or source query changed in this checkpoint. Foundry UUID and PM project reads remain distinct; the crosswalk blocker remains open. No unified operational assessment, production read, grant, deployment, activation or production authorization is claimed. #147 remains stacked on #143/#139; #145 and #119 remain separate.
+
+
+## Canonical RunBook event foreign-key identity #006, 2026-10-19
+
+Status: implementation candidate on PR #147, branch `pi-trusted-read-isolation`. The prior verified remote head was `e589b1b71436209b5cf3e0cd8f761d52d9891d0f`; exact-head verification for this candidate is pending until the new commit's workflows complete.
+
+Finding: the live/test RunBook timeline view is defined from `pm_events` and LEFT JOINs `pm_work_items` on `wi.id = e.work_item_id`. The earlier PI event envelope retained the event UUID and a text work key, but omitted the actual FK identity. Projected events therefore could not reliably identify their canonical PM work item.
+
+Change candidate: the fixed restricted query joins the timeline view to `pm_events` by event UUID and to `pm_work_items` by the declared FK. The response exposes event project UUID, canonical effective project UUID, optional work-item UUID, linked work-item project UUID, item type and all three source relations. The PI validator checks UUID shape, nullable relationship consistency and bounded provenance. A project mismatch remains visible with an explicit blocker. The opt-in page displays canonical UUIDs as text. Event rows with no linked work item remain representable. The existing disposable fixture has SELECT grants and RLS policies for all join sources, so no SQL migration, live grant or schema change was needed.
+
+Verification planned: focused PI event projection and query tests; PostgreSQL 17 restricted-reader integration comparing response UUIDs directly to the database FK; actual capture-to-RunBook-to-PI-to-Chromium acceptance asserting the displayed work-item UUID; all returned exact-head workflows and no-placeholder policy. All fixtures must remain synthetic. No production or live Supabase writes are part of this implementation.
+
+Open: exact-head CI, review and mergeability after the change; accepted event pagination remains bounded and not a complete or lossless feed; decision/authorization/verification relationship joins and evidence verification policy remain separate gaps; Foundry-to-PM project crosswalk remains unresolved. Preserve each source domain and disabled decision controls.
+

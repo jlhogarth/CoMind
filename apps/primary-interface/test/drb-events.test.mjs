@@ -1,9 +1,9 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {randomUUID} from 'node:crypto';
 import {projectRunbookEvents} from '../src/drb-events.mjs';import {readTrustedEvents} from '../src/trusted-reader.mjs';
-const envelope=()=>({version:'drb-002.v1',kind:'events',source:'comind_pm.v_runbook_timeline',source_relations:['comind_pm.v_runbook_timeline'],
- project:'COMIND',lane:'DRB-E2E',limit:1,more_available:true,request_id:randomUUID(),retrieved_at:'2026-10-18T21:00:00Z',data:[{event_id:randomUUID(),
+const envelope=()=>{const project= randomUUID(),workItem=randomUUID();return {version:'drb-002.v1',kind:'events',source:'comind_pm.v_runbook_timeline',source_relations:['comind_pm.v_runbook_timeline','comind_pm.pm_events','comind_pm.pm_work_items'],
+ project:'COMIND',lane:'DRB-E2E',limit:1,more_available:true,request_id:randomUUID(),retrieved_at:'2026-10-18T21:00:00Z',data:[{event_id:randomUUID(),project_id:project,event_project_id:project,work_item_id:workItem,work_item_project_id:project,item_type:'lane',
  project_key:'COMIND',work_key:'DRB-E2E',occurred_at:'2026-10-18T20:59:00Z',action_summary:'Synthetic failure',result_summary:'Source claim',outcome:'fail',
- next_action:'Review',source_system:'test',source_ref:'javascript:untrusted-reference',evidence:[{note:'<img src=x onerror=alert(1)>'}]}]});
+ next_action:'Review',source_system:'test',source_ref:'javascript:untrusted-reference',evidence:[{note:'<img src=x onerror=alert(1)>'}]}]};};
 test('RunBook projection preserves bounded historical evidence without claiming current authority',()=>{
  const input=envelope(),out=projectRunbookEvents(input,'COMIND');assert.equal(out.records[0].sourceId,input.data[0].event_id);
  assert.equal(out.records[0].source.source_ref,'javascript:untrusted-reference');assert.equal(out.records[0].decisionEnabled,false);
@@ -17,7 +17,7 @@ test('RunBook projection preserves bounded historical evidence without claiming 
 test('RunBook projection rejects wrong scope, duplicate IDs, absent provenance and malformed payloads',()=>{
  for(const patch of [{project:'OTHER'},{kind:'decisions'},{source:'unreviewed.events'},{source_relations:[]},{request_id:'bad'},
  {retrieved_at:'yesterday'},{limit:0},{limit:101},{more_available:null},{lane:undefined}])assert.throws(()=>projectRunbookEvents({...envelope(),...patch},'COMIND'));
- for(const patch of [{project_key:'OTHER'},{work_key:'OTHER-LANE'},{event_id:'bad'},{occurred_at:'invalid'},{evidence:{}},{action_summary:{}}]){
+ for(const patch of [{project_key:'OTHER'},{project_id:'bad'},{event_project_id:randomUUID()},{work_item_id:'bad'},{work_item_project_id:'bad'},{work_key:'OTHER-LANE'},{event_id:'bad'},{occurred_at:'invalid'},{evidence:{}},{action_summary:{}}]){
   const input=envelope();input.data[0]={...input.data[0],...patch};assert.throws(()=>projectRunbookEvents(input,'COMIND'));
  }
  const input=envelope();input.limit=2;input.data.push({...input.data[0]});assert.throws(()=>projectRunbookEvents(input,'COMIND'),/scope/);
@@ -26,6 +26,14 @@ test('event canonical projection excludes unreviewed fields and rejects malforme
  const input=envelope();input.data[0].unreviewed_secret='not released';
  const out=projectRunbookEvents(input,'COMIND');assert.equal(JSON.stringify(out).includes('unreviewed_secret'),false);
  input.data[0].evidence={secret:'must remain array'};assert.throws(()=>projectRunbookEvents(input,'COMIND'));
+});
+test('event retains canonical foreign keys and exposes mismatched project association as a blocker',()=>{
+ const input=envelope();input.data[0].work_item_project_id=randomUUID();
+ const out=projectRunbookEvents(input,'COMIND');
+ assert.equal(out.records[0].source.work_item_id,input.data[0].work_item_id);
+ assert.ok(out.records[0].blockers.some(x=>x.operation==='resolve event/work-item project association'));
+ input.data[0].work_item_id=null;input.data[0].work_item_project_id=null;input.data[0].item_type=null;
+ assert.equal(projectRunbookEvents(input,'COMIND').records[0].source.work_item_id,null);
 });
 test('event transport fixes route, carries no backend secret and rejects source/query mismatch',async()=>{
  const input=envelope();let request;

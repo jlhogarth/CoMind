@@ -8,6 +8,7 @@ import { randomBytes } from 'node:crypto';
 import { Pool } from 'pg';
 import { buildPiReadGateway } from '../dist/primary-interface/read-gateway.js';
 import { projectRunbookLanes } from '../../apps/primary-interface/src/drb-lanes.mjs';
+import { projectRunbookEvents } from '../../apps/primary-interface/src/drb-events.mjs';
 import { buildRunbookQueryService } from '../dist/runbook/query-service.js';
 import { createRunbookReadQuery, verifyRunbookReader } from '../dist/runbook/database.js';
 
@@ -86,6 +87,17 @@ test('isolated PostgreSQL 17 reader privilege and HTTP proof',{skip:!raw},async(
      assert.equal(projected.records[0].source.owner,null);
      assert.equal(projected.records[0].source.item_type,'lane');
      assert.equal(projected.coverage.total,null);
+    }
+    if(kind==='events' && project==='COMIND') {
+     const row=res.json().data[0];
+     const canonical=(await admin.query(`select e.id as event_id,coalesce(e.project_id,w.project_id) as project_id,e.project_id as event_project_id,
+       e.work_item_id,w.project_id as work_item_project_id,w.item_type from comind_pm.pm_events e left join comind_pm.pm_work_items w on w.id=e.work_item_id
+       where e.id=$1`,[row.event_id])).rows[0];
+     assert.equal(row.project_id,canonical.project_id);assert.equal(row.work_item_id,canonical.work_item_id);
+     assert.equal(row.work_item_project_id,canonical.work_item_project_id);assert.equal(row.item_type,canonical.item_type);
+     const projected=projectRunbookEvents(res.json(),'COMIND');
+     assert.equal(projected.records[0].source.work_item_id,canonical.work_item_id);
+     assert.equal(projected.retrieval.sourceRelations.length,3);
     }
     if(kind==='decisions' && project==='COMIND') {
      const row=res.json().data[0];assert.equal(row.project_key,'COMIND');assert.equal(row.work_key,'COMIND-FIXTURE');

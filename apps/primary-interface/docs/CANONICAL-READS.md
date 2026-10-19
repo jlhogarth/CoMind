@@ -95,3 +95,10 @@ Events without a linked work item remain valid and show null relationship fields
 The disposable PostgreSQL and Chromium acceptance creates three synthetic events at one exact timestamp through the existing append-only capture function, forces overflow with a two-row page, checks UUID tie ordering and cursor continuity, confirms another project's event rows are excluded, and navigates forward/back in the actual reader page. Event pages remain bounded and non-lossless. PM decisions, Foundry authorization requests and PI human-action assessments are unchanged and remain separate.
 
 Verified on PR #147 head `56ea984215a2cce68ce84ed21b58626360158d52`: all 11 returned workflows passed. The PostgreSQL 17.11-to-Chromium acceptance passed 17 checks with synthetic data and disposable Test identities. Artifact [12156730726](https://github.com/jlhogarth/CoMind/actions/runs/39181368911/artifacts/12156730726), SHA-256 `8321abafe3c3ba63bed8b5ceccb7355f0debfc57fb574c024d96ed946267a97d`. See `docs/provenance/2026-10-19-primary-interface-event-pagination.md` for workflow IDs and limits.
+
+
+## Event pagination browser-history context
+
+The #007 tuple cursor remains bounded keyset navigation: requests independently re-read a changing append-only source, and pages do not share a database snapshot. A page cursor is a navigation position, not proof of complete coverage. The connected reader's current cursor must remain paired with its project, lane and limit context in browser history. In particular, changing event scope after paging must not destroy the previous history entry's cursor or falsely retain the new scope's displayed rows when Back returns.
+
+PR #149 adds the cursor to each history state and a PostgreSQL 17/Chromium regression with five same-timestamp synthetic events. It traverses three pages, changes the lane filter, then uses Back to restore the prior page and scope. The test is pending exact-head CI. It does not claim snapshot consistency or lossless history. PM decisions, RunBook events, Foundry requests and human-action assessments remain separate.

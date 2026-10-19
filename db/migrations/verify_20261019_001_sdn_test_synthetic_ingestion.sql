@@ -147,7 +147,7 @@ begin
         from pg_class c
         join pg_namespace n on n.oid = c.relnamespace
         cross join lateral aclexplode(
-            coalesce(c.relacl, acldefault(case when c.relkind = 'S' then 'S' else 'r' end, c.relowner))
+            coalesce(c.relacl, acldefault((case when c.relkind = 'S' then 'S' else 'r' end)::"char", c.relowner))
         ) a
         where n.nspname = 'sdn_test'
           and c.relkind in ('r', 'S')

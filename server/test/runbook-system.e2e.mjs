@@ -94,8 +94,9 @@ try{
   loadBackend:()=>loadPrivatePrincipals(credentials),audit:createFileAudit(piAudit)});
  browser=await chromium.launch({headless:true});const context=await browser.newContext({viewport:{width:1200,height:900}});
  await context.addCookies([{name:'__Host-comind_pi',value:operator.token,domain:'127.0.0.1',path:'/',httpOnly:true,secure:true,sameSite:'Strict'}]);
- const page=await context.newPage(),requests=[],errors=[];
+ const page=await context.newPage(),requests=[],errors=[],eventResponses=[];
  page.on('pageerror',error=>errors.push(error.message));page.on('request',r=>requests.push({url:r.url(),headers:r.headers()}));
+ page.on('response',async response=>{if(response.url().includes('/api/pi/events'))eventResponses.push({url:response.url(),status:response.status(),body:await response.text().catch(()=>'<unavailable>')});});
  await page.goto(origin+'/apps/primary-interface/reader.html#/lanes');
  await page.getByLabel('Project',{exact:true}).fill('COMIND');await page.getByLabel('Lane filter (optional)',{exact:true}).fill('COMIND-E2E');
  const work=(await admin.query("select id,project_id,current_summary from comind_pm.pm_work_items where work_key='COMIND-E2E'")).rows[0];
@@ -124,7 +125,11 @@ try{
  await page.getByRole('button',{name:'Read older events',exact:true}).click();
  for(const id of pageTwo.json().data.map(row=>row.event_id))await page.locator('#event-list').getByText(id,{exact:true}).waitFor();
  await page.getByText('No next page is reported for this bounded response.',{exact:false}).waitFor();
- await page.goBack();
+ await page.getByRole('button',{name:'Back to newer events',exact:true}).click();
+ await page.waitForFunction(()=>document.querySelector('#event-status')?.textContent.startsWith('Page 1:')
+  ||document.querySelector('#event-status')?.textContent.startsWith('Trusted reader'));
+ assert.match(await page.locator('#event-status').innerText(),/^Page 1:/,
+  `browser did not restore page 1: url=${page.url()} state=${JSON.stringify(await page.evaluate(()=>history.state))} responses=${JSON.stringify(eventResponses)}`);
  for(const id of pageOne.json().data.map(row=>row.event_id))await page.locator('#event-list').getByText(id,{exact:true}).waitFor();
  check('browser history returns from the older event page to the prior cursor page');
  await page.locator('#event-limit').selectOption('25');

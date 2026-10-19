@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ArrowDownToLine, Clock3, ExternalLink, Search, ShieldAlert } from "lucide-react";
-import { activityHudTestFixture } from "@/lib/activity-hud/fixtures";
+import { AlertTriangle, ArrowDownToLine, Clock3, ExternalLink, RefreshCw, Search, ShieldAlert } from "lucide-react";
+import { getBrowserSupabaseClient } from "@/lib/supabase/browser";
+import { getPublicSupabaseConfig } from "@/lib/supabase/config";
+import { assertActivityHudTestProject } from "@/lib/activity-hud/source";
 import {
   formatElapsed,
   hasNoTerminalReturn,
@@ -166,12 +168,56 @@ export default function ActivityHudPage() {
   const [sourceFilter, setSourceFilter] = useState("all");
   const [sort, setSort] = useState<ActivitySort>("investigation");
   const [now, setNow] = useState(() => Date.now());
-  const rows = activityHudTestFixture;
+  const [rows, setRows] = useState<ActivityHudRow[]>([]);
+  const [refreshNonce, setRefreshNonce] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [sourceError, setSourceError] = useState<string | null>(null);
+  const [lastRefreshed, setLastRefreshed] = useState<string | null>(null);
+  const [reportedTotal, setReportedTotal] = useState(0);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
+    const timer = window.setInterval(() => {
+      setNow(Date.now());
+      setRefreshNonce((current) => current + 1);
+    }, 30_000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      setIsLoading(true);
+      setSourceError(null);
+      try {
+        assertActivityHudTestProject(getPublicSupabaseConfig().url);
+        const { data, error, count } = await getBrowserSupabaseClient()
+          .from("v_activity_hud_test")
+          .select("*", { count: "exact" })
+          .order("has_terminal_source_evidence", { ascending: true, nullsFirst: true })
+          .order("last_observed_at", { ascending: true, nullsFirst: true })
+          .order("started_at", { ascending: true })
+          .limit(1000);
+        if (error) throw error;
+        const nextRows = (data ?? []) as unknown as ActivityHudRow[];
+        if (nextRows.some((row) => row.is_synthetic !== true)) {
+          throw new Error("The Test browser projection returned a non-synthetic activity.");
+        }
+        if (active) {
+          setRows(nextRows);
+          setReportedTotal(count ?? nextRows.length);
+          setLastRefreshed(new Date().toISOString());
+        }
+      } catch (error) {
+        if (active) {
+          setSourceError(error instanceof Error ? error.message : "Unknown Supabase read error");
+        }
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    };
+    void load();
+    return () => { active = false; };
+  }, [refreshNonce]);
 
   const sources = useMemo(() => [...new Set(rows.map((row) => row.source_system))].sort(), [rows]);
   const visibleRows = useMemo(() => {
@@ -219,7 +265,9 @@ export default function ActivityHudPage() {
       <section className="hud-content">
         <header className="hud-topbar">
           <div className="hud-breadcrumb">CoMind <span>/</span> Operator Console <span>/</span> <b>Activity HUD</b></div>
-          <div className="hud-source-state"><i /> Synthetic PostgreSQL 17 acceptance fixture</div>
+          <div className={`hud-source-state ${sourceError ? "source-error" : "source-connected"}`}>
+            <i /> {sourceError ? "Supabase Test read failed" : "Supabase Test · read-only synthetic view"}
+          </div>
         </header>
 
         <div className="hud-heading">
@@ -228,27 +276,34 @@ export default function ActivityHudPage() {
             <h1>Activity HUD</h1>
             <p>Find work that stopped reporting, sort by time without a terminal return, and inspect the source evidence before deciding what to investigate.</p>
           </div>
-          <button className="hud-export" onClick={() => downloadInvestigation(visibleRows)}>
+          <div className="hud-heading-actions">
+          <button className="hud-refresh" onClick={() => setRefreshNonce((current) => current + 1)} disabled={isLoading}>
+            <RefreshCw size={14} /> {isLoading ? "Refreshing" : "Refresh"}
+          </button>
+          <button className="hud-export" onClick={() => downloadInvestigation(visibleRows)} disabled={visibleRows.length === 0}>
             <ArrowDownToLine size={15} /> Export no-return set
           </button>
+          </div>
         </div>
 
         <div className="hud-data-note" role="status">
           <ShieldAlert size={16} />
-          <span>This page is rendering synthetic rows shaped from <code>comind_hud_test.v_activity_hud</code>. It is not connected to a live browser data provider.</span>
+          <span>Connected to <code>public.v_activity_hud_test</code>, a read-only Test projection limited to synthetic rows from <code>comind_hud_test.v_activity_hud</code>. It refreshes every 30 seconds and returns at most 1,000 rows per read. Results are bounded and changing, not a lossless feed or a fixed snapshot.</span>
         </div>
+        {sourceError && <div className="hud-read-error" role="alert">Supabase read failed: {sourceError}. Confirm this app is configured for the CoMind Test project and reload.</div>}
+        {reportedTotal > rows.length && <div className="hud-read-error" role="status">Showing {rows.length} of {reportedTotal} rows reported by the latest read. The 1,000-row query limit was reached, so some activities may not be shown.</div>}
 
         <div className="hud-stats" aria-label="Activity summary">
           <article className="hud-stat attention"><span>Needs investigation</span><b>{investigationCount}</b><small>Stale, overdue, unknown, awaiting cancellation, or returned failure</small></article>
           <article className="hud-stat pending"><span>No terminal result</span><b>{noTerminal}</b><small>Source has not confirmed completion, failure, or cancellation</small></article>
           <article className="hud-stat returned"><span>Terminal source result</span><b>{resolved}</b><small>{failed} returned failure · other terminal outcomes are listed</small></article>
-          <article className="hud-stat sources"><span>Tracked activities</span><b>{rows.length}</b><small>{sources.length} source type in this fixture</small></article>
+          <article className="hud-stat sources"><span>Activities loaded</span><b>{rows.length}</b><small>{reportedTotal} rows reported · {sources.length} source types loaded</small></article>
         </div>
 
         <section className="hud-list-panel" aria-labelledby="activity-list-title">
           <div className="hud-list-heading">
-            <div><h2 id="activity-list-title">Tracked activities</h2><p>{visibleRows.length} shown · sorted by {sort === "investigation" ? "investigation priority" : sort.replaceAll("_", " ")}</p></div>
-            <span className="hud-snapshot-label"><Clock3 size={13} /> View rows update when the data source is connected</span>
+            <div><h2 id="activity-list-title">Tracked activities</h2><p>{visibleRows.length} shown from {rows.length} loaded · sorted by {sort === "investigation" ? "investigation priority" : sort.replaceAll("_", " ")}</p></div>
+            <span className="hud-snapshot-label"><Clock3 size={13} /> Last read {lastRefreshed ? new Date(lastRefreshed).toLocaleTimeString() : "not yet completed"} · refreshes every 30 seconds</span>
           </div>
           <div className="hud-filters">
             <label className="hud-search"><Search size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search activity, source, owner, evidence" /></label>
@@ -278,7 +333,7 @@ export default function ActivityHudPage() {
 
           <div className="activity-list" aria-live="polite">
             {visibleRows.length ? visibleRows.map((row) => <ActivityCard key={row.activity_id} row={row} now={now} />) : (
-              <div className="hud-empty"><b>No matching activities</b><span>Change the filters or search terms to see more rows.</span></div>
+              <div className="hud-empty"><b>{isLoading ? "Loading Test activities" : "No matching activities"}</b><span>{isLoading ? "Reading the synthetic Activity HUD view from Supabase." : "Change the filters or search terms to see more rows."}</span></div>
             )}
           </div>
         </section>
@@ -287,3 +342,4 @@ export default function ActivityHudPage() {
     </main>
   );
 }
+

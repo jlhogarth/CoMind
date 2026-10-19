@@ -36,7 +36,16 @@ jobs:
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/test/activity_hud_test.sql
         env:
           DATABASE_URL: postgres://postgres:activity_hud_ci_only@127.0.0.1:5432/activity_hud_ci
+      - name: Expose only the synthetic read projection to the browser role
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/test/activity_hud_api_test.sql
+        env:
+          DATABASE_URL: postgres://postgres:activity_hud_ci_only@127.0.0.1:5432/activity_hud_ci
+      - name: Revoke browser write privileges
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/test/activity_hud_api_privilege_fix_test.sql
+        env:
+          DATABASE_URL: postgres://postgres:activity_hud_ci_only@127.0.0.1:5432/activity_hud_ci
       - name: Verify states, source separation, and append-only evidence
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/test/verify_activity_hud_test.sql
         env:
           DATABASE_URL: postgres://postgres:activity_hud_ci_only@127.0.0.1:5432/activity_hud_ci
+

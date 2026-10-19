@@ -12,6 +12,7 @@ DECLARE
   v_unresolved_with_false_resolution integer;
   v_runbook_count integer;
   v_source_count integer;
+  v_public_view_rows integer;
 BEGIN
   SELECT count(*), count(*) FILTER (WHERE is_synthetic)
   INTO v_total, v_synthetic
@@ -38,17 +39,58 @@ BEGIN
     RAISE EXCEPTION 'An unconfirmed activity was assigned an evidence-based resolution';
   END IF;
 
+  SELECT count(*), count(*) FILTER (WHERE is_synthetic)
+  INTO v_public_view_rows, v_synthetic
+  FROM public.v_activity_hud_test;
+  IF v_public_view_rows <> 5 OR v_synthetic <> 5 THEN
+    RAISE EXCEPTION 'Public Test view must expose exactly five synthetic rows, got total %, synthetic %',
+      v_public_view_rows, v_synthetic;
+  END IF;
+
   SELECT count(*) INTO v_runbook_count FROM comind_hud_test.v_runbook_timeline;
   SELECT count(*) INTO v_source_count FROM comind_pm.v_runbook_timeline;
   IF v_runbook_count <> v_source_count THEN
     RAISE EXCEPTION 'RunBook projection row count differs from source: HUD %, source %', v_runbook_count, v_source_count;
   END IF;
 
-  IF has_schema_privilege('anon', 'comind_hud_test', 'USAGE')
+  IF NOT has_schema_privilege('anon', 'comind_hud_test', 'USAGE')
+     OR NOT has_table_privilege('anon', 'public.v_activity_hud_test', 'SELECT')
+     OR NOT has_table_privilege('anon', 'comind_hud_test.v_activity_hud', 'SELECT')
+     OR NOT has_table_privilege('anon', 'comind_hud_test.activity_runs', 'SELECT')
+     OR NOT has_table_privilege('anon', 'comind_hud_test.activity_observations', 'SELECT')
+     OR has_table_privilege('anon', 'public.v_activity_hud_test', 'INSERT')
+     OR has_table_privilege('anon', 'public.v_activity_hud_test', 'UPDATE')
+     OR has_table_privilege('anon', 'public.v_activity_hud_test', 'DELETE')
+     OR has_table_privilege('anon', 'comind_hud_test.activity_runs', 'INSERT')
+     OR has_table_privilege('anon', 'comind_hud_test.activity_runs', 'UPDATE')
+     OR has_table_privilege('anon', 'comind_hud_test.activity_runs', 'DELETE')
+     OR has_table_privilege('anon', 'comind_hud_test.activity_observations', 'INSERT')
+     OR has_table_privilege('anon', 'comind_hud_test.activity_observations', 'UPDATE')
+     OR has_table_privilege('anon', 'comind_hud_test.activity_observations', 'DELETE')
      OR has_schema_privilege('authenticated', 'comind_hud_test', 'USAGE')
-     OR has_table_privilege('anon', 'comind_hud_test.v_activity_hud', 'SELECT')
+     OR has_table_privilege('authenticated', 'public.v_activity_hud_test', 'SELECT')
      OR has_table_privilege('authenticated', 'comind_hud_test.v_activity_hud', 'SELECT') THEN
-    RAISE EXCEPTION 'HUD Test schema or view is available to anon/authenticated';
+    RAISE EXCEPTION 'HUD Test Data API privileges do not match the synthetic read-only contract';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'comind_hud_test'
+      AND tablename = 'activity_runs'
+      AND policyname = 'activity_runs_read_synthetic_anon'
+      AND roles @> ARRAY['anon']::name[]
+  ) OR NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'comind_hud_test'
+      AND tablename = 'activity_observations'
+      AND policyname = 'activity_observations_read_synthetic_anon'
+      AND roles @> ARRAY['anon']::name[]
+  ) THEN
+    RAISE EXCEPTION 'Expected synthetic-only anon read policies were not found';
+  END IF;
+
+  IF position('is_synthetic' in lower(pg_get_viewdef('public.v_activity_hud_test'::regclass, true))) = 0 THEN
+    RAISE EXCEPTION 'Public Test view does not filter to synthetic rows';
   END IF;
 
   BEGIN
@@ -82,3 +124,4 @@ SELECT event_id, occurred_at, project_key, work_key, event_type, actor,
 FROM comind_hud_test.v_runbook_timeline
 ORDER BY occurred_at DESC, event_id DESC
 LIMIT 25;
+

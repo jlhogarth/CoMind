@@ -110,9 +110,12 @@ try{
  assert.ok(pageOne.json().data.every(row=>Date.parse(row.occurred_at)===Date.parse(tiedAt)));
  const pageTwo=await drb.inject({method:'POST',url:'/v1/runbook/query',headers:{authorization:'Bearer '+backend.token},payload:{kind:'events',project:'COMIND',lane:'COMIND-E2E',limit:2,
   cursor_occurred_at:pageOne.json().next_cursor.occurred_at,cursor_event_id:pageOne.json().next_cursor.event_id}});
- assert.equal(pageTwo.statusCode,200);assert.equal(pageTwo.json().more_available,false);assert.equal(pageTwo.json().data.length,1);
- const pagedIds=[...pageOne.json().data,...pageTwo.json().data].map(row=>row.event_id);
- assert.deepEqual(pagedIds,tiedEventIds.slice().sort().reverse());assert.equal(new Set(pagedIds).size,3);
+ assert.equal(pageTwo.statusCode,200);assert.equal(pageTwo.json().more_available,true);assert.equal(pageTwo.json().data.length,2);
+ const pageThree=await drb.inject({method:'POST',url:'/v1/runbook/query',headers:{authorization:'Bearer '+backend.token},payload:{kind:'events',project:'COMIND',lane:'COMIND-E2E',limit:2,
+  cursor_occurred_at:pageTwo.json().next_cursor.occurred_at,cursor_event_id:pageTwo.json().next_cursor.event_id}});
+ assert.equal(pageThree.statusCode,200);assert.equal(pageThree.json().more_available,false);assert.equal(pageThree.json().data.length,1);
+ const pagedIds=[...pageOne.json().data,...pageTwo.json().data,...pageThree.json().data].map(row=>row.event_id);
+ assert.deepEqual(pagedIds,tiedEventIds.slice().sort().reverse());assert.equal(new Set(pagedIds).size,5);
  check('same-timestamp event rows use descending event UUID order and keyset continuation without omissions or duplicates');
  check('limit plus one reports overflow on the first page and no next page on the final bounded page');
  const projectIsolation=await drb.inject({method:'POST',url:'/v1/runbook/query',headers:{authorization:'Bearer '+backend.token},payload:{kind:'events',project:'OTHER',lane:'OTHER-E2E',limit:2}});
@@ -125,7 +128,7 @@ try{
  await page.getByRole('button',{name:'Read older events',exact:true}).click();
  for(const id of pageTwo.json().data.map(row=>row.event_id))await page.locator('#event-list').getByText(id,{exact:true}).waitFor();
  await page.getByRole('button',{name:'Read older events',exact:true}).click();
- const pageThreeIds=tiedEventIds.slice().sort().reverse().slice(4);
+ const pageThreeIds=pageThree.json().data.map(row=>row.event_id);
  for(const id of pageThreeIds)await page.locator('#event-list').getByText(id,{exact:true}).waitFor();
  await page.getByText('No next page is reported for this bounded response.',{exact:false}).waitFor();
  await page.getByRole('button',{name:'Back to newer events',exact:true}).click();

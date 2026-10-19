@@ -4,70 +4,70 @@ Date: 2026-10-19 America/Indiana/Indianapolis
 
 ## Scope
 
-Joseph authorized Activity HUD work in the CoMind Supabase Test project. This implementation adds a visual Operator Console route over the field contract of `comind_hud_test.v_activity_hud`, using clearly labeled synthetic rows. It does not connect the browser to Supabase yet. No production decision or change was made.
+Joseph authorized connecting the Activity HUD GUI to the CoMind Supabase Test project. PR #154 contains a Test-only browser read path to the synthetic Activity HUD projection. No production decision or change was made.
 
-The HUD presents RunBook events, activity observations, PM decisions, Foundry authorization requests, and human-action assessments as distinct records. It infers no Foundry UUID to PM project crosswalk, lane association, or decision/authorization/verification/evidence relationship.
+The HUD keeps RunBook events, activity observations, PM decisions, Foundry authorization requests, and human-action assessments distinct. It infers no Foundry UUID to PM project crosswalk, lane association, or decision, authorization, verification, or evidence relationship.
 
 ## Test data projection
 
-Supabase project: `sbgfuanxiqepcoboxzcl` (`CoMind`, PostgreSQL 17.11).
+Supabase project: `sbgfuanxiqepcoboxzcl` (CoMind Test, PostgreSQL 17.11).
 
-Migration: `activity_hud_test_v1`, database migration version `20261019214321`.
+Migration ledger:
 
-- `comind_hud_test.activity_runs`: activity identity and local deadline/staleness parameters.
-- `comind_hud_test.activity_observations`: append-only source observations with source and observation timestamps.
-- `comind_hud_test.v_activity_hud`: latest observed status, conservative stale/deadline labels, and evidence-based resolution only when terminal source evidence exists.
-- `comind_hud_test.v_runbook_timeline`: a separate read-only projection of the canonical RunBook timeline.
+- `activity_hud_test_v1`, version `20261019214321`: synthetic Activity HUD tables and private projection.
+- `activity_hud_test_api_v1`, version `20261019232618`: public Test API wrapper and synthetic-only RLS read policies.
+- `activity_hud_api_privilege_fix_test_v1`, version `20261019232654`: explicit browser-role write privilege revocation and SELECT-only grant.
 
-The fixture contains five synthetic activities: completed, failed, stale with no terminal return, cancellation requested without source confirmation, and locally elapsed deadline. It does not represent native ChatGPT UI events.
+The public `v_activity_hud_test` view uses an invoker context and filters to `is_synthetic`. The browser `anon` role can select the wrapper and underlying synthetic rows under RLS. Writes are revoked. No service-role or database credential is used by the browser.
 
-The live Supabase verification SQL completed successfully. It confirmed five synthetic rows, conservative states without false resolutions, matching RunBook projection/source row counts (68 at that verification), and rejection of fixture updates/deletes.
+The Test verifier passed: exactly five synthetic activity rows, conservative states without false terminal resolutions, separate RunBook projection, and explicit grants/policies. A query under the actual `anon` database role returned those five rows. An HTTP GET to the Test Supabase REST endpoint returned status 200 and exactly these five activity keys: `synthetic-cancel`, `synthetic-completed`, `synthetic-deadline`, `synthetic-failed`, `synthetic-stale`. All were marked synthetic.
+
+The migration ledger also contained `20261019_001_sdn_test_synthetic_ingestion`, version `20261019232639`, which is not part of this PR and has no matching migration file in the checked repository. It was left untouched. Its ownership and relationship to other Test work remain unresolved and should be reconciled before additional schema work.
 
 ## GUI and event handling
 
-The Operator Console route `/activity` includes state and source filters, search, evidence/timing details, and these sort choices: investigation priority, longest without report, most recently observed, newest started, and title. The default sort places deadline overruns and stale/unknown/cancellation-unconfirmed events first; within unresolved statuses it puts the oldest source observation first, falling back to start time when no observation exists. A local deadline is displayed as a local deadline state, not as a source failure.
+The Operator Console route `/activity` now reads `public.v_activity_hud_test` with the Test project URL guard, using a publishable browser key supplied locally through ignored `.env.local`. The actual key is not stored in the repository. The read is bounded to 1,000 rows, ordered with unresolved evidence first and oldest observation first, and repeated on manual refresh or every 30 seconds. The page shows the last successful read time, a limit warning, and a read failure state. A failed read clears previously displayed rows.
 
-“Export no-return set” downloads JSON for the currently visible activities without terminal source evidence. The export states its bounded coverage and retains source references, observations, and evidence for investigation. It does not send data to an outside vendor.
+The page retains search, state and source filters, investigation ordering, evidence/timing details, and the bounded no-terminal-return export. It clearly describes the results as a bounded, changing view and does not claim complete history, a lossless feed, or snapshot consistency. No source adapters ingest GitHub Actions, OpenAI API jobs, Drive writes, native ChatGPT UI events, or other activity automatically.
 
-All rows on this page are synthetic fixtures shaped from `v_activity_hud`; the page visibly says it is not connected to a live browser data provider. No Supabase credentials are configured for the Operator Console, and no Vercel project is connected. The private Test view remains owner-queryable. GitHub Actions, OpenAI API jobs, Drive writes, and other operations are not automatically ingested. The projection and UI do not claim complete history, a lossless feed, or snapshot consistency.
+No hosted GUI deployment occurred. PR #154 remains draft. Browser interaction could not be verified in this environment: the local loopback check did not connect, and no browser session was available for the built app. The Test REST read, local build, and CI checks were verified.
 
 ## Local verification
 
-At local implementation revision based on the then-current PR checkout:
+At GUI code head `c6b1b27eaff19d5c43ab1b4647f7810b48a7b463):
 
-- Four model tests passed using `node --import tsx --test test/activity-hud-model.test.ts`.
+- 39 Operator Console tests passed with `node --import tsx --test test/**/*.test.ts`.
 - `npm run typecheck` passed.
-- `npm run build` passed and produced `/activity`.
-- `git diff --check` passed.
-- The package `npm test` wrapper could not start under this environment because `tsx` attempted to create an IPC pipe in `/tmp` (`EPERM`); the same test file passed with Node's test runner entry point above.
-- Browser interaction was not verified because no Chromium executable is installed in the environment.
+- `npm run build` passed and produced the static `/activity` route.
+- The live Test Supabase REST read returned HTTP 200 and five synthetic rows.
+- All 13 returned GitHub Actions workflow runs passed at this exact head:
+
+| Workflow | Run ID |
+| --- | ---: |
+| Governed Provider Execution | 39342270727 |
+| Live Foundry LF-3 Readiness | 39342270731 |
+| Operator Console CI | 39342270729 |
+| Foundry Runtime Orchestration | 39342270738 |
+| Runtime Budget Authority Adapter | 39342270919 |
+| DRB-002 Query Contract | 39342270834 |
+| CI | 39342270842 |
+| Live Foundry Stage 1 Readiness | 39342270800 |
+| Activity HUD Test | 39342270841 |
+| No Placeholder Policy | 39342270902 |
+| Foundry Work Lease Kernel | 39342270721 |
+| CoMind Repository Configuration | 39342270758 |
+| Live Foundry LF-2 Readiness | 39342270743 |
 
 ## Remote checkpoint
 
 Repository: `jlhogarth/CoMind`; PR [#154](https://github.com/jlhogarth/CoMind/pull/154); branch `activity-hud-test-001`; base `main` at `524f893fb6ac71aef3954f4cff9d592a2f5090e9`.
 
-GUI implementation commit and exact workflow-evidence head: `af14f3128ee9b1706a05d99b7f48c1cb17ac92e7`.
+The GUI code head with exact passing workflow evidence is `c6b1b27eaff19d5c43ab1b4647f7810b48a7b463`. The preceding connection implementation head `cf808c68c1f4289859c5d0aa0b557bb62467bb39` also passed all 13 workflows; the final code head adds failure-state clearing.
 
-All 13 returned workflow runs passed at that exact head:
-
-- CI: `39332568603`
-- DRB-002 Query Contract: `39332568407`
-- Foundry Runtime Orchestration: `39332568621`
-- CoMind Repository Configuration: `39332568985`
-- No Placeholder Policy: `39332568539`
-- Activity HUD Test: `39332568668`
-- Live Foundry LF-3 Readiness: `39332568601`
-- Foundry Work Lease Kernel: `39332568666`
-- Governed Provider Execution: `39332568431`
-- Live Foundry Stage 1 Readiness: `39332568468`
-- Live Foundry LF-2 Readiness: `39332568703`
-- Runtime Budget Authority Adapter: `39332568417`
-- Operator Console CI: `39332568393`
-
-At checkpoint, PR #154 was open, draft, unmerged, mergeable, with no submitted reviews. It remains draft. No production endpoint, identity, grant, traffic, migration, or resource was changed.
+PR #154 is to remain open and draft. No production endpoint, identity, grant, traffic, migration, or resource was changed.
 
 ## Next steps
 
-1. Connect the page to the Test view through an explicitly configured Test-only read path; verify access to the exact `v_activity_hud` projection before replacing the synthetic fixture.
-2. Continue source adapters incrementally, preserving append-only event semantics and the distinction between a missing return and a terminal result.
-3. Add a bounded-view acceptance case where an event is appended between cursor-page requests, and confirm that the interface describes the changing result without implying snapshot consistency or a lossless feed.
+1. Reconcile ownership and intent for Test migration `20261019232639` before further Test schema changes.
+2. Add an acceptance case where a synthetic append arrives between cursor-page requests, and verify the reader continues to describe a bounded, changing view without implying snapshot consistency or a lossless feed.
+3. Continue source adapters only within the Test boundary, preserving append-only observations and source evidence.

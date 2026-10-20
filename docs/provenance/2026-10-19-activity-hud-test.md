@@ -155,7 +155,7 @@ Next: inspect LF-2 run `39356211207` and document its terminal result. Keep PR #
 
 ## Test access scope clarification (2026-10-20)
 
-Joseph clarified the Activity HUD issue goal to fit the intended Test monitor: issue #153 now explicitly permits the existing Test-only browser SELECT path to the synthetic-only `public.v_activity_hud_test` wrapper using the Supabase `anon` role. The private `comind_hud_test` tables remain private. No `authenticated` role or write access is granted. The browser rejects Supabase URLs outside project `sbgfuanxiqepcoboxzcl`. Formal HUD security reviews remain deferred; the issue clarification is not production authorization.
+Joseph clarified the Activity HUD issue goal to fit the intended Test monitor: issue #153 now explicitly permits the existing Test-only browser read path to the synthetic-only `public.v_activity_hud_test` wrapper using Supabase `anon`. To support its invoker-security view, `anon` also has schema USAGE and SELECT on the required underlying activity tables/view; RLS restricts visible activity/observation rows to synthetic data. No `authenticated` role or write access is granted. The browser rejects Supabase URLs outside project `sbgfuanxiqepcoboxzcl`. Formal HUD security reviews remain deferred; the issue clarification is not production authorization.
 
 This resolves the prior mismatch between the issue text and PR #154. The Test grants and migrations already described above implement this scoped path; this clarification did not apply a database migration or change any Supabase grant. No production endpoint, identity, grant, traffic, migration, data, or resource changed.
 

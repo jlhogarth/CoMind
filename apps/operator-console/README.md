@@ -23,6 +23,8 @@ npm run typecheck
 npm run dev
 ```
 
+The Activity HUD browser acceptance uses Playwright 1.55.0 and Chromium. Install the browser with `npx playwright install chromium`, then run `npm run browser-test`. The test starts the local app and intercepts its Supabase REST request with 23 synthetic rows; it verifies page navigation, filter narrowing, filter reset to page one, and bounded page counts. It does not use Supabase credentials or make a live data request.
+
 Populate `.env.local` with the CoMind Supabase project URL and a publishable key. Do not commit `.env.local`.
 
 ## Schema graph

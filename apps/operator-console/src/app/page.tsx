@@ -42,6 +42,7 @@ export default function Home() {
             </article>
           ))}
         </div>
+        <a className="activity-launch" href="/activity">Open Activity HUD</a>
       </section>
     </main>
   );

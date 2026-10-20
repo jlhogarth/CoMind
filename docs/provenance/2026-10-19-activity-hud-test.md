@@ -86,3 +86,30 @@ This identifies the source and owner lane; it does not establish that the HUD ow
 A disposable PostgreSQL 17 CI test now reads a two-row first page from the synthetic latest-activity projection, appends a heartbeat to an already-seen synthetic activity, then reads the next keyset page. The test expects that the changed latest observation can move the activity onto the next page and therefore appear again with a newer state. The transaction rolls back, leaving no fixture changes.
 
 This demonstrates one way rows can move between requests. It does not test front-end pagination, establish snapshot consistency, prove a lossless feed, or model every concurrent-write schedule. The GUI continues to describe its live query as bounded and changing.
+
+
+## Append between cursor pages acceptance checkpoint
+
+Implementation head `4605439d68333113c815c720ad1a6462f7769ce0` adds a disposable PostgreSQL 17 scenario to the Activity HUD Test workflow. It reads the first bounded page, appends a heartbeat to the already-seen stale synthetic activity, then reads the next keyset page. The changed latest observation moves that activity onto the second page with a newer state, so it appears again. The transaction rolls back. This is an observed changing-view case; it does not demonstrate front-end pagination or establish snapshot consistency, complete history, or a lossless feed.
+
+At exact implementation head `4605439d68333113c815c720ad1a6462f7769ce0`, all 13 returned workflows passed:
+
+| Workflow | Run ID |
+| --- | ---: |
+| Live Foundry LF-3 Readiness | 39351287395 |
+| Activity HUD Test | 39351287425 |
+| Governed Provider Execution | 39351287517 |
+| CI | 39351287556 |
+| Operator Console CI | 39351287520 |
+| Live Foundry LF-2 Readiness | 39351287608 |
+| Live Foundry Stage 1 Readiness | 39351287358 |
+| Foundry Runtime Orchestration | 39351287367 |
+| Runtime Budget Authority Adapter | 39351287406 |
+| Foundry Work Lease Kernel | 39351287499 |
+| CoMind Repository Configuration | 39351287523 |
+| DRB-002 Query Contract | 39351287583 |
+| No Placeholder Policy | 39351287559 |
+
+The SDN migration source is identified as PR #151 as documented above. No SDN objects or records were altered by this acceptance.
+
+Issue #153's original text says not to grant Data API access to `anon` or `authenticated`. The browser connection currently relies on the Test-only `anon` SELECT grant over the synthetic wrapper; no `authenticated` grant was added and write grants were revoked. This difference is recorded for scope reconciliation before PR #154 is accepted. PR #154 remains open and draft.

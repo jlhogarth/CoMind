@@ -116,3 +116,58 @@ The actual PostgreSQL 17.11 and Chromium proof adds three same-timestamp synthet
 ### Exact-head acceptance, 2026-10-19
 
 On PR #147 head `56ea984215a2cce68ce84ed21b58626360158d52`, all 11 returned workflows passed. Primary Interface run [39181368911](https://github.com/jlhogarth/CoMind/actions/runs/39181368911) passed the full PostgreSQL 17.11 capture-to-RunBook-to-PI-to-Chromium proof. The 17 checks cover same-timestamp UUID ordering, two-row overflow, cursor continuation without omissions or duplicates, project isolation, browser older-page and history navigation, bounded final-page status, canonical UUID display, append-only preservation, revocation, audit failure, DB loss/timeout and recovery, restart, and unchanged ledger. All data and identities were synthetic and disposable. Artifact [12156730726](https://github.com/jlhogarth/CoMind/actions/runs/39181368911/artifacts/12156730726), SHA-256 `8321abafe3c3ba63bed8b5ceccb7355f0debfc57fb574c024d96ed946267a97d`, retained until 2026-11-02 00:35:26 UTC. Exact workflow set and open boundaries are recorded in the PI-001 provenance file.
+
+# PI-001 event history context #008
+
+Date: 2026-10-19 (America/Indiana/Indianapolis)
+
+## Authority and boundary
+
+Visible autonomous development under the user's explicit direction to continue PI-001 and fully exercise CoMind Test before production decisions. T1 reversible repository/Test work. Production planning is allowed; no production decision or change is authorized by this milestone. No deployment, activation, production grant/identity/migration, traffic routing, paid resource, live source read, or live RunBook append occurred. PM decisions, RunBook events, Foundry authorization requests and human-action assessments remain distinct. No Foundry UUID-to-PM project crosswalk is inferred.
+
+## Reconciled source state
+
+- Repository: `jlhogarth/CoMind`.
+- PR #147 merged at `b245ebc0b650baf7b7c289d189d347b07c9e81d6`; merged head was `47fe10c7a08799a881a947f37897f90fe96ac809`. User-supplied acceptance: all 11 returned workflows passed on exact head; PostgreSQL 17.11 and Chromium passed 17 synthetic Test checks. Artifact `12156730726`; SHA-256 `8321abafe3c3ba63bed8b5ceccb7355f0debfc57fb574c024d96ed946267a97d`.
+- PR #143 open/draft/mergeable, head `b245ebc0b650baf7b7c289d189d347b07c9e81d6`, base BRAND #139 at `c5fc5d8bfd818a3feb22f5585bde93059a255658`; no reviews. All 11 exact-head workflows passed: 39309033079, 39309032821, 39309032721, 39309033009, 39309032899, 39309032954, 39309033414, 39309032735, 39309032898, 39309033093, 39309032840.
+- BRAND #139 remains open/draft/mergeable at `c5fc5d8bfd818a3feb22f5585bde93059a255658`; no reviews. All 11 returned workflows on this exact head completed successfully: 39060466496, 39060466479, 39060466412, 39060466459, 39060466452, 39060466620, 39060466371, 39060466473, 39060466351, 39060466427, 39060466481.
+- DRB #145 closed/merged at `524f893fb6ac71aef3954f4cff9d592a2f5090e9`.
+
+## Gap and implementation
+
+The event reader stored a history page number and its cursor in a shared mutable array. A new event query resets that array, so browser Back to an earlier paginated event context cannot recover its cursor. This can leave the new page displayed while URL/history points at an older page. The #007 cursor query itself remains correctly bounded and tuple ordered; this is an operator navigation-state gap.
+
+PR #149, draft and unmerged, branch `pi-001-event-history-context-008`, initial implementation head `75ee87c44cf6a7e10b5f91beaa8d291d255dfe07`, changes `apps/primary-interface/src/reader-entry.mjs` and `server/test/runbook-system.e2e.mjs`. Each browser history state now carries the exact page cursor. Popstate restores that cursor and context. A new event query pushes a fresh page-zero state if an event history state already exists. The Test proof creates five same-timestamp events, walks three pages, changes lane scope, and returns to the prior page using browser Back.
+
+## Verification status
+
+No local checkout is present in the work environment, so local build or local PostgreSQL/Chromium execution was not possible. No success claim is made for PR #149 until exact-head workflows and the acceptance artifact are fetched and inspected. Initial PR creation reported mergeable=false while CI/base computation was starting; current mergeability must be re-read. Record final #149 head, review state, all workflow IDs/conclusions, acceptance check count and artifact checksum after exact-head CI completes.
+
+## Limits and next step
+
+Tuple cursor navigation remains bounded and non-snapshot across page requests. It is not complete history, a lossless feed, or protection from concurrent source changes. The e2e proof uses only synthetic rows and disposable PostgreSQL/Test identities. It is not live Supabase or production readiness. Next: resolve any exact-head CI failures, inspect actual browser and DB acceptance artifacts, then update this provenance and CONTINUE.md with final verification. Keep PR #149 draft, separate from decisions to merge/ready. Production platform, identity, security review and C4 activation authority stay deferred.
+
+
+## PI-001 event-history context #008 acceptance
+
+Implementation head dc5abd25f55b9a3f126ca1fb190ccdb2bb4e25cc passed all 17 returned exact-head workflows. Primary Interface system proof run 39311073401 passed 18 checks on PostgreSQL 17.11 and Chromium; artifact ID 12215094538, retained through 2026-11-02 19:27:57 UTC, SHA-256 c7329466ed31846d830e46d41e688f8000707298b08c66b2c296c306b0c5dfea. All 17 returned workflows passed on implementation head dc5abd25f55b9a3f126ca1fb190ccdb2bb4e25cc. Primary Interface e2e run 39311073401; DRB Query Contract 39311073332; CI/build 39311073284; No Placeholder 39311073311; remaining workflow runs: 39311074531, 39311073486, 39311073476, 39311073517, 39311073359, 39311073428, 39311073344, with the other jobs included in 39311073284. The acceptance completed 18 checks. Artifact drb-test-system-evidence ID 12215094538, retained until 2026-11-02 19:27:57 UTC; SHA-256 zip digest c7329466ed31846d830e46d41e688f8000707298b08c66b2c296c306b0c5dfea.
+
+The proof adds five same-timestamp synthetic events, walks three pages using the canonical tuple cursor, changes the lane filter, and uses browser Back to restore the prior cursor and source scope. Capture, append-only, project isolation, revocation, audit denial, DB loss/timeout recovery, restart, and no-mutation checks remain in the same disposable acceptance.
+
+The first candidate failed at server/test/runbook-system.e2e.mjs:113 because its expected second page still assumed only three tied events. Unit/browser checks passed, but the system proof stopped before the new context-switch scenario; artifact 12216555648 is diagnostic only. The fixed three-page direct DB assertions are in the verified implementation head above. No persistent Test or production resource was affected.
+
+## Documentation-head CI and current PR state
+
+The documentation-only descendant 0e33b7d103f57b81d35211e3b759f7b0755671aa passed all 17 exact-head workflows and the 18-check PostgreSQL 17.11/Chromium proof. On documentation head 0e33b7d103f57b81d35211e3b759f7b0755671aa, all 17 returned workflows passed: Runtime Budget Authority 39311426565; LF-2 39311426568; Foundry Agent, PM Ledger, Conversation Lifecycle, Build, Devcontainer, FinOps Budget and Dev Runtime checks 39311426614; Stage 1 39311426613; DRB Query Contract 39311426536; LF-3 39311426537; Primary Interface 39311426547; Work Lease 39311426552; Foundry Runtime 39311426538; No Placeholder 39311426521; Governed Provider 39311426506. The PostgreSQL 17.11 and Chromium acceptance passed 18 checks. Artifact 12215357945, retained until 2026-11-02 19:30:45 UTC; SHA-256 zip digest 908f65028be915d210bc8c3cf53a6722064466b45067ff8865140dcf79210c16.
+
+PR #149 is draft/open/unmerged/mergeable on that head with no submitted reviews. Its implementation source remains the separately verified dc5abd25f55b9a3f126ca1fb190ccdb2bb4e25cc. No production activation or decision occurred.
+
+## PI-001 changing event-window observation #009
+
+Implementation head `6ca3756a130cdbfc073b743bc06ada19332ef922` adds explicit changing-window language to the event status and an append-between-pages regression. The actual browser loads page one from five tied synthetic events, a newer event is appended through the existing capture function, the original cursor continues to older events without presenting the append as part of that window, and a fresh first-page request observes the new event.
+
+Primary Interface run [39313866078](https://github.com/jlhogarth/CoMind/actions/runs/39313866078) passed 20 checks on PostgreSQL 17.11 and Chromium. It also covers capture validation, real migrations, append-only denial, database RLS, cursor ordering/continuation, bounded page messaging, project isolation, history restoration, text-only source rendering, revocation, audit denial, database loss/timeout recovery, restart, and unchanged-ledger behavior. Artifact [12216853647](https://github.com/jlhogarth/CoMind/actions/runs/39313866078/artifacts/12216853647), retained through 2026-11-02 19:48:15 UTC; SHA-256 `918197845c6ca89d685523713d693c450fff8a276ed3acb8cd3b19aecc59a209`.
+
+At implementation head `6ca3756a130cdbfc073b743bc06ada19332ef922`, 16 of 17 check runs completed successfully. Runtime Budget Authority workflow `39313866126` remains in progress without terminal output. The other ten workflows passed: Primary Interface `39313866078`, DRB Query Contract `39313866185`, CI `39313866157`, No Placeholder `39313866095`, Stage 1 `39313866100`, LF-3 `39313866226`, LF-2 `39313866113`, Work Lease `39313866098`, Foundry Runtime `39313866079`, Governed Provider `39313866080`. This checkpoint is not a claim that every exact-head workflow passed.
+
+The proof covers one concurrent append and does not establish general snapshot consistency, complete history, a lossless feed, or all possible concurrent-write behavior. Data and identities are synthetic and confined to disposable Test infrastructure. PM decisions, RunBook events, Foundry requests, and human-action assessments remain distinct. The Foundry-to-PM crosswalk and unresolved relationships remain unknown. No production action or decision occurred. PR #149 remains draft, open, unmerged, mergeable and without reviews.

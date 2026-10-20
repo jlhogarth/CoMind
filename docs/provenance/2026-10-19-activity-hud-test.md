@@ -113,3 +113,41 @@ At exact implementation head `4605439d68333113c815c720ad1a6462f7769ce0`, all 13 
 The SDN migration source is identified as PR #151 as documented above. No SDN objects or records were altered by this acceptance.
 
 Issue #153's original text says not to grant Data API access to `anon` or `authenticated`. The browser connection currently relies on the Test-only `anon` SELECT grant over the synthetic wrapper; no `authenticated` grant was added and write grants were revoked. This difference is recorded for scope reconciliation before PR #154 is accepted. PR #154 remains open and draft.
+
+## Activity HUD pagination, filters, and browser acceptance
+
+Implementation head `a8e215a861867f87f15a4c3b7aba193a06977ceb` adds client-side page navigation over the existing bounded, latest Supabase read. Operators can select 10, 25, or 50 rows per page and move to the first, previous, next, or last page. State, source, owner, confirmed-return, last-report-age, search, and sort controls reset to page one. Investigation ordering remains the default. The 1,000-row read cap and its warning remain in force; page navigation does not imply complete history or snapshot consistency.
+
+The Chromium proof runs the local `/activity` route and intercepts the Test Supabase REST URL with 23 synthetic rows. It verifies page ranges and disjoint adjacent pages, first/previous/next/last controls, narrowing to no-terminal and owner results, reset to page one after filtering, confirmed failure filtering, recent-report filtering, and records without report timestamps. It uses no Supabase credentials and makes no live data request. Local screenshot visual inspection confirmed that the filters, visible range, page controls, and bounded-view notice fit together in the rendered page. The earlier live Test REST read of five synthetic rows remains separate evidence and was not repeated in this browser test.
+
+Local verification at the implementation tree: `npm test` passed 44 tests; `npm run typecheck` passed; `npm run build` passed and emitted `/activity`; `npm run browser-test` passed in Chromium 140.0.7339.16 (Playwright build 1187). The local browser fixture is synthetic and intercepted. No production or Test database writes occurred.
+
+The exact-head Operator Console CI workflow `39356211028` passed locked dependency installation, all 44 unit tests, typecheck, Chromium browser acceptance, screenshot upload, and build. Browser screenshot artifact `12235406952` has SHA-256 `2b8ae416dc81796c2e1629e835f9beba74384612375318b41bfec9e1c461c845` and is retained until 2026-10-27 01:57:39 UTC. Package-lock evidence artifact `12235521675` has SHA-256 `3a6534216c0a56c07a3bb38ff1930efffa741f4940774e5ad3f5c41965f6623d`.
+
+At implementation head `a8e215a861867f87f15a4c3b7aba193a06977ceb`, 18 of 19 returned check runs passed. One run remains pending, not failed:
+
+| Check | Run ID | Readback |
+| --- | ---: | --- |
+| Reject unresolved development markers | 39356211650 | Passed |
+| DRB-002 Query Contract | 39356211156 | Passed |
+| Live Foundry LF-2 Readiness | 39356211207 | In progress; no job steps exposed |
+| Governed Provider Execution | 39356211185 | Passed |
+| Repository health and Supabase configuration | 39356211161 | Passed |
+| Activity HUD Test, PostgreSQL 17 | 39356211094 | Passed |
+| Live Foundry LF-3 Readiness | 39356211096 | Passed |
+| Foundry agent substrate | 39356211019 | Passed |
+| Devcontainer runtime | 39356211019 | Passed |
+| PM ledger migration | 39356211019 | Passed |
+| Live Foundry Stage 1 Readiness | 39356211106 | Passed |
+| Conversation lifecycle integration | 39356211019 | Passed |
+| CI build group | 39356211019 | Passed |
+| FinOps budget authority | 39356211019 | Passed |
+| Foundry Work Lease Kernel | 39356211018 | Passed |
+| Operator Console CI | 39356211028 | Passed |
+| Runtime Budget Authority Adapter | 39356211044 | Passed |
+| Foundry Runtime Orchestration | 39356211064 | Passed |
+| Dev runtime verification | 39356211019 | Passed |
+
+PR #154 was read back open, draft, unmerged, and mergeable at this checkpoint, with no submitted reviews. Its issue #153 access-boundary difference remains unresolved: the GUI uses the existing Test-only `anon` SELECT grant for the synthetic wrapper, while the issue text disallows Data API access to `anon` and `authenticated`. No grant was changed in this slice. PM decisions, RunBook events, Foundry authorization requests, and human-action assessments remain distinct. No production change or deployment occurred.
+
+Next: inspect LF-2 run `39356211207` and document its terminal result. Keep PR #154 draft. Do not treat the mocked browser response as live Supabase browser acceptance or claim automatic capture of GitHub, ChatGPT, Drive, or other application activities.

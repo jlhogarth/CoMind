@@ -40,5 +40,19 @@ jobs:
         run: npm test
       - name: Typecheck
         run: npm run typecheck
+      - name: Install Chromium for browser acceptance
+        run: npx playwright install --with-deps chromium
+      - name: Test Activity HUD pagination and filters in Chromium
+        run: npm run browser-test
+        env:
+          ACTIVITY_HUD_BROWSER_SCREENSHOT: artifacts/activity-hud-browser.png
+      - name: Upload Activity HUD browser screenshot
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: activity-hud-browser-acceptance
+          path: apps/operator-console/artifacts/activity-hud-browser.png
+          if-no-files-found: error
+          retention-days: 7
       - name: Build
         run: npm run build

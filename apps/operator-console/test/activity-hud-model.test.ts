@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { formatElapsed, hasNoTerminalReturn, needsInvestigation, sortActivityRows, type ActivityHudRow } from "../src/lib/activity-hud/model";
+import { formatElapsed, hasNoTerminalReturn, needsInvestigation, paginateActivityRows, sortActivityRows, type ActivityHudRow } from "../src/lib/activity-hud/model";
 
 const sample = (activity_key: string, hud_state: ActivityHudRow["hud_state"], started_at: string, last_observed_at: string | null, terminal = false): ActivityHudRow => ({
   activity_id: activity_key,
@@ -66,4 +66,16 @@ test("elapsed labels stay bounded and explicitly handle missing source observati
   const now = Date.UTC(2026, 9, 19, 20, 10);
   assert.equal(formatElapsed(new Date(now - 90_000).toISOString(), now), "1m ago");
   assert.equal(formatElapsed(null, now), "No source observation");
+});
+
+test("paginates the filtered bounded result and clamps page and page size", () => {
+  const rows = Array.from({ length: 23 }, (_, index) => `activity-${index + 1}`);
+  assert.deepEqual(paginateActivityRows(rows, 2, 10), {
+    items: rows.slice(10, 20), page: 2, pageSize: 10, total: 23, pageCount: 3, firstItem: 11, lastItem: 20,
+  });
+  assert.equal(paginateActivityRows(rows, 99, 10).page, 3);
+  assert.equal(paginateActivityRows(rows, 1, 7).pageSize, 25);
+  assert.deepEqual(paginateActivityRows([], 1, 10), {
+    items: [], page: 1, pageSize: 10, total: 0, pageCount: 1, firstItem: 0, lastItem: 0,
+  });
 });

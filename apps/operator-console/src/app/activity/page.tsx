@@ -9,6 +9,7 @@ import {
   formatElapsed,
   hasNoTerminalReturn,
   needsInvestigation,
+  paginateActivityRows,
   sortActivityRows,
   type ActivityHudRow,
   type ActivitySort,
@@ -174,6 +175,11 @@ export default function ActivityHudPage() {
   const [sourceError, setSourceError] = useState<string | null>(null);
   const [lastRefreshed, setLastRefreshed] = useState<string | null>(null);
   const [reportedTotal, setReportedTotal] = useState(0);
+  const [ownerFilter, setOwnerFilter] = useState("all");
+  const [resultFilter, setResultFilter] = useState("all");
+  const [reportAgeFilter, setReportAgeFilter] = useState("all");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -222,6 +228,7 @@ export default function ActivityHudPage() {
   }, [refreshNonce]);
 
   const sources = useMemo(() => [...new Set(rows.map((row) => row.source_system))].sort(), [rows]);
+  const owners = useMemo(() => [...new Set(rows.map((row) => row.owner_label).filter((owner): owner is string => Boolean(owner)))].sort(), [rows]);
   const visibleRows = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     const filtered = rows.filter((row) => {
@@ -236,13 +243,31 @@ export default function ActivityHudPage() {
       ].join(" ").toLowerCase().includes(normalized);
       const matchesState = stateFilter === "all"
         || (stateFilter === "investigate" && needsInvestigation(row))
-        || (stateFilter === "no-terminal" && hasNoTerminalReturn(row))
         || row.hud_state === stateFilter;
       const matchesSource = sourceFilter === "all" || row.source_system === sourceFilter;
-      return matchesSearch && matchesState && matchesSource;
+      const matchesOwner = ownerFilter === "all" || row.owner_label === ownerFilter;
+      const matchesResult = resultFilter === "all"
+        || (resultFilter === "no-terminal" && hasNoTerminalReturn(row))
+        || (resultFilter === "terminal" && row.has_terminal_source_evidence)
+        || (resultFilter === "failed" && row.evidence_based_resolution === "failed");
+      const ageSeconds = row.last_observed_at ? Math.max(0, (now - Date.parse(row.last_observed_at)) / 1000) : Number.POSITIVE_INFINITY;
+      const matchesAge = reportAgeFilter === "all"
+        || (reportAgeFilter === "under-hour" && ageSeconds < 3600)
+        || (reportAgeFilter === "one-to-24-hours" && ageSeconds >= 3600 && ageSeconds < 86400)
+        || (reportAgeFilter === "over-24-hours" && ageSeconds >= 86400)
+        || (reportAgeFilter === "never" && !row.last_observed_at);
+      return matchesSearch && matchesState && matchesSource && matchesOwner && matchesResult && matchesAge;
     });
     return sortActivityRows(filtered, sort);
-  }, [now, query, rows, sort, sourceFilter, stateFilter]);
+  }, [now, ownerFilter, query, reportAgeFilter, resultFilter, rows, sort, sourceFilter, stateFilter]);
+
+  const pageData = useMemo(() => paginateActivityRows(visibleRows, page, pageSize), [page, pageSize, visibleRows]);
+  const visiblePage = pageData.items;
+
+  function resetPage(change: () => void) {
+    change();
+    setPage(1);
+  }
 
   const noTerminal = rows.filter(hasNoTerminalReturn).length;
   const investigationCount = rows.filter(needsInvestigation).length;
@@ -308,21 +333,40 @@ export default function ActivityHudPage() {
             <span className="hud-snapshot-label"><Clock3 size={13} /> Last read {lastRefreshed ? new Date(lastRefreshed).toLocaleTimeString() : "not yet completed"} · refreshes every 30 seconds</span>
           </div>
           <div className="hud-filters">
-            <label className="hud-search"><Search size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search activity, source, owner, evidence" /></label>
+            <label className="hud-search"><Search size={15} /><input value={query} onChange={(event) => resetPage(() => setQuery(event.target.value))} placeholder="Search activity, source, owner, evidence" /></label>
             <label className="sr-only" htmlFor="state-filter">Filter activity state</label>
-            <select id="state-filter" value={stateFilter} onChange={(event) => setStateFilter(event.target.value)}>
+            <select id="state-filter" value={stateFilter} onChange={(event) => resetPage(() => setStateFilter(event.target.value))}>
               <option value="all">All states</option>
               <option value="investigate">Needs investigation</option>
-              <option value="no-terminal">No terminal result</option>
               {Object.entries(stateLabels).map(([state, label]) => <option key={state} value={state}>{label}</option>)}
             </select>
             <label className="sr-only" htmlFor="source-filter">Filter source</label>
-            <select id="source-filter" value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)}>
+            <select id="source-filter" value={sourceFilter} onChange={(event) => resetPage(() => setSourceFilter(event.target.value))}>
               <option value="all">All sources</option>
               {sources.map((source) => <option key={source} value={source}>{sourceLabel(source)}</option>)}
             </select>
+            <label className="sr-only" htmlFor="owner-filter">Filter owner</label>
+            <select id="owner-filter" value={ownerFilter} onChange={(event) => resetPage(() => setOwnerFilter(event.target.value))}>
+              <option value="all">All owners</option>
+              {owners.map((owner) => <option key={owner} value={owner}>{owner}</option>)}
+            </select>
+            <label className="sr-only" htmlFor="result-filter">Filter source result</label>
+            <select id="result-filter" value={resultFilter} onChange={(event) => resetPage(() => setResultFilter(event.target.value))}>
+              <option value="all">All source results</option>
+              <option value="no-terminal">No terminal result</option>
+              <option value="terminal">Terminal result confirmed</option>
+              <option value="failed">Returned failure</option>
+            </select>
+            <label className="sr-only" htmlFor="report-age-filter">Filter last report age</label>
+            <select id="report-age-filter" value={reportAgeFilter} onChange={(event) => resetPage(() => setReportAgeFilter(event.target.value))}>
+              <option value="all">Any report age</option>
+              <option value="under-hour">Reported within 1 hour</option>
+              <option value="one-to-24-hours">Reported 1–24 hours ago</option>
+              <option value="over-24-hours">Reported over 24 hours ago</option>
+              <option value="never">No report time</option>
+            </select>
             <label className="sr-only" htmlFor="sort-order">Sort activities</label>
-            <select id="sort-order" value={sort} onChange={(event) => setSort(event.target.value as ActivitySort)}>
+            <select id="sort-order" value={sort} onChange={(event) => resetPage(() => setSort(event.target.value as ActivitySort))}>
               <option value="investigation">Investigation priority</option>
               <option value="longest_wait">Longest without report</option>
               <option value="last_observed">Most recently observed</option>
@@ -334,10 +378,23 @@ export default function ActivityHudPage() {
           <div className="hud-sort-explainer"><AlertTriangle size={14} /> Default ordering puts deadline overruns and stale or unconfirmed work first, then sorts unresolved rows by the oldest source observation. A local deadline is not a source failure.</div>
 
           <div className="activity-list" aria-live="polite">
-            {visibleRows.length ? visibleRows.map((row) => <ActivityCard key={row.activity_id} row={row} now={now} />) : (
+            {visiblePage.length ? visiblePage.map((row) => <ActivityCard key={row.activity_id} row={row} now={now} />) : (
               <div className="hud-empty"><b>{isLoading ? "Loading Test activities" : "No matching activities"}</b><span>{isLoading ? "Reading the synthetic Activity HUD view from Supabase." : "Change the filters or search terms to see more rows."}</span></div>
             )}
           </div>
+          <nav className="hud-pagination" aria-label="Activity pages">
+            <span className="hud-page-count" aria-live="polite">Showing {pageData.firstItem}–{pageData.lastItem} of {pageData.total} matching activities · page {pageData.page} of {pageData.pageCount}</span>
+            <div className="hud-page-controls">
+              <label htmlFor="page-size">Rows per page</label>
+              <select id="page-size" value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1); }}>
+                <option value={10}>10</option><option value={25}>25</option><option value={50}>50</option>
+              </select>
+              <button type="button" onClick={() => setPage(1)} disabled={pageData.page <= 1} aria-label="First page">First</button>
+              <button type="button" onClick={() => setPage(Math.max(1, pageData.page - 1))} disabled={pageData.page <= 1} aria-label="Previous page">Previous</button>
+              <button type="button" onClick={() => setPage(Math.min(pageData.pageCount, pageData.page + 1))} disabled={pageData.page >= pageData.pageCount} aria-label="Next page">Next</button>
+              <button type="button" onClick={() => setPage(pageData.pageCount)} disabled={pageData.page >= pageData.pageCount} aria-label="Last page">Last</button>
+            </div>
+          </nav>
         </section>
         <footer className="hud-footer">Bounded observations only. This view does not establish complete history, a lossless feed, or snapshot consistency.</footer>
       </section>

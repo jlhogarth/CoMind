@@ -42,6 +42,33 @@ export type ActivitySort =
   | "newest_started"
   | "title";
 
+export interface ActivityPage<T> {
+  items: T[];
+  page: number;
+  pageSize: number;
+  total: number;
+  pageCount: number;
+  firstItem: number;
+  lastItem: number;
+}
+
+export function paginateActivityRows<T>(rows: T[], requestedPage: number, requestedPageSize: number): ActivityPage<T> {
+  const pageSize = [10, 25, 50].includes(requestedPageSize) ? requestedPageSize : 25;
+  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
+  const page = Math.min(pageCount, Math.max(1, Math.floor(requestedPage) || 1));
+  const start = (page - 1) * pageSize;
+  const items = rows.slice(start, start + pageSize);
+  return {
+    items,
+    page,
+    pageSize,
+    total: rows.length,
+    pageCount,
+    firstItem: rows.length === 0 ? 0 : start + 1,
+    lastItem: start + items.length,
+  };
+}
+
 const INVESTIGATION_RANK: Record<HudState, number> = {
   deadline_exceeded: 0,
   stale_unknown: 1,

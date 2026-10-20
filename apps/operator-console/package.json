@@ -10,7 +10,8 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test test/**/*.test.ts"
+    "test": "node --import tsx --test test/**/*.test.ts",
+    "browser-test": "node test/activity-hud.browser.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.75.0",
@@ -23,6 +24,7 @@
     "@types/node": "24.7.2",
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
+    "playwright": "1.55.0",
     "tsx": "4.20.6",
     "typescript": "5.9.3"
   }

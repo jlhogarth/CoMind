@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'db/test/activity_hud_*.sql'
+      - 'db/test/verify_activity_hud_*.sql'
       - 'db/test/verify_activity_hud_test.sql'
       - '.github/workflows/activity-hud-test.yml'
   workflow_dispatch:
@@ -46,6 +47,10 @@ jobs:
           DATABASE_URL: postgres://postgres:activity_hud_ci_only@127.0.0.1:5432/activity_hud_ci
       - name: Verify states, source separation, and append-only evidence
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/test/verify_activity_hud_test.sql
+        env:
+          DATABASE_URL: postgres://postgres:activity_hud_ci_only@127.0.0.1:5432/activity_hud_ci
+      - name: Verify cursor pages can change after an append
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/test/verify_activity_hud_changing_page_test.sql
         env:
           DATABASE_URL: postgres://postgres:activity_hud_ci_only@127.0.0.1:5432/activity_hud_ci
 

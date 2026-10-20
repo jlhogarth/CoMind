@@ -71,3 +71,18 @@ PR #154 is to remain open and draft. No production endpoint, identity, grant, tr
 1. Reconcile ownership and intent for Test migration `20261019232639` before further Test schema changes.
 2. Add an acceptance case where a synthetic append arrives between cursor-page requests, and verify the reader continues to describe a bounded, changing view without implying snapshot consistency or a lossless feed.
 3. Continue source adapters only within the Test boundary, preserving append-only observations and source evidence.
+
+
+## SDN Test migration source reconciliation
+
+The previously unrecognized Test migration `20261019_001_sdn_test_synthetic_ingestion`, version `20261019232639`, is the SDN-004 Test migration from issue #150 and draft PR [#151](https://github.com/jlhogarth/CoMind/pull/151), branch `issue-150-sdn-test-synthetic-ingestion`.
+
+At the time of reconciliation, PR #151 was open, draft, unmerged, and mergeable at head `58de8355536d8f5a992671f00ab8a8a7d9c89fde`, with no submitted reviews. Its description identifies the Test project and migration version, states that live Test verification passed, and reports that synthetic fixture rows were rolled back. Its changed file is `db/migrations/20261019_001_sdn_test_synthetic_ingestion.sql`; corresponding verification is `db/migrations/verify_20261019_001_sdn_test_synthetic_ingestion.sql`. All 13 returned workflows passed at that exact head: Work Lease 39315692591, LF-3 39315692830, Foundry Runtime 39315692592, Stage 1 39315692732, SDN-001 39315692939, SDN-002 39315692582, No Placeholder 39315692589, Governed Provider 39315692480, LF-2 39315692522, Runtime Budget Authority 39315692498, CI 39315692484, Repository Configuration 39315692479, and DRB-002 Query Contract 39315692477.
+
+This identifies the source and owner lane; it does not establish that the HUD owns or depends on SDN tables. The HUD work did not alter SDN schema objects or fixture rows. Keep SDN ingestion/provenance and HUD activity/RunBook projections separate.
+
+## Changing-view cursor acceptance
+
+A disposable PostgreSQL 17 CI test now reads a two-row first page from the synthetic latest-activity projection, appends a heartbeat to an already-seen synthetic activity, then reads the next keyset page. The test expects that the changed latest observation can move the activity onto the next page and therefore appear again with a newer state. The transaction rolls back, leaving no fixture changes.
+
+This demonstrates one way rows can move between requests. It does not test front-end pagination, establish snapshot consistency, prove a lossless feed, or model every concurrent-write schedule. The GUI continues to describe its live query as bounded and changing.

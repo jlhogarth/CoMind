@@ -1,0 +1,107 @@
+// Synthetic browser integration proof. No live records, database or provider calls.
+import { createRequire } from 'node:module';
+import { createServer } from 'node:http';
+import { readFile } from 'node:fs/promises';
+import { resolve, extname } from 'node:path';
+import assert from 'node:assert/strict';
+const require=createRequire(import.meta.url);
+const { chromium }=require(process.env.PI_PLAYWRIGHT_MODULE || 'playwright');
+const base=resolve('.');
+const server=createServer(async(req,res)=>{
+ try {const path=resolve(base,decodeURIComponent(new URL(req.url,'http://localhost').pathname).slice(1));
+ if(!path.startsWith(base+'/')) throw Error('Outside root');
+ res.setHeader('Content-Type',({'.html':'text/html','.mjs':'text/javascript','.css':'text/css'})[extname(path)] || 'text/plain'); res.end(await readFile(path));
+ }catch{res.statusCode=404;res.end('Unavailable');}
+});
+await new Promise(r=>server.listen(0,'127.0.0.1',r));
+let browser;
+try {
+ browser=await chromium.launch({headless:true}); const page=await browser.newPage({viewport:{width:390,height:844}});
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto(`http://127.0.0.1:${server.address().port}/apps/primary-interface/index.html`);
+ await page.getByRole('heading',{name:'Attention unavailable',exact:true}).waitFor();
+ assert.equal(await page.getByText('No count is available.',{exact:false}).count(),1);
+ await page.keyboard.press('Tab'); assert.equal(await page.locator(':focus').textContent(),'Skip to content');
+ assert.notEqual(await page.locator(':focus').evaluate(n=>getComputedStyle(n).outlineStyle),'none');
+ await page.keyboard.press('Enter');assert.equal(await page.locator(':focus').getAttribute('id'),'content');
+ await page.evaluate(async()=>{
+  const {mountCockpit}=await import('./src/cockpit.mjs');
+  const record={id:'fixture/action?1',laneId:'fixture-lane',status:'open',revision:1,stopReason:'Synthetic stop <img src=x onerror=alert(1)>',authorityBoundary:'C4 fixture only',recommendation:'Inspect synthetic evidence',consequences:'Synthetic consequence',requestedAt:'2026-10-17T18:00:00Z',expiresAt:'2026-10-17T20:00:00Z',evidence:[{id:'fixture-proof',sourceRef:'javascript:alert(1)',verification:'verified',conflict:false,verifiedAt:'2026-10-17T18:30:00Z',expiresAt:'2026-10-17T20:00:00Z'}],runbookRefs:[{id:'fixture-event',sourceRef:'fixture:runbook'}]};
+  window.fixtureNow='2026-10-17T19:00:00Z';
+  window.unmountFixture=mountCockpit(document.querySelector('main'),{status:'ready',synthetic:true,sourceRef:'test fixture',observedAt:'2026-10-17T19:00:00Z',records:[record]},{clock:()=>window.fixtureNow});
+ });
+ await page.getByLabel('Search',{exact:true}).fill('Synthetic');await page.getByRole('button',{name:'Apply filters'}).click();
+ await page.getByRole('link',{name:'1 matching records in supplied snapshot'}).waitFor();
+ await page.getByRole('link',{name:'fixture/action?1:',exact:false}).click();
+ await page.getByRole('heading',{name:'Human-action detail',exact:true}).waitFor();
+ assert.equal(await page.locator('img').count(),0); assert.equal(await page.locator('a[href^="javascript:"]').count(),0);
+ assert.equal(await page.getByRole('button',{name:'approve',exact:true}).isDisabled(),true);
+ await page.getByRole('link',{name:'Inspect evidence'}).click();await page.getByText('Requested identifier: fixture-proof',{exact:true}).waitFor();
+ await page.goBack(); await page.getByRole('heading',{name:'Human-action detail',exact:true}).waitFor();
+ await page.getByRole('link',{name:'Back to filtered attention'}).click();await page.getByLabel('Search',{exact:true}).waitFor();assert.equal(await page.getByLabel('Search',{exact:true}).inputValue(),'Synthetic');
+ await page.goBack();await page.getByRole('heading',{name:'Human-action detail',exact:true}).waitFor();await page.goForward();await page.getByLabel('Search',{exact:true}).waitFor();
+ await page.getByRole('link',{name:'fixture/action?1:',exact:false}).click();await page.getByRole('heading',{name:'Human-action detail',exact:true}).waitFor();
+ await page.evaluate(()=>window.fixtureNow='2026-10-17T20:00:00Z');await page.getByRole('button',{name:'Refresh assessment'}).click();await page.getByText('Assessment: needs_refresh',{exact:true}).waitFor();
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+ await page.evaluate(()=>{window.location.hash='/attention/missing';});await page.getByText('Record unavailable in this source snapshot.',{exact:true}).waitFor();
+ for (const [status, records, expected] of [
+  ['ready', [], 'No matching records in this successful source snapshot.'],
+  ['forbidden', [], 'Attention unavailable'],
+  ['failed', [], 'Attention unavailable'],
+  ['partial', [], 'Attention unavailable'],
+  ['ready', [null], 'Source integrity unavailable'],
+  ['ready', [{id:'duplicate'},{id:'duplicate'}], 'Source integrity unavailable'],
+ ]) {
+  await page.evaluate(async ({status,records})=>{
+   window.unmountFixture();
+   history.replaceState(null,'','#/attention');
+   const {mountCockpit}=await import('./src/cockpit.mjs');
+   window.unmountFixture=mountCockpit(document.querySelector('main'),{status,records,synthetic:true,sourceRef:'test fixture',reason:'Synthetic source boundary',observedAt:null});
+  },{status,records});
+  await page.getByText(expected,{exact:true}).waitFor();
+  if(status!=='ready') assert.equal(await page.locator('a.metric').count(),0);
+ }
+ // Synthetic DRB envelope exercises the same adapter verified against PostgreSQL.
+ await page.evaluate(async()=>{
+  window.unmountFixture();history.replaceState(null,'','#/lanes');
+  const id='00000000-0000-4000-8000-000000000001';
+  window.laneFixture={version:'drb-002.v1',kind:'lanes',source:'comind_pm.v_runbook_lane_state',source_relations:['comind_pm.v_runbook_lane_state','comind_pm.pm_work_items'],request_id:id,project:'COMIND',lane:null,limit:25,more_available:true,retrieved_at:'2026-10-17T21:00:00Z',data:[{id,project_id:id,project_key:'COMIND',item_type:'lane',work_key:'PI-TEST',title:'Synthetic lane <img src=x onerror=alert(1)>',status:'review',owner:'Synthetic owner',current_summary:'Synthetic summary',next_action:'Inspect fixture',priority:'high'}]};
+  const {mountCockpit}=await import('./src/cockpit.mjs');
+  window.unmountFixture=mountCockpit(document.querySelector('main'),{lanes:{status:'ready',project:'COMIND',synthetic:true,envelope:window.laneFixture}});
+ });
+ await page.getByRole('heading',{name:'Development lane records',exact:true}).waitFor();
+ await page.getByLabel('Search lanes',{exact:true}).fill('Synthetic');
+ await page.getByLabel('Lane lifecycle',{exact:true}).selectOption('review');
+ await page.getByRole('button',{name:'Apply lane filters'}).click();
+ await page.waitForFunction(()=>Array.from(document.querySelectorAll('a')).some(a=>a.textContent.startsWith('PI-TEST:')&&a.getAttribute('href').includes('q=Synthetic')&&a.getAttribute('href').includes('state=review')));
+ await page.getByRole('link',{name:'1 matching lanes in supplied window',exact:true}).waitFor();
+ await page.getByRole('link',{name:'PI-TEST:',exact:false}).focus();await page.keyboard.press('Enter');
+ await page.getByRole('heading',{name:'Development lane detail',exact:true}).waitFor();
+ assert.ok(page.url().includes('comind_pm.pm_work_items%3A'));
+ await page.getByText('Synthetic owner',{exact:true}).waitFor();
+ assert.equal(await page.locator('img').count(),0);
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+ await page.getByRole('link',{name:'Back to filtered lanes',exact:true}).click();
+ await page.getByLabel('Search lanes',{exact:true}).waitFor();
+ assert.equal(await page.getByLabel('Search lanes',{exact:true}).inputValue(),'Synthetic');
+ assert.equal(await page.getByLabel('Lane lifecycle',{exact:true}).inputValue(),'review');
+ await page.goBack();await page.getByRole('heading',{name:'Development lane detail',exact:true}).waitFor();
+ await page.goForward();await page.getByRole('heading',{name:'Development lane records',exact:true}).waitFor();
+ await page.evaluate(()=>window.location.hash='/lanes/missing');
+ await page.getByText('Lane unavailable in this bounded source window.',{exact:false}).waitFor();
+ for(const [status,mode,expected] of [['ready','empty','No matching lanes in this successful bounded window.'],['ready','duplicate','Lane source integrity unavailable'],['ready','scope','Lane source integrity unavailable'],['missing','empty','Development lanes unavailable'],['failed','empty','Development lanes unavailable'],['forbidden','empty','Development lanes unavailable'],['partial','empty','Development lanes unavailable']]){
+  await page.evaluate(async({status,mode})=>{
+   window.unmountFixture();history.replaceState(null,'','#/lanes');
+   const envelope=structuredClone(window.laneFixture);
+   if(mode==='empty')envelope.data=[];
+   if(mode==='duplicate')envelope.data.push(envelope.data[0]);
+   if(mode==='scope')envelope.project='OTHER';
+   const {mountCockpit}=await import('./src/cockpit.mjs');
+   window.unmountFixture=mountCockpit(document.querySelector('main'),{lanes:{status,project:'COMIND',synthetic:true,envelope}});
+  },{status,mode});
+  await page.getByText(expected,{exact:true}).waitFor();
+  if(status!=='ready'||mode!=='empty')assert.equal(await page.locator('a.metric').count(),0);
+ }
+ assert.deepEqual(errors,[]);
+ console.log('Browser proof passed: unavailable source, keyboard/focus, escaped text, read-only actions, encoded deep links, evidence drill-down, filter/history, expiry and mobile overflow.');
+} finally {await browser?.close();await new Promise(r=>server.close(r));}

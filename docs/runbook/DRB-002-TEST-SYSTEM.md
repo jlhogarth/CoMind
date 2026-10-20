@@ -1,0 +1,173 @@
+# DRB-002 database, RunBook and application system proof
+
+## Objective and authority
+
+Joseph directed an end-to-end tested system before any production-platform decision, then authorized development that benefits the Test database, RunBook and CoMind application. Production selection is not a prerequisite for this isolated proof. It remains a prerequisite for the later host-specific production proposal. Earlier broad authority is not used to create paid infrastructure or activate production.
+
+T1 reversible isolated implementation and synthetic Test database mutations; T2 scoped repository publication and existing RunBook append. Proposed NIST AC-3/AC-6/AU-3/AU-9/CP-10 mappings only. Affected identities: temporary Test capture role service_role, dedicated comind_runbook_query_login and generated Test backend/operator identities. No production identity or grant changes. No exceptions. Recovery: stop isolated processes, retain acceptance evidence, discard the dedicated CI service through normal runner teardown or revert the scoped development commit. No live database rollback is involved.
+
+## Application advantage
+
+The opt-in reader now exposes RunBook history alongside lanes, PM decisions and native-UUID Foundry reads. GET /api/pi/events uses the same server-owned credentials, current private-file operator session, fixed query allowlist, project checks, limits and audit boundary. It adds no browser database credential and no write endpoint. Events display canonical UUID, occurrence time, action/result, outcome, next action and source/evidence references as text. All evidence remains source data, not instructions or verified authority. Optional lane filtering applies to lanes, PM decisions and events. Switching source or starting another read clears old data.
+
+A successful page is a bounded window, not a full archive or lossless feed. An empty page, denial and unavailable reader are distinct. Foundry and PM projects remain separate; no cross-domain mapping is inferred. The disconnected default index remains unchanged.
+
+## Database and RunBook advantage
+
+server/test/runbook-system.e2e.mjs requires a fresh loopback database named drb_system_test and PostgreSQL 17 or later. It refuses another database, remote host, URL options or existing application tables before applying schema changes. It applies actual repository PM and DRB-001 migrations plus the existing disposable reader fixture. It captures synthetic operational events through record_runbook_event under SET LOCAL ROLE service_role, rather than manufacturing query results. This uses the existing Test capture authority, not a new production writer design.
+
+The restricted reader is a separate login with generated temporary password and existing COMIND-only fixture RLS. Operator and backend identities are distinct, expire after one hour, and are stored in temporary owner-only files. The browser receives only the HttpOnly operator cookie through Playwright fixture provisioning. That is not a production login/session issuer.
+
+The proof connects a real browser to the actual reader page, same-origin PI gateway, loopback RunBook HTTP service and actual PostgreSQL read-only transaction adapter. Its local HTTP fixture server serves only allowlisted application assets and the PI routes. No external listener, cloud endpoint or paid provider is created.
+
+## Required acceptance
+
+The test fails rather than skips when DRB_SYSTEM_ADMIN_URL is missing. CI provides a dedicated disposable PostgreSQL service. Acceptance includes:
+
+- real function capture and automatic canonical lane-summary projection;
+- browser event UUID/source/result and matching lane UUID;
+- literal evidence rendering without injected HTML;
+- database RLS excludes OTHER even when the backend HTTP identity allows OTHER;
+- application project denial, no reader writes and append-only UPDATE/DELETE rejection;
+- failure and corrective recovery events retained together;
+- operator/backend revocation and unsafe DRB/PI audit files clear displayed results;
+- real reader connection loss and real SQL lock timeout fail closed, then recover;
+- reader service stop/restart recovers the original database history and audit paths;
+- no source mutation from reads, payload-free audits and no backend secret/direct DRB request in browser traffic.
+
+These are synthetic event contents in a real Test database. They do not establish production readiness, full CoMind feature acceptance, independent security approval, backup/disaster recovery, or a deployed operational environment. The Test database login-loss case is not a database-server power-loss test. Service restart is in-process server teardown/recreation, not host reboot. Startup execution and certificate/session issuance remain separately unproven.
+
+## Reproduce and inspect
+
+Primary Interface CI builds server code, installs pinned Playwright, creates fresh postgres:17 and runs both the earlier isolated proofs and the new combined system proof. The latter runs:
+
+```sh
+cd server
+node test/runbook-system.e2e.mjs
+```
+
+Required environment: DRB_SYSTEM_ADMIN_URL is a direct administrator URL for the fresh dedicated loopback Test database. PI_PLAYWRIGHT_MODULE points to the installed Playwright module. DRB_SYSTEM_ARTIFACT_DIR chooses the evidence directory outside the temporary credential directory. Do not supply live credentials. The proof refuses to reset an existing database; recreate only disposable infrastructure through its owner-controlled workflow.
+
+CI uploads drb-test-system-evidence for 14 days. acceptance.json records executed checks and synthetic event UUIDs; runbook-test-timeline.png shows the rendered actual Test rows. Neither contains credential files. Durable provenance records the CI run links because runner artifacts expire. Browser and database helpers terminate in finally; no background monitor or persistent user-accessible deployment is created.
+
+## Dependencies and continuation
+
+The integration branch is stacked on PR #147 at inspected head 6ffcabc1cad349241149286af5ea2a44c8edebd0. It preserves the separate #143/#139 stack, #145 and #119. DRB #145 has newer deployment documentation at 19b7cf8; no runtime difference was observed there. Do not merge predecessor branches or retarget for convenience.
+
+Next: verify exact-head CI and diagnose failures before claiming acceptance. Review/adopt the Test integration with the current PI lane without overwriting concurrent work. After acceptance, expand toward a reusable operator Test environment and any remaining attention/evidence contracts. Production decisions, host-specific grants, independent security review and explicit activation authority remain separate. Read current AGENTS.md, remote heads, this guide and live RunBook before resuming. Update this continuation and provenance at each material checkpoint.
+
+## Canonical event projection follow-up, 2026-10-18
+
+The PI adapter now returns RunBook events under the shared canonical-read envelope with relation-namespaced event IDs, per-record observed-at time, null revision, bounded coverage and explicit blockers for missing event relationships and evidence policy. The connected Test reader renders those projected records, not raw source rows. This does not add event-to-decision, authorization, lane, or verification joins.
+
+Exact implementation head `2d718223bc0d120085d5470a413109ff107c62a5` passed all 11 returned PR workflows. Primary Interface run 39171293609 completed browser navigation, trusted reader browser proof, and actual PostgreSQL 17 capture-to-RunBook-to-browser acceptance successfully. `drb-test-system-evidence` contains acceptance JSON and screenshot and is retained through 2026-11-01 22:14 UTC. DRB Query Contract 39171293512, Main CI 39171293678 and No Placeholder Policy 39171293483 passed; all other returned workflows passed. This was synthetic isolated Test data and did not access or write live RunBook data.
+
+## Exact-head acceptance evidence
+
+Verified isolated Test candidate: `0d0155285db497af51745964a08928aea8789686` on PR #147. All 11 returned workflows completed successfully. Primary Interface run [39168308952](https://github.com/jlhogarth/CoMind/actions/runs/39168308952) passed the actual PostgreSQL 17 capture-to-RunBook-to-PI-browser proof and preserved artifact `drb-test-system-evidence` for 14 days. DRB query contract [39168308948](https://github.com/jlhogarth/CoMind/actions/runs/39168308948), Main CI [39168308973](https://github.com/jlhogarth/CoMind/actions/runs/39168308973), and No Placeholder [39168308951](https://github.com/jlhogarth/CoMind/actions/runs/39168308951) passed. Seven other returned workflows passed as well.
+
+Failure and repair are retained in the PR history. The first candidate `0b4309967840c89f2616656b2bfa75dd2d41f747` was rejected by the real schema because `isolated-e2e` is not an allowed `pm_events.source_system`. The fixture now uses existing allowed category `manual`; it also confirms an invalid category is rejected and leaves no event behind. The failed run touched only its disposable PostgreSQL service, which CI destroyed after failure.
+
+The final system proof used only synthetic rows, generated temporary identities and a loopback HTTP server. It did not contact Supabase, alter production, deploy a persistent service, create a production grant, or capture an event in the live RunBook. PR #147 remains draft/open/unmerged. At final readback it targets #143 head `d889f2395648af90bb0b8235c43226168d2c4534`, which remains stacked on BRAND #139; DRB #145 is separate. Its newer head `19b7cf8ad9e38dc1f6738925b6f7b4a09f09359a` changes only DRB deployment documentation relative to the runtime snapshot in this test stack. OC #119 is untouched.
+
+
+## Reader failure-state and accessibility review, 2026-10-18
+
+Review of exact starting head `2975e22be63ff7da75d74e884f93a646982bb6d6` confirmed #147 draft/open/unmerged/mergeable; #143 `d889f2395648af90bb0b8235c43226168d2c4534` remains stacked on #139 `c5fc5d8bfd818a3feb22f5585bde93059a255658`; #145 `19b7cf8ad9e38dc1f6738925b6f7b4a09f09359a` and #119 `f831b89e405351cbdbaaaf113f291f7a56d72215` remain separate. The 11 workflows returned for 2975e22 completed successfully; no PR #147 reviews were submitted.
+
+Review found network failure and malformed/out-of-scope payloads were both exposed as generic `failed`. The isolated opt-in reader now distinguishes `forbidden`, `unavailable`, and `malformed`; successful empty pages remain `ready` with zero records. Decisions and Foundry UI explicitly describes bounded pages without asserting completeness. Refresh clears prior data; observation time is not turned into a freshness judgment because no owner-defined threshold exists. The page's forms and read results are moved inside the primary main landmark; live status announcements and text-only source rendering are retained.
+
+Review confirmed event projection uses the shared envelope, source relation and event UUID, server retrieval observation, null revision, disabled decisions, bounded history and explicit relationship/evidence blockers. It introduces no event relationship or verification claim. Test acceptance is synthetic and isolated. No production reads, grants, deployment, activation, or crosswalk was added.
+
+Local exact-head execution is unavailable from this checkout because it does not contain commit 2975e22 and outbound GitHub access is restricted. The changed head must not be called verified until required exact-head CI succeeds. Continue by reviewing current PI/DRB contracts and owners' crosswalk evidence; define mapping cardinality, lifecycle, access policy, provenance and verification before any cross-domain read. Keep the production boundary unchanged.
+
+
+### CI review and repair of candidate 1d25fc0
+
+Exact-head Primary Interface run 39177702879 and DRB-002 Query Contract run 39177702810 failed in the PI Node contract suite before browser or database acceptance ran. The new reader correctly returned `unavailable`/`malformed`, while older assertions expected generic `failed`; the controller had not yet admitted the new terminal states; the added event-state test lacked its `readTrustedEvents` import. No production or persistent Test database was involved. The correction updates controller state validation, aligns regression assertions, and is pending exact-head rerun. Candidate 1d25fc0 is not accepted.
+
+
+### Browser failure and repair of candidate 2d312d2
+
+The exact-head PI contract suite and DRB query tests passed, but Primary Interface run 39177801876 failed the connected browser proof before database acceptance. Moving all reader UI under `main` exposed that the lane renderer replaces its mount root's children during initialization, removing the forms. The page now gives lane rendering a dedicated child host and keeps the primary landmark intact; the skip control focuses the main content region. The PostgreSQL acceptance step was skipped after the browser failure. Candidate 2d312d2 is not accepted; the corrected page requires a fresh exact-head run.
+
+
+## Reader-state and accessibility review acceptance
+
+Implementation candidate `d9d1e634622a92f9068bc8f390a00316e110e253` passed all 11 returned workflows on exact head. Primary Interface run [39177942031](https://github.com/jlhogarth/CoMind/actions/runs/39177942031) passed PI tests, browser navigation, trusted-reader browser proof, and actual PostgreSQL 17 capture-to-RunBook-to-browser acceptance. DRB-002 Query Contract [39177942033](https://github.com/jlhogarth/CoMind/actions/runs/39177942033), Main CI [39177942016](https://github.com/jlhogarth/CoMind/actions/runs/39177942016), and No Placeholder Policy [39177942026](https://github.com/jlhogarth/CoMind/actions/runs/39177942026) passed; the other seven returned workflows passed. Artifact `drb-test-system-evidence` (ID `12154124720`) is retained through 2026-11-01 23:48:17 UTC.
+
+The reader now distinguishes denied, unavailable, and malformed/out-of-scope responses. Successful empty remains a successful zero-row page. Previous results clear at refresh; bounded coverage remains bounded, even when no further page is reported. Observation time is shown without inventing a staleness threshold. The skip link targets the primary content landmark, source sections remain independently labeled, status updates use polite live regions, and lane rendering is isolated to its child host.
+
+No database, RunBook, production roles, grants, deployment, activation, or production authorization changed. The Foundry UUID to PM project crosswalk remains an explicit blocker pending source-owner reviewed mapping, cardinality, lifecycle, read access policy, provenance and verification semantics. Lane, attention, revision, event relationship and evidence verification semantics remain incomplete; no unified operational assessment is claimed.
+
+
+## Canonical event-to-work-item identity
+
+The bounded event projection returns the canonical event UUID, project UUID, nullable event project UUID, nullable work-item UUID, nullable linked work-item project UUID, and nullable item type. Its SQL follows the declared PM foreign key from `pm_events.work_item_id` to `pm_work_items.id`; the text work key remains a display/filter value. The response lineage names the timeline view and both base relations. Existing restricted Test-reader grants and RLS policies cover the joins, so no migration or grant change is needed.
+
+A row with no linked work item stays readable with null relationship fields. A conflicting event/work-item project association is surfaced as a blocker with both UUIDs retained. No PM-to-Foundry mapping or authority is inferred. Acceptance must compare the actual PostgreSQL FK result through the gateway and browser against the canonical work-item row.
+
+## PI-001 stable RunBook event pagination
+
+The isolated query now pages events with a strict descending keyset `(occurred_at,event_id)`, using the canonical event UUID to disambiguate identical timestamps. It requests `limit + 1` rows and returns a next cursor only when overflow is proven. PostgreSQL timestamp text retains six fractional digits so cursor round trips do not lose sub-millisecond precision in JavaScript. The PI adapter verifies ordering and cursor lineage; each request independently repeats session, project, lane and database RLS checks. Timestamp-only `since` is invalid for event queries.
+
+The actual PostgreSQL 17.11 and Chromium proof adds three same-timestamp synthetic events through `record_runbook_event`, pages them with a two-row bound, checks deterministic UUID order, cursor continuation, no duplicates or omissions, and exclusion of OTHER project records. The browser reads the older page and returns to the first page with browser Back. A bounded response with no reported next cursor remains a bounded observation, not proof of complete history. Read failures continue to clear the displayed snapshot and report denied, malformed or unavailable state. The test does not claim snapshot isolation across separate page requests or a lossless archive feed.
+
+### Exact-head acceptance, 2026-10-19
+
+On PR #147 head `56ea984215a2cce68ce84ed21b58626360158d52`, all 11 returned workflows passed. Primary Interface run [39181368911](https://github.com/jlhogarth/CoMind/actions/runs/39181368911) passed the full PostgreSQL 17.11 capture-to-RunBook-to-PI-to-Chromium proof. The 17 checks cover same-timestamp UUID ordering, two-row overflow, cursor continuation without omissions or duplicates, project isolation, browser older-page and history navigation, bounded final-page status, canonical UUID display, append-only preservation, revocation, audit failure, DB loss/timeout and recovery, restart, and unchanged ledger. All data and identities were synthetic and disposable. Artifact [12156730726](https://github.com/jlhogarth/CoMind/actions/runs/39181368911/artifacts/12156730726), SHA-256 `8321abafe3c3ba63bed8b5ceccb7355f0debfc57fb574c024d96ed946267a97d`, retained until 2026-11-02 00:35:26 UTC. Exact workflow set and open boundaries are recorded in the PI-001 provenance file.
+
+# PI-001 event history context #008
+
+Date: 2026-10-19 (America/Indiana/Indianapolis)
+
+## Authority and boundary
+
+Visible autonomous development under the user's explicit direction to continue PI-001 and fully exercise CoMind Test before production decisions. T1 reversible repository/Test work. Production planning is allowed; no production decision or change is authorized by this milestone. No deployment, activation, production grant/identity/migration, traffic routing, paid resource, live source read, or live RunBook append occurred. PM decisions, RunBook events, Foundry authorization requests and human-action assessments remain distinct. No Foundry UUID-to-PM project crosswalk is inferred.
+
+## Reconciled source state
+
+- Repository: `jlhogarth/CoMind`.
+- PR #147 merged at `b245ebc0b650baf7b7c289d189d347b07c9e81d6`; merged head was `47fe10c7a08799a881a947f37897f90fe96ac809`. User-supplied acceptance: all 11 returned workflows passed on exact head; PostgreSQL 17.11 and Chromium passed 17 synthetic Test checks. Artifact `12156730726`; SHA-256 `8321abafe3c3ba63bed8b5ceccb7355f0debfc57fb574c024d96ed946267a97d`.
+- PR #143 open/draft/mergeable, head `b245ebc0b650baf7b7c289d189d347b07c9e81d6`, base BRAND #139 at `c5fc5d8bfd818a3feb22f5585bde93059a255658`; no reviews. All 11 exact-head workflows passed: 39309033079, 39309032821, 39309032721, 39309033009, 39309032899, 39309032954, 39309033414, 39309032735, 39309032898, 39309033093, 39309032840.
+- BRAND #139 remains open/draft/mergeable at `c5fc5d8bfd818a3feb22f5585bde93059a255658`; no reviews. All 11 returned workflows on this exact head completed successfully: 39060466496, 39060466479, 39060466412, 39060466459, 39060466452, 39060466620, 39060466371, 39060466473, 39060466351, 39060466427, 39060466481.
+- DRB #145 closed/merged at `524f893fb6ac71aef3954f4cff9d592a2f5090e9`.
+
+## Gap and implementation
+
+The event reader stored a history page number and its cursor in a shared mutable array. A new event query resets that array, so browser Back to an earlier paginated event context cannot recover its cursor. This can leave the new page displayed while URL/history points at an older page. The #007 cursor query itself remains correctly bounded and tuple ordered; this is an operator navigation-state gap.
+
+PR #149, draft and unmerged, branch `pi-001-event-history-context-008`, initial implementation head `75ee87c44cf6a7e10b5f91beaa8d291d255dfe07`, changes `apps/primary-interface/src/reader-entry.mjs` and `server/test/runbook-system.e2e.mjs`. Each browser history state now carries the exact page cursor. Popstate restores that cursor and context. A new event query pushes a fresh page-zero state if an event history state already exists. The Test proof creates five same-timestamp events, walks three pages, changes lane scope, and returns to the prior page using browser Back.
+
+## Verification status
+
+No local checkout is present in the work environment, so local build or local PostgreSQL/Chromium execution was not possible. No success claim is made for PR #149 until exact-head workflows and the acceptance artifact are fetched and inspected. Initial PR creation reported mergeable=false while CI/base computation was starting; current mergeability must be re-read. Record final #149 head, review state, all workflow IDs/conclusions, acceptance check count and artifact checksum after exact-head CI completes.
+
+## Limits and next step
+
+Tuple cursor navigation remains bounded and non-snapshot across page requests. It is not complete history, a lossless feed, or protection from concurrent source changes. The e2e proof uses only synthetic rows and disposable PostgreSQL/Test identities. It is not live Supabase or production readiness. Next: resolve any exact-head CI failures, inspect actual browser and DB acceptance artifacts, then update this provenance and CONTINUE.md with final verification. Keep PR #149 draft, separate from decisions to merge/ready. Production platform, identity, security review and C4 activation authority stay deferred.
+
+
+## PI-001 event-history context #008 acceptance
+
+Implementation head dc5abd25f55b9a3f126ca1fb190ccdb2bb4e25cc passed all 17 returned exact-head workflows. Primary Interface system proof run 39311073401 passed 18 checks on PostgreSQL 17.11 and Chromium; artifact ID 12215094538, retained through 2026-11-02 19:27:57 UTC, SHA-256 c7329466ed31846d830e46d41e688f8000707298b08c66b2c296c306b0c5dfea. All 17 returned workflows passed on implementation head dc5abd25f55b9a3f126ca1fb190ccdb2bb4e25cc. Primary Interface e2e run 39311073401; DRB Query Contract 39311073332; CI/build 39311073284; No Placeholder 39311073311; remaining workflow runs: 39311074531, 39311073486, 39311073476, 39311073517, 39311073359, 39311073428, 39311073344, with the other jobs included in 39311073284. The acceptance completed 18 checks. Artifact drb-test-system-evidence ID 12215094538, retained until 2026-11-02 19:27:57 UTC; SHA-256 zip digest c7329466ed31846d830e46d41e688f8000707298b08c66b2c296c306b0c5dfea.
+
+The proof adds five same-timestamp synthetic events, walks three pages using the canonical tuple cursor, changes the lane filter, and uses browser Back to restore the prior cursor and source scope. Capture, append-only, project isolation, revocation, audit denial, DB loss/timeout recovery, restart, and no-mutation checks remain in the same disposable acceptance.
+
+The first candidate failed at server/test/runbook-system.e2e.mjs:113 because its expected second page still assumed only three tied events. Unit/browser checks passed, but the system proof stopped before the new context-switch scenario; artifact 12216555648 is diagnostic only. The fixed three-page direct DB assertions are in the verified implementation head above. No persistent Test or production resource was affected.
+
+## Documentation-head CI and current PR state
+
+The documentation-only descendant 0e33b7d103f57b81d35211e3b759f7b0755671aa passed all 17 exact-head workflows and the 18-check PostgreSQL 17.11/Chromium proof. On documentation head 0e33b7d103f57b81d35211e3b759f7b0755671aa, all 17 returned workflows passed: Runtime Budget Authority 39311426565; LF-2 39311426568; Foundry Agent, PM Ledger, Conversation Lifecycle, Build, Devcontainer, FinOps Budget and Dev Runtime checks 39311426614; Stage 1 39311426613; DRB Query Contract 39311426536; LF-3 39311426537; Primary Interface 39311426547; Work Lease 39311426552; Foundry Runtime 39311426538; No Placeholder 39311426521; Governed Provider 39311426506. The PostgreSQL 17.11 and Chromium acceptance passed 18 checks. Artifact 12215357945, retained until 2026-11-02 19:30:45 UTC; SHA-256 zip digest 908f65028be915d210bc8c3cf53a6722064466b45067ff8865140dcf79210c16.
+
+PR #149 is draft/open/unmerged/mergeable on that head with no submitted reviews. Its implementation source remains the separately verified dc5abd25f55b9a3f126ca1fb190ccdb2bb4e25cc. No production activation or decision occurred.
+
+## PI-001 changing event-window observation #009
+
+Implementation head `6ca3756a130cdbfc073b743bc06ada19332ef922` adds explicit changing-window language to the event status and an append-between-pages regression. The actual browser loads page one from five tied synthetic events, a newer event is appended through the existing capture function, the original cursor continues to older events without presenting the append as part of that window, and a fresh first-page request observes the new event.
+
+Primary Interface run [39313866078](https://github.com/jlhogarth/CoMind/actions/runs/39313866078) passed 20 checks on PostgreSQL 17.11 and Chromium. It also covers capture validation, real migrations, append-only denial, database RLS, cursor ordering/continuation, bounded page messaging, project isolation, history restoration, text-only source rendering, revocation, audit denial, database loss/timeout recovery, restart, and unchanged-ledger behavior. Artifact [12216853647](https://github.com/jlhogarth/CoMind/actions/runs/39313866078/artifacts/12216853647), retained through 2026-11-02 19:48:15 UTC; SHA-256 `918197845c6ca89d685523713d693c450fff8a276ed3acb8cd3b19aecc59a209`.
+
+At implementation head `6ca3756a130cdbfc073b743bc06ada19332ef922`, 16 of 17 check runs completed successfully. Runtime Budget Authority workflow `39313866126` remains in progress without terminal output. The other ten workflows passed: Primary Interface `39313866078`, DRB Query Contract `39313866185`, CI `39313866157`, No Placeholder `39313866095`, Stage 1 `39313866100`, LF-3 `39313866226`, LF-2 `39313866113`, Work Lease `39313866098`, Foundry Runtime `39313866079`, Governed Provider `39313866080`. This checkpoint is not a claim that every exact-head workflow passed.
+
+The proof covers one concurrent append and does not establish general snapshot consistency, complete history, a lossless feed, or all possible concurrent-write behavior. Data and identities are synthetic and confined to disposable Test infrastructure. PM decisions, RunBook events, Foundry requests, and human-action assessments remain distinct. The Foundry-to-PM crosswalk and unresolved relationships remain unknown. No production action or decision occurred. PR #149 remains draft, open, unmerged, mergeable and without reviews.

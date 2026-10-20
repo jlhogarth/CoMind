@@ -1,0 +1,11 @@
+# PI / DRB lane contract integration candidate
+
+Authority: Joseph explicitly requested adding the canonical lane identity and building useful additional test functionality. Tier T1 isolated reversible repository development. No production activation, database grant, credentials, VE authority, paid service or schema migration. Proposed NIST AC-3/AC-6/AU-3 traceability only; no compliance claim. Ownership: PI integration work, separate branch based on DRB-002 7d54edd. Human owner Joseph Hogarth.
+
+Read AGENTS.md, current DRB docs/service/test grants/integration harness, and prior PI canonical projection. DRB work advanced from 842f0cd to 7d54edd since the prior inspection. Existing PM work_key is globally UNIQUE; existing restricted reader already has SELECT/RLS access to pm_work_items. A fixed SELECT join resolves the missing identity without adding a registry or altering views/grants. All selected fields are explicit. Source data remains untrusted text; observation time is not freshness or concurrency proof.
+
+Added canonical UUID/project/type/owner/priority/update fields; limit and source relation provenance; PI pure response adapter; negative/scope/bounds tests; restricted PostgreSQL-to-HTTP-to-PI integration assertions. Shared PI projection files are copied byte-for-byte from 85af644 so later branch reconciliation can retain one canonical module. No browser mounting or token handling. No live RunBook capture performed.
+
+Local PI tests: 8 passed. TypeScript build and all 7 server query contract tests passed. Real PostgreSQL proof still requires exact-head CI before acceptance. CI workflow runs PostgreSQL 17 with the existing disposable test harness; do not claim live Supabase security or deployment based on this proof. Recovery: revert integration candidate, leaving DRB and PI predecessor branches intact. Cost: one bounded SELECT with indexed unique-key join, no new runtime dependency; latency requires measurement against production data before deployment.
+
+Continuation: inspect integration PR and current #145/#143 heads and exact-head CI, remediate failures, reconcile additive contract with DRB owner, then adopt adapter in PI through reviewed dependency integration. Broader browser identity/TLS/audit deployment remains separate. Decision controls stay disabled. Do not leave CI unobserved without a durable watch.

@@ -1,0 +1,11 @@
+# PI-001 canonical read projections 003 evidence
+
+Joseph authorized T1 reversible repository/interface development. Scope: PI-owned files only. Relevant AGENTS.md controls: evidence, no fabricated missing values, ownership, human oversight; proposed NIST AC-3/AC-6/AU-3 mapping, no assessed conformity. No exception, credential, agent authority, deployment, paid commitment or live data mutation.
+
+Initial remote PR readback: #143 head 7810175d44e7526348547bc38d3b9fae5d2eb3ea, #139 head c5fc5d8bfd818a3feb22f5585bde93059a255658, #119 head f831b89e405351cbdbaaaf113f291f7a56d72215. All draft, unmerged, mergeable. Returned PR workflow runs: PI 10/10 successful, BRAND 11/11 successful, OC 11/11 successful. This query is first-page PR workflow evidence, not a new assertion about every branch protection or individual check job.
+
+Read AGENTS.md and six requested PI records; canonical substrate, PM and DRB definitions; newer DRB-002 docs and query service at 842f0cd. DRB lane service/view omit UUID, and server response omits owner. No safe complete browser adapter established. No live source independently queried. Source definitions are not evidence of current live contents.
+
+Added pure projections with relation-qualified IDs, source field allowlists, bounded-window coverage, explicit missing mappings and disabled decisions. No joins inferred, no fabricated revisions, no raw metadata/evidence leakage, no source rows silently filtered. Five synthetic test groups cover lifecycle preservation, immutability, separated domains, state/coverage, bounds, malformed/duplicate IDs and unknown lifecycle. Full Node suite executed: 31 passed, zero failed. Existing browser code unchanged; prior browser proof is not new proof of this module or live integration.
+
+Trusted-server review contract and activation blockers in apps/primary-interface/docs/CANONICAL-READS.md. Existing DRB service is a dependency candidate only. No registry duplication or cross-lane files changed. Recovery by reverting this PI-only commit; cost is linear in bounded rows, zero new runtime dependencies. Live Durable RunBook capture did not occur in this lane. Updated continuation maintained in apps/primary-interface/CONTINUE.md.

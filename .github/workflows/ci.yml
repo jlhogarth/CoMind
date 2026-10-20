@@ -166,12 +166,25 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - name: Install server dependencies
+        run: npm ci --prefix server --ignore-scripts --no-audit --no-fund
+      - name: Build trusted Foundry reader
+        run: npm run build --prefix server
       - name: Install PostgreSQL client
         run: |
           sudo apt-get update
           sudo apt-get install --yes postgresql-client
       - name: Verify Foundry agent substrate
         run: bash ./scripts/test_foundry_agent_substrate.sh
+      - name: Verify isolated PI Foundry reader
+        run: node --test server/test/pi-foundry-reader.integration.test.mjs
+        env:
+          FOUNDRY_PI_TEST_ADMIN_URL: postgresql://postgres:postgres@127.0.0.1:5432/comind_ci
 
   conversation-lifecycle-integration:
     runs-on: ubuntu-latest

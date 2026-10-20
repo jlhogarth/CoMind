@@ -151,3 +151,14 @@ At implementation head `a8e215a861867f87f15a4c3b7aba193a06977ceb`, 18 of 19 retu
 PR #154 was read back open, draft, unmerged, and mergeable at this checkpoint, with no submitted reviews. Its issue #153 access-boundary difference remains unresolved: the GUI uses the existing Test-only `anon` SELECT grant for the synthetic wrapper, while the issue text disallows Data API access to `anon` and `authenticated`. No grant was changed in this slice. PM decisions, RunBook events, Foundry authorization requests, and human-action assessments remain distinct. No production change or deployment occurred.
 
 Next: inspect LF-2 run `39356211207` and document its terminal result. Keep PR #154 draft. Do not treat the mocked browser response as live Supabase browser acceptance or claim automatic capture of GitHub, ChatGPT, Drive, or other application activities.
+
+
+## Test access scope clarification (2026-10-20)
+
+Joseph clarified the Activity HUD issue goal to fit the intended Test monitor: issue #153 now explicitly permits the existing Test-only browser SELECT path to the synthetic-only `public.v_activity_hud_test` wrapper using the Supabase `anon` role. The private `comind_hud_test` tables remain private. No `authenticated` role or write access is granted. The browser rejects Supabase URLs outside project `sbgfuanxiqepcoboxzcl`. Formal HUD security reviews remain deferred; the issue clarification is not production authorization.
+
+This resolves the prior mismatch between the issue text and PR #154. The Test grants and migrations already described above implement this scoped path; this clarification did not apply a database migration or change any Supabase grant. No production endpoint, identity, grant, traffic, migration, data, or resource changed.
+
+PR #154 description now records the clarified scope and current limitations. At repository head `9461ead89c34f0be75805f0e774a2995c0b60e5c`, all 19 exact-head checks passed across 13 returned workflow runs: 39356629529, 39356629524, 39356629555, 39356629497, 39356629668, 39356629636, 39356629494, 39356629586, 39356629517, 39356629456, 39356629629, 39356629644, and 39356629641. The Chromium acceptance remains mocked with 23 synthetic rows; the separate earlier Test REST read returned five synthetic rows. Neither should be described as live-browser acceptance.
+
+The pagination/filter implementation head remains `a8e215a861867f87f15a4c3b7aba193a06977ceb`. The repository continuation was updated in commit `12244bedd38dedec449ee61ec2643e812c9a8229`; this provenance update is being recorded in a subsequent documentation-only commit. PR #154 remains open and draft, with no production deployment or production changes.

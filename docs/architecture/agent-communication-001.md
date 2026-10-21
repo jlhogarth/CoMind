@@ -25,9 +25,11 @@ A Supabase connector used interactively is distinct from an OpenAI API call. The
 
 ## Current substrate findings
 
-Read-only inspection of Supabase project `sbgfuanxiqepcoboxzcl` on 2026-10-20 found:
+Read-only inspection of Supabase project `sbgfuanxiqepcoboxzcl`, initially on 2026-10-20 and rechecked on 2026-10-21, found:
 
 - The project has existing `comind.cm_agent`, `cm_agent_run`, `cm_agent_step`, Foundry deliberation, participant, event and outcome relations, plus `comind_pm.pm_agent_runs`.
+- The 2026-10-21 query returned no rows from `comind.cm_agent` or `comind.cm_foundry_agent_profile`. Repository search found a planned descriptive role directory but no authoritative role records to select sender and recipient identities from. Do not guess names or identifiers.
+- The 2026-10-21 privilege query confirmed `anon` and `authenticated` have no `USAGE` on `comind`, no table access to `comind.cm_agent`, and no SELECT on `cm_foundry_agent_profile`. `service_role` has schema usage and profile SELECT. This does not establish access for a separate ChatGPT session.
 - The inspected agent/run/step/profile/deliberation and PM agent-run relations contained no records. The project had one `comind.cm_project` row and no `cm_task` or execution-context rows.
 - `cm_agent_run` and `cm_agent_step` did not grant table access to `service_role`. Foundry deliberation relations had RLS enabled and `service_role` SELECT/INSERT grants, with no UPDATE or DELETE grant.
 - The Foundry deliberation event type is constrained. It is intended for deliberation evidence and outcomes, not a general-purpose private mailbox.
@@ -68,9 +70,9 @@ This proves persisted, human-mediated handoff only. It does not prove independen
 
 ## Gate before any shared Supabase write
 
-GitHub issue #126 currently says not to create a schema implementation branch or mutate shared Supabase until Operator Console PR #119 reaches a terminal state or shared schema authority is explicitly reassigned. At this contract's initial inspection, PR #119 was still open, draft, and unmergeable.
+PR #119 remains open and draft, with no submitted reviews, unresolved review threads, and all 11 returned exact-head workflow runs successful. Its latest fetched metadata reports `mergeable: false`; the remaining application runtime acceptance is still documented on that PR. On 2026-10-21 Joseph directed this work to resolve the #119 gate. The explicit reassignment is recorded on [issue #126](https://github.com/jlhogarth/CoMind/issues/126#issuecomment-6310204197): #156 is now the sole active shared-Supabase schema lane for this bounded pilot, while #119 remains open for its Operator Console runtime work.
 
-Therefore this branch is repository-only. It does not authorize DDL or DML in shared Supabase. Before a future pilot write, recheck #119, #126, the migration ledger, and current privileges. If the gate remains active, do not write. Do not treat the privileged SQL connector as a reason to bypass the gate.
+This reassignment permits repository implementation and disposable isolated PostgreSQL verification for the pilot. It does not authorize shared Supabase DDL or DML yet. Before a live write, recheck the authoritative migration ledger and effective grants, finish the handoff contract and recovery review, identify the canonical sender and recipient, and verify Supabase access in the actual recipient session. Do not treat the privileged SQL connector as a reason to bypass those checks.
 
 If implementation requires a new relation, first add its migration and rollback/recovery design to GitHub and test it in disposable PostgreSQL 17. A future shared Test write requires the schema lane and exact test scope to be clear. Keep all records synthetic, bounded, attributable, and idempotent. Do not delete evidence as routine cleanup; prefer an explicit synthetic test lifecycle and preserve its record.
 

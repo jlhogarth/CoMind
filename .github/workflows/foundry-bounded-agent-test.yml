@@ -2,13 +2,17 @@ name: Foundry Bounded Agent Test
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - foundry-161-bounded-agent
+    paths:
+      - .github/issue161-activation
 
 permissions:
   contents: read
-  id-token: write
 
 concurrency:
-  group: foundry-bounded-agent-test-161
+  group: foundry-bounded-agent-test-161-${{ github.event_name }}
   cancel-in-progress: false
 
 env:
@@ -17,10 +21,36 @@ env:
   OLLAMA_MODEL: qwen2.5:0.5b
 
 jobs:
+  dispatch-bootstrap:
+    if: >-
+      github.repository == 'jlhogarth/CoMind' &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/foundry-161-bounded-agent' &&
+      contains(github.event.head_commit.message, '[run-issue161-once]')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - name: Create the genuine workflow_dispatch run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api \
+            --method POST \
+            -H 'Accept: application/vnd.github+json' \
+            repos/${GITHUB_REPOSITORY}/actions/workflows/foundry-bounded-agent-test.yml/dispatches \
+            -f ref='foundry-161-bounded-agent'
+
   one-shot-proof:
-    if: github.repository == 'jlhogarth/CoMind'
+    if: github.repository == 'jlhogarth/CoMind' && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 
@@ -154,6 +184,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          test -f completion.json || printf '{}\n' > completion.json
+          test -f verification.json || printf '{}\n' > verification.json
           jq -n \
             --arg repository "${GITHUB_REPOSITORY}" \
             --arg ref "${GITHUB_REF}" \
@@ -162,8 +194,8 @@ jobs:
             --arg run_attempt "${GITHUB_RUN_ATTEMPT}" \
             --arg provider 'ollama' \
             --arg model "${OLLAMA_MODEL}" \
-            --slurpfile completion "${GITHUB_WORKSPACE}/completion.json" \
-            --slurpfile verification "${GITHUB_WORKSPACE}/verification.json" \
+            --slurpfile completion completion.json \
+            --slurpfile verification verification.json \
             '{
               issue: 161,
               synthetic: true,

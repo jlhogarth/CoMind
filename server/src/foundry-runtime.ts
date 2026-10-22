@@ -102,13 +102,28 @@ export function authorityAllows(ceiling: FoundryAuthorityLevel, requested: Found
   return AUTHORITY_RANK[requested] <= AUTHORITY_RANK[ceiling];
 }
 
-export function grantScopeAllows(scope: unknown, targetRef: string | null): boolean {
+export function grantScopeAllows(
+  scope: unknown,
+  targetRef: string | null,
+  synthetic = false
+): boolean {
   if (scope === null || typeof scope !== 'object' || Array.isArray(scope)) {
     return false;
   }
   const record = scope as Record<string, unknown>;
   const keys = Object.keys(record);
-  if (keys.some((key) => key !== 'target_refs')) {
+  if (keys.some((key) => !['target_refs', 'max_tasks', 'synthetic_only'].includes(key))) {
+    return false;
+  }
+  if (Object.prototype.hasOwnProperty.call(record, 'max_tasks')
+    && (!Number.isSafeInteger(record.max_tasks) || (record.max_tasks as number) < 1)) {
+    return false;
+  }
+  if (Object.prototype.hasOwnProperty.call(record, 'synthetic_only')
+    && typeof record.synthetic_only !== 'boolean') {
+    return false;
+  }
+  if (record.synthetic_only === true && !synthetic) {
     return false;
   }
   if (!Object.prototype.hasOwnProperty.call(record, 'target_refs')) {
@@ -391,10 +406,26 @@ export class FoundryRuntimeOrchestrator {
       if (!authorityAllows(candidate.authority_ceiling, request.authorityLevel)) {
         return false;
       }
-      return grantScopeAllows(candidate.scope, targetRef);
+      return grantScopeAllows(candidate.scope, targetRef, input.synthetic === true);
     });
     if (!grant) {
       throw new FoundryRuntimeError('grant_not_valid', 'No active scoped capability grant authorizes this execution');
+    }
+    const grantScope = grant.scope as Record<string, unknown>;
+    if (typeof grantScope.max_tasks === 'number') {
+      const consumed = await this.queryFn<{ task_count: number }>(
+        `SELECT count(*)::int AS task_count
+         FROM comind.cm_foundry_execution_context
+         WHERE profile_id = $1::uuid
+           AND capability_id = $2::uuid
+           AND project_id IS NOT DISTINCT FROM $3::uuid
+           AND environment = $4::text
+           AND context->>'target_ref' IS NOT DISTINCT FROM $5::text`,
+        [request.profileId, authority.capability_id, request.projectId ?? null, request.environment, targetRef]
+      );
+      if (Number(consumed.rows[0]?.task_count ?? 0) >= grantScope.max_tasks) {
+        throw new FoundryRuntimeError('grant_task_limit_exceeded', 'Capability grant task limit has been consumed');
+      }
     }
 
     const authorizationResult = await this.queryFn<AuthorizationRow>(

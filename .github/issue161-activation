@@ -1,0 +1,7 @@
+issue: 161
+activation: one-shot
+environment: Test
+purpose: prove one bounded model-backed Foundry Agent execution
+model: qwen2.5:0.5b
+provider: local Ollama
+max_task_attempts: 1

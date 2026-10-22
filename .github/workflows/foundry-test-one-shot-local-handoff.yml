@@ -10,7 +10,7 @@ on:
       - 'scripts/test_foundry_runtime_orchestration.sh'
       - 'server/src/foundry-runtime.ts'
       - 'server/src/providers/ollama-foundry-adapter.ts'
-      - 'server/test/integration/foundry-ollama-one-shot.test.mjs'
+      - 'server/test/integration/foundry-ollama-one-shot.e2e.mjs'
       - 'server/test/ollama-foundry-adapter.test.mjs'
 
 permissions:
@@ -87,7 +87,7 @@ jobs:
         run: bash ./scripts/test_foundry_runtime_orchestration.sh
       - name: Execute one synthetic ATLAS to PROOF handoff
         working-directory: server
-        run: node --test --test-concurrency=1 test/integration/foundry-ollama-one-shot.test.mjs
+        run: node --test --test-concurrency=1 test/integration/foundry-ollama-one-shot.e2e.mjs
       - name: Preserve readback evidence
         if: always()
         uses: actions/upload-artifact@v4

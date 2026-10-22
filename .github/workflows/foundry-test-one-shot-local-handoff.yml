@@ -8,6 +8,7 @@ on:
       - 'db/migrations/**'
       - 'db/sql/v2/**'
       - 'scripts/test_foundry_runtime_orchestration.sh'
+      - 'scripts/test_foundry_work_lease_kernel.sh'
       - 'server/src/foundry-runtime.ts'
       - 'server/src/providers/ollama-foundry-adapter.ts'
       - 'server/test/integration/foundry-ollama-one-shot.e2e.mjs'
@@ -85,6 +86,8 @@ jobs:
             http://127.0.0.1:11434/api/pull
       - name: Verify isolated Foundry substrate and network-free tests
         run: bash ./scripts/test_foundry_runtime_orchestration.sh
+      - name: Install and verify the isolated work lease kernel
+        run: bash ./scripts/test_foundry_work_lease_kernel.sh
       - name: Execute one synthetic ATLAS to PROOF handoff
         working-directory: server
         run: node --test --test-concurrency=1 test/integration/foundry-ollama-one-shot.e2e.mjs

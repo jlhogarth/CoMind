@@ -1,0 +1,88 @@
+name: Foundry Test one-shot local handoff
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: foundry-test-one-shot-local-handoff
+  cancel-in-progress: false
+
+jobs:
+  one-shot-handoff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.6-pg17-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      ollama:
+        image: ollama/ollama:0.40.8
+        env:
+          OLLAMA_NO_CLOUD: '1'
+          OLLAMA_NUM_PARALLEL: '1'
+          OLLAMA_MAX_QUEUE: '1'
+        ports:
+          - 11434:11434
+        options: >-
+          --health-cmd "ollama list >/dev/null 2>&1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+      OLLAMA_BASE_URL: http://127.0.0.1:11434
+      OLLAMA_MODEL: qwen3:0.6b
+      FOUNDRY_HANDOFF_ARTIFACT: artifacts/foundry-test-handoff-evidence.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+      - name: Pull the bounded local model
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:11434/api/version >/dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              echo "Local Ollama server did not become ready." >&2
+              exit 1
+            fi
+            sleep 2
+          done
+          curl --fail --silent --show-error --max-time 900 \
+            -H 'Content-Type: application/json' \
+            -d '{"model":"qwen3:0.6b","stream":false}' \
+            http://127.0.0.1:11434/api/pull
+      - name: Verify isolated Foundry substrate and network-free tests
+        run: bash ./scripts/test_foundry_runtime_orchestration.sh
+      - name: Execute one synthetic ATLAS to PROOF handoff
+        working-directory: server
+        run: node --test --test-concurrency=1 test/integration/foundry-ollama-one-shot.test.mjs
+      - name: Preserve readback evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: foundry-test-handoff-evidence
+          path: artifacts/foundry-test-handoff-evidence.json
+          if-no-files-found: warn
+          retention-days: 14

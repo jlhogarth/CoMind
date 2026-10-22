@@ -94,8 +94,8 @@ export function createLocalOllamaFoundryAdapter(
 
     const payload = await response.json() as { model?: unknown; response?: unknown; done?: unknown };
     const output = typeof payload.response === 'string' ? payload.response.trim() : '';
-    if (payload.done !== true || output.length === 0 || output.length > MAX_RESULT_CHARS) {
-      throw new Error('Local Ollama returned an empty, incomplete, or oversized response');
+    if (payload.model !== model || payload.done !== true || output.length === 0 || output.length > MAX_RESULT_CHARS) {
+      throw new Error('Local Ollama returned an unexpected model, empty, incomplete, or oversized response');
     }
 
     return {

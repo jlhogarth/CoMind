@@ -120,7 +120,7 @@ async function readExecution(execution = null) {
     '       count(DISTINCT ev.event_id)::int AS lease_event_count,',
     '       count(DISTINCT ec.execution_context_id)::int AS execution_count,',
     '       count(DISTINCT eo.execution_outcome_id)::int AS outcome_count,',
-    '       min(eo.terminal_status) AS terminal_status',
+    '       min(eo.terminal_status) AS terminal_status,',
     '       min(aror.result_ref) AS result_ref, min(aror.summary) AS summary,',
     '       min(ec.execution_context_id::text) AS execution_context_id,',
     '       min(eo.execution_outcome_id::text) AS execution_outcome_id',

@@ -310,6 +310,7 @@ try {
       taskId: TASK_ID,
       idempotencyKey: 'issue164-live-' + randomUUID(),
       input: {
+        synthetic: true,
         prompt: syntheticPrompt,
         source_role: 'atlas_fixture',
         recipient_role: 'proof_test_agent',

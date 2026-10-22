@@ -147,10 +147,11 @@ try {
   registry.register('ollama_local', createLocalOllamaFoundryAdapter({ baseUrl: ollamaBaseUrl, model }));
   const orchestrator = new FoundryRuntimeOrchestrator(query, registry);
   const syntheticPrompt = [
-    'You are PROOF, reviewing one synthetic test handoff from the ATLAS role.',
-    'Use only the report below. Return a concise verification with two supported facts and one limitation.',
-    'Synthetic report: the Test runtime schema and lease kernel have been installed; no worker execution result has yet been recorded.',
-    'Do not claim that production is active or that a model call occurred before this request.',
+    'You are PROOF, receiving one synthetic handoff from the ATLAS role.',
+    'Confirm receipt in one or two concise sentences. State that this is a synthetic isolated-CI test and that execution uses the local ollama_local adapter at C1 authority.',
+    'ATLAS report: the Test runtime schema and work-lease kernel are installed. This request is being executed once through local Ollama with qwen3:0.6b, using the isolated comind_ci database.',
+    'This run does not access live Supabase, production, the OpenAI API, or a separate ChatGPT GPT session.',
+    'State one limitation: this isolated run does not prove live Test Supabase operation or communication between separate GPT sessions. Do not describe this handoff as incomplete or production-ready.',
   ].join(' ');
 
   let execution;

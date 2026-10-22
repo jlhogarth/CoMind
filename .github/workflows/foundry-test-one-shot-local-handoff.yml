@@ -2,12 +2,22 @@ name: Foundry Test one-shot local handoff
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/foundry-test-one-shot-local-handoff.yml'
+      - 'db/migrations/**'
+      - 'db/sql/v2/**'
+      - 'scripts/test_foundry_runtime_orchestration.sh'
+      - 'server/src/foundry-runtime.ts'
+      - 'server/src/providers/ollama-foundry-adapter.ts'
+      - 'server/test/integration/foundry-ollama-one-shot.test.mjs'
+      - 'server/test/ollama-foundry-adapter.test.mjs'
 
 permissions:
   contents: read
 
 concurrency:
-  group: foundry-test-one-shot-local-handoff
+  group: foundry-test-one-shot-local-handoff-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:

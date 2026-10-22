@@ -119,7 +119,8 @@ async function readExecution(execution = null) {
     'SELECT l.state AS lease_state, l.attempt_count, l.max_attempts,',
     '       count(DISTINCT ev.event_id)::int AS lease_event_count,',
     '       count(DISTINCT ec.execution_context_id)::int AS execution_count,',
-    '       min(eo.terminal_status) AS terminal_status,',
+    '       count(DISTINCT eo.execution_outcome_id)::int AS outcome_count,',
+    '       min(eo.terminal_status) AS terminal_status',
     '       min(aror.result_ref) AS result_ref, min(aror.summary) AS summary,',
     '       min(ec.execution_context_id::text) AS execution_context_id,',
     '       min(eo.execution_outcome_id::text) AS execution_outcome_id',
@@ -151,6 +152,8 @@ async function readExecution(execution = null) {
     task_id: TASK_ID,
     execution_context_id: row.execution_context_id,
     execution_outcome_id: row.execution_outcome_id,
+    execution_count: Number(row.execution_count),
+    outcome_count: Number(row.outcome_count),
     terminal_status: row.terminal_status ?? 'not_recorded',
     lease_state: row.lease_state,
     lease_events: Number(row.lease_event_count),
@@ -168,8 +171,8 @@ try {
   requireCondition(model === EXPECTED_MODEL, 'Refusing an unapproved live Test model.');
   const identity = await one(
     'SELECT current_database() AS database_name, current_user AS database_user, '
-      + 'current_setting(\\'server_version_num\\')::integer AS server_version_num, '
-      + 'current_setting(\\'transaction_read_only\\') AS transaction_read_only'
+      + 'current_setting(\'server_version_num\')::integer AS server_version_num, '
+      + 'current_setting(\'transaction_read_only\') AS transaction_read_only'
   );
   assert.equal(identity.database_name, 'postgres');
   assert.equal(identity.database_user, 'postgres');
@@ -260,10 +263,10 @@ try {
     'SELECT l.task_id::text AS task_id',
     'FROM comind.cm_foundry_work_lease l',
     'JOIN comind.cm_task t ON t.task_id=l.task_id',
-    'WHERE (l.state=\\'ready\\' OR (l.state=\\'leased\\' AND l.lease_expires_at <= clock_timestamp()))',
+    'WHERE (l.state=\'ready\' OR (l.state=\'leased\' AND l.lease_expires_at <= clock_timestamp()))',
     '  AND l.not_before <= clock_timestamp()',
     '  AND l.attempt_count < l.max_attempts',
-    '  AND t.status NOT IN (\\'blocked\\',\\'done\\')',
+    '  AND t.status NOT IN (\'blocked\',\'done\')',
   ].join('\n');
   const eligible = await query(eligibleSql);
   assert.equal(eligible.rows.length, 1, 'Refusing to claim while any other eligible lease exists');
@@ -332,6 +335,8 @@ try {
   assert.equal(evidence.attempt_count, 1);
   assert.equal(evidence.max_attempts, 1);
   assert.equal(evidence.lease_events, 2);
+  assert.equal(evidence.execution_count, 1);
+  assert.equal(evidence.outcome_count, 1);
   assert.ok(evidence.execution_context_id);
   assert.ok(evidence.execution_outcome_id);
   assert.match(evidence.result_ref, /^ollama-local:\/\/qwen2\.5:0\.5b\/[a-f0-9]{64}$/);

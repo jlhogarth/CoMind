@@ -11,46 +11,31 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: foundry-bounded-agent-test-161-${{ github.event_name }}
-  cancel-in-progress: false
-
 env:
   FUNCTION_URL: https://sbgfuanxiqepcoboxzcl.supabase.co/functions/v1/foundry-test-worker
   OLLAMA_VERSION: 0.40.7
   OLLAMA_MODEL: qwen2.5:0.5b
 
 jobs:
-  dispatch-bootstrap:
+  one-shot-proof:
     if: >-
       github.repository == 'jlhogarth/CoMind' &&
-      github.event_name == 'push' &&
-      github.ref == 'refs/heads/foundry-161-bounded-agent' &&
-      contains(github.event.head_commit.message, '[run-issue161-once]')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      actions: write
-    steps:
-      - name: Create the genuine workflow_dispatch run
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          gh api \
-            --method POST \
-            -H 'Accept: application/vnd.github+json' \
-            repos/${GITHUB_REPOSITORY}/actions/workflows/foundry-bounded-agent-test.yml/dispatches \
-            -f ref='foundry-161-bounded-agent'
-
-  one-shot-proof:
-    if: github.repository == 'jlhogarth/CoMind' && github.event_name == 'workflow_dispatch'
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/foundry-161-bounded-agent' &&
+          contains(github.event.head_commit.message, '[run-issue161-once]')
+        )
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       contents: read
       id-token: write
+    concurrency:
+      group: foundry-bounded-agent-test-161
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
 
@@ -65,7 +50,7 @@ jobs:
           OLLAMA_VERSION="${OLLAMA_VERSION}" sh /tmp/ollama-install.sh
           ollama --version
 
-      - name: Start Ollama and pull the bounded model before claiming work
+      - name: Start Ollama and pull bounded model before claiming work
         shell: bash
         run: |
           set -euo pipefail
@@ -126,7 +111,7 @@ jobs:
           MAX_OUTPUT="$(jq -r '.maxOutputChars' claim.json)"
           test "${OUTPUT_LENGTH}" -le "${MAX_OUTPUT}"
 
-      - name: Persist the governed terminal result and finish the lease
+      - name: Persist governed terminal result and finish lease
         shell: bash
         run: |
           set -euo pipefail
@@ -188,6 +173,7 @@ jobs:
           test -f verification.json || printf '{}\n' > verification.json
           jq -n \
             --arg repository "${GITHUB_REPOSITORY}" \
+            --arg event "${GITHUB_EVENT_NAME}" \
             --arg ref "${GITHUB_REF}" \
             --arg sha "${GITHUB_SHA}" \
             --arg run_id "${GITHUB_RUN_ID}" \
@@ -200,6 +186,7 @@ jobs:
               issue: 161,
               synthetic: true,
               repository: $repository,
+              event: $event,
               ref: $ref,
               sha: $sha,
               github_run_id: $run_id,

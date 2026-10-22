@@ -1,0 +1,197 @@
+name: Foundry Bounded Agent Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: foundry-bounded-agent-test-161
+  cancel-in-progress: false
+
+env:
+  FUNCTION_URL: https://sbgfuanxiqepcoboxzcl.supabase.co/functions/v1/foundry-test-worker
+  OLLAMA_VERSION: 0.40.7
+  OLLAMA_MODEL: qwen2.5:0.5b
+
+jobs:
+  one-shot-proof:
+    if: github.repository == 'jlhogarth/CoMind'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Ollama runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL \
+            https://github.com/ollama/ollama/releases/download/v0.40.7/install.sh \
+            -o /tmp/ollama-install.sh
+          echo '25f64b810b947145095956533e1bdf56eacea2673c55a7e586be4515fc882c9f  /tmp/ollama-install.sh' | sha256sum -c -
+          OLLAMA_VERSION="${OLLAMA_VERSION}" sh /tmp/ollama-install.sh
+          ollama --version
+
+      - name: Start Ollama and pull the bounded model before claiming work
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! curl -fsS http://127.0.0.1:11434/api/tags >/dev/null 2>&1; then
+            nohup ollama serve >/tmp/ollama.log 2>&1 &
+          fi
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:11434/api/tags >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:11434/api/tags >/dev/null
+          ollama pull "${OLLAMA_MODEL}"
+
+      - name: Claim exactly one synthetic Foundry task
+        shell: bash
+        run: |
+          set -euo pipefail
+          OIDC_TOKEN="$(curl -fsSL \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=comind-foundry-test" | jq -r '.value')"
+          test -n "${OIDC_TOKEN}"
+          echo "::add-mask::${OIDC_TOKEN}"
+          curl -fsS \
+            -H "Authorization: Bearer ${OIDC_TOKEN}" \
+            -H 'Content-Type: application/json' \
+            --data '{"action":"claim"}' \
+            "${FUNCTION_URL}" > claim.json
+          jq -e '.taskId == "16100000-0000-4000-8000-000000000009" and .provider == "ollama" and .model == "qwen2.5:0.5b"' claim.json >/dev/null
+          echo "::add-mask::$(jq -r '.leaseToken' claim.json)"
+
+      - name: Run one local PROOF model invocation
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROMPT="$(jq -r '.prompt' claim.json)"
+          jq -n \
+            --arg model "${OLLAMA_MODEL}" \
+            --arg prompt "${PROMPT}" \
+            '{
+              model: $model,
+              prompt: $prompt,
+              stream: false,
+              format: "json",
+              options: {
+                temperature: 0,
+                seed: 161,
+                num_predict: 160
+              }
+            }' > ollama-request.json
+          curl -fsS \
+            -H 'Content-Type: application/json' \
+            --data @ollama-request.json \
+            http://127.0.0.1:11434/api/generate > ollama-response.json
+          jq -e '.response | type == "string" and length > 0' ollama-response.json >/dev/null
+          OUTPUT_LENGTH="$(jq -r '.response | length' ollama-response.json)"
+          MAX_OUTPUT="$(jq -r '.maxOutputChars' claim.json)"
+          test "${OUTPUT_LENGTH}" -le "${MAX_OUTPUT}"
+
+      - name: Persist the governed terminal result and finish the lease
+        shell: bash
+        run: |
+          set -euo pipefail
+          OIDC_TOKEN="$(curl -fsSL \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=comind-foundry-test" | jq -r '.value')"
+          test -n "${OIDC_TOKEN}"
+          echo "::add-mask::${OIDC_TOKEN}"
+          jq -n \
+            --slurpfile claim claim.json \
+            --slurpfile model ollama-response.json \
+            '{
+              action: "complete",
+              taskId: $claim[0].taskId,
+              workerId: $claim[0].workerId,
+              leaseToken: $claim[0].leaseToken,
+              fencingEpoch: $claim[0].fencingEpoch,
+              executionContextId: $claim[0].executionContextId,
+              adapterOperationId: $claim[0].adapterOperationId,
+              agentRunId: $claim[0].agentRunId,
+              output: $model[0].response,
+              modelMeta: {
+                model: $model[0].model,
+                doneReason: $model[0].done_reason,
+                promptEvalCount: $model[0].prompt_eval_count,
+                evalCount: $model[0].eval_count,
+                totalDuration: $model[0].total_duration
+              }
+            }' > complete-request.json
+          curl -fsS \
+            -H "Authorization: Bearer ${OIDC_TOKEN}" \
+            -H 'Content-Type: application/json' \
+            --data @complete-request.json \
+            "${FUNCTION_URL}" > completion.json
+          jq -e '.terminalStatus == "succeeded" and .errorCode == null' completion.json >/dev/null
+
+      - name: Verify one task, one claim, one terminal execution, and no retry
+        shell: bash
+        run: |
+          set -euo pipefail
+          OIDC_TOKEN="$(curl -fsSL \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=comind-foundry-test" | jq -r '.value')"
+          test -n "${OIDC_TOKEN}"
+          echo "::add-mask::${OIDC_TOKEN}"
+          curl -fsS \
+            -H "Authorization: Bearer ${OIDC_TOKEN}" \
+            -H 'Content-Type: application/json' \
+            --data '{"action":"verify"}' \
+            "${FUNCTION_URL}" > verification.json
+          jq -e '.verified == true and .attempt_count == 1 and .claimed_events == 1 and .completed_events == 1 and .execution_contexts == 1 and .execution_outcomes == 1' verification.json >/dev/null
+
+      - name: Build sanitized execution evidence
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -n \
+            --arg repository "${GITHUB_REPOSITORY}" \
+            --arg ref "${GITHUB_REF}" \
+            --arg sha "${GITHUB_SHA}" \
+            --arg run_id "${GITHUB_RUN_ID}" \
+            --arg run_attempt "${GITHUB_RUN_ATTEMPT}" \
+            --arg provider 'ollama' \
+            --arg model "${OLLAMA_MODEL}" \
+            --slurpfile completion "${GITHUB_WORKSPACE}/completion.json" \
+            --slurpfile verification "${GITHUB_WORKSPACE}/verification.json" \
+            '{
+              issue: 161,
+              synthetic: true,
+              repository: $repository,
+              ref: $ref,
+              sha: $sha,
+              github_run_id: $run_id,
+              github_run_attempt: $run_attempt,
+              provider: $provider,
+              model: $model,
+              terminal_status: ($completion[0].terminalStatus // null),
+              execution_context_id: ($completion[0].executionContextId // null),
+              execution_outcome_id: ($completion[0].executionOutcomeId // null),
+              result_ref: ($completion[0].resultRef // null),
+              verified: ($verification[0].verified // false),
+              lease_state: ($verification[0].lease_state // null),
+              attempt_count: ($verification[0].attempt_count // null),
+              claimed_events: ($verification[0].claimed_events // null),
+              completed_events: ($verification[0].completed_events // null),
+              execution_contexts: ($verification[0].execution_contexts // null),
+              execution_outcomes: ($verification[0].execution_outcomes // null)
+            }' > issue161-evidence.json
+
+      - name: Upload sanitized evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: foundry-bounded-agent-issue161-${{ github.run_id }}
+          path: issue161-evidence.json
+          if-no-files-found: error
+          retention-days: 14

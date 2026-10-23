@@ -1,0 +1,145 @@
+:root,
+[data-comind-theme="dark"] {
+  color-scheme: dark;
+
+  --cm-font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --cm-font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+
+  --cm-field-1000: #02090c;
+  --cm-field-950: #041115;
+  --cm-field-900: #071419;
+  --cm-field-850: #0a1b21;
+  --cm-field-800: #0d242b;
+  --cm-field-700: #12323a;
+
+  --cm-caribbean-200: #90d9f9;
+  --cm-caribbean-300: #6dd2f3;
+  --cm-caribbean-400: #36c2e5;
+  --cm-caribbean-500: #19a9d0;
+  --cm-caribbean-600: #1584aa;
+
+  --cm-copper-200: #f0c79d;
+  --cm-copper-300: #dda972;
+  --cm-copper-400: #c68b52;
+  --cm-copper-500: #a96f3e;
+  --cm-copper-600: #7f4e2d;
+
+  --cm-green-400: #59d89b;
+  --cm-green-500: #31b97c;
+  --cm-amber-400: #f1bd62;
+  --cm-amber-500: #d99b35;
+  --cm-red-400: #ff7c7c;
+  --cm-red-500: #df5656;
+  --cm-blue-400: #72aef8;
+
+  --cm-text-strong: #f2fbfb;
+  --cm-text: #d8e8e9;
+  --cm-text-muted: #9fb7bb;
+  --cm-text-faint: #739096;
+
+  --cm-surface: rgba(9, 29, 35, 0.76);
+  --cm-surface-raised: rgba(13, 39, 46, 0.86);
+  --cm-surface-solid: #0d272e;
+  --cm-surface-soft: rgba(20, 55, 63, 0.48);
+  --cm-border: rgba(116, 171, 181, 0.24);
+  --cm-border-strong: rgba(116, 171, 181, 0.42);
+  --cm-divider: rgba(116, 171, 181, 0.16);
+
+  --cm-accent: var(--cm-caribbean-400);
+  --cm-accent-strong: var(--cm-caribbean-300);
+  --cm-accent-soft: rgba(54, 194, 229, 0.12);
+  --cm-accent-border: rgba(54, 194, 229, 0.34);
+  --cm-accent-glow: rgba(54, 194, 229, 0.22);
+
+  --cm-human: var(--cm-copper-400);
+  --cm-human-soft: rgba(198, 139, 82, 0.13);
+  --cm-human-border: rgba(198, 139, 82, 0.38);
+
+  --cm-focus: #9bdff7;
+  --cm-selection: rgba(54, 194, 229, 0.3);
+  --cm-disabled-opacity: 0.48;
+
+  --cm-space-1: 0.25rem;
+  --cm-space-2: 0.5rem;
+  --cm-space-3: 0.75rem;
+  --cm-space-4: 1rem;
+  --cm-space-5: 1.25rem;
+  --cm-space-6: 1.5rem;
+  --cm-space-8: 2rem;
+  --cm-space-10: 2.5rem;
+  --cm-space-12: 3rem;
+  --cm-space-16: 4rem;
+  --cm-space-20: 5rem;
+
+  --cm-radius-sm: 0.5rem;
+  --cm-radius-md: 0.75rem;
+  --cm-radius-lg: 1rem;
+  --cm-radius-xl: 1.5rem;
+  --cm-radius-pill: 999px;
+
+  --cm-shadow-low: 0 12px 34px rgba(0, 0, 0, 0.22);
+  --cm-shadow-mid: 0 22px 60px rgba(0, 0, 0, 0.3);
+  --cm-shadow-high: 0 34px 90px rgba(0, 0, 0, 0.42);
+
+  --cm-duration-fast: 140ms;
+  --cm-duration-standard: 260ms;
+  --cm-duration-emphasis: 520ms;
+  --cm-duration-ambient: 18s;
+
+  --cm-ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --cm-ease-emphasis: cubic-bezier(0.16, 1, 0.3, 1);
+  --cm-ease-settle: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+[data-comind-scope="cognition"] {
+  --cm-accent: var(--cm-caribbean-400);
+  --cm-accent-strong: var(--cm-caribbean-300);
+  --cm-accent-soft: rgba(54, 194, 229, 0.12);
+  --cm-accent-border: rgba(54, 194, 229, 0.34);
+  --cm-accent-glow: rgba(54, 194, 229, 0.22);
+}
+
+[data-comind-scope="operator"] {
+  --cm-accent: var(--cm-copper-400);
+  --cm-accent-strong: var(--cm-copper-300);
+  --cm-accent-soft: rgba(198, 139, 82, 0.13);
+  --cm-accent-border: rgba(198, 139, 82, 0.38);
+  --cm-accent-glow: rgba(198, 139, 82, 0.2);
+}
+
+[data-comind-scope="governance"] {
+  --cm-accent: var(--cm-amber-400);
+  --cm-accent-strong: #ffd48a;
+  --cm-accent-soft: rgba(241, 189, 98, 0.12);
+  --cm-accent-border: rgba(241, 189, 98, 0.36);
+  --cm-accent-glow: rgba(241, 189, 98, 0.18);
+}
+
+[data-comind-scope="success"] {
+  --cm-accent: var(--cm-green-400);
+  --cm-accent-strong: #8cebb9;
+  --cm-accent-soft: rgba(89, 216, 155, 0.12);
+  --cm-accent-border: rgba(89, 216, 155, 0.34);
+  --cm-accent-glow: rgba(89, 216, 155, 0.18);
+}
+
+[data-comind-scope="warning"] {
+  --cm-accent: var(--cm-amber-400);
+  --cm-accent-strong: #ffd48a;
+  --cm-accent-soft: rgba(241, 189, 98, 0.12);
+  --cm-accent-border: rgba(241, 189, 98, 0.36);
+  --cm-accent-glow: rgba(241, 189, 98, 0.18);
+}
+
+[data-comind-scope="danger"] {
+  --cm-accent: var(--cm-red-400);
+  --cm-accent-strong: #ffaaaa;
+  --cm-accent-soft: rgba(255, 124, 124, 0.11);
+  --cm-accent-border: rgba(255, 124, 124, 0.34);
+  --cm-accent-glow: rgba(255, 124, 124, 0.16);
+}
+
+::selection {
+  background: var(--cm-selection);
+  color: var(--cm-text-strong);
+}

@@ -32,7 +32,7 @@ jobs:
     env:
       OLLAMA_BASE_URL: http://127.0.0.1:11434
       OLLAMA_MODEL: qwen2.5:0.5b
-      FOUNDRY_HANDOFF_ARTIFACT: server/artifacts/foundry-test-161-live-evidence.json
+      FOUNDRY_HANDOFF_ARTIFACT: artifacts/foundry-test-161-live-evidence.json
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -93,5 +93,5 @@ jobs:
         with:
           name: foundry-test-161-live-evidence
           path: server/artifacts/foundry-test-161-live-evidence.json
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 14

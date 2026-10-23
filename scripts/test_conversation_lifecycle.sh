@@ -6,9 +6,24 @@ if [[ -z "${DATABASE_URL:-}" ]]; then
   exit 2
 fi
 
+python3 - "$DATABASE_URL" <<'PY'
+import sys
+from urllib.parse import urlsplit
+
+parsed = urlsplit(sys.argv[1])
+database_name = parsed.path.removeprefix("/")
+if parsed.scheme not in {"postgres", "postgresql"} \
+        or parsed.hostname not in {"localhost", "127.0.0.1", "::1"} \
+        or database_name != "comind_ci":
+    raise SystemExit(
+        "Refusing integration setup: DATABASE_URL must target local PostgreSQL database comind_ci."
+    )
+PY
+
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 schema_dir="$repo_root/db/sql/v2"
 fixture_file="$repo_root/db/test/conversation_lifecycle_fixtures.sql"
+notebook_fixture_file="$repo_root/db/test/conversation_notebook_fixture.sql"
 
 (
   cd "$schema_dir"
@@ -16,6 +31,7 @@ fixture_file="$repo_root/db/test/conversation_lifecycle_fixtures.sql"
 )
 
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$fixture_file"
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$notebook_fixture_file"
 
 (
   cd "$repo_root/server"

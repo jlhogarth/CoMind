@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CoMind Conversation Notebook</title>
+<style>
+:root{--bg:#07131e;--surface:#0b1925;--panel:#0f2030;--panel2:#13283a;--line:#203a4d;--ink:#edf5fa;--muted:#91a9b9;--blue:#2d8ac1;--blue2:#54b4e7;--copper:#d29a6c;--green:#62c99d;--yellow:#e9c47e;--red:#ed918b;--purple:#b9a6ea;--shadow:0 18px 55px #0005}*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 62% -22%,#16466a 0,transparent 42%),var(--bg);color:var(--ink);font:14px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;min-height:100vh}button,input,textarea,select{font:inherit}button{cursor:pointer}.shell{min-height:100vh;display:grid;grid-template-columns:246px minmax(0,1fr)}.sidebar{position:sticky;top:0;height:100vh;padding:22px 15px 16px;background:#081621ed;border-right:1px solid #203747;display:flex;flex-direction:column}.brand{display:flex;align-items:center;gap:11px;padding:4px 8px 27px}.brain{width:37px;height:37px;display:grid;place-items:center;border-radius:12px;background:linear-gradient(145deg,#1e6a9c,#10334d);border:1px solid #4a91b7;color:#c5ebfa;font-size:20px;box-shadow:0 0 22px #2792c833}.brand b{font-size:17px;letter-spacing:.04em}.brand small{display:block;color:#85a1b2;font-size:9px;letter-spacing:.16em;text-transform:uppercase}.workspace{display:flex;align-items:center;justify-content:space-between;padding:10px 10px;border:1px solid #294254;background:#0d1e2a;border-radius:9px;color:#c6d7e0;font-size:11px;margin-bottom:19px}.workspace span:last-child{font-size:10px;color:#7ea4ba}.nav-caption{padding:6px 10px;color:#648093;font-size:9px;font-weight:800;letter-spacing:.16em;text-transform:uppercase}.nav{display:grid;gap:4px}.nav button{display:flex;align-items:center;gap:10px;width:100%;padding:10px;border:1px solid transparent;border-radius:8px;background:transparent;color:#a9bfcc;text-align:left;font-size:12px}.nav button .ico{width:20px;text-align:center;color:#82c7e9;font-size:15px}.nav button.active{background:#14354e;border-color:#2e536b;color:#f4fbff}.nav button .badge{margin-left:auto;font-size:10px;color:#83a1b4}.side-bottom{margin-top:auto}.privacy{padding:12px;border:1px solid #2c424e;background:#0d1b25;border-radius:10px;color:#9bb0bd;font-size:10px}.privacy b{display:block;color:#dceaf1;margin:0 0 4px;font-size:11px}.online{display:inline-flex;align-items:center;gap:6px;color:#92c9aa}.online i{width:6px;height:6px;background:#64c89b;border-radius:50%;box-shadow:0 0 8px #64c89b88}.main{width:100%;max-width:1520px;margin:auto;padding:27px clamp(20px,4vw,62px) 50px}.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:25px}.crumb{color:#849eae;font-size:11px}.crumb b{color:#d6e5ed;font-weight:600}.top-actions{display:flex;align-items:center;gap:9px}.mode{display:flex;align-items:center;gap:7px;padding:6px 9px;border:1px solid #315064;border-radius:999px;color:#a8c2d1;font-size:10px;background:#0e202c}.mode i{width:6px;height:6px;border-radius:50%;background:var(--green)}.iconbtn{height:31px;width:31px;border:1px solid #2b4557;background:#102331;color:#b7cad5;border-radius:8px}.view{display:none}.view.active{display:block}.heading{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:22px}.eyebrow{color:var(--copper);font-size:9px;font-weight:800;letter-spacing:.17em;text-transform:uppercase;margin-bottom:6px}.heading h1{font-size:clamp(26px,3vw,37px);line-height:1.12;letter-spacing:-.04em;margin:0 0 8px}.heading p{margin:0;color:#9db2bf;max-width:720px;font-size:13px}.heading-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.btn{padding:8px 11px;border:1px solid #304b5e;border-radius:8px;background:#102535;color:#c5d7e0;font-size:11px;font-weight:650}.btn:hover{border-color:#47728b;background:#153147}.btn.primary{border-color:#4197c8;background:linear-gradient(180deg,#2e8dc3,#1a6591);color:#fff;box-shadow:0 5px 16px #145c8038}.btn.copper{border-color:#8e684b;background:#3a2c23;color:#f0c7a0}.btn.danger{border-color:#75494b;color:#edaaa6;background:#2a1d22}.grid{display:grid;gap:14px}.overview-grid{grid-template-columns:minmax(0,1.35fr) minmax(280px,.65fr)}.panel{background:linear-gradient(180deg,#102333,#0c1a25);border:1px solid var(--line);border-radius:13px;box-shadow:var(--shadow)}.pad{padding:17px}.panelhead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}.panelhead h2{font-size:14px;margin:0;letter-spacing:-.01em}.subtle{color:#819bab;font-size:10px}.field{display:block;width:100%;padding:9px 11px;border:1px solid #2c4a5e;border-radius:8px;outline:0;background:#091722;color:#d8e7ef;font-size:12px}.field:focus{border-color:#4898c3;box-shadow:0 0 0 3px #2c88b522}.source-meta{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin-bottom:9px}.filepick{position:relative;display:flex;align-items:center;gap:7px;padding:8px 10px;border:1px solid #36556a;border-radius:8px;color:#c1d5df;font-size:10px;white-space:nowrap}.filepick input{position:absolute;inset:0;opacity:0;width:100%;cursor:pointer}.conversation{height:205px;width:100%;resize:vertical;padding:12px;border:1px solid #29465a;border-radius:9px;outline:0;background:#081620;color:#d7e7ef;font:12px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace}.conversation:focus{border-color:#4898c3;box-shadow:0 0 0 3px #2c88b522}.conversation::placeholder{color:#5e7a8c}.intake-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px}.footnote{font-size:10px;color:#7f98a8}.foot-buttons{display:flex;gap:8px}.analysis-panel{padding:17px;display:flex;flex-direction:column}.analysis-panel h2{font-size:16px;line-height:1.3;margin:0 0 8px}.analysis-panel p{color:#9db2bf;font-size:11px;margin:0}.steps{display:grid;gap:9px;margin-top:15px}.step{display:grid;grid-template-columns:23px 1fr;align-items:center;gap:8px;color:#bfd0d9;font-size:10px}.step span:first-child{width:22px;height:22px;display:grid;place-items:center;border-radius:7px;background:#17364b;border:1px solid #2d566e;color:#9dd8f3;font-weight:700}.local-note{margin-top:auto;padding:9px 0 0 10px;border-left:2px solid var(--copper);color:#aebfc9;font-size:10px}.section-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin:26px 0 11px}.section-head h2{font-size:16px;margin:0 0 3px}.section-head p{font-size:10px;color:#8199a8;margin:0}.section-actions{display:flex;gap:7px}.findings{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.finding{border:1px solid #253e50;background:#0c1b27;border-radius:11px;padding:13px}.finding-top{display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:8px}.tag{padding:3px 7px;border-radius:999px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}.tag.decision{color:#e4b9cf;background:#302432}.tag.action{color:#a5ddb7;background:#1c3025}.tag.preference{color:#9cd1ec;background:#192e3a}.tag.question{color:#ebce8b;background:#352d1f}.tag.insight{color:#c9b9ef;background:#2a2739}.tag.commitment{color:#e2ad84;background:#33271f}.trace{font-size:9px;color:#7892a2}.finding h3{font-size:12px;font-weight:620;line-height:1.45;margin:0 0 8px}.quote{padding:8px 9px;background:#091722;border-left:2px solid #3f819f;border-radius:0 7px 7px 0;color:#9bb2c0;font-size:10px;line-height:1.45}.quote b{display:block;color:#7195aa;font-size:8px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:3px}.finding-foot{display:flex;align-items:center;justify-content:space-between;gap:7px;margin-top:9px}.route{display:flex;gap:5px;align-items:center;color:#7e99a9;font-size:9px}.route select{max-width:160px;padding:5px 7px;border-radius:6px;border:1px solid #2b485c;background:#102535;color:#c8d9e1;font-size:10px}.finding-buttons{display:flex;gap:5px}.mini{padding:5px 7px;border:1px solid #2c4b5b;border-radius:6px;background:#112536;color:#b9cdd7;font-size:9px}.mini.ok{border-color:#36745c;background:#16382e;color:#a4dfc1}.mini.no{border-color:#6c4448;color:#d89a98;background:#271d22}.empty{grid-column:1/-1;border:1px dashed #385366;border-radius:11px;padding:24px;text-align:center;background:#0b1924;color:#8da5b4;font-size:11px}.empty b{display:block;color:#d3e1e9;margin-bottom:4px}.stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin:15px 0}.stat{border:1px solid #203c4e;background:#0c1d29;border-radius:10px;padding:10px 12px}.stat b{display:block;font-size:19px;letter-spacing:-.04em}.stat span{color:#849dad;font-size:9px;text-transform:uppercase;letter-spacing:.08em}.notebook-tabs{display:flex;gap:7px;border-bottom:1px solid #203849;margin-bottom:13px}.ntab{padding:8px 10px;border:0;border-bottom:2px solid transparent;background:none;color:#89a2b1;font-size:10px}.ntab.active{border-color:#43a7d7;color:#d7eaf4}.toolbar{display:flex;align-items:center;gap:8px;margin-bottom:11px}.search{min-width:180px;flex:1}.filter{padding:8px;border:1px solid #294659;border-radius:8px;background:#102434;color:#c5d6df;font-size:10px}.entries{display:grid;gap:8px}.entry{display:grid;grid-template-columns:106px minmax(0,1fr) auto;align-items:start;gap:12px;padding:12px;border:1px solid #233d4f;border-radius:10px;background:#0c1b27}.entry-scope{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#75badd;font-weight:800}.entry-text{font-size:11px;color:#d1dfe7}.entry-text small{display:block;color:#8199a8;font-size:9px;margin-top:5px}.entry-tools{display:flex;gap:5px}.sql-layout{display:grid;grid-template-columns:minmax(0,1fr) 275px;gap:12px}.sql-box{border:1px solid #294456;border-radius:11px;background:#08141d;overflow:hidden}.sql-toolbar{display:flex;align-items:center;justify-content:space-between;padding:9px 11px;border-bottom:1px solid #213748;background:#0e202d}.sql-toolbar b{font-size:10px;color:#d5e4eb}.sql-toolbar span{font-size:9px;color:#7893a3}.sql-code{display:block;max-height:600px;overflow:auto;padding:14px;color:#bad4e1;font:10px/1.65 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre}.sql-aside{padding:14px}.sql-aside h3{font-size:12px;margin:0 0 8px}.sql-aside p,.sql-aside li{color:#97adbb;font-size:10px}.sql-aside ul{padding-left:15px;margin:9px 0}.schema-list{display:grid;gap:6px;margin:12px 0}.schema-item{padding:8px;border:1px solid #233d4e;border-radius:7px;background:#0b1a25;color:#b9ced9;font-size:9px}.schema-item b{color:#80c4e6}.warning{margin-top:12px;border-left:2px solid var(--yellow);padding-left:9px;color:#c6b994;font-size:9px}.toast{position:fixed;right:20px;bottom:20px;padding:10px 13px;border:1px solid #3c6b79;background:#102a32;color:#d3f0e3;border-radius:9px;box-shadow:var(--shadow);font-size:11px;opacity:0;transform:translateY(8px);transition:.2s;pointer-events:none}.toast.show{opacity:1;transform:translateY(0)}.footer{margin-top:29px;border-top:1px solid #1d3444;padding-top:12px;display:flex;justify-content:space-between;gap:10px;color:#688395;font-size:9px}
+@media(max-width:980px){.shell{grid-template-columns:66px minmax(0,1fr)}.sidebar{padding:18px 8px}.brand{padding:4px 6px 24px}.brand>div:last-child,.workspace,.nav-caption,.nav button .navlabel,.nav button .badge,.privacy{display:none}.nav button{justify-content:center;padding:11px 5px}.nav button .ico{font-size:16px}.overview-grid{grid-template-columns:1fr}.analysis-panel{min-height:220px}.sql-layout{grid-template-columns:1fr}.sql-aside{display:grid;grid-template-columns:1fr 1fr;gap:10px}.sql-aside .warning{grid-column:1/-1}}@media(max-width:680px){.main{padding:18px 13px 36px}.heading{display:block}.heading-actions{justify-content:flex-start;margin-top:13px}.topbar{margin-bottom:18px}.overview-grid{gap:10px}.pad,.analysis-panel{padding:13px}.source-meta{grid-template-columns:1fr}.filepick{width:max-content}.findings{grid-template-columns:1fr}.stat-row{grid-template-columns:repeat(2,1fr)}.toolbar{flex-wrap:wrap}.entry{grid-template-columns:1fr auto;gap:5px}.entry-scope{grid-column:1/-1}.entry-text{grid-column:1}.entry-tools{grid-column:2;grid-row:2}.sql-aside{display:block}.footer{display:block}.footer span{display:block;margin-top:5px}.intake-foot{align-items:flex-start;flex-direction:column}.foot-buttons{width:100%;justify-content:flex-end}}
+</style>
+</head>
+<body>
+<div class="shell">
+<aside class="sidebar"><div class="brand"><div class="brain">◉</div><div><b>CoMind</b><small>Conversation Notebook</small></div></div><div class="workspace"><span>Joseph's workspace</span><span>TEST ▾</span></div><div class="nav-caption">Notebook</div><nav class="nav"><button class="active" data-view="inbox"><span class="ico">⌂</span><span class="navlabel">Conversation inbox</span><span class="badge" id="queueBadge">0</span></button><button data-view="sources"><span class="ico">◷</span><span class="navlabel">Saved conversations</span><span class="badge" id="sourceBadge">0</span></button><button data-view="notebook"><span class="ico">▤</span><span class="navlabel">Approved notebooks</span><span class="badge" id="memoryBadge">0</span></button><button data-view="sql"><span class="ico">⌘</span><span class="navlabel">SQL Studio</span></button></nav><div class="side-bottom"><div class="privacy"><b>Source stays attached</b>Exact evidence stays attached. Personal stays in this browser. Project approval in CoMind uses the existing canonical memory route.<br><br><span class="online"><i></i> Browser-local demo</span></div></div></aside>
+<main class="main"><div class="topbar"><div class="crumb">CoMind <span>/</span> <b>Notebook</b></div><div class="top-actions"><div class="mode"><i></i>Local Test · synthetic data</div><button class="iconbtn" id="helpBtn" title="About this prototype">?</button></div></div>
+<section class="view active" id="inboxView"><header class="heading"><div><div class="eyebrow">Capture · understand · carry forward</div><h1>Conversation Notebook</h1><p>One conversation can hold personal continuity and project decisions. CoMind finds candidate items, shows the evidence, then lets you decide where each belongs.</p></div><div class="heading-actions"><button class="btn" id="loadSample">Load sample</button><button class="btn" id="exportData">Export notebook JSON</button></div></header>
+<div class="grid overview-grid"><section class="panel pad"><div class="panelhead"><h2>New conversation</h2><span class="subtle" id="charCount">0 chars</span></div><input class="field" id="sourceTitle" value="CoMind product direction discussion" aria-label="Conversation title"><div style="height:8px"></div><div class="source-meta"><input class="field" id="sourceOrigin" value="ChatGPT conversation · pasted text" aria-label="Conversation source"><label class="filepick">＋ Import .txt / .md<input id="sourceFile" type="file" accept=".txt,.md,text/plain"></label></div><textarea class="conversation" id="sourceText" aria-label="Conversation content" placeholder="Paste a conversation here or load the sample."></textarea><div class="intake-foot"><div class="footnote">Analysis runs in this page. Nothing is sent to a service.</div><div class="foot-buttons"><button class="btn" id="resetForm">Clear</button><button class="btn primary" id="analyze">Analyze and review ↗</button></div></div></section>
+<aside class="panel analysis-panel"><div class="eyebrow">Governed review loop</div><h2>Nothing is approved without your review.</h2><p>Each candidate stays linked to its source. Personal continuity stays local. A connected CoMind Test approval promotes a persisted project message into the existing canonical memory store.</p><div class="steps"><div class="step"><span>1</span><span>Capture source and observation details</span></div><div class="step"><span>2</span><span>Review findings beside the exact evidence</span></div><div class="step"><span>3</span><span>Approve or reject, then route Personal separately from project memory</span></div><div class="step"><span>4</span><span>Retrieve approved items by notebook</span></div></div><div class="local-note">This offline review surface uses local phrase rules. It does not call CoMind services. Its project entries are demonstration records only; canonical promotion is verified separately in isolated PostgreSQL Test.</div></aside></div>
+<div class="section-head"><div><h2>Review queue <span class="subtle" id="queueCount"></span></h2><p>Candidate findings with source quotes and line references.</p></div><div class="section-actions"><button class="btn" id="clearQueue">Clear queue</button></div></div><div class="findings" id="findings"><div class="empty"><b>Ready for a conversation.</b>Load the sample or paste text, then analyze it to see evidence-linked findings.</div></div></section>
+<section class="view" id="sourcesView"><header class="heading"><div><div class="eyebrow">Captured source archive</div><h1>Saved conversations</h1><p>Reopen conversations already captured in this browser. Search or sort the saved sources, then load the original text back into the intake.</p></div><div class="heading-actions"><span class="mode">Browser-local sources</span></div></header><div class="toolbar"><input class="field search" id="sourceSearch" placeholder="Search saved conversations"><select class="filter" id="sourceSort" aria-label="Sort saved conversations"><option value="newest">Newest saved</option><option value="oldest">Oldest saved</option><option value="title-asc">Title A to Z</option><option value="title-desc">Title Z to A</option><option value="longest">Longest first</option><option value="shortest">Shortest first</option></select><span class="subtle" id="sourceCount"></span></div><div class="entries" id="savedSources"><div class="empty"><b>No saved conversations yet.</b>Analyze a conversation in the inbox. Its source will appear here and remain in this browser.</div></div></section>
+<section class="view" id="notebookView"><header class="heading"><div><div class="eyebrow">Approved notebook items</div><h1>Approved notebooks</h1><p>Personal continuity stays in this browser. Project items shown here are local prototype records; connected CoMind approval uses the existing <code>comind.cm_memory_node</code> promotion and lifecycle contracts.</p></div><div class="heading-actions"><button class="btn" id="downloadJson">Download JSON</button><button class="btn danger" id="clearMemory">Clear local notebook</button></div></header><div class="stat-row"><div class="stat"><b id="totalMemory">0</b><span>approved entries</span></div><div class="stat"><b id="personalTotal">0</b><span>personal</span></div><div class="stat"><b id="projectTotal">0</b><span>project</span></div><div class="stat"><b id="sourceTotal">0</b><span>source records</span></div></div><div class="notebook-tabs"><button class="ntab active" data-filter="All">All notebooks</button><button class="ntab" data-filter="Personal">Personal</button><button class="ntab" data-filter="CoMind project">CoMind project</button></div><div class="toolbar"><input class="field search" id="search" placeholder="Search memories, sources, and evidence"><select class="filter" id="kindFilter"><option value="All">All finding types</option><option>Decision</option><option>Action</option><option>Preference</option><option>Question</option><option>Insight</option><option>Commitment</option></select></div><div class="entries" id="entries"><div class="empty"><b>No approved memories yet.</b>Approve an item from the review queue to begin.</div></div></section>
+<section class="view" id="sqlView"><header class="heading"><div><div class="eyebrow">Relational model · provenance · isolation</div><h1>Test schema fixture</h1><p>Disposable PostgreSQL Test storage for source records, candidate findings, exact evidence, and review events. Approved project memory links to the canonical CoMind row.</p></div><div class="heading-actions"><button class="btn" id="copySql">Copy SQL</button><button class="btn primary" id="saveSql">Download Test fixture</button></div></header><div class="sql-layout"><div class="sql-box"><div class="sql-toolbar"><b>conversation_notebook_fixture.sql</b><span>Disposable PostgreSQL 17 only</span></div><pre class="sql-code"><code id="sqlCode"></code></pre></div><aside class="panel sql-aside"><div><h3>What the schema captures</h3><p>The fixture holds review state and an optional link to existing CoMind project memory.</p><div class="schema-list"><div class="schema-item"><b>source_records</b> Source text, origin, hash, project identity</div><div class="schema-item"><b>findings</b> Candidate, approved, rejected</div><div class="schema-item"><b>evidence_spans</b> Exact quote and code-point offsets</div><div class="schema-item"><b>review_events</b> Append-only approval and rejection</div><div class="schema-item"><b>cm_memory_node</b> Existing canonical project destination</div></div></div><div><h3>Scope boundary</h3><p>CoMind project identity uses the canonical project UUID. Personal continuity is separate and local in this prototype. The active CoMind database is not the Test database.</p><div class="warning">Test fixture only. Never apply it to production. It creates no second memory table, runtime service, grant, or production identity contract.</div></div></aside></div></section>
+<div class="footer"><span>CoMind Conversation Notebook · interactive Test artifact</span><span>Local-only prototype · no live database connection · synthetic sample</span></div></main></div><div class="toast" id="toast"></div>
+<script type="text/plain" id="sqlSource">
+-- Disposable PostgreSQL 17 fixture only. Loaded by scripts/test_conversation_lifecycle.sh.
+-- This schema is never installed by db/sql/v2 or db/migrations.
+-- Notebook stores intake, candidate findings, evidence, review, and a link to the
+-- canonical project memory row. It does not create a second durable memory table.
+
+DROP SCHEMA IF EXISTS comind_notebook CASCADE;
+CREATE SCHEMA comind_notebook;
+
+CREATE TABLE comind_notebook.source_records (
+  source_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  scope TEXT NOT NULL CHECK (scope IN ('personal', 'project')),
+  project_id UUID REFERENCES comind.cm_project(project_id) ON DELETE RESTRICT,
+  source_conversation_id UUID REFERENCES comind.cm_conversation(conv_id) ON DELETE RESTRICT,
+  captured_by UUID NOT NULL REFERENCES comind.cm_actor(actor_id) ON DELETE RESTRICT,
+  title TEXT NOT NULL CHECK (length(btrim(title)) > 0),
+  source_type TEXT NOT NULL CHECK (source_type IN ('paste', 'text_file', 'synthetic')),
+  source_ref TEXT,
+  raw_text TEXT NOT NULL CHECK (length(raw_text) > 0),
+  content_sha256 CHAR(64) NOT NULL CHECK (content_sha256 ~ '^[0-9a-f]{64}$'),
+  captured_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (source_id, project_id),
+  UNIQUE NULLS NOT DISTINCT (scope, project_id, content_sha256),
+  CHECK ((scope = 'personal' AND project_id IS NULL)
+      OR (scope = 'project' AND project_id IS NOT NULL)),
+  CHECK ((scope = 'personal' AND source_conversation_id IS NULL)
+      OR (scope = 'project' AND source_conversation_id IS NOT NULL))
+);
+
+CREATE TABLE comind_notebook.findings (
+  finding_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  source_id UUID NOT NULL,
+  project_id UUID,
+  source_message_id UUID REFERENCES comind.cm_message(msg_id) ON DELETE RESTRICT,
+  kind TEXT NOT NULL CHECK (kind IN ('decision', 'action', 'preference', 'question', 'insight', 'commitment')),
+  content TEXT NOT NULL CHECK (length(btrim(content)) > 0),
+  content_sha256 CHAR(64) NOT NULL CHECK (content_sha256 ~ '^[0-9a-f]{64}$'),
+  extractor_version TEXT NOT NULL CHECK (length(btrim(extractor_version)) > 0),
+  status TEXT NOT NULL DEFAULT 'candidate' CHECK (status IN ('candidate', 'approved', 'rejected')),
+  destination TEXT CHECK (destination IN ('personal_local', 'project_memory')),
+  memory_id UUID REFERENCES comind.cm_memory_node(memory_id) ON DELETE RESTRICT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (source_id, finding_id),
+  UNIQUE NULLS NOT DISTINCT (source_id, source_message_id, extractor_version, kind, content_sha256),
+  FOREIGN KEY (source_id, project_id)
+    REFERENCES comind_notebook.source_records(source_id, project_id) ON DELETE RESTRICT,
+  CHECK ((status = 'candidate' AND destination IS NULL AND memory_id IS NULL)
+      OR (status = 'rejected' AND destination IS NULL AND memory_id IS NULL)
+      OR (status = 'approved' AND destination = 'personal_local' AND project_id IS NULL AND memory_id IS NULL)
+      OR (status = 'approved' AND destination = 'project_memory' AND project_id IS NOT NULL
+          AND source_message_id IS NOT NULL AND memory_id IS NOT NULL))
+);
+
+CREATE TABLE comind_notebook.evidence_spans (
+  evidence_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  source_id UUID NOT NULL,
+  finding_id UUID NOT NULL,
+  start_char INTEGER NOT NULL CHECK (start_char >= 0),
+  end_char INTEGER NOT NULL CHECK (end_char > start_char),
+  line_number INTEGER NOT NULL CHECK (line_number > 0),
+  excerpt TEXT NOT NULL CHECK (length(excerpt) > 0),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (finding_id, start_char, end_char),
+  FOREIGN KEY (source_id, finding_id)
+    REFERENCES comind_notebook.findings(source_id, finding_id) ON DELETE RESTRICT
+);
+
+CREATE TABLE comind_notebook.review_events (
+  review_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  finding_id UUID NOT NULL UNIQUE REFERENCES comind_notebook.findings(finding_id) ON DELETE RESTRICT,
+  reviewer_id UUID NOT NULL REFERENCES comind.cm_actor(actor_id) ON DELETE RESTRICT,
+  decision TEXT NOT NULL CHECK (decision IN ('approve', 'reject')),
+  destination TEXT CHECK (destination IN ('personal_local', 'project_memory')),
+  memory_id UUID REFERENCES comind.cm_memory_node(memory_id) ON DELETE RESTRICT,
+  note TEXT,
+  occurred_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK ((decision = 'reject' AND destination IS NULL AND memory_id IS NULL)
+      OR (decision = 'approve' AND destination = 'personal_local' AND memory_id IS NULL)
+      OR (decision = 'approve' AND destination = 'project_memory' AND memory_id IS NOT NULL))
+);
+
+CREATE INDEX source_records_project_captured_idx
+  ON comind_notebook.source_records(project_id, captured_at DESC);
+CREATE INDEX findings_source_status_idx
+  ON comind_notebook.findings(source_id, status, created_at);
+CREATE INDEX findings_project_memory_idx
+  ON comind_notebook.findings(project_id, memory_id)
+  WHERE destination = 'project_memory';
+CREATE INDEX evidence_finding_idx
+  ON comind_notebook.evidence_spans(source_id, finding_id, line_number);
+
+CREATE FUNCTION comind_notebook.prevent_review_event_mutation()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RAISE EXCEPTION 'Notebook review events are append-only';
+END;
+$$;
+
+CREATE TRIGGER review_events_no_update
+BEFORE UPDATE OR DELETE ON comind_notebook.review_events
+FOR EACH ROW EXECUTE FUNCTION comind_notebook.prevent_review_event_mutation();
+
+CREATE TRIGGER source_records_no_update
+BEFORE UPDATE OR DELETE ON comind_notebook.source_records
+FOR EACH ROW EXECUTE FUNCTION comind_notebook.prevent_review_event_mutation();
+
+CREATE TRIGGER evidence_spans_no_update
+BEFORE UPDATE OR DELETE ON comind_notebook.evidence_spans
+FOR EACH ROW EXECUTE FUNCTION comind_notebook.prevent_review_event_mutation();
+
+CREATE FUNCTION comind_notebook.validate_source_scope()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF NEW.scope = 'project' AND NOT EXISTS (
+    SELECT 1 FROM comind.cm_conversation c
+    WHERE c.conv_id = NEW.source_conversation_id AND c.project_id = NEW.project_id
+  ) THEN
+    RAISE EXCEPTION 'Source conversation is outside the canonical project';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER source_records_project_scope
+BEFORE INSERT ON comind_notebook.source_records
+FOR EACH ROW EXECUTE FUNCTION comind_notebook.validate_source_scope();
+
+CREATE FUNCTION comind_notebook.guard_finding_transition()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF OLD.status <> 'candidate'
+     OR NEW.status NOT IN ('approved', 'rejected')
+     OR NEW.finding_id IS DISTINCT FROM OLD.finding_id
+     OR NEW.source_id IS DISTINCT FROM OLD.source_id
+     OR NEW.project_id IS DISTINCT FROM OLD.project_id
+     OR NEW.source_message_id IS DISTINCT FROM OLD.source_message_id
+     OR NEW.kind IS DISTINCT FROM OLD.kind
+     OR NEW.content IS DISTINCT FROM OLD.content
+     OR NEW.content_sha256 IS DISTINCT FROM OLD.content_sha256
+     OR NEW.extractor_version IS DISTINCT FROM OLD.extractor_version
+     OR NEW.created_at IS DISTINCT FROM OLD.created_at THEN
+    RAISE EXCEPTION 'Finding transition is unavailable or changes immutable evidence';
+  END IF;
+  IF NEW.destination = 'project_memory' AND NOT EXISTS (
+    SELECT 1 FROM comind.cm_memory_node m
+    WHERE m.memory_id = NEW.memory_id AND m.project_id = NEW.project_id
+  ) THEN
+    RAISE EXCEPTION 'Project approval must link memory in the finding project';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER findings_review_transition_only
+BEFORE UPDATE ON comind_notebook.findings
+FOR EACH ROW EXECUTE FUNCTION comind_notebook.guard_finding_transition();
+
+CREATE FUNCTION comind_notebook.validate_finding_source_scope()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF NEW.project_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1
+    FROM comind.cm_message m
+    JOIN comind.cm_conversation c ON c.conv_id = m.conv_id
+    JOIN comind_notebook.source_records s ON s.source_id = NEW.source_id
+    WHERE m.msg_id = NEW.source_message_id
+      AND c.project_id = NEW.project_id
+      AND c.conv_id = s.source_conversation_id
+  ) THEN
+    RAISE EXCEPTION 'Finding source message is outside the canonical project';
+  END IF;
+  IF NEW.project_id IS NULL AND NEW.source_message_id IS NOT NULL THEN
+    RAISE EXCEPTION 'Personal findings do not link into a CoMind project conversation';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER findings_source_scope
+BEFORE INSERT OR UPDATE ON comind_notebook.findings
+FOR EACH ROW EXECUTE FUNCTION comind_notebook.validate_finding_source_scope();
+
+CREATE FUNCTION comind_notebook.validate_exact_evidence()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_raw_text TEXT;
+  v_line_number INTEGER;
+BEGIN
+  SELECT raw_text INTO v_raw_text
+  FROM comind_notebook.source_records
+  WHERE source_id = NEW.source_id;
+  IF v_raw_text IS NULL
+     OR NEW.end_char > char_length(v_raw_text)
+     OR substring(v_raw_text FROM NEW.start_char + 1 FOR NEW.end_char - NEW.start_char) <> NEW.excerpt THEN
+    RAISE EXCEPTION 'Evidence excerpt does not match its exact source span';
+  END IF;
+  v_line_number := 1 + char_length(substring(v_raw_text FROM 1 FOR NEW.start_char))
+                    - char_length(replace(substring(v_raw_text FROM 1 FOR NEW.start_char), E'\n', ''));
+  IF v_line_number <> NEW.line_number THEN
+    RAISE EXCEPTION 'Evidence line number does not match its source offset';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER evidence_exact_source_span
+BEFORE INSERT OR UPDATE ON comind_notebook.evidence_spans
+FOR EACH ROW EXECUTE FUNCTION comind_notebook.validate_exact_evidence();
+
+COMMENT ON SCHEMA comind_notebook IS
+  'Disposable Test fixture for Notebook intake and human review. Not a production migration or durable memory authority.';
+</script>
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];const sample=`Joseph: I want CoMind to help with both personal continuity and project operations. Why build separate ingestion systems if the source and analysis can be shared?
+Assistant: We can share the analysis pipeline and keep Personal memory separate from each project space. Every finding should link back to the conversation that supports it.
+Joseph: That sounds right. Please keep my personal continuity separate from CoMind project decisions.
+Joseph: For the first test, let's start with pasted or uploaded conversations. Later we can add other sources.
+Assistant: The first loop can be conversation intake, reviewable findings, approval into a memory space, and later retrieval.
+Joseph: I want to see what CoMind thinks it found before anything becomes durable memory.
+Assistant: We should test one complete flow in the browser before expanding integrations.
+Joseph: Next, build the intake and review experience in a local Test prototype.`;
+const sql=$('#sqlSource').textContent.trim();$('#sqlCode').textContent=sql;
+const rules=[{kind:'decision',label:'Decision',rx:[/\bwe can\b/i,/\bwe will\b/i,/\bkeep .{0,90} separate\b/i,/\blet's start with\b/i,/\bwe should\b/i]},{kind:'action',label:'Action',rx:[/\bplease build\b/i,/\bnext,? build\b/i,/\bneed to (?:build|test|review|add|create)\b/i,/\bstart with\b/i]},{kind:'preference',label:'Preference',rx:[/\bi want\b/i,/\bi prefer\b/i,/\bplease keep\b/i,/\bmake sure\b/i]},{kind:'question',label:'Question',rx:[/\?\s*$/]},{kind:'insight',label:'Insight',rx:[/\bwhy build\b/i,/\bevery finding should\b/i,/\bthe first loop\b/i]},{kind:'commitment',label:'Commitment',rx:[/\bwe will\b/i,/\bi will\b/i,/\bnext,?\s+(?:i|we) will\b/i]}];
+let queue=[], memories=[], sources=[], localPersistence=true, sourceSort='newest';try{const store=window.localStorage;queue=JSON.parse(store.getItem('comind-notebook-queue')||'[]');memories=JSON.parse(store.getItem('comind-notebook-memories')||'[]');sources=JSON.parse(store.getItem('comind-notebook-sources')||'[]');sourceSort=store.getItem('comind-notebook-source-sort')||'newest'}catch{localPersistence=false}
+function newId(){return globalThis.crypto&&typeof globalThis.crypto.randomUUID==='function'?globalThis.crypto.randomUUID():String(Date.now())+'-'+Math.random().toString(36).slice(2)}
+function save(){try{if(localPersistence){localStorage.setItem('comind-notebook-queue',JSON.stringify(queue));localStorage.setItem('comind-notebook-memories',JSON.stringify(memories));localStorage.setItem('comind-notebook-sources',JSON.stringify(sources));localStorage.setItem('comind-notebook-source-sort',sourceSort)}}catch{localPersistence=false}updateBadges();renderQueue();renderNotebook();renderSources()}
+function toast(msg){let t=$('#toast');t.textContent=msg;t.classList.add('show');clearTimeout(window.toastTimer);window.toastTimer=setTimeout(()=>t.classList.remove('show'),2100)}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function updateBadges(){$('#queueBadge').textContent=queue.length;$('#sourceBadge').textContent=sources.length;$('#memoryBadge').textContent=memories.length;$('#queueCount').textContent=queue.length?`· ${queue.length} candidates`:''}
+function analyze(){let raw=$('#sourceText').value.trim();if(!raw){toast('Paste a conversation or load the sample first.');$('#sourceText').focus();return}const title=$('#sourceTitle').value.trim()||'Untitled conversation';const sourceId=newId();let origin=$('#sourceOrigin').value.trim()||'Pasted text';let source=sources.find(s=>s.title===title&&s.origin===origin&&s.text===raw);if(!source){source={id:sourceId,title,origin,text:raw,importedAt:new Date().toISOString()};sources.unshift(source)}let rows=[],cursor=0;for(const [i,line] of raw.split(/\n/).entries()){const exactLine=line.replace(/\r$/,'');const text=exactLine.trim();if(text){const startUtf16=cursor+exactLine.indexOf(text),endUtf16=startUtf16+text.length;rows.push({text,line:i+1,startChar:Array.from(raw.slice(0,startUtf16)).length,endChar:Array.from(raw.slice(0,endUtf16)).length})}cursor+=line.length+1}let lines=rows;let candidates=[];for(const row of lines){let text=row.text.replace(/^[^:]{1,48}:\s*/,'');let hits=rules.filter(r=>r.rx.some(p=>p.test(text)));if(!hits.length)continue;let rule=hits[0];if(/\b(?:i want|i prefer|please keep|make sure)\b/i.test(text))rule=rules.find(r=>r.kind==='preference');else if(/\bwhy build\b/i.test(text))rule=rules.find(r=>r.kind==='insight');else if(/\bwe will\b/i.test(text))rule=rules.find(r=>r.kind==='commitment');let normalized=text.replace(/[.!?]+$/,'');let key=rule.kind+'|'+normalized.toLowerCase();if(candidates.some(c=>c.key===key))continue;let scope=rule.kind==='preference'?'Personal':'CoMind project';if(queue.some(c=>c.sourceId===source.id&&c.key===key&&c.evidenceStart===row.startChar&&c.evidenceEnd===row.endChar)||memories.some(c=>c.sourceId===source.id&&c.key===key&&c.evidenceStart===row.startChar&&c.evidenceEnd===row.endChar))continue;candidates.push({id:crypto.randomUUID?crypto.randomUUID():String(Math.random()),sourceId:source.id,sourceTitle:title,origin:source.origin,kind:rule.kind,label:rule.label,text:normalized,evidence:row.text,evidenceStart:row.startChar,evidenceEnd:row.endChar,line:row.line,scope,key,createdAt:new Date().toISOString()})}queue=[...candidates,...queue];save();toast(`${candidates.length} candidate findings added to review.`);$('#findings').scrollIntoView({behavior:'smooth',block:'start'})}
+function renderQueue(){const box=$('#findings');if(!queue.length){box.innerHTML='<div class="empty"><b>Review queue is clear.</b>Load a conversation to create evidence-linked candidates.</div>';return}box.innerHTML=queue.map(f=>`<article class="finding"><div class="finding-top"><span class="tag ${esc(f.kind)}">${esc(f.label)}</span><span class="trace">${esc(f.sourceTitle)} · line ${f.line}</span></div><h3>${esc(f.text)}</h3><div class="quote"><b>Evidence · ${esc(f.origin)} · code points ${f.evidenceStart}–${f.evidenceEnd}</b>${esc(f.evidence)}</div><div class="finding-foot"><label class="route">Notebook <select data-route="${esc(f.id)}"><option ${f.scope==='Personal'?'selected':''}>Personal</option><option ${f.scope==='CoMind project'?'selected':''}>CoMind project</option></select></label><div class="finding-buttons"><button class="mini no" data-reject="${esc(f.id)}">Reject</button><button class="mini ok" data-approve="${esc(f.id)}">Approve</button></div></div></article>`).join('');box.querySelectorAll('[data-route]').forEach(s=>s.addEventListener('change',()=>{let f=queue.find(x=>x.id===s.dataset.route);if(f)f.scope=s.value}));box.querySelectorAll('[data-approve]').forEach(b=>b.addEventListener('click',()=>approve(b.dataset.approve)));box.querySelectorAll('[data-reject]').forEach(b=>b.addEventListener('click',()=>reject(b.dataset.reject)))}
+function approve(id){let f=queue.find(x=>x.id===id);if(!f)return;memories.unshift({...f,savedAt:new Date().toISOString(),event:'approved',localDemo:true});queue=queue.filter(x=>x.id!==id);save();toast(f.scope==='CoMind project'?'Saved in this browser only. Canonical CoMind promotion is not called here.':'Saved in the local Personal notebook.')}function reject(id){let f=queue.find(x=>x.id===id);if(!f)return;queue=queue.filter(x=>x.id!==id);sources=sources.map(s=>s.id===f.sourceId?{...s,rejected:(s.rejected||0)+1}:s);save();toast('Candidate rejected. Source record retained.')}
+function openSource(id){const source=sources.find(item=>item.id===id);if(!source){toast('Saved conversation not found.');return}$('#sourceTitle').value=source.title||'Untitled conversation';$('#sourceOrigin').value=source.origin||'Pasted text';$('#sourceText').value=source.text||'';countChars();go('inbox');toast('Saved conversation loaded into intake.')}
+function renderSources(){const box=$('#savedSources');if(!box)return;const query=$('#sourceSearch').value.trim().toLowerCase();const collator=new Intl.Collator(undefined,{sensitivity:'base',numeric:true});let rows=sources.map((source,index)=>({...source,_index:index})).filter(source=>!query||[source.title,source.origin,source.text].join(' ').toLowerCase().includes(query));const dates=source=>{const time=Date.parse(source.importedAt||'');return Number.isFinite(time)?time:0};rows.sort((a,b)=>{let order=0;if(sourceSort==='newest')order=dates(b)-dates(a);else if(sourceSort==='oldest')order=dates(a)-dates(b);else if(sourceSort==='title-asc')order=collator.compare(a.title||'',b.title||'');else if(sourceSort==='title-desc')order=collator.compare(b.title||'',a.title||'');else if(sourceSort==='longest')order=(b.text||'').length-(a.text||'').length;else if(sourceSort==='shortest')order=(a.text||'').length-(b.text||'').length;return order||a._index-b._index});$('#sourceCount').textContent=`${rows.length} of ${sources.length} conversations`;if(!rows.length){box.innerHTML=sources.length?'<div class="empty"><b>No matching conversations.</b>Try a different search.</div>':'<div class="empty"><b>No saved conversations yet.</b>Analyze a conversation in the inbox. Its source will appear here and remain in this browser.</div>';return}box.innerHTML=rows.map(source=>{const candidateCount=queue.filter(item=>item.sourceId===source.id).length;const approvedCount=memories.filter(item=>item.sourceId===source.id).length;const saved=source.importedAt?new Date(source.importedAt).toLocaleString():'Saved locally';const preview=(source.text||'').replace(/\s+/g,' ').trim().slice(0,220);return `<article class="entry"><div class="entry-scope">${(source.text||'').length.toLocaleString()} chars<div style="margin-top:5px;color:#849cab;font-weight:500;letter-spacing:0">${candidateCount} candidates · ${approvedCount} approved</div></div><div class="entry-text"><b>${esc(source.title||'Untitled conversation')}</b><small>${esc(source.origin||'Pasted text')} · saved ${esc(saved)}</small><small>${esc(preview)}${(source.text||'').length>220?'…':''}</small></div><div class="entry-tools"><button class="mini" data-open-source="${esc(source.id)}">Load</button></div></article>`}).join('');box.querySelectorAll('[data-open-source]').forEach(button=>button.addEventListener('click',()=>openSource(button.dataset.openSource)))}
+if(!['newest','oldest','title-asc','title-desc','longest','shortest'].includes(sourceSort))sourceSort='newest';$('#sourceSort').value=sourceSort;
+let scopeFilter='All';function renderNotebook(){let q=$('#search').value.toLowerCase(),kind=$('#kindFilter').value;let rows=memories.filter(m=>(scopeFilter==='All'||m.scope===scopeFilter)&&(kind==='All'||m.label===kind)&&(!q||[m.text,m.sourceTitle,m.origin,m.evidence,m.scope].join(' ').toLowerCase().includes(q)));$('#totalMemory').textContent=memories.length;$('#personalTotal').textContent=memories.filter(m=>m.scope==='Personal').length;$('#projectTotal').textContent=memories.filter(m=>m.scope==='CoMind project').length;$('#sourceTotal').textContent=sources.length;let box=$('#entries');if(!rows.length){box.innerHTML='<div class="empty"><b>No matching memories.</b>Try another notebook or search term, or approve a finding from the inbox.</div>';return}box.innerHTML=rows.map(m=>`<article class="entry"><div class="entry-scope">${esc(m.scope)}<div style="margin-top:5px;color:#849cab;font-weight:500;letter-spacing:0">${esc(m.label)}</div></div><div class="entry-text">${esc(m.text)}<small>Source: ${esc(m.sourceTitle)} · line ${m.line} · saved ${new Date(m.savedAt).toLocaleString()}<br>Evidence: “${esc(m.evidence)}”</small></div><div class="entry-tools"><button class="mini" data-open="${esc(m.sourceId)}">Source</button><button class="mini no" data-delete="${esc(m.id)}">Delete</button></div></article>`).join('');box.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>{let s=sources.find(x=>x.id===b.dataset.open);if(!s){toast('Source record not found.');return}$('#sourceTitle').value=s.title;$('#sourceOrigin').value=s.origin;$('#sourceText').value=s.text;countChars();go('inbox');toast('Source loaded into conversation intake.')}));box.querySelectorAll('[data-delete]').forEach(b=>b.addEventListener('click',()=>{memories=memories.filter(m=>m.id!==b.dataset.delete);save();toast('Memory entry deleted locally.')}))}
+function go(name){$$('.view').forEach(v=>v.classList.remove('active'));$('#'+name+'View').classList.add('active');$$('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===name));if(name==='notebook')renderNotebook();if(name==='sources')renderSources();window.scrollTo({top:0,behavior:'smooth'})}
+$$('.nav button').forEach(b=>b.addEventListener('click',()=>go(b.dataset.view)));$('#analyze').addEventListener('click',analyze);$('#loadSample').addEventListener('click',()=>{$('#sourceTitle').value='CoMind product direction discussion';$('#sourceOrigin').value='ChatGPT conversation · sample';$('#sourceText').value=sample;countChars();$('#sourceText').focus();toast('Sample loaded. Review it, then select Analyze and review.')});$('#resetForm').addEventListener('click',()=>{$('#sourceTitle').value='';$('#sourceOrigin').value='Pasted text';$('#sourceText').value='';countChars()});$('#sourceFile').addEventListener('change',async e=>{let f=e.target.files[0];if(!f)return;$('#sourceTitle').value=f.name;$('#sourceOrigin').value='Text file · '+f.name;$('#sourceText').value=await f.text();countChars();e.target.value='';toast('Text file loaded. Review before analysis.')});function countChars(){$('#charCount').textContent=$('#sourceText').value.length.toLocaleString()+' chars'}$('#sourceText').addEventListener('input',countChars);$('#clearQueue').addEventListener('click',()=>{queue=[];save();toast('Review queue cleared. Source records remain.')});$('#search').addEventListener('input',renderNotebook);$('#sourceSearch').addEventListener('input',renderSources);$('#sourceSort').addEventListener('change',()=>{sourceSort=$('#sourceSort').value;try{localStorage.setItem('comind-notebook-source-sort',sourceSort)}catch{localPersistence=false}renderSources()});$('#kindFilter').addEventListener('change',renderNotebook);$$('.ntab').forEach(b=>b.addEventListener('click',()=>{$$('.ntab').forEach(x=>x.classList.remove('active'));b.classList.add('active');scopeFilter=b.dataset.filter;renderNotebook()}));function exportNotebook(){let data={exportedAt:new Date().toISOString(),notebooks:[{name:'Personal · browser local',scope:'personal'},{name:'CoMind project · local prototype only',scope:'project'}],sources,reviewQueue:queue,approvedNotebookItems:memories};let blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});let a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='comind-notebook-export.json';a.click();URL.revokeObjectURL(a.href);toast('Notebook JSON exported.')}$('#exportData').addEventListener('click',exportNotebook);$('#downloadJson').addEventListener('click',exportNotebook);$('#clearMemory').addEventListener('click',()=>{if(!confirm('Delete all notebook entries, source records, and review candidates saved in this browser?'))return;memories=[];sources=[];queue=[];save();toast('Local notebook data cleared.')});$('#copySql').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(sql);toast('SQL copied to clipboard.')}catch{toast('Clipboard access unavailable. Use Download Test fixture.')}});$('#saveSql').addEventListener('click',()=>{let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([sql+'\n'],{type:'text/sql'}));a.download='conversation_notebook_fixture.sql';a.click();URL.revokeObjectURL(a.href);toast('Test-only SQL fixture downloaded.')});$('#helpBtn').addEventListener('click',()=>alert('This is an offline, browser-local prototype. Analysis uses phrase rules and local storage. Project approvals are demo records only. The SQL download is a disposable Test fixture, not a production migration.'));updateBadges();renderQueue();renderNotebook();renderSources();countChars();
+</script>
+</body>
+</html>

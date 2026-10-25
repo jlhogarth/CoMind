@@ -145,6 +145,12 @@ export function classifyWorkflowHealth({
         jobCount: jobs.length,
       });
     }
+    if (conclusion === 'startup_failure') {
+      return result(base, 'startup_failure', 'critical', 'GitHub could not start executable workflow work; this is a narrowly eligible transient-fault class.', {
+        ageSeconds,
+        jobCount: jobs.length,
+      });
+    }
     if (conclusion === 'cancelled') {
       return result(base, 'cancelled', 'warning', 'Workflow was cancelled before successful completion.', {
         ageSeconds,

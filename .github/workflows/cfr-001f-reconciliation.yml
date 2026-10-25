@@ -10,7 +10,7 @@ on:
       - 'db/migrations/20261025_007_native_chatgpt_live_reconciliation.sql'
       - 'db/migrations/20261025_008_native_chatgpt_live_reconciliation_live_read_boundary.sql'
       - 'db/migrations/20261025_009_native_chatgpt_live_reconciliation_ambiguity_hardening.sql'
-      - 'db/verification/cfr_001f_reconciler_live_read_boundary.sql'
+      - 'db/verification/cfr_001f_*'
       - 'db/sql/v2/**'
       - 'scripts/test_cfr_001f_reconciliation.sh'
       - 'server/src/archive/chatgpt-live-reconcile*.ts'
@@ -85,3 +85,53 @@ jobs:
 
       - name: Verify reconciler can read sources but cannot mutate them
         run: psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f ./db/verification/cfr_001f_reconciler_live_read_boundary.sql
+
+      - name: Seed active-branch and constrained-login execution fixture
+        run: psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f ./db/verification/cfr_001f_execution_fixture.sql
+
+      - name: Verify constrained reconciliation login preflight
+        env:
+          COMIND_DATABASE_PURPOSE: chatgpt_reconciliation
+          CHATGPT_RECONCILIATION_DATABASE_URL: postgresql://comind_reconciliation_test_login:cfr001f-local-only@localhost:5432/comind_ci
+        run: node ./server/dist/archive/chatgpt-live-reconcile-cli.js --preflight-only
+
+      - name: Reconcile exact synthetic pair twice and prove idempotency
+        env:
+          COMIND_DATABASE_PURPOSE: chatgpt_reconciliation
+          CHATGPT_RECONCILIATION_DATABASE_URL: postgresql://comind_reconciliation_test_login:cfr001f-local-only@localhost:5432/comind_ci
+        run: |
+          first="$(node ./server/dist/archive/chatgpt-live-reconcile-cli.js \
+            --import-id f0010001-0000-4000-8000-000000000102 \
+            --source-conversation-id native-conversation-1 \
+            --cutoff 2026-10-25T18:01:00Z)"
+          second="$(node ./server/dist/archive/chatgpt-live-reconcile-cli.js \
+            --import-id f0010001-0000-4000-8000-000000000102 \
+            --source-conversation-id native-conversation-1 \
+            --cutoff 2026-10-25T18:01:00Z)"
+          FIRST="${first}" SECOND="${second}" python3 - <<'PY'
+          import json
+          import os
+          first = json.loads(os.environ['FIRST'])
+          second = json.loads(os.environ['SECOND'])
+          a = first['reconciliation']
+          b = second['reconciliation']
+          assert first['preflight']['currentUser'] == 'comind_conversation_reconciler'
+          assert a['result'] == 'exact_match'
+          assert a['matchMethod'] == 'explicit_source_id'
+          assert a['selectedConvId'] == 'f0010001-0000-4000-8000-000000000001'
+          assert a['reused'] is False
+          assert b['reused'] is True
+          assert a['reconciliationId'] == b['reconciliationId']
+          assert a['receiptSha256'] == b['receiptSha256']
+          print('CFR-001F constrained-login reconciliation idempotency PASS')
+          PY
+
+      - name: Verify source evidence remained immutable
+        run: |
+          psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -At <<'SQL'
+          SELECT CASE WHEN
+            (SELECT count(*) FROM comind.cm_message WHERE conv_id='f0010001-0000-4000-8000-000000000001')=2
+            AND (SELECT count(*) FROM comind.cm_archive_node_observation WHERE import_id='f0010001-0000-4000-8000-000000000102')=2
+            AND (SELECT count(*) FROM comind.cm_conversation_reconciliation_receipt WHERE import_id='f0010001-0000-4000-8000-000000000102')=2
+          THEN 'PASS' ELSE 'FAIL' END;
+          SQL

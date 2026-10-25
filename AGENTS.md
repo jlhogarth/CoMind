@@ -55,3 +55,23 @@ Preserve established CoMind agent names and their canonical identifiers. Do not 
 ## No silent delegated work
 
 Long-running delegated operations must have a durable owner, status, terminal condition, recovery or escalation path, and an appropriate completion notification. Any temporary monitor must be retired after its terminal condition is verified. Do not claim a monitor exists unless its configuration has been verified.
+
+## Own the outcome and anticipate the blocker
+
+Standing user direction recorded 2026-10-24, issue #170. Apply to every authorized task and carry forward at handoff.
+
+- Before asking Joseph for manual work, inspect available connectors, shell/CLI access, browser operation, reusable implementations and alternate execution environments. Prefer an existing trustworthy path over reinvention. Do not assume tools or credentials are available without checking.
+- Identify the next milestone's prerequisites before starting. Consider materially different approaches and recommend the smallest effective path, accounting for cost, reversibility, authority and evidence.
+- After two failures of the same mechanism, stop repeating it. Diagnose and switch methods within authority. Switch earlier when evidence shows the approach is unsuitable. Never bypass security or approval boundaries.
+- Do safe, reversible, authorized work autonomously. Ask only for missing decisions, required access or authority. Explain the exact blocker and continue independent work when possible.
+- Before declaring completion, verify the actual result and record evidence. Distinguish proposed, attempted, implemented, tested, deployed and operational states.
+- Maintain one active implementation lane by default. Give each lane an outcome, owner, state, dependency, smallest next action and acceptance evidence. Move to the next lane only after verified completion or a recorded blocker and explicit queue transition.
+- Improve this procedure when new problems reveal gaps. Record the failure mechanism, successful workaround, applicability, limits and next-time trigger in existing provenance records. Avoid duplicating canonical facts across registers.
+- At handoff preserve current branch/head, uncommitted work, completed checks, unresolved blockers, next action and authority boundary. Never imply a background agent or monitor is running without verified execution.
+- Measure usefulness through repeated failure count, avoidable manual handoffs, time to unblock and verified milestone completion. These are proposed review measures until actual measurements exist, not a claim that instrumentation is operating.
+
+Proven workaround: browser-operated VS Code Codespaces terminal completed the operator-console Next.js 16.4.1 update and checks in the 2026-10-24 session. Verify repository, branch, working tree and prompt before entering commands; use an idle terminal; observe exit status and output. Browser session access, cold startup and terminal visibility remain limitations. This is an available method, not a guarantee of universal access.
+
+Moment/public naming remains on hold at Joseph's direction. Internal development and isolated previews can proceed; external brand clearance, domain purchase and Workspace tenant commitments remain separate decisions.
+
+Current prioritized snapshot: docs/roadmap/2026-10-24-open-lanes.md. Refresh source issues and PRs before execution; do not treat the snapshot as current runtime evidence.

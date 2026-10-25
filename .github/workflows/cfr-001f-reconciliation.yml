@@ -8,6 +8,8 @@ on:
       - 'db/migrations/20261012_002_chatgpt_archive_quarantine.sql'
       - 'db/migrations/20261012_003_chatgpt_archive_access_hardening.sql'
       - 'db/migrations/20261025_007_native_chatgpt_live_reconciliation.sql'
+      - 'db/migrations/20261025_008_native_chatgpt_live_reconciliation_live_read_boundary.sql'
+      - 'db/verification/cfr_001f_reconciler_live_read_boundary.sql'
       - 'db/sql/v2/**'
       - 'scripts/test_cfr_001f_reconciliation.sh'
       - 'server/src/archive/chatgpt-live-reconcile.ts'
@@ -61,3 +63,9 @@ jobs:
 
       - name: Verify reconciliation substrate against isolated PostgreSQL
         run: bash ./scripts/test_cfr_001f_reconciliation.sh
+
+      - name: Apply reconciler live-read RLS boundary
+        run: psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f ./db/migrations/20261025_008_native_chatgpt_live_reconciliation_live_read_boundary.sql
+
+      - name: Verify reconciler can read sources but cannot mutate them
+        run: psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f ./db/verification/cfr_001f_reconciler_live_read_boundary.sql

@@ -1,10 +1,12 @@
 # CoMind Lane Health Sentinel
 
-Status: repository design and tested classification foundation for Issue #115. No background sentinel, PR commenting, automatic rerun, merge authority, deployment, or external notification is claimed by this document.
+Status: tested read-only lane-health system for Issue #115. The pull-request observer has been demonstrated against live GitHub workflow data. The trusted background watcher is implemented and exact-head verified but is not called operational until it is merged to `main` and demonstrated from trusted default-branch code on a controlled pull request.
+
+No PR commenting, automatic rerun, merge authority, branch mutation, deployment, paid-resource action, or production mutation is enabled by this implementation.
 
 ## Purpose
 
-The Lane Health Sentinel makes GitHub development work observable at the timescale of the workflows themselves. It must distinguish absence, waiting, queue delay, active progress, deterministic failure, orchestration failure, cancellation, timeout, stale-head evidence, and successful completion without collapsing those states into a generic red or green label.
+The Lane Health Sentinel makes GitHub development work observable at the timescale of the workflows themselves. It distinguishes absence, waiting, queue delay, active progress, deterministic failure, orchestration failure, cancellation, timeout, stale-head evidence, and successful completion without collapsing those states into a generic red or green label.
 
 Governing doctrine:
 
@@ -18,11 +20,11 @@ Every lane-health decision is bound to one expected pull-request head SHA.
 
 Evidence from another SHA is `stale_head_evidence` and cannot establish current lane health, even when that older evidence is successful.
 
-A lane summary must fail closed if any workflow classification was produced for a different expected head.
+A lane summary fails closed if any workflow classification was produced for a different expected head.
 
 ## Observation states
 
-The classifier currently distinguishes:
+The classifier distinguishes:
 
 - `waiting_for_run`: the expected workflow has not appeared, but is still within the configured trigger interval.
 - `expected_run_absent`: the workflow has not appeared after the configured trigger interval.
@@ -54,6 +56,23 @@ The initial defaults are:
 Measured recent successful runtime is preferred. A configured per-workflow fallback is used when a trustworthy recent sample is unavailable.
 
 These are operational thresholds, not service-level guarantees.
+
+## GitHub run and job reconciliation
+
+GitHub can briefly report a workflow run as `queued` while one or more jobs under that run are already `in_progress`.
+
+The sentinel therefore records both:
+
+- `reportedRunStatus`: the status returned by the workflow-run endpoint
+- `effectiveRunStatus`: the status derived from the run plus current job evidence
+
+Rules:
+
+- a terminal run status or conclusion remains authoritative
+- a nonterminal run with any active job is effectively `in_progress`
+- a nonterminal run with queued jobs and no active job remains `queued`
+
+This behavior was discovered during live PR #180 observation and then covered by dedicated regression tests before the observer was accepted.
 
 ## Machine-readable lane summary
 
@@ -89,6 +108,15 @@ The focal step is selected in this order:
 
 A step-specific URL is not fabricated when GitHub has not supplied a verified stable step URL. The direct job URL plus exact step name and number are retained instead.
 
+## Suppression signals
+
+The read-only GitHub ingestion layer surfaces bounded suppression evidence, including:
+
+- `action_required_zero_jobs` when GitHub requires action but created no executable jobs
+- `bot_authored_required_run_absent` when a bot-authored exact head has exceeded the required-run appearance threshold
+
+A suppression signal is evidence for diagnosis. It does not authorize rerun or remediation.
+
 ## Escalation payload
 
 When operator attention is required, the bounded payload is:
@@ -123,35 +151,118 @@ When operator attention is required, the bounded payload is:
 
 Missing GitHub evidence remains null. It must not be invented.
 
+## Pull-request observer
+
+`.github/workflows/lane-health-sentinel-observe.yml` is the PR-local evidence collector.
+
+It runs with only:
+
+- `actions: read`
+- `contents: read`
+- `pull-requests: read`
+
+It collects the exact PR head, governed workflow runs, jobs and steps, recent successful runtime samples, lane state, suppression signals, and escalation payloads. It writes an operator summary and uploads `lane-health.json` as a 14-day GitHub Actions artifact.
+
+It cannot comment, rerun, merge, modify a branch, mutate a database, or deploy anything.
+
+### Live observer evidence
+
+The first live observer proof ran successfully on PR #180:
+
+- run: https://github.com/jlhogarth/CoMind/actions/runs/40237289101
+- artifact: https://github.com/jlhogarth/CoMind/actions/runs/40237289101/artifacts/12615766551
+- observed state: `in_progress`
+- severity: `info`
+- attention required: `false`
+- suppression signals: `0`
+- authority: `observe_only`
+
+That proof exposed the lagging top-level run-status behavior described above.
+
+The corrected live observer proof then preserved both reported and effective status:
+
+- run: https://github.com/jlhogarth/CoMind/actions/runs/40237413585
+- artifact: https://github.com/jlhogarth/CoMind/actions/runs/40237413585/artifacts/12615612242
+- active job evidence correctly converted lagging `queued` run reports to effective `in_progress`
+- genuinely queued jobs remained queued
+- no suppression signals were invented
+
+## Trusted background watcher
+
+`.github/workflows/lane-health-sentinel-background.yml` is the unattended observer candidate.
+
+Security boundary:
+
+- it does not run as a `pull_request` workflow
+- it explicitly checks out `main`
+- checkout credentials are not persisted
+- permissions are limited to `actions: read`, `contents: read`, and `pull-requests: read`
+- pull-request code therefore cannot redefine the code the trusted watcher executes
+
+Triggers:
+
+- governed `workflow_run` lifecycle events: requested, in progress, completed
+- a five-minute scheduled fallback for cases where no usable workflow lifecycle event is emitted
+- manual dispatch for controlled verification or a targeted PR
+
+Behavior:
+
+- resolves the associated open pull request from the workflow event
+- falls back to commit-associated PR lookup when GitHub omits direct PR association
+- scheduled fallback scans open PRs against `main`
+- one GitHub Actions concurrency group is used per observed head so newer lifecycle events cancel stale watchers
+- if a lane remains active, the watcher rechecks every 60 seconds for up to eight observations
+- each observation uses the same exact-head classifier and evidence contract as the PR-local observer
+- the workflow uploads a machine-readable background evidence bundle
+
+The workflow remains observe-only. It has no comment, rerun, merge, branch-write, secret-management, database-mutation, or deployment authority.
+
+### Background activation boundary
+
+The background workflow is fully implemented and exact-head tested in PR #180, including six resolver tests and the complete repository workflow matrix.
+
+It is intentionally not called operational before merge because its trust model requires the watcher code itself to exist on `main`.
+
+Operational acceptance therefore requires a post-merge controlled pull request that demonstrates:
+
+1. the watcher executes code checked out from trusted `main`
+2. a real `workflow_run` event resolves the controlled PR
+3. the watcher produces a machine-readable artifact for the exact PR head
+4. a controlled failure or stall is classified without weakening CI
+5. no unintended write authority is exercised
+
 ## Authority boundaries
 
-### Current repository stage: observe only
+### Current implementation: observe only
 
-The code in this PR may:
+The sentinel may:
 
-- classify supplied GitHub workflow metadata
+- read GitHub PR, commit, workflow-run, job, and step metadata
+- classify exact-head workflow health
 - aggregate per-head lane state
-- identify the focal job and step from supplied metadata
+- identify focal jobs and steps
+- model recent successful runtime
+- identify bounded suppression signals
 - create deterministic alert fingerprints
-- construct an explicit escalation payload
+- construct explicit escalation payloads
+- upload read-only evidence artifacts and step summaries
 
 It may not:
 
-- post a PR or issue comment
-- rerun a workflow or job
-- merge or close a PR
+- post a PR or issue comment automatically
+- rerun a workflow or job automatically
+- merge or close a PR automatically
 - modify a branch
 - change required checks
 - weaken CI
-- use repository secrets
+- use application or database secrets
 - mutate Supabase or another datastore
 - deploy infrastructure
 - create paid-resource usage
-- claim that a background sentinel is operating
 
 ### Future notification authority
 
-A later accepted slice may place deduplicated notifications through a trusted default-branch workflow. That workflow should have only the minimum permission required for the notification surface and must consume reviewed code from the trusted branch, not execute mutable PR code with write credentials.
+A later accepted slice may place deduplicated notifications through a trusted default-branch workflow. That workflow must have only the minimum permission required for the chosen notification surface and must execute reviewed default-branch code, not mutable PR code.
 
 Notification authority is not remediation authority.
 
@@ -177,13 +288,13 @@ A deterministic technical defect that is safe, reversible, already authorized, a
 
 ## Active-session behavior
 
-While a development session is actively working a lane, the current executor must inspect and respond at the workflow's own timescale. A future background sentinel is a fallback for unattended periods, not a reason for the active executor to wait passively.
+While a development session is actively working a lane, the current executor must inspect and respond at the workflow's own timescale. The background sentinel is a fallback for unattended periods, not a reason for the active executor to wait passively.
 
-No background execution should be claimed until a deployed workflow, schedule/event trigger, permissions, and observed execution evidence have all been verified.
+No background execution is claimed until the default-branch deployment, event trigger, permissions, and observed post-merge execution evidence have all been verified.
 
 ## Recovery and continuity
 
-Every handoff must preserve:
+Every handoff preserves:
 
 - active issue and PR
 - branch and exact head SHA
@@ -197,12 +308,31 @@ CFR-001 conversational continuity and the development handoff rule remain comple
 
 ## Current implementation files
 
+Policy and workflows:
+
 - `.github/lane-health-sentinel.json`
+- `.github/workflows/lane-health-sentinel-observe.yml`
+- `.github/workflows/lane-health-sentinel-background.yml`
+
+Runtime modules:
+
 - `scripts/lane_health_sentinel.mjs`
 - `scripts/lane_health_summary.mjs`
 - `scripts/lane_health_evidence.mjs`
+- `scripts/lane_health_github.mjs`
+- `scripts/lane_health_background.mjs`
+
+Regression tests:
+
 - `server/test/lane-health-sentinel.test.mjs`
 - `server/test/lane-health-summary.test.mjs`
 - `server/test/lane-health-evidence.test.mjs`
+- `server/test/lane-health-github.test.mjs`
+- `server/test/lane-health-github-live-status.test.mjs`
+- `server/test/lane-health-background.test.mjs`
 
-This document defines the current contract. It does not claim operational monitoring until a later event-ingestion workflow has been implemented and demonstrated on a controlled test PR.
+## Current acceptance checkpoint
+
+The code candidate before this documentation update passed the full returned exact-head repository matrix on PR #180. Main CI passed all eight jobs and the server suite reported 253 tests, 246 passed, 7 skipped, 0 failed, with zero production dependency vulnerabilities.
+
+The next acceptance step is a full exact-head verification of this documentation-complete candidate, followed by merge to `main` and a controlled post-merge proof of the trusted background watcher.

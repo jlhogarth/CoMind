@@ -50,6 +50,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 .github/issue169_patch.py
+          python3 .github/issue169_snapshot_fix.py
           git diff --check
           node --check server/test/integration/foundry-ollama-one-shot.e2e.mjs
           node --check server/test/integration/foundry-ollama-live-test-one-shot.e2e.mjs
@@ -80,6 +81,7 @@ jobs:
           set -euo pipefail
           rm .github/workflows/issue-169-terminal-lifecycle-implementation.yml
           rm .github/issue169_patch.py
+          rm .github/issue169_snapshot_fix.py
           git add \
             server/src/foundry-runtime.ts \
             server/src/foundry-lifecycle.ts \
@@ -90,7 +92,8 @@ jobs:
             .github/workflows/foundry-terminal-lifecycle.yml \
             .github/workflows/foundry-test-one-shot-local-handoff.yml \
             .github/workflows/issue-169-terminal-lifecycle-implementation.yml \
-            .github/issue169_patch.py
+            .github/issue169_patch.py \
+            .github/issue169_snapshot_fix.py
           git status --short
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'

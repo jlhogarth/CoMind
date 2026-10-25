@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "defaults": {
+    "expectedRunAfterSeconds": 75,
+    "queueStallSeconds": 90,
+    "runtimeStallMultiplier": 2,
+    "minimumRuntimeStallSeconds": 120,
+    "maxAutoRetriggers": 1,
+    "recentSuccessSampleSize": 5
+  },
+  "workflows": [
+    {
+      "name": "CI",
+      "requiredForAllPullRequests": true,
+      "fallbackNormalSeconds": 420,
+      "allowTransientRetrigger": true
+    },
+    {
+      "name": "No Placeholder Policy",
+      "requiredForAllPullRequests": true,
+      "fallbackNormalSeconds": 45,
+      "allowTransientRetrigger": true
+    },
+    {
+      "name": "CoMind Repository Configuration",
+      "requiredForAllPullRequests": false,
+      "fallbackNormalSeconds": 45,
+      "allowTransientRetrigger": true
+    },
+    {
+      "name": "Operator Console CI",
+      "requiredForAllPullRequests": false,
+      "fallbackNormalSeconds": 180,
+      "allowTransientRetrigger": true
+    },
+    {
+      "name": "Foundry Runtime Orchestration",
+      "requiredForAllPullRequests": false,
+      "fallbackNormalSeconds": 180,
+      "allowTransientRetrigger": true
+    },
+    {
+      "name": "Foundry Terminal Lifecycle",
+      "requiredForAllPullRequests": false,
+      "fallbackNormalSeconds": 240,
+      "allowTransientRetrigger": true
+    },
+    {
+      "name": "Foundry Work Lease Kernel",
+      "requiredForAllPullRequests": false,
+      "fallbackNormalSeconds": 180,
+      "allowTransientRetrigger": true
+    },
+    {
+      "name": "Governed Provider Execution",
+      "requiredForAllPullRequests": false,
+      "fallbackNormalSeconds": 180,
+      "allowTransientRetrigger": true
+    },
+    {
+      "name": "Runtime Budget Authority Adapter",
+      "requiredForAllPullRequests": false,
+      "fallbackNormalSeconds": 180,
+      "allowTransientRetrigger": true
+    },
+    {
+      "name": "Foundry Test one-shot local handoff",
+      "requiredForAllPullRequests": false,
+      "fallbackNormalSeconds": 900,
+      "allowTransientRetrigger": true
+    },
+    {
+      "name": "Live Foundry Stage 1 Readiness",
+      "requiredForAllPullRequests": false,
+      "fallbackNormalSeconds": 240,
+      "allowTransientRetrigger": true
+    },
+    {
+      "name": "Live Foundry LF-2 Readiness",
+      "requiredForAllPullRequests": false,
+      "fallbackNormalSeconds": 240,
+      "allowTransientRetrigger": true
+    },
+    {
+      "name": "Live Foundry LF-3 Readiness",
+      "requiredForAllPullRequests": false,
+      "fallbackNormalSeconds": 240,
+      "allowTransientRetrigger": true
+    },
+    {
+      "name": "DRB-002 Query Contract",
+      "requiredForAllPullRequests": false,
+      "fallbackNormalSeconds": 120,
+      "allowTransientRetrigger": true
+    }
+  ]
+}

@@ -1,0 +1,138 @@
+name: Lane Health Sentinel Background
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+      - No Placeholder Policy
+      - CoMind Repository Configuration
+      - Operator Console CI
+      - Foundry Runtime Orchestration
+      - Foundry Terminal Lifecycle
+      - Foundry Work Lease Kernel
+      - Governed Provider Execution
+      - Runtime Budget Authority Adapter
+      - Foundry Test one-shot local handoff
+      - Live Foundry Stage 1 Readiness
+      - Live Foundry LF-2 Readiness
+      - Live Foundry LF-3 Readiness
+      - DRB-002 Query Contract
+    types: [requested, in_progress, completed]
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Optional pull request number. Leave blank to scan open PRs against main.
+        required: false
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: lane-health-background-${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || 'fallback' }}
+  cancel-in-progress: true
+
+jobs:
+  observe:
+    name: Trusted unattended lane watcher
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      TARGET_PR: ${{ github.event_name == 'workflow_dispatch' && inputs.pr_number || '' }}
+    steps:
+      - name: Check out trusted default branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Observe lane and recheck while active
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          collect() {
+            args=(
+              --repository "${GITHUB_REPOSITORY}"
+              --event "${GITHUB_EVENT_NAME}"
+              --event-path "${GITHUB_EVENT_PATH}"
+              --policy .github/lane-health-sentinel.json
+              --output artifacts/lane-health-background.json
+            )
+            if [[ -n "${TARGET_PR}" ]]; then
+              args+=(--pr "${TARGET_PR}")
+            fi
+            node scripts/lane_health_background.mjs "${args[@]}"
+          }
+
+          state() {
+            node --input-type=module -e '
+              import { readFile } from "node:fs/promises";
+              const bundle = JSON.parse(await readFile("artifacts/lane-health-background.json", "utf8"));
+              process.stdout.write(`${bundle.attentionRequired ? "attention" : bundle.active ? "active" : "terminal"}\n`);
+            '
+          }
+
+          collect
+
+          for attempt in 1 2 3 4 5 6 7 8; do
+            current_state="$(state)"
+            printf 'Sentinel observation %s state: %s\n' "${attempt}" "${current_state}"
+            if [[ "${current_state}" != "active" ]]; then
+              break
+            fi
+            sleep 60
+            collect
+          done
+
+      - name: Write operator summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { readFile, appendFile } from 'node:fs/promises';
+          const bundle = JSON.parse(await readFile('artifacts/lane-health-background.json', 'utf8'));
+          const lines = [
+            '# Lane Health Sentinel Background',
+            '',
+            `- Trigger: \`${bundle.trigger.eventName}\``,
+            `- Trigger workflow: \`${bundle.trigger.workflowName || 'none'}\``,
+            `- PRs observed: \`${bundle.prNumbers.join(', ') || 'none'}\``,
+            `- Active lanes: \`${bundle.active}\``,
+            `- Attention required: \`${bundle.attentionRequired}\``,
+            `- Authority: \`${bundle.authorityBoundary}\``,
+            '',
+            'Trusted default-branch observer only. No comment, rerun, merge, branch write, or remediation authority is present.',
+          ];
+          for (const snapshot of bundle.snapshots) {
+            lines.push(
+              '',
+              `## PR #${snapshot.prNumber}`,
+              `- Exact head: \`${snapshot.exactHeadSha}\``,
+              `- State: \`${snapshot.laneSummary.state}\``,
+              `- Severity: \`${snapshot.laneSummary.severity}\``,
+              `- Suppression signals: \`${snapshot.suppressionSignals.length}\``
+            );
+          }
+          await appendFile(process.env.GITHUB_STEP_SUMMARY, `${lines.join('\n')}\n`, 'utf8');
+          NODE
+
+      - name: Upload background lane evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: lane-health-background
+          path: artifacts/lane-health-background.json
+          if-no-files-found: error
+          retention-days: 14

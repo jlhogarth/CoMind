@@ -124,31 +124,27 @@ export async function prepareReconciliationDatabaseSession(): Promise<Reconcilia
       is_member: boolean;
       inherits_privileges: boolean;
       can_set_role: boolean;
-      archive_exists: boolean;
-      live_exists: boolean;
-      receipt_exists: boolean;
     }>(
       `SELECT pg_has_role(session_user, 'comind_conversation_reconciler', 'MEMBER') AS is_member,
               pg_has_role(session_user, 'comind_conversation_reconciler', 'USAGE') AS inherits_privileges,
-              pg_has_role(session_user, 'comind_conversation_reconciler', 'SET') AS can_set_role,
-              to_regclass('comind.cm_archive_conversation_observation') IS NOT NULL AS archive_exists,
-              to_regclass('comind.cm_conversation') IS NOT NULL AS live_exists,
-              to_regclass('comind.cm_conversation_reconciliation_receipt') IS NOT NULL AS receipt_exists`
+              pg_has_role(session_user, 'comind_conversation_reconciler', 'SET') AS can_set_role`
     );
     const capability = capabilityResult.rows[0];
     if (!capability?.is_member || capability.inherits_privileges || !capability.can_set_role) {
       throw new Error('Reconciliation login lacks the required non-inherited SET capability');
     }
-    if (!capability.archive_exists || !capability.live_exists || !capability.receipt_exists) {
-      throw new Error('Required governed reconciliation database objects are not deployed');
-    }
 
+    // The constrained login intentionally has no direct USAGE on comind. Do not
+    // inspect schema objects before assuming the SET-only reconciliation role.
     await client.query('SET ROLE comind_conversation_reconciler');
 
     const assumedResult = await client.query<{
       session_user: string;
       current_user: string;
       schema_usage: boolean;
+      archive_exists: boolean;
+      live_exists: boolean;
+      receipt_exists: boolean;
       live_select: boolean;
       live_insert: boolean;
       archive_select: boolean;
@@ -161,6 +157,9 @@ export async function prepareReconciliationDatabaseSession(): Promise<Reconcilia
       `SELECT session_user::text AS session_user,
               current_user::text AS current_user,
               has_schema_privilege(current_user, 'comind', 'USAGE') AS schema_usage,
+              to_regclass('comind.cm_archive_conversation_observation') IS NOT NULL AS archive_exists,
+              to_regclass('comind.cm_conversation') IS NOT NULL AS live_exists,
+              to_regclass('comind.cm_conversation_reconciliation_receipt') IS NOT NULL AS receipt_exists,
               has_table_privilege(current_user, 'comind.cm_conversation', 'SELECT') AS live_select,
               has_table_privilege(current_user, 'comind.cm_conversation', 'INSERT') AS live_insert,
               has_table_privilege(current_user, 'comind.cm_archive_conversation_observation', 'SELECT') AS archive_select,
@@ -174,6 +173,9 @@ export async function prepareReconciliationDatabaseSession(): Promise<Reconcilia
     if (!assumed || assumed.session_user !== identity.session_user
       || assumed.current_user !== 'comind_conversation_reconciler') {
       throw new Error('Reconciliation database session did not assume comind_conversation_reconciler');
+    }
+    if (!assumed.archive_exists || !assumed.live_exists || !assumed.receipt_exists) {
+      throw new Error('Required governed reconciliation database objects are not deployed');
     }
     if (!assumed.schema_usage || !assumed.live_select || assumed.live_insert
       || !assumed.archive_select || assumed.archive_insert

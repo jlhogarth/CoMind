@@ -246,10 +246,7 @@ function streamTerminalError(
   const code = eventType === 'response.incomplete'
     ? 'openai_stream_incomplete'
     : 'openai_stream_failed';
-  const error = providerError(
-    `OpenAI stream terminated with ${eventType}`,
-    code
-  );
+  const error = providerError(`OpenAI stream terminated with ${eventType}`, code);
   attachProviderMetadata(
     error,
     failedResponseMetadata(response, envelope, durationMs, code)
@@ -310,7 +307,8 @@ export class OpenAIAssistantProvider implements AssistantProvider {
 
   constructor(
     private readonly responses: OpenAIResponsesClient,
-    private readonly options: OpenAIAssistantProviderOptions
+    private readonly options: OpenAIAssistantProviderOptions,
+    private readonly streamingObservationsEnabled = false
   ) {}
 
   private async generateStreamingResponse(
@@ -324,10 +322,7 @@ export class OpenAIAssistantProvider implements AssistantProvider {
     try {
       stream = await executeOpenAIProviderStreamingEnvelope(this.responses, envelope);
     } catch (error) {
-      attachProviderMetadata(
-        error,
-        failedCallMetadata(error, envelope, Date.now() - startedAt)
-      );
+      attachProviderMetadata(error, failedCallMetadata(error, envelope, Date.now() - startedAt));
       throw error;
     }
 
@@ -392,19 +387,12 @@ export class OpenAIAssistantProvider implements AssistantProvider {
         }
       }
     } catch (error) {
-      attachProviderMetadata(
-        error,
-        failedCallMetadata(error, envelope, Date.now() - startedAt)
-      );
+      attachProviderMetadata(error, failedCallMetadata(error, envelope, Date.now() - startedAt));
       throw error;
     }
 
     if (!completedResponse) {
-      throw incompleteStreamError(
-        envelope,
-        Date.now() - startedAt,
-        responseId
-      );
+      throw incompleteStreamError(envelope, Date.now() - startedAt, responseId);
     }
 
     const finalContent = content.trim();
@@ -431,7 +419,7 @@ export class OpenAIAssistantProvider implements AssistantProvider {
     request: AssistantResponseRequest,
     observer?: AssistantResponseObserver
   ): Promise<AssistantResponse> {
-    if (observer) {
+    if (observer && this.streamingObservationsEnabled) {
       return this.generateStreamingResponse(request, observer);
     }
 
@@ -441,10 +429,7 @@ export class OpenAIAssistantProvider implements AssistantProvider {
     try {
       response = await executeOpenAIProviderExecutionEnvelope(this.responses, envelope);
     } catch (error) {
-      attachProviderMetadata(
-        error,
-        failedCallMetadata(error, envelope, Date.now() - startedAt)
-      );
+      attachProviderMetadata(error, failedCallMetadata(error, envelope, Date.now() - startedAt));
       throw error;
     }
 
@@ -476,7 +461,8 @@ export function createOpenAIAssistantProvider(
   const client = new OpenAI(openAIClientOptions(apiKey, options));
   return new OpenAIAssistantProvider(
     client.responses as unknown as OpenAIResponsesClient,
-    options
+    options,
+    true
   );
 }
 

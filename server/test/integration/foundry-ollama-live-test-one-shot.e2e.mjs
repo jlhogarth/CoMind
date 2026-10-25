@@ -17,6 +17,7 @@ const EXPECTED_MODEL = 'qwen2.5:0.5b';
 
 const { FoundryAdapterRegistry, FoundryRuntimeOrchestrator } =
   await import('../../dist/foundry-runtime.js');
+const { finalizeBoundedFoundryWork } = await import('../../dist/foundry-lifecycle.js');
 const { createLocalOllamaFoundryAdapter } =
   await import('../../dist/providers/ollama-foundry-adapter.js');
 
@@ -323,11 +324,18 @@ try {
     throw error;
   }
 
-  const finished = await one(
-    'SELECT comind.cm_foundry_finish_work($1::uuid, $2::text, $3::uuid, $4::bigint, true) AS ok',
-    [TASK_ID, workerId, claim.lease_token, claim.fencing_epoch]
-  );
-  assert.equal(finished.ok, true);
+  const finished = await finalizeBoundedFoundryWork(query, {
+    taskId: TASK_ID,
+    workerInstanceId: workerId,
+    leaseToken: claim.lease_token,
+    fencingEpoch: claim.fencing_epoch,
+    executionContextId: execution.executionContextId,
+    adapterOperationId: execution.adapterOperationId,
+    terminalStatus: execution.terminalStatus,
+  });
+  assert.equal(finished.finalized, true);
+  assert.equal(finished.taskStatus, 'done');
+  assert.equal(finished.leaseState, 'completed');
   assert.equal(execution.terminalStatus, 'succeeded');
 
   const evidence = await readExecution(execution);

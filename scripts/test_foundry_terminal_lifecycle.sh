@@ -28,6 +28,6 @@ psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f "${repository_root}/db/migration
   npm ci
   npm run build
   npm test
-  node --test --test-concurrency=1 test/integration/foundry-terminal-lifecycle.integration.test.mjs
+  node --test --test-concurrency=1 test/integration/foundry-terminal-lifecycle.e2e.mjs
 )
 printf 'Foundry terminal lifecycle verification passed.\n'

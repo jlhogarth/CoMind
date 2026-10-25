@@ -266,7 +266,7 @@ test('recovery and later turns use only the selected persisted chronological his
     true
   );
   assert.equal(
-    assistantMetadata.every((meta) => meta.conversation_fast_path?.strategy === 'durable_generation_claim_v1'),
+    assistantMetadata.every((meta) => meta.conversation_fast_path?.strategy === 'durable_generation_claim_cfr_v2'),
     true
   );
   assert.equal(

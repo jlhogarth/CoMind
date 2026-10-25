@@ -40,23 +40,23 @@ All Rulebook and DRULE-002 tables have RLS enabled. `anon`, `authenticated`, and
 
 The canonical CoMind project currently contains:
 
-- 147 normalized rules
-- 147 current rule versions
-- 147 direct rule-source links
-- 53 source documents in the source census
-- 27 rule candidates
+- 157 normalized rules
+- 157 current rule versions
+- 157 direct rule-source links
+- 68 source documents in the source census
+- 44 rule candidates
 - 1 promoted candidate
 - 10 typed rule relationships, 8 confirmed
-- 17 reconciliation cases, 16 open and 1 resolved
+- 19 reconciliation cases, 18 open and 1 resolved
 - 32 Layer-0 archaeology queue entries
 - 28 Layer-0 sections still open for original clause recovery
 - 4 Layer-0 sections partially reconstructed from surviving clause text
 
 Current rule lifecycle distribution:
 
-- 88 Active
+- 101 Active
 - 5 Approved
-- 34 Specified
+- 31 Specified
 - 7 Proposed
 - 13 Historical Candidate
 
@@ -69,20 +69,40 @@ Direct founder or explicit CoMind-rule evidence has now recovered and normalized
 - Never promise an action you do not perform
 - Infinitum structural preservation and recurring continuity snapshots
 - Acronym Transparency, including first-use expansion, visible self-correction, and opportunistic legacy retrofit
+- Safe Creation Defaults
 - Execution & Transparency
 - Core Rule of System Evolution
+- Forward Reasoning
+- Observable Evidence Rule
 - milestone closeout and continuation handoff
 - intervention only when founder action is genuinely required, with safe reversible workarounds otherwise
 - visible development communication
 - Development Continuance Rule
 - one active implementation lane by default
+- Handoff = Yes as an evidence-backed Foundry readiness gate
+- selected planning becomes one GitHub implementation issue before code
+- free deterministic verification before paid/provider calls
+- direct action links when Joseph must act in another application
+- the operational meaning of `Continue`
+- Secret-classified CoMind IP non-disclosure
+- separation of personal continuity from CoMind project decisions
 - version archaeology relationship classification
 - the founder-approved CoMind PDF presentation standard
 - approved software supply-chain controls from the Open Source Sourcing and IP Protection Policy
 
-Ten Ranked Preference Decision Architecture frozen invariants are also captured as `specified` successor evidence rather than being silently promoted into active enterprise policy.
+Ten Ranked Preference Decision Architecture frozen invariants are captured as `specified` successor evidence rather than silently promoted into active enterprise policy.
 
 Conversation archaeology distinguishes founder-approved instructions from assistant-proposed historical suggestions through source authority and authority-confidence fields.
+
+## Artifact census findings
+
+The artifact sweep now includes the historical XML ruleset and AI Control Code V1.
+
+The XML ruleset contains genuine clause-level rules covering code style, response format, PDF presentation, self-review, testing, tool-call budgeting, caching, and fallback behavior. Several are clearly context-bound, such as functional-components-only, Jest-per-function, and a three-tool-call maximum. These are stored as historical candidates with low or mixed authority rather than activated simply because they appear inside a `<ruleset>` artifact.
+
+The dark and light HTML XML exports contain the same clause set with presentation differences and are stored as separate source artifacts without double-counting the rules.
+
+AI Control Code V1 is stored as a mixed-authority control artifact. Founder approval is directly established for the compact no-space syntax and broad V1 concept, while several persistence/default semantics remain artifact-authored candidates until independently corroborated.
 
 ## Layer-0 recovery state
 
@@ -105,32 +125,33 @@ Individual assistant-proposed historical rule examples remain lower-authority ca
 
 ## Reconciliation state
 
-The first reconciliation case has been resolved: historical explicit memory approval is now represented by active `RULE-MEM-004` and `RULE-MEM-005`, linked to the broader modern memory-promotion rules through confirmed specialization/support relationships.
+The first reconciliation case has been resolved: historical explicit memory approval is represented by active `RULE-MEM-004` and `RULE-MEM-005`, linked to the broader modern memory-promotion rules through confirmed specialization/support relationships.
 
-Open cases include:
+Open reconciliation families include:
 
-- historical Layer-0 110 percent budget auto-limit versus current FinOps hard-stop semantics
-- historical Layer-0 constitutional priority versus modern C0-C4, T0-T3, EIK, and Durable Rulebook governance
-- historical synthetic/test-data boundary versus current evidence-state rules
-- immutable raw archive and parse-before-promotion requirements versus current ingestion/continuity contracts
+- historical Layer-0 budget and cost semantics versus current FinOps
+- historical Layer-0 constitutional priority versus modern authority/governance architecture
+- synthetic/test data versus current evidence-state rules
+- immutable raw archive and parse-before-promotion requirements
 - affective context versus evidence-led reasoning
-- historical 40 percent SLA padding versus a future current service-level policy
-- historical line-item cost control versus current FinOps economic envelopes and causal cost lineage
-- historical production-ready-only delivery language versus modern staged Test-first maturity
-- historical soft-delete requirements versus modern privacy, erasure, invalidation, and audit retention
+- historical SLA padding versus a future current service-level policy
+- historical production-ready-only language versus staged Test-first maturity
+- soft deletion versus modern privacy, erasure, invalidation, and audit retention
 - system-wide anomaly Auto-Watch versus current observability architecture
-- migration source-of-truth audit versus current canonical evidence and conflict-preservation rules
+- migration source-of-truth audit versus canonical evidence/conflict preservation
 - historical resilience mechanisms versus a reusable modern resilience contract
-- Infinitum weekly snapshot cadence versus continuous modern evidence capture
+- Infinitum weekly cadence versus continuous evidence capture
 - Clarification Persistence versus safe reversible autonomy
 - historical `CoMind AI` filename prefix versus CDES durable identity
-- historical Replit incremental bundle behavior versus Git and reproducible-build workflows
+- historical Replit bundle behavior versus Git/reproducible builds
+- options-before-build versus current proactive artifact creation
+- filename reuse/anti-version-sprawl versus CDES version lineage
 
 No unresolved case is silently resolved by recency.
 
 ## Repository parity
 
-This branch adds:
+This branch adds exactly five DRULE-002 files:
 
 - `db/migrations/20261025_005_durable_rulebook_registry.sql`
 - `db/migrations/20261025_006_drule_002_rule_archaeology_reconciliation.sql`
@@ -146,6 +167,8 @@ The repository migration is intentionally cleaner than the live construction seq
 2. Dropping that composite key did not remove the inherited `NOT NULL` flags.
 
 The repository version directly models `pm_rule_reconciliation_members` with its own UUID primary key, nullable `rule_id` / `candidate_id`, an XOR check, and partial uniqueness indexes.
+
+The branch was refreshed onto current `main` with a two-parent merge commit rather than a force update. Immediately before this provenance refresh the branch was zero commits behind `main`, and the PR diff remained exactly five DRULE-002 files.
 
 ## Verification
 

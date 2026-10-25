@@ -68,8 +68,8 @@ export interface OpenAIResponseStreamEventLike {
 export interface OpenAIResponseStreamLike extends AsyncIterable<OpenAIResponseStreamEventLike> {}
 
 export interface OpenAIResponsesClient {
-  create(request: OpenAIResponseCreateRequest): Promise<OpenAIResponseLike>;
   create(request: OpenAIResponseStreamingCreateRequest): Promise<OpenAIResponseStreamLike>;
+  create(request: OpenAIResponseCreateRequest): Promise<OpenAIResponseLike>;
 }
 
 export interface OpenAIAssistantProviderOptions extends OpenAIExecutionOptions {}

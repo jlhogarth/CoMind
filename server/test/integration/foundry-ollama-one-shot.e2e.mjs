@@ -5,6 +5,7 @@ import { dirname } from 'node:path';
 import { Pool } from 'pg';
 
 const { FoundryAdapterRegistry, FoundryRuntimeOrchestrator } = await import('../../dist/foundry-runtime.js');
+const { finalizeBoundedFoundryWork } = await import('../../dist/foundry-lifecycle.js');
 const { createLocalOllamaFoundryAdapter, localOllamaFoundryDefaults } = await import('../../dist/providers/ollama-foundry-adapter.js');
 
 function requireIsolatedDatabaseUrl(raw) {
@@ -178,11 +179,18 @@ try {
   }
 
   assert.equal(execution.terminalStatus, 'succeeded');
-  const finished = await one(
-    `SELECT comind.cm_foundry_finish_work($1::uuid, $2::text, $3::uuid, $4::bigint, true) AS ok`,
-    [task.id, workerId, claim.lease_token, claim.fencing_epoch]
-  );
-  assert.equal(finished.ok, true);
+  const finished = await finalizeBoundedFoundryWork(query, {
+    taskId: task.id,
+    workerInstanceId: workerId,
+    leaseToken: claim.lease_token,
+    fencingEpoch: claim.fencing_epoch,
+    executionContextId: execution.executionContextId,
+    adapterOperationId: execution.adapterOperationId,
+    terminalStatus: execution.terminalStatus,
+  });
+  assert.equal(finished.finalized, true);
+  assert.equal(finished.taskStatus, 'done');
+  assert.equal(finished.leaseState, 'completed');
 
   const readback = await one(
     `SELECT l.state AS lease_state, l.attempt_count, l.max_attempts,

@@ -12,7 +12,7 @@ on:
       - 'scripts/test_foundry_terminal_lifecycle.sh'
       - 'server/src/foundry-runtime.ts'
       - 'server/src/foundry-lifecycle.ts'
-      - 'server/test/integration/foundry-terminal-lifecycle.integration.test.mjs'
+      - 'server/test/integration/foundry-terminal-lifecycle.e2e.mjs'
   workflow_dispatch:
 
 permissions:

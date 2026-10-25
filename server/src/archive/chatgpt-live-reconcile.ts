@@ -253,6 +253,7 @@ function classifyCandidate(
   const createdTimeCompatible = timestampsCompatible(archive.createdAt, live.createdAt);
   const sameTitle = titleCorrelation(archive.title, live.title);
   const partials = interruptedPartialEvidence(archive, live);
+  const hasAdditionalPartialEvidence = partials.archiveCompletionCount > 0 || partials.liveOnlyPartialCount > 0;
 
   let matchMethod: Exclude<MatchMethod, 'none'>;
   let matchStrength: CandidateClassification['matchStrength'];
@@ -262,15 +263,17 @@ function classifyCandidate(
     matchMethod = 'explicit_source_id';
     matchStrength = 'strong';
     if (conflictAt !== null) classification = 'conflict_candidate';
+    else if (archiveExtendsLive || liveExtendsArchive || hasAdditionalPartialEvidence) classification = 'extension_candidate';
     else if (exactMessages) classification = 'exact_candidate';
-    else if (archiveExtendsLive || liveExtendsArchive || partials.archiveCompletionCount > 0) classification = 'extension_candidate';
     else classification = 'partial_candidate';
   } else if ((exactMessages || archiveExtendsLive || liveExtendsArchive)
     && prefixLength >= 2
     && createdTimeCompatible !== false) {
     matchMethod = 'ordered_message_fingerprint';
     matchStrength = createdTimeCompatible === true ? 'strong' : 'medium';
-    classification = exactMessages ? 'exact_candidate' : 'extension_candidate';
+    classification = archiveExtendsLive || liveExtendsArchive || hasAdditionalPartialEvidence
+      ? 'extension_candidate'
+      : 'exact_candidate';
   } else if (sameTitle && createdTimeCompatible === true) {
     matchMethod = 'weak_correlation';
     matchStrength = 'weak';

@@ -14,4 +14,5 @@
 \i '12_enterprise_checklist.sql'
 \i '13_research_refs.sql'
 \i '14_conversational_continuity.sql'
+\i '14a_cfr_ci_evidence_compat.sql'
 \i '15_conversation_promotion_pruning.sql'

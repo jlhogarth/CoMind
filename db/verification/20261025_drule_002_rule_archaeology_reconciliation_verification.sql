@@ -92,6 +92,19 @@ begin
     raise exception 'DRULE-002 reconciliation-member XOR constraint missing';
   end if;
 
+  if (select is_nullable from information_schema.columns
+      where table_schema='comind_pm'
+        and table_name='pm_rule_reconciliation_members'
+        and column_name='rule_id') <> 'YES'
+     or
+     (select is_nullable from information_schema.columns
+      where table_schema='comind_pm'
+        and table_name='pm_rule_reconciliation_members'
+        and column_name='candidate_id') <> 'YES'
+  then
+    raise exception 'DRULE-002 reconciliation member rule_id/candidate_id must remain nullable for XOR membership';
+  end if;
+
   if not exists (
     select 1 from pg_indexes
     where schemaname = 'comind_pm'

@@ -34,6 +34,10 @@ export interface OpenAIResponseCreateRequest {
   max_output_tokens: number;
 }
 
+export type OpenAIResponseStreamingCreateRequest = OpenAIResponseCreateRequest & {
+  stream: true;
+};
+
 export interface OpenAIExecutionOptions {
   model: string;
   processingMode: OpenAIProcessingMode;
@@ -50,6 +54,10 @@ export type OpenAIProviderExecutionEnvelope =
 
 export interface OpenAIResponseCreateClient<TResponse> {
   create(request: OpenAIResponseCreateRequest): Promise<TResponse>;
+}
+
+export interface OpenAIResponseStreamingClient<TStream> {
+  create(request: OpenAIResponseStreamingCreateRequest): Promise<TStream>;
 }
 
 export interface OpenAIInputTokenCountRequest {
@@ -120,6 +128,17 @@ export function executeOpenAIProviderExecutionEnvelope<TResponse>(
   return responses.create(envelope.request);
 }
 
+export function executeOpenAIProviderStreamingEnvelope<TStream>(
+  responses: OpenAIResponseStreamingClient<TStream>,
+  envelope: OpenAIProviderExecutionEnvelope
+) {
+  assertProviderExecutionEnvelopeIntegrity(envelope);
+  return responses.create({
+    ...envelope.request,
+    stream: true,
+  });
+}
+
 export function quoteOpenAIExecutionEnvelopeExposure(
   envelope: OpenAIProviderExecutionEnvelope,
   preflight: ProviderInputTokenPreflight
@@ -161,6 +180,25 @@ export function executeGovernedOpenAIProviderExecutionEnvelope<TResponse>(
     operationName: 'responses.create',
     execute: (executionEnvelope) =>
       executeOpenAIProviderExecutionEnvelope(responses, executionEnvelope),
+  });
+}
+
+export function executeGovernedOpenAIProviderStreamingEnvelope<TStream>(
+  responses: OpenAIResponseStreamingClient<TStream>,
+  envelope: OpenAIProviderExecutionEnvelope,
+  inputTokenCounter: ProviderInputTokenCounter<OpenAIResponseCreateRequest>,
+  budgetAuthority: GovernedProviderBudgetAuthority
+): Promise<GovernedProviderExecutionResult<TStream, OpenAIProviderExposureQuote>> {
+  return executeGovernedProviderExecution({
+    envelope,
+    inputTokenCounter,
+    exposureQuoter: {
+      quoteExposure: quoteOpenAIExecutionEnvelopeExposure,
+    },
+    budgetAuthority,
+    operationName: 'responses.create',
+    execute: (executionEnvelope) =>
+      executeOpenAIProviderStreamingEnvelope(responses, executionEnvelope),
   });
 }
 

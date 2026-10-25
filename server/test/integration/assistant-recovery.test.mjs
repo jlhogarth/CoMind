@@ -266,7 +266,7 @@ test('recovery and later turns use only the selected persisted chronological his
     true
   );
   assert.equal(
-    assistantMetadata.every((meta) => meta.conversation_fast_path?.strategy === 'durable_generation_claim_v1'),
+    assistantMetadata.every((meta) => meta.conversation_fast_path?.strategy === 'durable_generation_claim_cfr_v2'),
     true
   );
   assert.equal(
@@ -281,12 +281,19 @@ test('recovery and later turns use only the selected persisted chronological his
     assert.equal(typeof meta.conversation_fast_path?.claim_ms, 'number');
     assert.equal(typeof meta.conversation_fast_path?.memory_retrieval_ms, 'number');
     assert.equal(typeof meta.conversation_fast_path?.provider_ms, 'number');
+    assert.match(
+      meta.conversational_continuity?.generation_id ?? '',
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    );
+    assert.equal(meta.conversational_continuity?.observed_delta_count, 0);
+    assert.equal(meta.conversational_continuity?.captured_delta_count, 0);
   }
   assert.deepEqual(
     assistantMetadata.map(({
       duration_ms,
       request_fingerprint,
       conversation_fast_path,
+      conversational_continuity,
       ...meta
     }) => meta),
     [

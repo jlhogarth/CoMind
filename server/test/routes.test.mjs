@@ -127,12 +127,14 @@ test('message append persists a supported role and content', async () => {
     calls.push({ text, params });
     return {
       rows: [{
+        generation_active: false,
         msg_id: '55555555-5555-4555-8555-555555555559',
         conv_id: params[0],
         role: params[1],
         content: params[2],
         created_at: '2026-10-06T07:31:00.000Z',
         meta: null,
+        capture_event_id: '66666666-6666-4666-8666-666666666666',
       }],
     };
   };
@@ -150,6 +152,7 @@ test('message append persists a supported role and content', async () => {
     assert.equal(response.json().content, 'Persist this message');
     assert.equal(calls.length, 1);
     assert.match(calls[0].text, /INSERT INTO comind\.cm_message/);
+    assert.match(calls[0].text, /cm_record_conversation_capture_event/);
   });
 });
 

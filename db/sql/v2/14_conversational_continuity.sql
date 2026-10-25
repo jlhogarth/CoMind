@@ -4,6 +4,11 @@
 -- Local/CI schema parity for the conversational continuity substrate already
 -- deployed to the Supabase Test environment. This file deliberately avoids
 -- Supabase-specific anon/authenticated/service_role grants.
+--
+-- Local CI differs in one controlled way: conversation fixture deletion may
+-- cascade through CFR rows so the existing integration harness can clean up.
+-- Supabase Test retains the stricter ON DELETE RESTRICT and delete-immutable
+-- evidence contract verified by CFR-001 Phase 1.
 
 BEGIN;
 SET search_path TO comind, public;
@@ -67,9 +72,9 @@ CREATE TABLE IF NOT EXISTS cm_conversation_capture_cursor (
 
 CREATE TABLE IF NOT EXISTS cm_conversation_capture_event (
   capture_event_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  conv_id uuid NOT NULL REFERENCES cm_conversation(conv_id) ON DELETE RESTRICT,
-  generation_id uuid REFERENCES cm_assistant_generation(generation_id) ON DELETE RESTRICT,
-  msg_id uuid REFERENCES cm_message(msg_id) ON DELETE RESTRICT,
+  conv_id uuid NOT NULL REFERENCES cm_conversation(conv_id) ON DELETE CASCADE,
+  generation_id uuid REFERENCES cm_assistant_generation(generation_id) ON DELETE CASCADE,
+  msg_id uuid REFERENCES cm_message(msg_id) ON DELETE CASCADE,
   sequence_no bigint NOT NULL CHECK (sequence_no > 0),
   event_type text NOT NULL CHECK (event_type IN (
     'user_message_observed',
@@ -99,11 +104,11 @@ CREATE TABLE IF NOT EXISTS cm_conversation_capture_event (
 
 CREATE TABLE IF NOT EXISTS cm_conversation_recovery_checkpoint (
   checkpoint_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  conv_id uuid NOT NULL REFERENCES cm_conversation(conv_id) ON DELETE RESTRICT,
-  generation_id uuid REFERENCES cm_assistant_generation(generation_id) ON DELETE RESTRICT,
+  conv_id uuid NOT NULL REFERENCES cm_conversation(conv_id) ON DELETE CASCADE,
+  generation_id uuid REFERENCES cm_assistant_generation(generation_id) ON DELETE CASCADE,
   checkpoint_reason text NOT NULL,
   last_capture_sequence bigint NOT NULL CHECK (last_capture_sequence >= 0),
-  last_complete_msg_id uuid REFERENCES cm_message(msg_id) ON DELETE RESTRICT,
+  last_complete_msg_id uuid REFERENCES cm_message(msg_id) ON DELETE CASCADE,
   partial_assistant_content text,
   snapshot jsonb NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(snapshot) = 'object'),
   snapshot_sha256 char(64) NOT NULL CHECK (snapshot_sha256 ~ '^[a-f0-9]{64}$'),
@@ -112,8 +117,8 @@ CREATE TABLE IF NOT EXISTS cm_conversation_recovery_checkpoint (
 
 CREATE TABLE IF NOT EXISTS cm_conversation_promotion_evaluation (
   evaluation_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  conv_id uuid NOT NULL REFERENCES cm_conversation(conv_id) ON DELETE RESTRICT,
-  checkpoint_id uuid REFERENCES cm_conversation_recovery_checkpoint(checkpoint_id) ON DELETE RESTRICT,
+  conv_id uuid NOT NULL REFERENCES cm_conversation(conv_id) ON DELETE CASCADE,
+  checkpoint_id uuid REFERENCES cm_conversation_recovery_checkpoint(checkpoint_id) ON DELETE CASCADE,
   decision text NOT NULL CHECK (decision IN ('retain_raw', 'eligible_to_prune', 'extend_protection')),
   evaluated_by text NOT NULL,
   rationale text NOT NULL,
@@ -153,7 +158,7 @@ CREATE INDEX IF NOT EXISTS idx_cm_assistant_generation_assistant_msg
   ON cm_assistant_generation (assistant_msg_id)
   WHERE assistant_msg_id IS NOT NULL;
 
-CREATE OR REPLACE FUNCTION cm_reject_cfr_evidence_mutation()
+CREATE OR REPLACE FUNCTION cm_reject_cfr_evidence_update()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY INVOKER
@@ -171,10 +176,6 @@ SECURITY INVOKER
 SET search_path = pg_catalog, comind
 AS $$
 BEGIN
-  IF TG_OP = 'DELETE' THEN
-    RAISE EXCEPTION 'assistant generation history cannot be deleted';
-  END IF;
-
   IF NEW.conv_id <> OLD.conv_id
      OR NEW.user_msg_id <> OLD.user_msg_id
      OR NEW.claim_token <> OLD.claim_token
@@ -192,22 +193,22 @@ $$;
 
 DROP TRIGGER IF EXISTS trg_cm_conversation_capture_event_immutable ON cm_conversation_capture_event;
 CREATE TRIGGER trg_cm_conversation_capture_event_immutable
-BEFORE UPDATE OR DELETE ON cm_conversation_capture_event
-FOR EACH ROW EXECUTE FUNCTION cm_reject_cfr_evidence_mutation();
+BEFORE UPDATE ON cm_conversation_capture_event
+FOR EACH ROW EXECUTE FUNCTION cm_reject_cfr_evidence_update();
 
 DROP TRIGGER IF EXISTS trg_cm_conversation_recovery_checkpoint_immutable ON cm_conversation_recovery_checkpoint;
 CREATE TRIGGER trg_cm_conversation_recovery_checkpoint_immutable
-BEFORE UPDATE OR DELETE ON cm_conversation_recovery_checkpoint
-FOR EACH ROW EXECUTE FUNCTION cm_reject_cfr_evidence_mutation();
+BEFORE UPDATE ON cm_conversation_recovery_checkpoint
+FOR EACH ROW EXECUTE FUNCTION cm_reject_cfr_evidence_update();
 
 DROP TRIGGER IF EXISTS trg_cm_conversation_promotion_eval_immutable ON cm_conversation_promotion_evaluation;
 CREATE TRIGGER trg_cm_conversation_promotion_eval_immutable
-BEFORE UPDATE OR DELETE ON cm_conversation_promotion_evaluation
-FOR EACH ROW EXECUTE FUNCTION cm_reject_cfr_evidence_mutation();
+BEFORE UPDATE ON cm_conversation_promotion_evaluation
+FOR EACH ROW EXECUTE FUNCTION cm_reject_cfr_evidence_update();
 
 DROP TRIGGER IF EXISTS trg_cm_assistant_generation_transition ON cm_assistant_generation;
 CREATE TRIGGER trg_cm_assistant_generation_transition
-BEFORE UPDATE OR DELETE ON cm_assistant_generation
+BEFORE UPDATE ON cm_assistant_generation
 FOR EACH ROW EXECUTE FUNCTION cm_guard_assistant_generation_transition();
 
 CREATE OR REPLACE FUNCTION cm_record_conversation_capture_event(

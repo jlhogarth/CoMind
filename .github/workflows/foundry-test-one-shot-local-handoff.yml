@@ -10,6 +10,7 @@ on:
       - 'scripts/test_foundry_runtime_orchestration.sh'
       - 'scripts/test_foundry_work_lease_kernel.sh'
       - 'server/src/foundry-runtime.ts'
+      - 'server/src/foundry-lifecycle.ts'
       - 'server/src/providers/ollama-foundry-adapter.ts'
       - 'server/test/integration/foundry-ollama-one-shot.e2e.mjs'
       - 'server/test/ollama-foundry-adapter.test.mjs'

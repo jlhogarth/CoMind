@@ -1,0 +1,90 @@
+name: Issue 173 Server Dependency Audit Probe
+
+on:
+  push:
+    branches:
+      - issue-173-server-dependency-audit
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repair branch
+        uses: actions/checkout@v4
+        with:
+          ref: issue-173-server-dependency-audit
+          fetch-depth: 0
+
+      - name: Use Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Record tool versions
+        run: |
+          node --version
+          npm --version
+
+      - name: Upgrade direct Zod dependency to patched v4
+        working-directory: server
+        run: npm install --save-exact zod@4.6.7
+
+      - name: Apply nonbreaking production audit fixes
+        working-directory: server
+        run: npm audit fix --omit=dev
+
+      - name: Clean install candidate lockfile
+        working-directory: server
+        run: npm ci
+
+      - name: Build server
+        working-directory: server
+        run: npm run build
+
+      - name: Run full server test suite
+        working-directory: server
+        run: npm test
+
+      - name: Require production audit gate to pass
+        working-directory: server
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Capture candidate diff
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git status --short
+          git diff -- server > issue-173-server-dependency-audit.patch
+          git diff --stat -- server
+
+      - name: Upload candidate patch evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue-173-server-dependency-audit-patch
+          path: issue-173-server-dependency-audit.patch
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Preserve verified dependency patch
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/issue-173-server-audit.yml
+          git add server/package.json server/package-lock.json .github/workflows/issue-173-server-audit.yml
+          git status --short
+          if git diff --cached --quiet; then
+            echo 'No verified dependency changes found.' >&2
+            exit 1
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix(server): clear production dependency audit'
+          git push origin HEAD:issue-173-server-dependency-audit

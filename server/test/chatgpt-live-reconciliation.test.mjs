@@ -112,6 +112,25 @@ test('an interrupted live partial can be preserved while a later archive observa
   assert.equal(result.evidence.selectedInterruptedPartialEvidence.details[0].classification, 'later_archive_completion');
 });
 
+test('live-only interrupted text prevents an otherwise exact pair from being labeled exact', () => {
+  const source = archive(twoArchiveMessages());
+  const candidate = live('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd', twoLiveMessages(), {
+    externalRef: source.sourceConversationId,
+    interruptedPartials: [{
+      generationId: 'abababab-abab-4bab-8bab-abababababab',
+      content: 'This unfinished assistant text exists only in the live CFR evidence.',
+      observedAt: '2026-10-25T18:00:20.000Z',
+    }],
+  });
+  const result = reconcileConversationEvidence(source, [candidate]);
+  assert.equal(result.result, 'compatible_extension');
+  assert.equal(result.matchMethod, 'explicit_source_id');
+  assert.equal(result.candidates[0]?.classification, 'extension_candidate');
+  assert.equal(result.classificationCounts.live_only_interrupted_partial, 1);
+  assert.equal(result.classificationCounts.later_archive_completion, 0);
+  assert.equal(result.evidence.selectedInterruptedPartialEvidence.details[0].classification, 'live_only_interrupted_partial');
+});
+
 test('explicit identity plus differing ordered content is a conflicting observation', () => {
   const source = archive(twoArchiveMessages());
   const candidate = live('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', [

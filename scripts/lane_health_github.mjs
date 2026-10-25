@@ -84,6 +84,16 @@ export function buildRecentRuntimeSamples({ runs, sampleSize }) {
   return grouped;
 }
 
+export function deriveEffectiveRunStatus({ run, jobs = [] }) {
+  if (!run) return null;
+  if (run.status === 'completed' || run.conclusion) return run.status;
+
+  if (jobs.some((job) => job.status === 'in_progress')) return 'in_progress';
+  if (jobs.some((job) => ['queued', 'waiting', 'pending'].includes(job.status))) return 'queued';
+
+  return run.status;
+}
+
 function workflowPolicy(policy, workflow) {
   return {
     ...policy.defaults,
@@ -157,12 +167,19 @@ export async function collectLaneHealthSnapshot({
     const lastMeaningfulTransitionAt = run
       ? latestMeaningfulTransitionAt({ run, jobs })
       : null;
+    const effectiveStatus = deriveEffectiveRunStatus({ run, jobs });
+    const classificationRun = run
+      ? {
+          ...run,
+          status: effectiveStatus,
+        }
+      : null;
 
     const result = classifyWorkflowHealth({
       expectedHeadSha,
       workflowName: workflow.name,
       policy: workflowPolicy(policy, workflow),
-      run,
+      run: classificationRun,
       jobs,
       recentSuccessfulDurationsSeconds: recentSamples.get(workflow.name) || [],
       headObservedAt,
@@ -177,6 +194,8 @@ export async function collectLaneHealthSnapshot({
 
     workflowResults.push({
       ...result,
+      reportedRunStatus: run?.status || null,
+      effectiveRunStatus: effectiveStatus,
       requiredForAllPullRequests: Boolean(workflow.requiredForAllPullRequests),
       allowTransientRetrigger: Boolean(workflow.allowTransientRetrigger),
       lastMeaningfulTransitionAt,

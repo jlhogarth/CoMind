@@ -13,7 +13,7 @@ on:
       - 'db/migrations/20261025_010_native_chatgpt_live_reconciliation_snapshot_identity.sql'
       - 'db/verification/cfr_001f_*'
       - 'db/sql/v2/**'
-      - 'scripts/test_cfr_001f_reconciliation.sh'
+      - 'scripts/test_cfr_001f_*.sh'
       - 'server/src/archive/chatgpt-live-reconcile*.ts'
       - 'server/src/archive/reconciliation-db.ts'
       - 'server/test/chatgpt-live-reconciliation.test.mjs'
@@ -127,6 +127,12 @@ jobs:
           assert a['receiptSha256'] == b['receiptSha256']
           print('CFR-001F constrained-login reconciliation idempotency PASS')
           PY
+
+      - name: Reconcile extension, live-only partial, conflict, ambiguity, and unmatched cases
+        env:
+          COMIND_DATABASE_PURPOSE: chatgpt_reconciliation
+          CHATGPT_RECONCILIATION_DATABASE_URL: postgresql://comind_reconciliation_test_login:cfr001f-local-only@localhost:5432/comind_ci
+        run: bash ./scripts/test_cfr_001f_classifications.sh
 
       - name: Verify source evidence remained immutable
         run: |

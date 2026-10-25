@@ -1,0 +1,63 @@
+name: CFR-001F Reconciliation
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/cfr-001f-reconciliation.yml'
+      - 'db/migrations/20261012_001_chatgpt_archive_ingestion.sql'
+      - 'db/migrations/20261012_002_chatgpt_archive_quarantine.sql'
+      - 'db/migrations/20261012_003_chatgpt_archive_access_hardening.sql'
+      - 'db/migrations/20261025_007_native_chatgpt_live_reconciliation.sql'
+      - 'db/sql/v2/**'
+      - 'scripts/test_cfr_001f_reconciliation.sh'
+      - 'server/src/archive/chatgpt-live-reconcile.ts'
+      - 'server/test/chatgpt-live-reconciliation.test.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reconciliation:
+    name: native archive and live CFR reconciliation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.6-pg17-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+    steps:
+      - name: Check out exact workflow candidate
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+
+      - name: Build server and run deterministic classifier tests
+        working-directory: server
+        run: |
+          npm ci
+          npm run build
+          node --test test/chatgpt-live-reconciliation.test.mjs
+
+      - name: Verify reconciliation substrate against isolated PostgreSQL
+        run: bash ./scripts/test_cfr_001f_reconciliation.sh

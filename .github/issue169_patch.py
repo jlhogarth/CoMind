@@ -1,0 +1,830 @@
+from pathlib import Path
+
+runtime = Path('server/src/foundry-runtime.ts')
+source = runtime.read_text()
+
+helper_anchor = '\nfunction assertExecutionRequest(request: FoundryExecutionRequest): void {'
+if 'export async function persistFoundryTerminalResultAtomic(' not in source:
+    helper = r'''
+export async function persistFoundryTerminalResultAtomic(
+  queryFn: QueryFunction,
+  executionContextId: string,
+  adapterOperationId: string,
+  result: FoundryAdapterResult
+): Promise<{ adapterOperationResultId: string; executionOutcomeId: string }> {
+  const governed = validateAdapterResult(result);
+  const resultFingerprint = sha256Fingerprint({
+    adapter_operation_id: adapterOperationId,
+    terminal_status: governed.status,
+    result_ref: governed.resultRef,
+    error_code: governed.errorCode,
+    summary: governed.summary,
+  });
+
+  const persisted = await queryFn<{
+    adapter_operation_result_id: string;
+    execution_outcome_id: string;
+  }>(
+    `WITH adapter_result AS (
+       INSERT INTO comind.cm_foundry_adapter_operation_result (
+         adapter_operation_id, terminal_status, result_ref,
+         result_fingerprint, error_code, summary
+       ) VALUES (
+         $1::uuid, $2::text, $3::text,
+         $4::text, $5::text, $6::text
+       )
+       RETURNING adapter_operation_result_id
+     ), execution_outcome AS (
+       INSERT INTO comind.cm_foundry_execution_outcome (
+         execution_context_id, adapter_operation_result_id,
+         terminal_status, error_code, summary
+       )
+       SELECT $7::uuid, ar.adapter_operation_result_id,
+              $2::text, $5::text, $6::text
+       FROM adapter_result AS ar
+       RETURNING execution_outcome_id, adapter_operation_result_id
+     )
+     SELECT ar.adapter_operation_result_id::text,
+            eo.execution_outcome_id::text
+     FROM adapter_result AS ar
+     JOIN execution_outcome AS eo
+       ON eo.adapter_operation_result_id = ar.adapter_operation_result_id`,
+    [
+      adapterOperationId,
+      governed.status,
+      governed.resultRef,
+      resultFingerprint,
+      governed.errorCode,
+      governed.summary,
+      executionContextId,
+    ]
+  );
+
+  if (persisted.rows.length !== 1) {
+    throw new FoundryRuntimeError(
+      'terminal_persistence_failed',
+      'Adapter result and execution outcome were not persisted atomically',
+      executionContextId,
+      adapterOperationId
+    );
+  }
+
+  return {
+    adapterOperationResultId: persisted.rows[0].adapter_operation_result_id,
+    executionOutcomeId: persisted.rows[0].execution_outcome_id,
+  };
+}
+'''
+    if helper_anchor not in source:
+        raise SystemExit('Foundry runtime helper insertion anchor not found')
+    source = source.replace(helper_anchor, '\n' + helper + helper_anchor, 1)
+
+method_start = source.index('  private async persistTerminalResult(')
+class_end_marker = '\n}\n\nexport interface FoundryDeliberationEventInput'
+method_end = source.index(class_end_marker, method_start)
+replacement = r'''  private async persistTerminalResult(
+    executionContextId: string,
+    adapterOperationId: string,
+    result: ReturnType<typeof validateAdapterResult>
+  ): Promise<{ adapterOperationResultId: string; executionOutcomeId: string }> {
+    return persistFoundryTerminalResultAtomic(
+      this.queryFn,
+      executionContextId,
+      adapterOperationId,
+      result
+    );
+  }
+'''
+source = source[:method_start] + replacement + source[method_end:]
+runtime.write_text(source)
+
+Path('server/src/foundry-lifecycle.ts').write_text(r'''import { QueryFunction } from './db.js';
+
+export type FoundryLifecycleTerminalStatus = 'succeeded' | 'failed' | 'cancelled' | 'blocked';
+export type FoundryLifecycleConsistency = 'open' | 'consistent' | 'inconsistent';
+
+const TERMINAL_STATUSES: readonly FoundryLifecycleTerminalStatus[] = [
+  'succeeded',
+  'failed',
+  'cancelled',
+  'blocked',
+];
+
+export class FoundryLifecycleError extends Error {
+  constructor(public readonly code: string, message: string) {
+    super(message);
+    this.name = 'FoundryLifecycleError';
+  }
+}
+
+export interface FinalizeBoundedFoundryWorkInput {
+  readonly taskId: string;
+  readonly workerInstanceId: string;
+  readonly leaseToken: string;
+  readonly fencingEpoch: string | number;
+  readonly executionContextId: string;
+  readonly adapterOperationId: string;
+  readonly terminalStatus: FoundryLifecycleTerminalStatus;
+}
+
+export interface FinalizeBoundedFoundryWorkResult {
+  readonly finalized: true;
+  readonly taskStatus: 'done' | 'blocked';
+  readonly leaseState: 'completed' | 'exhausted';
+}
+
+interface FinalizeRow {
+  finalized: boolean;
+  task_status: string | null;
+  lease_state: string | null;
+}
+
+function requiredText(value: string, field: string): string {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new FoundryLifecycleError('invalid_request', `${field} must be a non-empty string`);
+  }
+  return value;
+}
+
+function assertTerminalStatus(status: string): asserts status is FoundryLifecycleTerminalStatus {
+  if (!TERMINAL_STATUSES.includes(status as FoundryLifecycleTerminalStatus)) {
+    throw new FoundryLifecycleError('invalid_terminal_status', 'Unsupported Foundry terminal status');
+  }
+}
+
+export async function finalizeBoundedFoundryWork(
+  queryFn: QueryFunction,
+  input: FinalizeBoundedFoundryWorkInput
+): Promise<FinalizeBoundedFoundryWorkResult> {
+  requiredText(input.taskId, 'taskId');
+  requiredText(input.workerInstanceId, 'workerInstanceId');
+  requiredText(input.leaseToken, 'leaseToken');
+  requiredText(input.executionContextId, 'executionContextId');
+  requiredText(input.adapterOperationId, 'adapterOperationId');
+  assertTerminalStatus(input.terminalStatus);
+
+  const result = await queryFn<FinalizeRow>(
+    `WITH guarded AS MATERIALIZED (
+       SELECT l.task_id
+       FROM comind.cm_foundry_work_lease AS l
+       JOIN comind.cm_task AS t
+         ON t.task_id = l.task_id
+       JOIN comind.cm_foundry_execution_context AS ec
+         ON ec.task_id = t.task_id
+       JOIN comind.cm_foundry_adapter_operation AS ao
+         ON ao.execution_context_id = ec.execution_context_id
+       JOIN comind.cm_foundry_adapter_operation_result AS ar
+         ON ar.adapter_operation_id = ao.adapter_operation_id
+       JOIN comind.cm_foundry_execution_outcome AS eo
+         ON eo.execution_context_id = ec.execution_context_id
+        AND eo.adapter_operation_result_id = ar.adapter_operation_result_id
+       WHERE l.task_id = $1::uuid
+         AND l.state = 'leased'
+         AND l.worker_instance_id = $2::text
+         AND l.lease_token = $3::uuid
+         AND l.fencing_epoch = $4::bigint
+         AND l.lease_expires_at > clock_timestamp()
+         AND l.max_attempts = 1
+         AND l.attempt_count = 1
+         AND t.status IN ('todo', 'in_progress')
+         AND ec.execution_context_id = $5::uuid
+         AND ao.adapter_operation_id = $6::uuid
+         AND ar.terminal_status = $7::text
+         AND eo.terminal_status = $7::text
+       FOR UPDATE OF l, t
+     ), finished AS MATERIALIZED (
+       SELECT comind.cm_foundry_finish_work(
+         $1::uuid,
+         $2::text,
+         $3::uuid,
+         $4::bigint,
+         ($7::text = 'succeeded')
+       ) AS ok
+       FROM guarded
+     ), task_updated AS (
+       UPDATE comind.cm_task AS t
+       SET status = CASE WHEN $7::text = 'succeeded' THEN 'done' ELSE 'blocked' END
+       WHERE t.task_id = $1::uuid
+         AND EXISTS (SELECT 1 FROM finished WHERE ok)
+       RETURNING t.status
+     )
+     SELECT COALESCE((SELECT ok FROM finished), false) AS finalized,
+            (SELECT status FROM task_updated) AS task_status,
+            (SELECT state FROM comind.cm_foundry_work_lease WHERE task_id = $1::uuid) AS lease_state`,
+    [
+      input.taskId,
+      input.workerInstanceId,
+      input.leaseToken,
+      input.fencingEpoch,
+      input.executionContextId,
+      input.adapterOperationId,
+      input.terminalStatus,
+    ]
+  );
+
+  const row = result.rows[0];
+  if (!row?.finalized) {
+    throw new FoundryLifecycleError(
+      'fence_rejected',
+      'Foundry terminalization was rejected because the bounded lease, fence, execution, operation, or terminal evidence did not match'
+    );
+  }
+
+  const expectedTaskStatus = input.terminalStatus === 'succeeded' ? 'done' : 'blocked';
+  const expectedLeaseState = input.terminalStatus === 'succeeded' ? 'completed' : 'exhausted';
+  if (row.task_status !== expectedTaskStatus || row.lease_state !== expectedLeaseState) {
+    throw new FoundryLifecycleError(
+      'terminal_state_mismatch',
+      'Foundry terminalization returned a task or lease state inconsistent with the terminal outcome'
+    );
+  }
+
+  return Object.freeze({
+    finalized: true,
+    taskStatus: expectedTaskStatus,
+    leaseState: expectedLeaseState,
+  });
+}
+
+interface LifecycleRow {
+  task_id: string;
+  task_status: string;
+  lease_state: string | null;
+  attempt_count: number | string | null;
+  max_attempts: number | string | null;
+  fencing_epoch: number | string | null;
+  execution_context_id: string;
+  execution_header_closed_at: string | null;
+  execution_terminal_status: FoundryLifecycleTerminalStatus | null;
+  execution_terminal_at: string | null;
+  execution_effective_state: string;
+  adapter_operation_id: string | null;
+  adapter_header_status: string | null;
+  adapter_header_completed_at: string | null;
+  adapter_terminal_status: FoundryLifecycleTerminalStatus | null;
+  adapter_terminal_at: string | null;
+  adapter_effective_state: string | null;
+  lifecycle_consistency: FoundryLifecycleConsistency;
+}
+
+export interface FoundryLifecycleProjection {
+  readonly taskId: string;
+  readonly taskStatus: string;
+  readonly leaseState: string | null;
+  readonly attemptCount: number | null;
+  readonly maxAttempts: number | null;
+  readonly fencingEpoch: number | null;
+  readonly executionContextId: string;
+  readonly executionHeaderClosedAt: string | null;
+  readonly executionTerminalStatus: FoundryLifecycleTerminalStatus | null;
+  readonly executionTerminalAt: string | null;
+  readonly executionEffectiveState: 'open' | 'closed';
+  readonly adapterOperationId: string | null;
+  readonly adapterHeaderStatus: string | null;
+  readonly adapterHeaderCompletedAt: string | null;
+  readonly adapterTerminalStatus: FoundryLifecycleTerminalStatus | null;
+  readonly adapterTerminalAt: string | null;
+  readonly adapterEffectiveState: string | null;
+  readonly lifecycleConsistency: FoundryLifecycleConsistency;
+}
+
+function nullableNumber(value: number | string | null): number | null {
+  if (value === null) return null;
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed)) {
+    throw new FoundryLifecycleError('malformed_projection', 'Foundry lifecycle projection contains a non-integer counter');
+  }
+  return parsed;
+}
+
+export async function readFoundryLifecycle(
+  queryFn: QueryFunction,
+  executionContextId: string
+): Promise<FoundryLifecycleProjection> {
+  requiredText(executionContextId, 'executionContextId');
+  const result = await queryFn<LifecycleRow>(
+    `SELECT t.task_id::text,
+            t.status AS task_status,
+            l.state AS lease_state,
+            l.attempt_count,
+            l.max_attempts,
+            l.fencing_epoch,
+            ec.execution_context_id::text,
+            ec.closed_at::text AS execution_header_closed_at,
+            eo.terminal_status AS execution_terminal_status,
+            eo.created_at::text AS execution_terminal_at,
+            CASE WHEN eo.execution_outcome_id IS NULL THEN 'open' ELSE 'closed' END AS execution_effective_state,
+            ao.adapter_operation_id::text,
+            ao.status AS adapter_header_status,
+            ao.completed_at::text AS adapter_header_completed_at,
+            ar.terminal_status AS adapter_terminal_status,
+            ar.created_at::text AS adapter_terminal_at,
+            CASE
+              WHEN ar.adapter_operation_result_id IS NOT NULL THEN ar.terminal_status
+              ELSE ao.status
+            END AS adapter_effective_state,
+            CASE
+              WHEN eo.execution_outcome_id IS NULL AND ar.adapter_operation_result_id IS NULL THEN 'open'
+              WHEN eo.execution_outcome_id IS NULL OR ar.adapter_operation_result_id IS NULL THEN 'inconsistent'
+              WHEN eo.terminal_status <> ar.terminal_status THEN 'inconsistent'
+              WHEN eo.terminal_status = 'succeeded' AND l.state = 'completed' AND t.status = 'done' THEN 'consistent'
+              WHEN eo.terminal_status IN ('failed', 'cancelled', 'blocked') AND l.state = 'exhausted' AND t.status = 'blocked' THEN 'consistent'
+              ELSE 'inconsistent'
+            END AS lifecycle_consistency
+     FROM comind.cm_foundry_execution_context AS ec
+     JOIN comind.cm_task AS t
+       ON t.task_id = ec.task_id
+     LEFT JOIN comind.cm_foundry_work_lease AS l
+       ON l.task_id = t.task_id
+     LEFT JOIN comind.cm_foundry_execution_outcome AS eo
+       ON eo.execution_context_id = ec.execution_context_id
+     LEFT JOIN comind.cm_foundry_adapter_operation AS ao
+       ON ao.execution_context_id = ec.execution_context_id
+     LEFT JOIN comind.cm_foundry_adapter_operation_result AS ar
+       ON ar.adapter_operation_id = ao.adapter_operation_id
+     WHERE ec.execution_context_id = $1::uuid`,
+    [executionContextId]
+  );
+
+  if (result.rows.length !== 1) {
+    throw new FoundryLifecycleError(
+      'projection_not_unique',
+      'Foundry lifecycle projection did not resolve exactly one execution and adapter operation'
+    );
+  }
+
+  const row = result.rows[0];
+  return Object.freeze({
+    taskId: row.task_id,
+    taskStatus: row.task_status,
+    leaseState: row.lease_state,
+    attemptCount: nullableNumber(row.attempt_count),
+    maxAttempts: nullableNumber(row.max_attempts),
+    fencingEpoch: nullableNumber(row.fencing_epoch),
+    executionContextId: row.execution_context_id,
+    executionHeaderClosedAt: row.execution_header_closed_at,
+    executionTerminalStatus: row.execution_terminal_status,
+    executionTerminalAt: row.execution_terminal_at,
+    executionEffectiveState: row.execution_effective_state as 'open' | 'closed',
+    adapterOperationId: row.adapter_operation_id,
+    adapterHeaderStatus: row.adapter_header_status,
+    adapterHeaderCompletedAt: row.adapter_header_completed_at,
+    adapterTerminalStatus: row.adapter_terminal_status,
+    adapterTerminalAt: row.adapter_terminal_at,
+    adapterEffectiveState: row.adapter_effective_state,
+    lifecycleConsistency: row.lifecycle_consistency,
+  });
+}
+''')
+
+Path('server/test/integration/foundry-terminal-lifecycle.integration.test.mjs').write_text(r'''import assert from 'node:assert/strict';
+import test from 'node:test';
+import { randomUUID } from 'node:crypto';
+import { Pool } from 'pg';
+
+const {
+  FoundryAdapterRegistry,
+  FoundryRuntimeOrchestrator,
+  persistFoundryTerminalResultAtomic,
+} = await import('../../dist/foundry-runtime.js');
+const {
+  FoundryLifecycleError,
+  finalizeBoundedFoundryWork,
+  readFoundryLifecycle,
+} = await import('../../dist/foundry-lifecycle.js');
+
+function requireIsolatedDatabaseUrl(raw) {
+  if (!raw) throw new Error('DATABASE_URL is required');
+  const parsed = new URL(raw);
+  if (!['postgres:', 'postgresql:'].includes(parsed.protocol)
+    || !['localhost', '127.0.0.1', '::1', 'db'].includes(parsed.hostname)
+    || parsed.pathname !== '/comind_ci') {
+    throw new Error('Refusing Foundry terminal lifecycle verification outside isolated local comind_ci');
+  }
+  return raw;
+}
+
+const pool = new Pool({ connectionString: requireIsolatedDatabaseUrl(process.env.DATABASE_URL) });
+const query = async (sql, params = []) => {
+  const result = await pool.query(sql, params);
+  return { rows: result.rows };
+};
+const one = async (sql, params = []) => {
+  const result = await query(sql, params);
+  assert.equal(result.rows.length, 1);
+  return result.rows[0];
+};
+
+async function createFixture(label) {
+  const suffix = randomUUID().replaceAll('-', '');
+  const org = await one(
+    `INSERT INTO comind.cm_org (name, slug)
+     VALUES ($1::text, $2::text) RETURNING org_id::text AS id`,
+    [`Issue 169 ${label} ${suffix}`, `issue169-${label}-${suffix}`]
+  );
+  const approver = await one(
+    `INSERT INTO comind.cm_actor (org_id, kind, handle, display_name)
+     VALUES ($1::uuid, 'person', $2::text, 'Issue 169 approver')
+     RETURNING actor_id::text AS id`,
+    [org.id, `issue169-approver-${suffix}`]
+  );
+  const agentActor = await one(
+    `INSERT INTO comind.cm_actor (org_id, kind, handle, display_name)
+     VALUES ($1::uuid, 'agent', $2::text, 'Issue 169 lifecycle agent')
+     RETURNING actor_id::text AS id`,
+    [org.id, `issue169-agent-${suffix}`]
+  );
+  const agent = await one(
+    `INSERT INTO comind.cm_agent (org_id, name, description)
+     VALUES ($1::uuid, $2::text, 'Issue 169 bounded lifecycle verification')
+     RETURNING agent_id::text AS id`,
+    [org.id, `Issue 169 lifecycle agent ${suffix}`]
+  );
+  const project = await one(
+    `INSERT INTO comind.cm_project (org_id, title, slug, created_by)
+     VALUES ($1::uuid, $2::text, $3::text, $4::uuid)
+     RETURNING project_id::text AS id`,
+    [org.id, `Issue 169 ${label}`, `issue169-project-${suffix}`, approver.id]
+  );
+  const task = await one(
+    `INSERT INTO comind.cm_task (project_id, title, status)
+     VALUES ($1::uuid, $2::text, 'in_progress')
+     RETURNING task_id::text AS id`,
+    [project.id, `Issue 169 ${label} task`]
+  );
+  const profile = await one(
+    `INSERT INTO comind.cm_foundry_agent_profile (
+       agent_id, actor_id, org_id, role_code, display_name,
+       authority_floor, authority_ceiling, instruction_version,
+       runtime_defaults, competencies, status, activated_at
+     ) VALUES (
+       $1::uuid, $2::uuid, $3::uuid, $4::text, $5::text,
+       'C0', 'C1', 'issue169-v1', '{}'::jsonb, '[]'::jsonb, 'active', NOW()
+     ) RETURNING profile_id::text AS id`,
+    [agent.id, agentActor.id, org.id, `issue169_${label}`, `Issue 169 ${label}`]
+  );
+  const capabilityCode = `foundry.test.issue169.${label}.${suffix}`;
+  const capability = await one(
+    `INSERT INTO comind.cm_foundry_capability (
+       capability_code, description, action, target_kind, max_authority,
+       risk_class, cost_bearing, adapter
+     ) VALUES ($1::text, 'Issue 169 terminal lifecycle', 'verify_lifecycle',
+       'repository', 'C1', 'low', false, 'lifecycle_test')
+     RETURNING capability_id::text AS id`,
+    [capabilityCode]
+  );
+  const targetRef = `synthetic:issue169:${label}:${suffix}`;
+  await query(
+    `INSERT INTO comind.cm_foundry_capability_grant (
+       profile_id, capability_id, org_id, project_id, environment,
+       authority_ceiling, scope, granted_by_actor_id, grant_reason
+     ) VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, 'isolated',
+       'C1', $5::jsonb, $6::uuid, 'Issue 169 isolated lifecycle verification')`,
+    [
+      profile.id,
+      capability.id,
+      org.id,
+      project.id,
+      JSON.stringify({ max_tasks: 1, synthetic_only: true, target_refs: [targetRef] }),
+      approver.id,
+    ]
+  );
+  const authorizationRequest = await one(
+    `INSERT INTO comind.cm_foundry_authorization_request (
+       requesting_profile_id, requesting_actor_id, capability_id,
+       project_id, task_id, authority_level, environment,
+       target_kind, target_ref, reason, status
+     ) VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5::uuid,
+       'C1', 'isolated', 'repository', $6::text,
+       'Issue 169 isolated terminal lifecycle verification', 'approved')
+     RETURNING authorization_request_id::text AS id`,
+    [profile.id, agentActor.id, capability.id, project.id, task.id, targetRef]
+  );
+  const decision = await one(
+    `INSERT INTO comind.cm_foundry_authorization_decision (
+       authorization_request_id, decision, decided_by_actor_id, decision_basis
+     ) VALUES ($1::uuid, 'approved', $2::uuid, 'Issue 169 isolated verification')
+     RETURNING authorization_decision_id::text AS id`,
+    [authorizationRequest.id, approver.id]
+  );
+  await query(
+    `INSERT INTO comind.cm_foundry_work_lease (task_id, max_attempts)
+     VALUES ($1::uuid, 1)`,
+    [task.id]
+  );
+  return { org, approver, agentActor, agent, project, task, profile, capability, capabilityCode, targetRef, decision };
+}
+
+async function claimTask(taskId, workerId) {
+  const claim = await one(
+    `SELECT task_id::text AS task_id, lease_token::text AS lease_token, fencing_epoch
+     FROM comind.cm_foundry_claim_work($1::text, 120)`,
+    [workerId]
+  );
+  assert.equal(claim.task_id, taskId);
+  return claim;
+}
+
+async function executeFixture(fixture, terminalStatus) {
+  const registry = new FoundryAdapterRegistry();
+  registry.register('lifecycle_test', async () => ({
+    status: terminalStatus,
+    resultRef: terminalStatus === 'succeeded' ? `synthetic://${fixture.task.id}` : null,
+    errorCode: terminalStatus === 'succeeded' ? null : 'synthetic_failure',
+    summary: `Issue 169 ${terminalStatus} terminal result`,
+  }));
+  const orchestrator = new FoundryRuntimeOrchestrator(query, registry);
+  return orchestrator.execute({
+    profileId: fixture.profile.id,
+    capabilityCode: fixture.capabilityCode,
+    authorizationDecisionId: fixture.decision.id,
+    authorityLevel: 'C1',
+    environment: 'isolated',
+    targetKind: 'repository',
+    targetRef: fixture.targetRef,
+    projectId: fixture.project.id,
+    taskId: fixture.task.id,
+    idempotencyKey: `issue169-${randomUUID()}`,
+    input: { synthetic: true, test_case: terminalStatus },
+  });
+}
+
+test('successful one-attempt execution reconciles lease, task, and derived lifecycle state', async () => {
+  const fixture = await createFixture('success');
+  const workerId = `issue169-success-${randomUUID()}`;
+  const claim = await claimTask(fixture.task.id, workerId);
+  const execution = await executeFixture(fixture, 'succeeded');
+  const finalized = await finalizeBoundedFoundryWork(query, {
+    taskId: fixture.task.id,
+    workerInstanceId: workerId,
+    leaseToken: claim.lease_token,
+    fencingEpoch: claim.fencing_epoch,
+    executionContextId: execution.executionContextId,
+    adapterOperationId: execution.adapterOperationId,
+    terminalStatus: execution.terminalStatus,
+  });
+  assert.deepEqual(finalized, { finalized: true, taskStatus: 'done', leaseState: 'completed' });
+  const projection = await readFoundryLifecycle(query, execution.executionContextId);
+  assert.equal(projection.taskStatus, 'done');
+  assert.equal(projection.leaseState, 'completed');
+  assert.equal(projection.attemptCount, 1);
+  assert.equal(projection.maxAttempts, 1);
+  assert.equal(projection.executionHeaderClosedAt, null);
+  assert.equal(projection.executionTerminalStatus, 'succeeded');
+  assert.equal(projection.executionEffectiveState, 'closed');
+  assert.equal(projection.adapterHeaderStatus, 'approved');
+  assert.equal(projection.adapterHeaderCompletedAt, null);
+  assert.equal(projection.adapterTerminalStatus, 'succeeded');
+  assert.equal(projection.adapterEffectiveState, 'succeeded');
+  assert.equal(projection.lifecycleConsistency, 'consistent');
+});
+
+test('failed one-attempt execution exhausts the lease and blocks the task', async () => {
+  const fixture = await createFixture('failure');
+  const workerId = `issue169-failure-${randomUUID()}`;
+  const claim = await claimTask(fixture.task.id, workerId);
+  const execution = await executeFixture(fixture, 'failed');
+  const finalized = await finalizeBoundedFoundryWork(query, {
+    taskId: fixture.task.id,
+    workerInstanceId: workerId,
+    leaseToken: claim.lease_token,
+    fencingEpoch: claim.fencing_epoch,
+    executionContextId: execution.executionContextId,
+    adapterOperationId: execution.adapterOperationId,
+    terminalStatus: execution.terminalStatus,
+  });
+  assert.deepEqual(finalized, { finalized: true, taskStatus: 'blocked', leaseState: 'exhausted' });
+  const projection = await readFoundryLifecycle(query, execution.executionContextId);
+  assert.equal(projection.taskStatus, 'blocked');
+  assert.equal(projection.leaseState, 'exhausted');
+  assert.equal(projection.executionTerminalStatus, 'failed');
+  assert.equal(projection.executionEffectiveState, 'closed');
+  assert.equal(projection.adapterHeaderStatus, 'approved');
+  assert.equal(projection.adapterTerminalStatus, 'failed');
+  assert.equal(projection.adapterEffectiveState, 'failed');
+  assert.equal(projection.lifecycleConsistency, 'consistent');
+});
+
+test('stale fencing epoch cannot mutate lease or task terminal state', async () => {
+  const fixture = await createFixture('stale');
+  const workerId = `issue169-stale-${randomUUID()}`;
+  const claim = await claimTask(fixture.task.id, workerId);
+  const execution = await executeFixture(fixture, 'succeeded');
+  await assert.rejects(
+    finalizeBoundedFoundryWork(query, {
+      taskId: fixture.task.id,
+      workerInstanceId: workerId,
+      leaseToken: claim.lease_token,
+      fencingEpoch: Number(claim.fencing_epoch) + 1,
+      executionContextId: execution.executionContextId,
+      adapterOperationId: execution.adapterOperationId,
+      terminalStatus: execution.terminalStatus,
+    }),
+    (error) => error instanceof FoundryLifecycleError && error.code === 'fence_rejected'
+  );
+  const unchanged = await one(
+    `SELECT t.status AS task_status, l.state AS lease_state
+     FROM comind.cm_task AS t
+     JOIN comind.cm_foundry_work_lease AS l ON l.task_id = t.task_id
+     WHERE t.task_id = $1::uuid`,
+    [fixture.task.id]
+  );
+  assert.equal(unchanged.task_status, 'in_progress');
+  assert.equal(unchanged.lease_state, 'leased');
+  await finalizeBoundedFoundryWork(query, {
+    taskId: fixture.task.id,
+    workerInstanceId: workerId,
+    leaseToken: claim.lease_token,
+    fencingEpoch: claim.fencing_epoch,
+    executionContextId: execution.executionContextId,
+    adapterOperationId: execution.adapterOperationId,
+    terminalStatus: execution.terminalStatus,
+  });
+});
+
+test('atomic terminal persistence rolls back adapter result when outcome insert fails', async () => {
+  const fixture = await createFixture('atomicity');
+  const context = await one(
+    `INSERT INTO comind.cm_foundry_execution_context (
+       profile_id, project_id, task_id, capability_id,
+       authorization_decision_id, environment, execution_kind,
+       idempotency_key, context
+     ) VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid,
+       $5::uuid, 'isolated', 'adapter_operation', $6::text, '{}'::jsonb)
+     RETURNING execution_context_id::text AS id`,
+    [fixture.profile.id, fixture.project.id, fixture.task.id, fixture.capability.id, fixture.decision.id, `issue169-atomic-context-${randomUUID()}`]
+  );
+  const operationOne = await one(
+    `INSERT INTO comind.cm_foundry_adapter_operation (
+       execution_context_id, capability_id, adapter, operation_name,
+       target_kind, target_ref, idempotency_key, request_fingerprint, status
+     ) VALUES ($1::uuid, $2::uuid, 'lifecycle_test', 'verify_lifecycle',
+       'repository', $3::text, $4::text, $5::text, 'approved')
+     RETURNING adapter_operation_id::text AS id`,
+    [context.id, fixture.capability.id, fixture.targetRef, `issue169-op1-${randomUUID()}`, 'a'.repeat(64)]
+  );
+  const operationTwo = await one(
+    `INSERT INTO comind.cm_foundry_adapter_operation (
+       execution_context_id, capability_id, adapter, operation_name,
+       target_kind, target_ref, idempotency_key, request_fingerprint, status
+     ) VALUES ($1::uuid, $2::uuid, 'lifecycle_test', 'verify_lifecycle',
+       'repository', $3::text, $4::text, $5::text, 'approved')
+     RETURNING adapter_operation_id::text AS id`,
+    [context.id, fixture.capability.id, fixture.targetRef, `issue169-op2-${randomUUID()}`, 'b'.repeat(64)]
+  );
+  const seededResult = await one(
+    `INSERT INTO comind.cm_foundry_adapter_operation_result (
+       adapter_operation_id, terminal_status, result_fingerprint, summary
+     ) VALUES ($1::uuid, 'succeeded', $2::text, 'Seeded terminal result')
+     RETURNING adapter_operation_result_id::text AS id`,
+    [operationOne.id, 'c'.repeat(64)]
+  );
+  await query(
+    `INSERT INTO comind.cm_foundry_execution_outcome (
+       execution_context_id, adapter_operation_result_id,
+       terminal_status, summary
+     ) VALUES ($1::uuid, $2::uuid, 'succeeded', 'Seeded outcome')`,
+    [context.id, seededResult.id]
+  );
+  await assert.rejects(
+    persistFoundryTerminalResultAtomic(query, context.id, operationTwo.id, {
+      status: 'failed',
+      errorCode: 'forced_collision',
+      summary: 'This outcome must collide with the seeded execution outcome',
+    })
+  );
+  const rolledBack = await one(
+    `SELECT count(*)::int AS result_count
+     FROM comind.cm_foundry_adapter_operation_result
+     WHERE adapter_operation_id = $1::uuid`,
+    [operationTwo.id]
+  );
+  assert.equal(Number(rolledBack.result_count), 0);
+});
+
+test.after(async () => {
+  await pool.end();
+});
+''')
+
+Path('scripts/test_foundry_terminal_lifecycle.sh').write_text(r'''#!/usr/bin/env bash
+set -euo pipefail
+repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [[ -z "${DATABASE_URL:-}" ]]; then
+  echo "DATABASE_URL is required for isolated Foundry terminal lifecycle verification." >&2
+  exit 2
+fi
+DATABASE_URL="${DATABASE_URL}" python3 <<'PY2'
+import os
+import sys
+from urllib.parse import urlparse
+parsed = urlparse(os.environ['DATABASE_URL'])
+if parsed.scheme not in {'postgres', 'postgresql'} or parsed.hostname not in {'localhost', '127.0.0.1', '::1', 'db'} or parsed.path != '/comind_ci':
+    print('Refusing Foundry terminal lifecycle verification outside local isolated comind_ci.', file=sys.stderr)
+    raise SystemExit(2)
+PY2
+if [[ "$(psql "${DATABASE_URL}" -X -Atc 'SELECT current_database();')" != "comind_ci" ]]; then
+  echo "Refusing Foundry terminal lifecycle verification outside comind_ci." >&2
+  exit 2
+fi
+bash "${repository_root}/scripts/test_foundry_agent_substrate.sh"
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f "${repository_root}/db/migrations/20261008_008_foundry_runtime_orchestration.sql"
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f "${repository_root}/db/migrations/20261009_009_foundry_work_lease_kernel.sql"
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f "${repository_root}/db/migrations/20261021_011_foundry_work_lease_rpc_acl_hardening.sql"
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f "${repository_root}/db/migrations/20261021_012_foundry_work_lease_rpc_search_path_hardening.sql"
+(
+  cd "${repository_root}/server"
+  npm ci
+  npm run build
+  npm test
+  node --test --test-concurrency=1 test/integration/foundry-terminal-lifecycle.integration.test.mjs
+)
+printf 'Foundry terminal lifecycle verification passed.\n'
+''')
+Path('scripts/test_foundry_terminal_lifecycle.sh').chmod(0o755)
+
+Path('.github/workflows/foundry-terminal-lifecycle.yml').write_text(r'''name: Foundry Terminal Lifecycle
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    paths:
+      - '.github/workflows/foundry-terminal-lifecycle.yml'
+      - 'db/migrations/**'
+      - 'db/sql/v2/**'
+      - 'scripts/test_foundry_agent_substrate.sh'
+      - 'scripts/test_foundry_terminal_lifecycle.sh'
+      - 'server/src/foundry-runtime.ts'
+      - 'server/src/foundry-lifecycle.ts'
+      - 'server/test/integration/foundry-terminal-lifecycle.integration.test.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  terminal-lifecycle:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.6-pg17-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+      - name: Verify terminal lifecycle reconciliation
+        run: bash ./scripts/test_foundry_terminal_lifecycle.sh
+''')
+
+def patch_once(path, old, new):
+    p = Path(path)
+    text = p.read_text()
+    if old not in text:
+        raise SystemExit(f'Patch anchor not found in {path}')
+    p.write_text(text.replace(old, new, 1))
+
+lifecycle_import = "const { finalizeBoundedFoundryWork } = await import('../../dist/foundry-lifecycle.js');\n"
+patch_once(
+    'server/test/integration/foundry-ollama-one-shot.e2e.mjs',
+    "const { FoundryAdapterRegistry, FoundryRuntimeOrchestrator } = await import('../../dist/foundry-runtime.js');\n",
+    "const { FoundryAdapterRegistry, FoundryRuntimeOrchestrator } = await import('../../dist/foundry-runtime.js');\n" + lifecycle_import
+)
+patch_once(
+    'server/test/integration/foundry-ollama-one-shot.e2e.mjs',
+    "  const finished = await one(\n    `SELECT comind.cm_foundry_finish_work($1::uuid, $2::text, $3::uuid, $4::bigint, true) AS ok`,\n    [task.id, workerId, claim.lease_token, claim.fencing_epoch]\n  );\n  assert.equal(finished.ok, true);\n",
+    "  const finished = await finalizeBoundedFoundryWork(query, {\n    taskId: task.id,\n    workerInstanceId: workerId,\n    leaseToken: claim.lease_token,\n    fencingEpoch: claim.fencing_epoch,\n    executionContextId: execution.executionContextId,\n    adapterOperationId: execution.adapterOperationId,\n    terminalStatus: execution.terminalStatus,\n  });\n  assert.equal(finished.finalized, true);\n  assert.equal(finished.taskStatus, 'done');\n  assert.equal(finished.leaseState, 'completed');\n"
+)
+patch_once(
+    'server/test/integration/foundry-ollama-live-test-one-shot.e2e.mjs',
+    "const { FoundryAdapterRegistry, FoundryRuntimeOrchestrator } =\n  await import('../../dist/foundry-runtime.js');\n",
+    "const { FoundryAdapterRegistry, FoundryRuntimeOrchestrator } =\n  await import('../../dist/foundry-runtime.js');\nconst { finalizeBoundedFoundryWork } = await import('../../dist/foundry-lifecycle.js');\n"
+)
+patch_once(
+    'server/test/integration/foundry-ollama-live-test-one-shot.e2e.mjs',
+    "  const finished = await one(\n    'SELECT comind.cm_foundry_finish_work($1::uuid, $2::text, $3::uuid, $4::bigint, true) AS ok',\n    [TASK_ID, workerId, claim.lease_token, claim.fencing_epoch]\n  );\n  assert.equal(finished.ok, true);\n",
+    "  const finished = await finalizeBoundedFoundryWork(query, {\n    taskId: TASK_ID,\n    workerInstanceId: workerId,\n    leaseToken: claim.lease_token,\n    fencingEpoch: claim.fencing_epoch,\n    executionContextId: execution.executionContextId,\n    adapterOperationId: execution.adapterOperationId,\n    terminalStatus: execution.terminalStatus,\n  });\n  assert.equal(finished.finalized, true);\n  assert.equal(finished.taskStatus, 'done');\n  assert.equal(finished.leaseState, 'completed');\n"
+)
+patch_once(
+    '.github/workflows/foundry-test-one-shot-local-handoff.yml',
+    "      - 'server/src/foundry-runtime.ts'\n",
+    "      - 'server/src/foundry-runtime.ts'\n      - 'server/src/foundry-lifecycle.ts'\n"
+)

@@ -320,7 +320,12 @@ export class OpenAIAssistantProvider implements AssistantProvider {
     let stream: OpenAIResponseStreamLike;
 
     try {
-      stream = await executeOpenAIProviderStreamingEnvelope(this.responses, envelope);
+      stream = await executeOpenAIProviderStreamingEnvelope(
+        {
+          create: (providerRequest) => this.responses.create(providerRequest),
+        },
+        envelope
+      );
     } catch (error) {
       attachProviderMetadata(error, failedCallMetadata(error, envelope, Date.now() - startedAt));
       throw error;
@@ -427,7 +432,12 @@ export class OpenAIAssistantProvider implements AssistantProvider {
     const startedAt = Date.now();
     let response: OpenAIResponseLike;
     try {
-      response = await executeOpenAIProviderExecutionEnvelope(this.responses, envelope);
+      response = await executeOpenAIProviderExecutionEnvelope(
+        {
+          create: (providerRequest) => this.responses.create(providerRequest),
+        },
+        envelope
+      );
     } catch (error) {
       attachProviderMetadata(error, failedCallMetadata(error, envelope, Date.now() - startedAt));
       throw error;

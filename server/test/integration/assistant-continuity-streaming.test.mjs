@@ -135,7 +135,7 @@ test('completed streaming generation persists ordered deltas before canonical co
   assert.ok(storedGenerations[0].completed_at);
 
   const events = await captureEvents(id);
-  assert.deepEqual(events.map((row) => row.sequence_no), [1, 2, 3, 4, 5]);
+  assert.deepEqual(events.map((row) => Number(row.sequence_no)), [1, 2, 3, 4, 5]);
   assert.deepEqual(events.map((row) => row.event_type), [
     'user_message_observed',
     'assistant_generation_started',
@@ -207,7 +207,7 @@ test('interrupted streaming generation preserves partial deltas with no canonica
   assert.ok(storedGenerations[0].interrupted_at);
 
   const events = await captureEvents(id);
-  assert.deepEqual(events.map((row) => row.sequence_no), [1, 2, 3, 4, 5]);
+  assert.deepEqual(events.map((row) => Number(row.sequence_no)), [1, 2, 3, 4, 5]);
   assert.deepEqual(events.map((row) => row.event_type), [
     'user_message_observed',
     'assistant_generation_started',

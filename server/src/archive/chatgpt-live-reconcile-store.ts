@@ -389,7 +389,7 @@ async function persistReceipt(
      ) VALUES (
        $1,$2,$3,$4,$5,$6::timestamptz,$7,$8,$9,$10,$11::jsonb,$12::jsonb,$13::jsonb,$14::jsonb,$15
      )
-     ON CONFLICT (import_id,source_conversation_id,reconciliation_version,live_candidate_set_sha256)
+     ON CONFLICT (import_id,source_conversation_id,reconciliation_version,live_candidate_set_sha256,live_snapshot_cutoff)
      DO NOTHING
      RETURNING reconciliation_id`,
     [
@@ -424,8 +424,8 @@ async function persistReceipt(
       `SELECT reconciliation_id,receipt_sha256::text,result,selected_conv_id,match_method,live_snapshot_cutoff
          FROM comind.cm_conversation_reconciliation_receipt
         WHERE import_id=$1 AND source_conversation_id=$2 AND reconciliation_version=$3
-          AND live_candidate_set_sha256=$4`,
-      [archive.importId, archive.sourceConversationId, CHATGPT_LIVE_RECONCILIATION_VERSION, classification.candidateSetSha256]
+          AND live_candidate_set_sha256=$4 AND live_snapshot_cutoff=$5::timestamptz`,
+      [archive.importId, archive.sourceConversationId, CHATGPT_LIVE_RECONCILIATION_VERSION, classification.candidateSetSha256, cutoff]
     );
     const row = existing.rows[0];
     if (!row) throw new Error('Reconciliation receipt conflict did not resolve to an existing receipt');

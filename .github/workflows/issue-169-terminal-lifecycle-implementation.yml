@@ -74,12 +74,11 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Preserve verified implementation
+      - name: Preserve verified implementation code
         if: success()
         shell: bash
         run: |
           set -euo pipefail
-          rm .github/workflows/issue-169-terminal-lifecycle-implementation.yml
           rm .github/issue169_patch.py
           rm .github/issue169_snapshot_fix.py
           git add \
@@ -89,9 +88,6 @@ jobs:
             server/test/integration/foundry-ollama-one-shot.e2e.mjs \
             server/test/integration/foundry-ollama-live-test-one-shot.e2e.mjs \
             scripts/test_foundry_terminal_lifecycle.sh \
-            .github/workflows/foundry-terminal-lifecycle.yml \
-            .github/workflows/foundry-test-one-shot-local-handoff.yml \
-            .github/workflows/issue-169-terminal-lifecycle-implementation.yml \
             .github/issue169_patch.py \
             .github/issue169_snapshot_fix.py
           git status --short

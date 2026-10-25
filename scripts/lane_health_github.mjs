@@ -196,6 +196,8 @@ export async function collectLaneHealthSnapshot({
       ...result,
       reportedRunStatus: run?.status || null,
       effectiveRunStatus: effectiveStatus,
+      runConclusion: run?.conclusion || null,
+      runAttempt: Number.isInteger(run?.run_attempt) ? run.run_attempt : null,
       requiredForAllPullRequests: Boolean(workflow.requiredForAllPullRequests),
       allowTransientRetrigger: Boolean(workflow.allowTransientRetrigger),
       lastMeaningfulTransitionAt,

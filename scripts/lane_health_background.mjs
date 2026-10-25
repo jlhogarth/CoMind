@@ -39,6 +39,10 @@ export async function resolveBackgroundPullRequests({
 }) {
   if (targetPrNumber) return uniquePositiveIntegers([targetPrNumber]);
 
+  if (eventName === 'pull_request_target') {
+    return uniquePositiveIntegers([event?.pull_request?.number]);
+  }
+
   const encodedRepo = encodedRepository(repositoryFullName);
 
   if (eventName === 'workflow_run') {
@@ -106,6 +110,8 @@ export async function collectBackgroundBundle({
     observedAt: now.toISOString(),
     trigger: {
       eventName,
+      pullRequestNumber: event?.pull_request?.number || null,
+      pullRequestHeadSha: event?.pull_request?.head?.sha || null,
       workflowName: event?.workflow_run?.name || null,
       workflowRunId: event?.workflow_run?.id || null,
       workflowRunStatus: event?.workflow_run?.status || null,

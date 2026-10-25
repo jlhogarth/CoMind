@@ -1,0 +1,57 @@
+name: Lane Health Sentinel Notify
+
+on:
+  workflow_run:
+    workflows:
+      - Lane Health Sentinel Background
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  notify:
+    name: Notify meaningful lane-health transitions
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out trusted default branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Download trusted background evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: lane-health-background
+          path: artifacts
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - name: Apply deduplicated PR notification
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >-
+          node scripts/lane_health_notify.mjs
+          --repository "${GITHUB_REPOSITORY}"
+          --input artifacts/lane-health-background.json
+          --output artifacts/lane-health-notification.json
+
+      - name: Upload notification decision evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: lane-health-notification
+          path: artifacts/lane-health-notification.json
+          if-no-files-found: error
+          retention-days: 14

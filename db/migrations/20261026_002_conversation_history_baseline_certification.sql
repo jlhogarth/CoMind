@@ -107,6 +107,135 @@ CREATE POLICY cm_conversation_history_reader_select
   ON comind.cm_conversation_history_baseline
   FOR SELECT TO comind_conversation_history_reader USING (true);
 
+-- The certifier can inspect only the source/import identity required to bind a certificate.
+DROP POLICY IF EXISTS cm_conversation_history_certifier_select ON comind.cm_archive_source;
+CREATE POLICY cm_conversation_history_certifier_select ON comind.cm_archive_source
+  FOR SELECT TO comind_conversation_history_certifier USING (true);
+DROP POLICY IF EXISTS cm_conversation_history_certifier_select ON comind.cm_archive_import;
+CREATE POLICY cm_conversation_history_certifier_select ON comind.cm_archive_import
+  FOR SELECT TO comind_conversation_history_certifier USING (true);
+
+-- Replace the broad history-reader policies from migration 001 with certification-bounded policies.
+DROP POLICY IF EXISTS cm_conversation_history_reader_select ON comind.cm_archive_source;
+CREATE POLICY cm_conversation_history_reader_select ON comind.cm_archive_source
+  FOR SELECT TO comind_conversation_history_reader
+  USING (EXISTS (
+    SELECT 1 FROM comind.cm_conversation_history_baseline b
+    WHERE b.source_archive_id = cm_archive_source.source_archive_id
+  ));
+
+DROP POLICY IF EXISTS cm_conversation_history_reader_select ON comind.cm_archive_source_file;
+CREATE POLICY cm_conversation_history_reader_select ON comind.cm_archive_source_file
+  FOR SELECT TO comind_conversation_history_reader
+  USING (EXISTS (
+    SELECT 1 FROM comind.cm_conversation_history_baseline b
+    WHERE b.source_archive_id = cm_archive_source_file.source_archive_id
+  ));
+
+DROP POLICY IF EXISTS cm_conversation_history_reader_select ON comind.cm_archive_import;
+CREATE POLICY cm_conversation_history_reader_select ON comind.cm_archive_import
+  FOR SELECT TO comind_conversation_history_reader
+  USING (EXISTS (
+    SELECT 1 FROM comind.cm_conversation_history_baseline b
+    WHERE b.import_id = cm_archive_import.import_id
+  ));
+
+DROP POLICY IF EXISTS cm_conversation_history_reader_select ON comind.cm_archive_conversation_observation;
+CREATE POLICY cm_conversation_history_reader_select ON comind.cm_archive_conversation_observation
+  FOR SELECT TO comind_conversation_history_reader
+  USING (EXISTS (
+    SELECT 1 FROM comind.cm_conversation_history_baseline b
+    WHERE b.import_id = cm_archive_conversation_observation.import_id
+  ));
+
+DROP POLICY IF EXISTS cm_conversation_history_reader_select ON comind.cm_archive_node_observation;
+CREATE POLICY cm_conversation_history_reader_select ON comind.cm_archive_node_observation
+  FOR SELECT TO comind_conversation_history_reader
+  USING (EXISTS (
+    SELECT 1 FROM comind.cm_conversation_history_baseline b
+    WHERE b.import_id = cm_archive_node_observation.import_id
+  ));
+
+DROP POLICY IF EXISTS cm_conversation_history_reader_select ON comind.cm_archive_attachment_reference;
+CREATE POLICY cm_conversation_history_reader_select ON comind.cm_archive_attachment_reference
+  FOR SELECT TO comind_conversation_history_reader
+  USING (EXISTS (
+    SELECT 1 FROM comind.cm_conversation_history_baseline b
+    WHERE b.import_id = cm_archive_attachment_reference.import_id
+  ));
+
+DROP POLICY IF EXISTS cm_conversation_history_reader_select ON comind.cm_archive_parser_event;
+CREATE POLICY cm_conversation_history_reader_select ON comind.cm_archive_parser_event
+  FOR SELECT TO comind_conversation_history_reader
+  USING (EXISTS (
+    SELECT 1 FROM comind.cm_conversation_history_baseline b
+    WHERE b.import_id = cm_archive_parser_event.import_id
+  ));
+
+DROP POLICY IF EXISTS cm_conversation_history_reader_select ON comind.cm_archive_quarantine;
+CREATE POLICY cm_conversation_history_reader_select ON comind.cm_archive_quarantine
+  FOR SELECT TO comind_conversation_history_reader
+  USING (EXISTS (
+    SELECT 1 FROM comind.cm_conversation_history_baseline b
+    WHERE b.import_id = cm_archive_quarantine.import_id
+  ));
+
+-- Diff evidence is intentionally withheld until the PIT comparison lane is active.
+REVOKE SELECT ON TABLE comind.cm_archive_diff_receipt FROM comind_conversation_history_reader;
+DROP POLICY IF EXISTS cm_conversation_history_reader_select ON comind.cm_archive_diff_receipt;
+
+DROP POLICY IF EXISTS cm_conversation_history_reader_select ON comind.cm_conversation_reconciliation_receipt;
+CREATE POLICY cm_conversation_history_reader_select ON comind.cm_conversation_reconciliation_receipt
+  FOR SELECT TO comind_conversation_history_reader
+  USING (EXISTS (
+    SELECT 1 FROM comind.cm_conversation_history_baseline b
+    WHERE b.import_id = cm_conversation_reconciliation_receipt.import_id
+  ));
+
+DROP POLICY IF EXISTS cm_conversation_history_reader_select ON comind.cm_conversation_reconciliation_candidate;
+CREATE POLICY cm_conversation_history_reader_select ON comind.cm_conversation_reconciliation_candidate
+  FOR SELECT TO comind_conversation_history_reader
+  USING (EXISTS (
+    SELECT 1
+    FROM comind.cm_conversation_reconciliation_receipt r
+    JOIN comind.cm_conversation_history_baseline b ON b.import_id = r.import_id
+    WHERE r.reconciliation_id = cm_conversation_reconciliation_candidate.reconciliation_id
+  ));
+
+DROP POLICY IF EXISTS cm_conversation_history_reader_select ON comind.cm_conversation_derivation_run;
+CREATE POLICY cm_conversation_history_reader_select ON comind.cm_conversation_derivation_run
+  FOR SELECT TO comind_conversation_history_reader
+  USING (EXISTS (
+    SELECT 1
+    FROM comind.cm_conversation_reconciliation_receipt r
+    JOIN comind.cm_conversation_history_baseline b ON b.import_id = r.import_id
+    WHERE r.selected_conv_id = cm_conversation_derivation_run.conv_id
+  ));
+
+DROP POLICY IF EXISTS cm_conversation_history_reader_select ON comind.cm_conversation_derivation;
+CREATE POLICY cm_conversation_history_reader_select ON comind.cm_conversation_derivation
+  FOR SELECT TO comind_conversation_history_reader
+  USING (EXISTS (
+    SELECT 1
+    FROM comind.cm_conversation_reconciliation_receipt r
+    JOIN comind.cm_conversation_history_baseline b ON b.import_id = r.import_id
+    WHERE r.selected_conv_id = cm_conversation_derivation.conv_id
+  ));
+
+DROP POLICY IF EXISTS cm_conversation_history_reader_select ON comind.cm_conversation_promotion_candidate;
+CREATE POLICY cm_conversation_history_reader_select ON comind.cm_conversation_promotion_candidate
+  FOR SELECT TO comind_conversation_history_reader
+  USING (EXISTS (
+    SELECT 1
+    FROM comind.cm_conversation_reconciliation_receipt r
+    JOIN comind.cm_conversation_history_baseline b ON b.import_id = r.import_id
+    WHERE r.selected_conv_id = cm_conversation_promotion_candidate.conv_id
+  ));
+
+-- Projection tables are not required by the CHIST read model and could expose unrelated live analytics.
+REVOKE SELECT ON TABLE comind.cm_message_analytics, comind.cm_conversation_analytics
+  FROM comind_conversation_history_reader;
+
 REVOKE ALL ON TABLE comind.cm_conversation_history_baseline FROM PUBLIC;
 DO $$
 DECLARE v_role text;

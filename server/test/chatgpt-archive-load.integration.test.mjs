@@ -25,7 +25,9 @@ if (process.env.CHATGPT_ARCHIVE_DB_TEST !== '1') {
   const conversationsPerShard = conversationCount / shardCount;
   const physicalAssetCount = 10;
   const distinctAttachmentReferenceCount = 10;
-  const attachmentReferenceObservationCount = 20;
+  // Each attachment-bearing message carries one logical source reference. The parser
+  // must not double-count the same file_id when recursive inspection sees it again.
+  const attachmentReferenceObservationCount = distinctAttachmentReferenceCount;
 
   function makeConversation(index) {
     const conversationId = `pit0-conversation-${String(index).padStart(4, '0')}`;

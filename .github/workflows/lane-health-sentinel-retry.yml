@@ -70,6 +70,17 @@ jobs:
           unzip -q artifacts/lane-health-background.zip -d artifacts/background
           test -f artifacts/background/lane-health-background.json
 
+      - name: Review structured transient signal evidence
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          node scripts/lane_health_transient_signal.mjs \
+            --repository "${GITHUB_REPOSITORY}" \
+            --bundle artifacts/background/lane-health-background.json \
+            --output artifacts/background/lane-health-background-enriched.json
+
       - name: Evaluate and request at most one retry
         shell: bash
         env:
@@ -78,7 +89,7 @@ jobs:
           set -euo pipefail
           node scripts/lane_health_retry.mjs \
             --repository "${GITHUB_REPOSITORY}" \
-            --bundle artifacts/background/lane-health-background.json \
+            --bundle artifacts/background/lane-health-background-enriched.json \
             --policy .github/lane-health-sentinel.json \
             --output artifacts/lane-health-retry.json
 
@@ -107,6 +118,11 @@ jobs:
               `- Action: \`${outcome.action}\``,
               `- Reason: ${outcome.retryReason || outcome.reason || 'none'}`
             );
+            if (outcome.structuredTransientSignal?.classification) {
+              lines.push(
+                `- Structured transient: \`${outcome.structuredTransientSignal.classification}\` / exit \`${outcome.structuredTransientSignal.exitCode}\``
+              );
+            }
             if (outcome.retryAttemptUrl) lines.push(`- Retry attempt: ${outcome.retryAttemptUrl}`);
           }
           await appendFile(process.env.GITHUB_STEP_SUMMARY, `${lines.join('\n')}\n`, 'utf8');
@@ -116,6 +132,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: lane-health-retry
-          path: artifacts/lane-health-retry.json
+          path: |
+            artifacts/lane-health-retry.json
+            artifacts/background/lane-health-background-enriched.json
           if-no-files-found: error
           retention-days: 14

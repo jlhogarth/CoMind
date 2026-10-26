@@ -12,33 +12,91 @@ jobs:
   controlled-retry-proof:
     name: Controlled transient retry proof
     runs-on: ubuntu-latest
-    timeout-minutes: 1
+    timeout-minutes: 5
     steps:
       - name: Check out exact pull request candidate
         uses: actions/checkout@v4
 
       - name: Execute controlled retry fixture
+        id: fixture
         shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
           fixture="docs/provenance/lane-health-retry-proof/mode.txt"
           test -f "${fixture}"
           mode="$(tr -d '\r\n' < "${fixture}")"
           printf 'Controlled retry fixture mode: %s; run attempt: %s\n' "${mode}" "${GITHUB_RUN_ATTEMPT}"
 
+          exit_code=0
           case "${mode}" in
             transient-repeat-timeout)
-              sleep 75
+              if [ "${GITHUB_RUN_ATTEMPT}" -eq 1 ]; then
+                printf 'Attempt 1: simulating a reviewed resource timeout with GNU timeout.\n'
+                timeout 1s bash -c 'sleep 5'
+                exit_code=$?
+              else
+                printf 'Attempt %s: deterministic recovery succeeded.\n' "${GITHUB_RUN_ATTEMPT}"
+                exit_code=0
+              fi
               ;;
             deterministic-failure)
               printf 'Controlled deterministic failure. This must not be automatically retried.\n'
-              exit 1
+              exit_code=1
               ;;
             healthy)
               printf 'Controlled retry proof is healthy.\n'
+              exit_code=0
               ;;
             *)
               printf 'Unsupported controlled retry proof mode: %s\n' "${mode}" >&2
-              exit 2
+              exit_code=2
               ;;
           esac
+
+          printf 'exit_code=%s\n' "${exit_code}" >> "${GITHUB_OUTPUT}"
+          exit "${exit_code}"
+
+      - name: Emit reviewed structured transient signal
+        if: ${{ failure() && github.run_attempt == 1 && steps.fixture.outputs.exit_code == '124' }}
+        shell: bash
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EXIT_CODE: ${{ steps.fixture.outputs.exit_code }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/transient-signal
+          node --input-type=module <<'NODE'
+          import { writeFile } from 'node:fs/promises';
+
+          const signal = {
+            schemaVersion: 1,
+            kind: 'comind_transient_retry_signal',
+            producer: 'comind_transient_wrapper_v1',
+            retrySafe: true,
+            classification: 'resource_timeout',
+            exitCode: Number(process.env.EXIT_CODE),
+            runId: Number(process.env.GITHUB_RUN_ID),
+            runAttempt: Number(process.env.GITHUB_RUN_ATTEMPT),
+            headSha: process.env.PR_HEAD_SHA,
+            workflow: process.env.GITHUB_WORKFLOW,
+            event: process.env.GITHUB_EVENT_NAME,
+            step: 'Execute controlled retry fixture',
+            generatedAt: new Date().toISOString(),
+          };
+
+          await writeFile(
+            'artifacts/transient-signal/lane-health-transient-signal.json',
+            `${JSON.stringify(signal, null, 2)}\n`,
+            'utf8'
+          );
+          console.log(JSON.stringify(signal));
+          NODE
+
+      - name: Upload structured transient signal
+        if: ${{ failure() && github.run_attempt == 1 && steps.fixture.outputs.exit_code == '124' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: lane-health-transient-signal-attempt-${{ github.run_attempt }}
+          path: artifacts/transient-signal/lane-health-transient-signal.json
+          if-no-files-found: error
+          retention-days: 14

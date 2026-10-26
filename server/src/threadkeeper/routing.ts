@@ -7,6 +7,10 @@ function includesAny(values: string[], candidates: string[]): boolean {
 }
 
 export function recommendRoute(assessment: ContinuityAssessment): RouteRecommendation {
+  if (assessment.classification === 'INTACT') {
+    throw new Error('No route required for intact continuity');
+  }
+
   let routeCode: RouteCode;
   let authorityRequired = false;
 
@@ -30,11 +34,9 @@ export function recommendRoute(assessment: ContinuityAssessment): RouteRecommend
       ? 'REQUEST_GOVERNANCE_REVIEW'
       : 'REQUEST_HUMAN_REVIEW';
     authorityRequired = true;
-  } else if (assessment.classification === 'BLOCKED') {
+  } else {
     routeCode = 'PAUSE_DEPENDENT_ACTION';
     authorityRequired = true;
-  } else {
-    routeCode = 'RETAIN_UNRESOLVED';
   }
 
   return {

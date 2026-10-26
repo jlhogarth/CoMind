@@ -1,0 +1,91 @@
+name: Lane Health Sentinel Notify
+
+on:
+  workflow_run:
+    workflows:
+      - Lane Health Sentinel Background
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+  issues: write
+
+concurrency:
+  group: lane-health-notify-${{ github.event.workflow_run.id }}
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    name: Publish deduplicated lane-health notification
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out trusted default branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Download exact background evidence artifact
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          BACKGROUND_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/background
+
+          curl --fail --silent --show-error \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/actions/runs/${BACKGROUND_RUN_ID}/artifacts?per_page=100" \
+            > artifacts/background-artifacts.json
+
+          archive_url="$(node --input-type=module <<'NODE'
+          import { readFile } from 'node:fs/promises';
+          const payload = JSON.parse(await readFile('artifacts/background-artifacts.json', 'utf8'));
+          const matches = (payload.artifacts || []).filter((artifact) => artifact.name === 'lane-health-background' && !artifact.expired);
+          if (matches.length !== 1) {
+            throw new Error(`Expected exactly one live lane-health-background artifact, found ${matches.length}.`);
+          }
+          process.stdout.write(matches[0].archive_download_url);
+          NODE
+          )"
+
+          curl --fail --silent --show-error --location \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "${archive_url}" \
+            --output artifacts/lane-health-background.zip
+
+          unzip -q artifacts/lane-health-background.zip -d artifacts/background
+          test -f artifacts/background/lane-health-background.json
+
+      - name: Create or update sentinel PR notification
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          node scripts/lane_health_notify.mjs \
+            --repository "${GITHUB_REPOSITORY}" \
+            --bundle artifacts/background/lane-health-background.json \
+            | tee artifacts/lane-health-notification.json
+
+      - name: Upload notification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: lane-health-notification
+          path: artifacts/lane-health-notification.json
+          if-no-files-found: error
+          retention-days: 14

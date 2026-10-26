@@ -6,6 +6,7 @@ on:
       - 'db/migrations/20261025_012_conversation_analytics_intent_derivation.sql'
       - 'db/migrations/20261025_013_conversation_analytics_policy_hardening.sql'
       - 'db/verification/cfr_001g_execution_fixture.sql'
+      - 'db/verification/cfr_001g_local_source_read_compat.sql'
       - 'server/src/analytics/**'
       - 'server/test/conversation-derivation.test.mjs'
       - 'scripts/test_cfr_001g_derivation.sh'

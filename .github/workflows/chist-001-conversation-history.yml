@@ -1,0 +1,99 @@
+name: CHIST-001 Conversation History
+
+on:
+  pull_request:
+    paths:
+      - 'db/migrations/20261026_001_conversation_history_reader.sql'
+      - 'db/migrations/20261026_002_conversation_history_baseline_certification.sql'
+      - 'db/migrations/20261026_003_conversation_history_baseline_index_hardening.sql'
+      - 'db/migrations/20261026_004_conversation_history_archive_derivation.sql'
+      - 'db/migrations/20261026_005_conversation_history_pit_diff.sql'
+      - 'db/migrations/20261026_006_conversation_history_archive_derivation_fk_indexes.sql'
+      - 'db/migrations/20261026_007_chatgpt_archive_parser_info_events.sql'
+      - 'db/verification/chist_001_live_test.sql'
+      - 'server/src/history/**'
+      - 'server/src/archive/chatgpt-export.ts'
+      - 'server/src/archive/chatgpt-export-ingest.ts'
+      - 'server/src/archive/chatgpt-export-diff*.ts'
+      - 'scripts/test_chist_001_conversation_history.sh'
+      - 'scripts/test_chist_001_archive_derivation.sh'
+      - 'scripts/test_chist_001_archive_readback.sh'
+      - 'scripts/test_chist_001_baseline_certification.sh'
+      - 'scripts/test_chist_001_pit_diff.sh'
+      - '.github/workflows/chist-001-conversation-history.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  governed-history-reader:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.6-pg17-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/comind_ci
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Install server dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Typecheck and build Conversation History reader
+        working-directory: server
+        run: npm run build
+
+      - name: Run governed Conversation History retrieval proof
+        run: bash scripts/test_chist_001_conversation_history.sh
+
+      - name: Apply CHIST baseline index hardening
+        run: psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f db/migrations/20261026_003_conversation_history_baseline_index_hardening.sql
+
+      - name: Verify CHIST baseline source-archive index
+        run: |
+          test "$(psql "$DATABASE_URL" -X -At -v ON_ERROR_STOP=1 -c "SELECT count(*) FROM pg_indexes WHERE schemaname='comind' AND tablename='cm_conversation_history_baseline' AND indexname='idx_cm_conversation_history_baseline_source_archive';")" = "1"
+
+      - name: Run archive-native deterministic analytics proof
+        run: bash scripts/test_chist_001_archive_derivation.sh
+
+      - name: Apply archive derivation FK index hardening
+        run: psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f db/migrations/20261026_006_conversation_history_archive_derivation_fk_indexes.sql
+
+      - name: Verify archive derivation composite FK indexes
+        run: |
+          test "$(psql "$DATABASE_URL" -X -At -v ON_ERROR_STOP=1 -c "SELECT count(*) FROM pg_indexes WHERE schemaname='comind' AND tablename='cm_archive_derivation' AND indexname='idx_cm_archive_derivation_run_scope_fk';")" = "1"
+          test "$(psql "$DATABASE_URL" -X -At -v ON_ERROR_STOP=1 -c "SELECT count(*) FROM pg_indexes WHERE schemaname='comind' AND tablename='cm_archive_promotion_candidate' AND indexname='idx_cm_archive_candidate_run_scope_fk';")" = "1"
+
+      - name: Verify archive-native analytics in history detail
+        run: bash scripts/test_chist_001_archive_readback.sh
+
+      - name: Run governed baseline certification proof
+        run: bash scripts/test_chist_001_baseline_certification.sh
+
+      - name: Run governed point-in-time diff proof
+        run: bash scripts/test_chist_001_pit_diff.sh

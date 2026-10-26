@@ -101,6 +101,7 @@ export function planNotification({ snapshot, existingComment = null, currentHead
 
   const existingMetadata = existingComment ? extractCommentMetadata(existingComment.body) : null;
   const attentionRequired = Boolean(snapshot.laneSummary?.attentionRequired);
+  const laneState = snapshot.laneSummary?.state;
 
   if (attentionRequired) {
     const fingerprint = snapshot.laneSummary?.alertFingerprint;
@@ -112,6 +113,13 @@ export function planNotification({ snapshot, existingComment = null, currentHead
       action: existingComment ? 'update' : 'create',
       body: renderSentinelComment({ snapshot, resolved: false }),
       fingerprint,
+    };
+  }
+
+  if (laneState !== 'healthy') {
+    return {
+      action: 'noop',
+      reason: 'Lane is not healthy and has no actionable attention transition; preserve any existing sentinel state.',
     };
   }
 

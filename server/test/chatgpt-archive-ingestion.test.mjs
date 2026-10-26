@@ -78,7 +78,8 @@ test('analyzer accounts for conversations, messages, timestamps, roles, branches
   assert.equal(analysis.currentNodeId, 'assistant-b');
   assert.equal(analysis.nodeCount, 4);
   assert.equal(analysis.messageCount, 3);
-  assert.equal(analysis.attachmentReferenceCount >= 1, true);
+  assert.equal(analysis.attachmentReferenceCount, 1);
+  assert.equal(analysis.attachments.filter((attachment) => attachment.sourceReference === 'file-123').length, 1);
 
   const user = analysis.nodes.find((node) => node.sourceMessageId === 'message-user-1');
   assert.ok(user);
@@ -241,6 +242,8 @@ test('unknown source fields emit non-degrading schema-drift telemetry while raw 
   fixture.future_conversation_field = { version: 99 };
   fixture.mapping['assistant-a'].future_node_field = true;
   fixture.mapping['assistant-a'].message.future_message_field = 'new-shape';
+  fixture.mapping['assistant-a'].message.author.future_author_field = 'actor-shape';
+  fixture.mapping['assistant-a'].message.content.future_content_field = 'content-shape';
   fixture.mapping['assistant-a'].message.metadata = { future_metadata_field: 42 };
 
   const analysis = analyzeChatGptConversation(fixture);
@@ -250,6 +253,8 @@ test('unknown source fields emit non-degrading schema-drift telemetry while raw 
   assert.equal(drift.some((event) => event.eventCode === 'SCHEMA_DRIFT_CONVERSATION_FIELDS'), true);
   assert.equal(drift.some((event) => event.eventCode === 'SCHEMA_DRIFT_NODE_FIELDS'), true);
   assert.equal(drift.some((event) => event.eventCode === 'SCHEMA_DRIFT_MESSAGE_FIELDS'), true);
+  assert.equal(drift.some((event) => event.eventCode === 'SCHEMA_DRIFT_AUTHOR_FIELDS'), true);
+  assert.equal(drift.some((event) => event.eventCode === 'SCHEMA_DRIFT_CONTENT_FIELDS'), true);
   assert.equal(drift.some((event) => event.eventCode === 'SCHEMA_DRIFT_MESSAGE_METADATA_FIELDS'), true);
   assert.deepEqual(analysis.rawConversation.future_conversation_field, { version: 99 });
 });

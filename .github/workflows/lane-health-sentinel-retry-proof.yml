@@ -12,12 +12,13 @@ jobs:
   controlled-retry-proof:
     name: Controlled transient retry proof
     runs-on: ubuntu-latest
-    timeout-minutes: 1
+    timeout-minutes: 3
     steps:
       - name: Check out exact pull request candidate
         uses: actions/checkout@v4
 
       - name: Execute controlled retry fixture
+        timeout-minutes: 1
         shell: bash
         run: |
           set -euo pipefail
@@ -27,7 +28,7 @@ jobs:
           printf 'Controlled retry fixture mode: %s; run attempt: %s\n' "${mode}" "${GITHUB_RUN_ATTEMPT}"
 
           case "${mode}" in
-            transient-repeat-timeout)
+            transient-step-timeout)
               sleep 75
               ;;
             deterministic-failure)

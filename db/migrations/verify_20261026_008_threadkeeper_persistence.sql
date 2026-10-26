@@ -63,8 +63,16 @@ BEGIN
        OR has_table_privilege('service_role', format('comind.%I', target_table), 'TRUNCATE') THEN
       RAISE EXCEPTION 'service_role has prohibited mutation privilege on %', target_table;
     END IF;
-    IF has_table_privilege('anon', format('comind.%I', target_table), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')
-       OR has_table_privilege('authenticated', format('comind.%I', target_table), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE') THEN
+    IF has_table_privilege('anon', format('comind.%I', target_table), 'SELECT')
+       OR has_table_privilege('anon', format('comind.%I', target_table), 'INSERT')
+       OR has_table_privilege('anon', format('comind.%I', target_table), 'UPDATE')
+       OR has_table_privilege('anon', format('comind.%I', target_table), 'DELETE')
+       OR has_table_privilege('anon', format('comind.%I', target_table), 'TRUNCATE')
+       OR has_table_privilege('authenticated', format('comind.%I', target_table), 'SELECT')
+       OR has_table_privilege('authenticated', format('comind.%I', target_table), 'INSERT')
+       OR has_table_privilege('authenticated', format('comind.%I', target_table), 'UPDATE')
+       OR has_table_privilege('authenticated', format('comind.%I', target_table), 'DELETE')
+       OR has_table_privilege('authenticated', format('comind.%I', target_table), 'TRUNCATE') THEN
       RAISE EXCEPTION 'client role has ThreadKeeper table privilege on %', target_table;
     END IF;
   END LOOP;

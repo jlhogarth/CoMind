@@ -101,6 +101,8 @@ The history reader receives read-only access to metric definitions and certified
 
 Ordinary Data API roles do not receive access. Production is outside CHIST-A01 v0.1 scope.
 
+The composite foreign key from metric facts to archive derivation runs is covered by an index whose leading columns exactly match `(archive_derivation_run_id, import_id, source_conversation_id)`. This is part of the acceptance contract because Supabase's database advisor reports uncovered foreign keys as a performance risk.
+
 ## Acceptance
 
 CHIST-A01 v0.1 requires evidence that:
@@ -112,8 +114,9 @@ CHIST-A01 v0.1 requires evidence that:
 5. The history reader can read but cannot mutate metric facts.
 6. The derivation role cannot bypass the calculator with direct INSERT.
 7. Data API roles have no private metric read privilege.
-8. The exact candidate commit passes its dedicated GitHub Actions gate.
-9. Supabase Test receives a bounded verification before the issue can be completed.
+8. The archive metric composite foreign key has the required covering index and exact leading-column order.
+9. The exact candidate commit passes its dedicated GitHub Actions gate and broad repository CI.
+10. Supabase Test receives a bounded verification, including security and performance advisor review, before the issue can be completed.
 
 A successful synthetic proof does not certify any real personal analytics. Real metrics remain unavailable until a native OpenAI export is ingested, reviewed, and explicitly certified as a Conversation History baseline.
 
@@ -146,5 +149,8 @@ The synthetic fixture proves implementation behavior, not representativeness of 
 - `docs/architecture/conversation-history-platform.md`
 - `db/migrations/20261026_008_conversation_history_personal_analytics.sql`
 - `db/migrations/20261026_009_conversation_history_personal_analytics_hash_hardening.sql`
+- `db/migrations/20261026_010_conversation_history_personal_analytics_fk_index.sql`
 - `scripts/test_chist_a01_personal_analytics.sh`
+- `scripts/test_chist_a01_personal_analytics_fk_index.sh`
 - GitHub Issue #229
+- GitHub PR #231

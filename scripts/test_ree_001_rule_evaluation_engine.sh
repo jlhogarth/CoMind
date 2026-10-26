@@ -15,6 +15,7 @@ psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${repository_root}/db/migration
 psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${repository_root}/db/migrations/20261025_015_auth_001_authority_graph.sql"
 psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${repository_root}/db/migrations/20261025_016_auth_001_event_ordering_hardening.sql"
 psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${repository_root}/db/migrations/20261026_001_ree_001_rule_evaluation_engine.sql"
+psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${repository_root}/db/migrations/20261026_002_ree_001_authority_time_hardening.sql"
 
 printf 'Creating minimum governed REE-001 fixture...\n'
 psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
@@ -135,5 +136,8 @@ psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${repository_root}/db/verificat
 
 printf 'Running REE-001 direct domain-applicability verification...\n'
 psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${repository_root}/db/verification/20261026_ree_001_domain_applicability_verification.sql"
+
+printf 'Running REE-001 server-controlled authority-time verification...\n'
+psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${repository_root}/db/verification/20261026_ree_001_authority_time_verification.sql"
 
 printf 'REE-001 rule evaluation engine verification passed.\n'

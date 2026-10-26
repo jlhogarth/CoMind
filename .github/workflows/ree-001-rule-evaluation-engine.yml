@@ -13,10 +13,12 @@ on:
       - 'db/migrations/20261025_015_auth_001_authority_graph.sql'
       - 'db/migrations/20261025_016_auth_001_event_ordering_hardening.sql'
       - 'db/migrations/20261026_001_ree_001_rule_evaluation_engine.sql'
+      - 'db/migrations/20261026_002_ree_001_authority_time_hardening.sql'
       - 'db/sql/20261025_drule_003_founder_authority_seed.sql'
       - 'db/sql/20261026_auth_001_initial_authority_graph_seed.sql'
       - 'db/verification/20261026_ree_001_rule_evaluation_engine_verification.sql'
       - 'db/verification/20261026_ree_001_domain_applicability_verification.sql'
+      - 'db/verification/20261026_ree_001_authority_time_verification.sql'
       - 'scripts/test_ree_001_rule_evaluation_engine.sh'
   workflow_dispatch:
 

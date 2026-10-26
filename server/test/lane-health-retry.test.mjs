@@ -9,6 +9,24 @@ import {
 
 const head = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
+function structuredSignal(overrides = {}) {
+  return {
+    validated: true,
+    schemaVersion: 1,
+    kind: 'comind_transient_retry_signal',
+    producer: 'comind_transient_wrapper_v1',
+    classification: 'resource_timeout',
+    exitCode: 124,
+    runId: 100,
+    runAttempt: 1,
+    headSha: head,
+    workflow: 'CI',
+    event: 'pull_request',
+    step: 'Execute controlled retry fixture',
+    ...overrides,
+  };
+}
+
 function workflowResult(overrides = {}) {
   return {
     workflow: 'CI',
@@ -54,19 +72,52 @@ const pull = {
   head: { sha: head },
 };
 
-test('timed_out and startup_failure are the only initial retry-safe transient states', () => {
+test('native transient states and trusted structured transient failure are retry candidates', () => {
   const candidates = findRetryCandidates({
     bundle: bundle([
       workflowResult({ workflow: 'CI', runId: 100, state: 'timed_out' }),
       workflowResult({ workflow: 'Repository Config', runId: 101, state: 'terminal_startup_failure' }),
-      workflowResult({ workflow: 'Tests', runId: 102, state: 'terminal_failure' }),
-      workflowResult({ workflow: 'Cancelled', runId: 103, state: 'cancelled' }),
-      workflowResult({ workflow: 'Action', runId: 104, state: 'action_required' }),
+      workflowResult({
+        workflow: 'Proof',
+        runId: 102,
+        state: 'structured_transient_failure',
+        structuredTransientSignal: structuredSignal({
+          runId: 102,
+          workflow: 'Proof',
+        }),
+      }),
+      workflowResult({ workflow: 'Tests', runId: 103, state: 'terminal_failure' }),
+      workflowResult({ workflow: 'Cancelled', runId: 104, state: 'cancelled' }),
+      workflowResult({ workflow: 'Action', runId: 105, state: 'action_required' }),
     ]),
     maxAutoRetriggers: 1,
   });
-  assert.deepEqual(candidates.map((candidate) => candidate.runId), [100, 101]);
-  assert.deepEqual(candidates.map((candidate) => candidate.transientConclusion), ['timed_out', 'startup_failure']);
+  assert.deepEqual(candidates.map((candidate) => candidate.runId), [100, 101, 102]);
+  assert.deepEqual(candidates.map((candidate) => candidate.transientConclusion), ['timed_out', 'startup_failure', 'failure']);
+});
+
+test('unvalidated or mismatched structured signal is never a retry candidate', () => {
+  const candidates = findRetryCandidates({
+    bundle: bundle([
+      workflowResult({
+        runId: 100,
+        state: 'structured_transient_failure',
+        structuredTransientSignal: structuredSignal({ validated: false }),
+      }),
+      workflowResult({
+        runId: 101,
+        state: 'structured_transient_failure',
+        structuredTransientSignal: structuredSignal({ runId: 999 }),
+      }),
+      workflowResult({
+        runId: 102,
+        state: 'structured_transient_failure',
+        structuredTransientSignal: structuredSignal({ exitCode: 137 }),
+      }),
+    ]),
+    maxAutoRetriggers: 1,
+  });
+  assert.deepEqual(candidates, []);
 });
 
 test('policy opt-out, stale-head evidence, and non-PR executions are never candidates', () => {
@@ -88,7 +139,7 @@ test('retry ceiling other than exactly one fails closed', () => {
   );
 });
 
-test('attempt one exact-head timeout is eligible for one rerun', () => {
+test('attempt one exact-head native timeout is eligible for one rerun', () => {
   const candidate = findRetryCandidates({ bundle: bundle(), maxAutoRetriggers: 1 })[0];
   const plan = planRetryAgainstCurrentEvidence({
     candidate,
@@ -99,6 +150,45 @@ test('attempt one exact-head timeout is eligible for one rerun', () => {
   assert.equal(plan.action, 'rerun');
   assert.equal(plan.runAttempt, 1);
   assert.equal(plan.retryAttempt, 2);
+});
+
+test('attempt one exact-head structured timeout evidence is eligible for one rerun', () => {
+  const structuredResult = workflowResult({
+    state: 'structured_transient_failure',
+    reason: 'Reviewed structured transient signal resource_timeout with exit code 124.',
+    structuredTransientSignal: structuredSignal(),
+  });
+  const candidate = findRetryCandidates({
+    bundle: bundle([structuredResult]),
+    maxAutoRetriggers: 1,
+  })[0];
+  const plan = planRetryAgainstCurrentEvidence({
+    candidate,
+    pullRequest: pull,
+    workflowRun: currentRun({ conclusion: 'failure' }),
+    maxAutoRetriggers: 1,
+  });
+  assert.equal(plan.action, 'rerun');
+  assert.match(plan.reason, /resource_timeout exit 124/);
+});
+
+test('structured signal attempt mismatch blocks the retry before mutation', () => {
+  const structuredResult = workflowResult({
+    state: 'structured_transient_failure',
+    structuredTransientSignal: structuredSignal(),
+  });
+  const candidate = findRetryCandidates({
+    bundle: bundle([structuredResult]),
+    maxAutoRetriggers: 1,
+  })[0];
+  const plan = planRetryAgainstCurrentEvidence({
+    candidate,
+    pullRequest: pull,
+    workflowRun: currentRun({ conclusion: 'failure', run_attempt: 2 }),
+    maxAutoRetriggers: 1,
+  });
+  assert.equal(plan.action, 'reject');
+  assert.match(plan.reason, /no longer matches/);
 });
 
 test('attempt two cannot be automatically retriggered again', () => {
@@ -192,7 +282,7 @@ test('executor serializes multiple eligible candidates into at most one rerun re
   assert.match(result.outcomes[1].reason, /prior candidate already consumed/);
 });
 
-test('deterministic failure fixture produces zero API writes', async () => {
+test('deterministic generic failure fixture produces zero API writes', async () => {
   let requests = 0;
   const result = await executeRetryFromBundle({
     bundle: bundle([workflowResult({ state: 'terminal_failure' })]),

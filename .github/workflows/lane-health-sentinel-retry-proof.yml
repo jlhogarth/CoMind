@@ -32,8 +32,7 @@ jobs:
             transient-repeat-timeout)
               if [ "${GITHUB_RUN_ATTEMPT}" -eq 1 ]; then
                 printf 'Attempt 1: simulating a reviewed resource timeout with GNU timeout.\n'
-                timeout 1s bash -c 'sleep 5'
-                exit_code=$?
+                timeout 1s bash -c 'sleep 5' || exit_code=$?
               else
                 printf 'Attempt %s: deterministic recovery succeeded.\n' "${GITHUB_RUN_ATTEMPT}"
                 exit_code=0

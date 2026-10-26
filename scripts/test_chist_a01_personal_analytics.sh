@@ -17,6 +17,33 @@ PY
 bash "${root}/scripts/test_chist_001_conversation_history.sh"
 bash "${root}/scripts/test_chist_001_archive_derivation.sh"
 
+# CoMind/Supabase places extension functions in the `extensions` schema. The
+# shared local CHIST fixture creates pgcrypto with PostgreSQL's default schema,
+# so align this isolated database with the governed runtime convention before
+# exercising A01. This changes only the disposable local `comind_ci` database.
+psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 <<'SQL'
+CREATE SCHEMA IF NOT EXISTS extensions;
+DO $$
+DECLARE
+  v_schema text;
+BEGIN
+  SELECT n.nspname
+    INTO v_schema
+    FROM pg_catalog.pg_extension e
+    JOIN pg_catalog.pg_namespace n ON n.oid=e.extnamespace
+   WHERE e.extname='pgcrypto';
+
+  IF v_schema IS NULL THEN
+    RAISE EXCEPTION 'CHIST-A01 requires pgcrypto in the isolated acceptance database';
+  END IF;
+
+  IF v_schema <> 'extensions' THEN
+    ALTER EXTENSION pgcrypto SET SCHEMA extensions;
+  END IF;
+END
+$$;
+SQL
+
 psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f "${root}/db/migrations/20261026_008_conversation_history_personal_analytics.sql"
 psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f "${root}/db/migrations/20261026_009_conversation_history_personal_analytics_hash_hardening.sql"
 

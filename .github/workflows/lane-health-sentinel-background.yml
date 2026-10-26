@@ -17,6 +17,7 @@ on:
       - Live Foundry LF-2 Readiness
       - Live Foundry LF-3 Readiness
       - DRB-002 Query Contract
+      - Lane Health Sentinel Retry Proof
     types: [requested, in_progress, completed]
   schedule:
     - cron: "*/5 * * * *"

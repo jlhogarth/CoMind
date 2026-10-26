@@ -1,8 +1,8 @@
 # CoMind Lane Health Sentinel
 
-Status: tested read-only lane-health system for Issue #115. The pull-request observer has been demonstrated against live GitHub workflow data. The trusted background watcher is implemented and exact-head verified but is not called operational until it is merged to `main` and demonstrated from trusted default-branch code on a controlled pull request.
+Status: observation and deduplicated PR notification are operationally proven from trusted default-branch code. One-shot transient workflow retry is implemented and exact-head tested in PR #204, but is not called operational until merged to `main` and demonstrated through the controlled retry proof defined in Issue #194.
 
-No PR commenting, automatic rerun, merge authority, branch mutation, deployment, paid-resource action, or production mutation is enabled by this implementation.
+The sentinel is split into independent authority surfaces. Observation is read-only. Notification may write only the governed PR conversation comment. Retry may request only one bounded GitHub Actions rerun for a narrowly proven transient workflow failure. None of these authorities implies merge, branch mutation, check bypass, deployment, database mutation, secret-management, provider execution, paid-resource authority, or production mutation.
 
 ## Purpose
 
@@ -22,6 +22,8 @@ Evidence from another SHA is `stale_head_evidence` and cannot establish current 
 
 A lane summary fails closed if any workflow classification was produced for a different expected head.
 
+Notification and retry add a second exact-head check immediately before their write operation. If the PR head moved after the Background observation, the write is rejected or becomes a no-op.
+
 ## Observation states
 
 The classifier distinguishes:
@@ -34,10 +36,11 @@ The classifier distinguishes:
 - `runtime_stall`: an in-progress workflow has no meaningful transition beyond its runtime threshold.
 - `healthy_success`: exact-head workflow completion succeeded.
 - `terminal_failure`: the workflow completed with failure.
-- `action_required_zero_jobs`: GitHub reports `action_required` but created no executable jobs. Issue #115 records PR #113 as the canonical regression case.
+- `action_required_zero_jobs`: GitHub reports `action_required` but created no executable jobs.
 - `action_required`: GitHub requires explicit operator action.
 - `cancelled`: the workflow was cancelled.
 - `timed_out`: the workflow exceeded its execution timeout.
+- `terminal_startup_failure`: GitHub failed to start the workflow execution.
 - `stale_head_evidence`: evidence belongs to another commit.
 - `unknown`: a state outside the current contract was observed and must not be normalized to healthy.
 
@@ -45,13 +48,13 @@ The classifier distinguishes:
 
 Repository policy is stored in `.github/lane-health-sentinel.json`.
 
-The initial defaults are:
+Initial defaults:
 
 - expected workflow run: 75 seconds
 - queue stall: 90 seconds
 - runtime stall: the greater of 120 seconds or 2 times measured normal runtime
 - recent successful runtime sample size: 5
-- maximum future transient retriggers: 1
+- maximum automatic transient retriggers: exactly 1
 
 Measured recent successful runtime is preferred. A configured per-workflow fallback is used when a trustworthy recent sample is unavailable.
 
@@ -72,7 +75,7 @@ Rules:
 - a nonterminal run with any active job is effectively `in_progress`
 - a nonterminal run with queued jobs and no active job remains `queued`
 
-This behavior was discovered during live PR #180 observation and then covered by dedicated regression tests before the observer was accepted.
+This behavior was discovered during live PR #180 observation and then covered by regression tests before acceptance.
 
 ## Machine-readable lane summary
 
@@ -85,212 +88,216 @@ Lane states:
 - `degraded`: at least one warning exists and no critical condition exists.
 - `attention_required`: at least one critical condition exists.
 
-The summary preserves the exact head SHA, all workflow states, direct PR/run evidence URLs, and a deterministic alert fingerprint.
+The summary preserves the exact head SHA, workflow states, direct evidence URLs, and a deterministic alert fingerprint.
 
-Unchanged warning or critical evidence produces the same fingerprint and must not create a duplicate notification transition. A materially changed attention state produces a new fingerprint.
+Unchanged warning or critical evidence produces the same fingerprint. A materially changed attention state produces a new fingerprint.
 
 ## Job and step evidence
 
-When GitHub job evidence is available, the sentinel records:
-
-- workflow name
-- workflow run ID and URL
-- job ID, job name, and direct GitHub job URL
-- focal step number and name
-- step status and conclusion
-
-The focal step is selected in this order:
-
-1. terminal failure/cancellation/timeout/action-required step
-2. active in-progress step
-3. pending/queued step
-4. most recent completed step
+When GitHub job evidence is available, the sentinel records workflow run, job, and focal-step evidence. Focal-step selection prefers terminal failure, then active work, then pending work, then the most recent completed step.
 
 A step-specific URL is not fabricated when GitHub has not supplied a verified stable step URL. The direct job URL plus exact step name and number are retained instead.
 
 ## Suppression signals
 
-The read-only GitHub ingestion layer surfaces bounded suppression evidence, including:
+The read-only ingestion layer surfaces bounded suppression evidence, including:
 
 - `action_required_zero_jobs` when GitHub requires action but created no executable jobs
-- `bot_authored_required_run_absent` when a bot-authored exact head has exceeded the required-run appearance threshold
+- `bot_authored_required_run_absent` when a bot-authored exact head exceeds the required-run appearance threshold
 
-A suppression signal is evidence for diagnosis. It does not authorize rerun or remediation.
-
-## Escalation payload
-
-When operator attention is required, the bounded payload is:
-
-```json
-{
-  "schemaVersion": 1,
-  "kind": "lane_health_escalation",
-  "prNumber": 180,
-  "prUrl": "https://github.com/OWNER/REPOSITORY/pull/NUMBER",
-  "exactHeadSha": "FULL_SHA",
-  "laneState": "attention_required",
-  "laneSeverity": "critical",
-  "workflow": "CI",
-  "workflowState": "terminal_failure",
-  "workflowReason": "Evidence-backed reason",
-  "runId": 123,
-  "runUrl": "https://github.com/OWNER/REPOSITORY/actions/runs/123",
-  "jobId": 456,
-  "jobName": "build",
-  "jobUrl": "https://github.com/OWNER/REPOSITORY/actions/runs/123/job/456",
-  "stepNumber": 6,
-  "stepName": "Run server tests",
-  "stepStatus": "completed",
-  "stepConclusion": "failure",
-  "authorityBoundary": "observe_only",
-  "requiresHuman": true,
-  "recommendedAction": "Evidence-backed next action",
-  "alertFingerprint": "SHA256"
-}
-```
-
-Missing GitHub evidence remains null. It must not be invented.
+A suppression signal is evidence for diagnosis. It does not authorize retry or remediation.
 
 ## Pull-request observer
 
 `.github/workflows/lane-health-sentinel-observe.yml` is the PR-local evidence collector.
 
-It runs with only:
+Permissions:
 
 - `actions: read`
 - `contents: read`
 - `pull-requests: read`
 
-It collects the exact PR head, governed workflow runs, jobs and steps, recent successful runtime samples, lane state, suppression signals, and escalation payloads. It writes an operator summary and uploads `lane-health.json` as a 14-day GitHub Actions artifact.
+It collects exact-head workflow, job, step, runtime, suppression, summary, and escalation evidence and uploads a 14-day artifact.
 
 It cannot comment, rerun, merge, modify a branch, mutate a database, or deploy anything.
 
 ### Live observer evidence
 
-The first live observer proof ran successfully on PR #180:
+First live observer proof on PR #180:
 
 - run: https://github.com/jlhogarth/CoMind/actions/runs/40237289101
 - artifact: https://github.com/jlhogarth/CoMind/actions/runs/40237289101/artifacts/12615766551
-- observed state: `in_progress`
+- state: `in_progress`
 - severity: `info`
-- attention required: `false`
-- suppression signals: `0`
 - authority: `observe_only`
 
-That proof exposed the lagging top-level run-status behavior described above.
-
-The corrected live observer proof then preserved both reported and effective status:
+Corrected live-status proof:
 
 - run: https://github.com/jlhogarth/CoMind/actions/runs/40237413585
 - artifact: https://github.com/jlhogarth/CoMind/actions/runs/40237413585/artifacts/12615612242
-- active job evidence correctly converted lagging `queued` run reports to effective `in_progress`
-- genuinely queued jobs remained queued
-- no suppression signals were invented
+
+Active job evidence correctly converted lagging top-level `queued` reports to effective `in_progress` while genuinely queued work remained queued.
 
 ## Trusted background watcher
 
-`.github/workflows/lane-health-sentinel-background.yml` is the unattended observer candidate.
+`.github/workflows/lane-health-sentinel-background.yml` is the unattended observer.
 
-Security boundary:
+Trust boundary:
 
 - it does not run as a `pull_request` workflow
 - it explicitly checks out `main`
 - checkout credentials are not persisted
 - permissions are limited to `actions: read`, `contents: read`, and `pull-requests: read`
-- pull-request code therefore cannot redefine the code the trusted watcher executes
+- pull-request code cannot redefine the code executed by the trusted watcher
 
 Triggers:
 
 - governed `workflow_run` lifecycle events: requested, in progress, completed
-- a five-minute scheduled fallback for cases where no usable workflow lifecycle event is emitted
-- manual dispatch for controlled verification or a targeted PR
+- five-minute scheduled fallback for missing usable lifecycle events
+- manual dispatch for controlled verification or targeted PR observation
 
 Behavior:
 
-- resolves the associated open pull request from the workflow event
-- falls back to commit-associated PR lookup when GitHub omits direct PR association
-- scheduled fallback scans open PRs against `main`
-- one GitHub Actions concurrency group is used per observed head so newer lifecycle events cancel stale watchers
-- if a lane remains active, the watcher rechecks every 60 seconds for up to eight observations
-- each observation uses the same exact-head classifier and evidence contract as the PR-local observer
-- the workflow uploads a machine-readable background evidence bundle
+- resolves the associated open PR from the workflow event
+- falls back to commit-associated PR lookup when direct association is absent
+- scans open PRs on scheduled fallback
+- uses one concurrency group per observed head so newer events cancel stale watchers
+- rechecks active lanes every 60 seconds for up to eight observations
+- uploads a machine-readable Background bundle
 
-The workflow remains observe-only. It has no comment, rerun, merge, branch-write, secret-management, database-mutation, or deployment authority.
+The Background watcher remains strictly read-only.
 
-### Background activation boundary
+### Background operational proof
 
-The background workflow is fully implemented and exact-head tested in PR #180, including six resolver tests and the complete repository workflow matrix.
+Controlled PR #188 established the trusted unattended path after PR #180 merged:
 
-It is intentionally not called operational before merge because its trust model requires the watcher code itself to exist on `main`.
+- Background run: https://github.com/jlhogarth/CoMind/actions/runs/40238241135
+- controlled failing run: https://github.com/jlhogarth/CoMind/actions/runs/40238161144
+- artifact: https://github.com/jlhogarth/CoMind/actions/runs/40238241135/artifacts/12615244588
 
-Operational acceptance therefore requires a post-merge controlled pull request that demonstrates:
+The watcher executed reviewed `main` code, resolved the controlled PR, classified the exact-head deterministic failure, created direct workflow/job/step evidence, and exercised no write authority.
 
-1. the watcher executes code checked out from trusted `main`
-2. a real `workflow_run` event resolves the controlled PR
-3. the watcher produces a machine-readable artifact for the exact PR head
-4. a controlled failure or stall is classified without weakening CI
-5. no unintended write authority is exercised
+## Deduplicated PR notification
 
-## Authority boundaries
+`.github/workflows/lane-health-sentinel-notify.yml` consumes a successful trusted Background artifact and publishes one governed sentinel comment on the affected PR.
 
-### Current implementation: observe only
+Permissions:
 
-The sentinel may:
+- `actions: read`
+- `contents: read`
+- `pull-requests: write`
 
-- read GitHub PR, commit, workflow-run, job, and step metadata
-- classify exact-head workflow health
-- aggregate per-head lane state
-- identify focal jobs and steps
-- model recent successful runtime
-- identify bounded suppression signals
-- create deterministic alert fingerprints
-- construct explicit escalation payloads
-- upload read-only evidence artifacts and step summaries
+It has no `actions: write`, merge, branch-write, deployment, database, secret, or paid-resource authority.
 
-It may not:
+Notification rules:
 
-- post a PR or issue comment automatically
-- rerun a workflow or job automatically
-- merge or close a PR automatically
-- modify a branch
-- change required checks
-- weaken CI
-- use application or database secrets
-- mutate Supabase or another datastore
-- deploy infrastructure
-- create paid-resource usage
+- exact PR head must still match the Background snapshot
+- first actionable fingerprint creates one sentinel comment
+- unchanged fingerprint is a no-op
+- changed actionable fingerprint updates the same comment
+- `in_progress` never resolves an existing alert
+- only a fully `healthy` exact head may update the existing comment to `resolved`
 
-### Future notification authority
+### Notification acceptance history
 
-A later accepted slice may place deduplicated notifications through a trusted default-branch workflow. That workflow must have only the minimum permission required for the chosen notification surface and must execute reviewed default-branch code, not mutable PR code.
+The first controlled proof exposed a real GitHub integration boundary: an Issues-write token was rejected with HTTP 403 when posting to the PR conversation. Corrective PR #201 moved the permission to `pull-requests: write` and added healthy-only resolution semantics.
 
-Notification authority is not remediation authority.
+Controlled PR #197 then proved the complete contract:
 
-### Future bounded transient rerun authority
+- failure head: `9e7efa525f761c450a10156a3c44398cef7eaff9`
+- intentional failure run: https://github.com/jlhogarth/CoMind/actions/runs/40255376841
+- exactly one sentinel comment: https://github.com/jlhogarth/CoMind/pull/197#issuecomment-6406384041
+- recovery head: `8541204456f94e58d19175c2abc3573be0986e43`
+- all 11 returned workflow families succeeded on recovery
+- the alert remained unresolved while the recovery lane was nonterminal
+- Notify run 40256366385 updated the same comment ID to resolved
+- notification artifact: https://github.com/jlhogarth/CoMind/actions/runs/40256366385/artifacts/12622781546
 
-A later accepted slice may propose one transient rerun only when evidence identifies a runner/environment failure class that is safe to retry. Any such capability must be isolated in a separately permissioned job and must enforce the configured maximum of one automatic retrigger.
+PR #197 was closed without merge after acceptance.
 
-The following do not qualify for automatic rerun:
+## One-shot transient retry
 
-- deterministic test or build failure
-- security or dependency-audit failure
+`.github/workflows/lane-health-sentinel-retry.yml` is the separately permissioned bounded retry executor introduced by Issue #194.
+
+Permissions:
+
+- `actions: write`
+- `contents: read`
+- `pull-requests: read`
+
+It has no PR-comment write, merge, branch-write, deployment, database, secret-management, provider, or paid-resource authority.
+
+The retry executor consumes the exact trusted Background artifact, then re-fetches current GitHub state immediately before any write.
+
+An automatic retry is eligible only when all of these are true:
+
+1. repository policy explicitly sets `allowTransientRetrigger` for the workflow;
+2. the Background state is `timed_out` or `terminal_startup_failure`;
+3. the observed workflow belongs to the exact PR head;
+4. the workflow event is `pull_request`;
+5. the PR remains open and still has the exact same head;
+6. the original run ID and workflow name still match;
+7. the run remains terminal with conclusion exactly `timed_out` or `startup_failure`;
+8. `run_attempt === 1`;
+9. `policy.defaults.maxAutoRetriggers === 1`.
+
+GitHub reruns retain the same workflow run ID and increment `run_attempt`. That GitHub-native attempt counter is the durable one-retry guard. Attempt 2 can never satisfy the automatic retry gate again.
+
+The retry workflow also uses a single global concurrency group and permits at most one rerun POST per executor invocation. This prevents one Background completion from fanning out into multiple automatic writes and reduces race risk across concurrent lifecycle events.
+
+The following never qualify automatically:
+
+- ordinary deterministic `failure`
+- deterministic test/build failure
+- dependency or security audit failure
+- cancellation
+- `action_required`
 - stale-head evidence
-- `action_required` requiring operator approval
-- recurring failure after one bounded retry
+- source or workflow identity mismatch
 - ambiguous failure classification
-- a failure whose remediation would change code, data, schema, security, credentials, production state, cost authority, or external commitments
+- attempt 2 or later
+- a failure whose remediation changes code, data, schema, security, credentials, production state, cost authority, provider execution, or external commitments
 
-### Human escalation boundary
+### Controlled retry proof workflow
+
+`.github/workflows/lane-health-sentinel-retry-proof.yml` is a path-gated acceptance fixture. It runs only when a PR touches `docs/provenance/lane-health-retry-proof/**`.
+
+Supported fixture modes:
+
+- `transient-repeat-timeout`: one-job workflow intentionally exceeds its one-minute timeout on every attempt. Acceptance requires exactly one automatic rerun from attempt 1 to attempt 2 and no attempt 3.
+- `deterministic-failure`: exits with code 1. Acceptance requires zero automatic reruns.
+- `healthy`: succeeds without a retry.
+
+The proof workflow itself has only `contents: read`.
+
+### Retry activation boundary
+
+The retry implementation and nine deterministic retry tests passed on PR #204 before this documentation update. The pre-documentation exact head `5b317b362e6d3d1ef4b3f95d67f605643c48876c` passed all 12 returned workflow families. Main CI reported 277 tests, 270 passed, 7 skipped, 0 failed, with zero production dependency vulnerabilities.
+
+Retry authority is not called operationally proven until PR #204 is merged to trusted `main` and both controlled post-merge fixtures are completed with machine-readable retry evidence.
+
+## Authority matrix
+
+| Surface | GitHub write authority | Explicitly excluded |
+| --- | --- | --- |
+| PR observer | none | comments, reruns, merge, branch write, deployment, data mutation |
+| Background watcher | none | comments, reruns, merge, branch write, deployment, data mutation |
+| Notify | PR conversation comment only | actions rerun, merge, branch write, deployment, data mutation |
+| Retry | Actions rerun only | comments, merge, branch write, deployment, data mutation, secrets, provider or paid action |
+
+Notification authority is not retry authority. Retry authority is not general remediation authority.
+
+## Human escalation boundary
 
 Joseph is required when the next action needs a product decision, missing access, explicit authority, production action, schema/security/grant change, credential or secret action, paid-resource authority, destructive action, or a choice among materially different consequential remedies.
 
-A deterministic technical defect that is safe, reversible, already authorized, and inside the active development lane may be repaired without additional approval, but its failure, repair, and verification remain visible in the lane evidence.
+A deterministic technical defect that is safe, reversible, already authorized, and inside the active development lane may be repaired without additional approval, but its failure, repair, and verification remain visible in the evidence.
 
 ## Active-session behavior
 
-While a development session is actively working a lane, the current executor must inspect and respond at the workflow's own timescale. The background sentinel is a fallback for unattended periods, not a reason for the active executor to wait passively.
+While a development session is actively working a lane, the current executor must inspect and respond at the workflow's own timescale. The Background watcher is a fallback for unattended periods, not a reason for the active executor to wait passively.
 
-No background execution is claimed until the default-branch deployment, event trigger, permissions, and observed post-merge execution evidence have all been verified.
+No authority is called operational until its default-branch deployment, trigger, permissions, and post-merge execution evidence have been verified.
 
 ## Recovery and continuity
 
@@ -313,6 +320,9 @@ Policy and workflows:
 - `.github/lane-health-sentinel.json`
 - `.github/workflows/lane-health-sentinel-observe.yml`
 - `.github/workflows/lane-health-sentinel-background.yml`
+- `.github/workflows/lane-health-sentinel-notify.yml`
+- `.github/workflows/lane-health-sentinel-retry.yml`
+- `.github/workflows/lane-health-sentinel-retry-proof.yml`
 
 Runtime modules:
 
@@ -321,6 +331,8 @@ Runtime modules:
 - `scripts/lane_health_evidence.mjs`
 - `scripts/lane_health_github.mjs`
 - `scripts/lane_health_background.mjs`
+- `scripts/lane_health_notify.mjs`
+- `scripts/lane_health_retry.mjs`
 
 Regression tests:
 
@@ -330,9 +342,11 @@ Regression tests:
 - `server/test/lane-health-github.test.mjs`
 - `server/test/lane-health-github-live-status.test.mjs`
 - `server/test/lane-health-background.test.mjs`
+- `server/test/lane-health-notify.test.mjs`
+- `server/test/lane-health-retry.test.mjs`
 
 ## Current acceptance checkpoint
 
-The code candidate before this documentation update passed the full returned exact-head repository matrix on PR #180. Main CI passed all eight jobs and the server suite reported 253 tests, 246 passed, 7 skipped, 0 failed, with zero production dependency vulnerabilities.
+Observation, unattended Background detection, and deduplicated notification are operationally proven.
 
-The next acceptance step is a full exact-head verification of this documentation-complete candidate, followed by merge to `main` and a controlled post-merge proof of the trusted background watcher.
+The next acceptance step is the full exact-head verification of this documentation-complete PR #204 candidate, followed by merge to `main`, one controlled repeated-timeout proof, one controlled deterministic-failure proof, and evidence write-through to Issues #194 and #115.

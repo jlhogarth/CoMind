@@ -11,6 +11,7 @@ on:
       - 'db/migrations/20261012_001_chatgpt_archive_ingestion.sql'
       - 'db/migrations/20261012_002_chatgpt_archive_quarantine.sql'
       - 'db/migrations/20261012_003_chatgpt_archive_access_hardening.sql'
+      - 'db/migrations/20261026_007_chatgpt_archive_parser_info_events.sql'
       - 'db/migrations/verify_20261012_001_chatgpt_archive_ingestion.sql'
       - 'db/migrations/verify_20261012_003_chatgpt_archive_access_hardening.sql'
       - 'scripts/test_chatgpt_archive_ingestion.sh'
@@ -18,6 +19,7 @@ on:
       - '.github/workflows/chatgpt-archive-ingestion.yml'
       - 'docs/CHATGPT-ARCHIVE-INGESTION.md'
       - 'docs/CHATGPT-ARCHIVE-LIVE-DEPLOYMENT.md'
+      - 'docs/architecture/conversation-history-platform.md'
   push:
     branches: [main]
     paths:
@@ -29,6 +31,7 @@ on:
       - 'db/migrations/20261012_001_chatgpt_archive_ingestion.sql'
       - 'db/migrations/20261012_002_chatgpt_archive_quarantine.sql'
       - 'db/migrations/20261012_003_chatgpt_archive_access_hardening.sql'
+      - 'db/migrations/20261026_007_chatgpt_archive_parser_info_events.sql'
       - 'db/migrations/verify_20261012_001_chatgpt_archive_ingestion.sql'
       - 'db/migrations/verify_20261012_003_chatgpt_archive_access_hardening.sql'
       - 'scripts/test_chatgpt_archive_ingestion.sh'
@@ -36,6 +39,7 @@ on:
       - '.github/workflows/chatgpt-archive-ingestion.yml'
       - 'docs/CHATGPT-ARCHIVE-INGESTION.md'
       - 'docs/CHATGPT-ARCHIVE-LIVE-DEPLOYMENT.md'
+      - 'docs/architecture/conversation-history-platform.md'
   workflow_dispatch:
 
 permissions:

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-export const CHATGPT_ARCHIVE_PARSER_VERSION = 'chatgpt-export-v0.2.0';
+export const CHATGPT_ARCHIVE_PARSER_VERSION = 'chatgpt-export-v0.3.0';
 export const CHATGPT_ARCHIVE_SCHEMA_VERSION = 'comind-archive-v1';
 
 export type IntegrityStatus = 'PASS' | 'WARN' | 'FAIL';
@@ -209,21 +209,30 @@ function collectAttachmentReferences(
   message: Record<string, unknown>
 ): AttachmentReference[] {
   const found: AttachmentReference[] = [];
-  const seen = new Set<string>();
+  const byReference = new Map<string, number>();
   const referenceKeys = new Set(['file_id', 'asset_pointer', 'attachment_id']);
 
   const add = (kind: string, reference: string, metadata: Record<string, unknown>) => {
-    const referenceHash = sha256Canonical({ kind, reference, metadata });
-    if (seen.has(referenceHash)) return;
-    seen.add(referenceHash);
-    found.push({
+    const normalizedReference = reference.trim();
+    if (!normalizedReference) return;
+    const candidate: AttachmentReference = {
       sourceNodeId: nodeId,
       sourceMessageId: messageId,
       referenceKind: kind,
-      sourceReference: reference,
+      sourceReference: normalizedReference,
       sourceMetadata: metadata,
-      referenceHash,
-    });
+      referenceHash: sha256Canonical({ kind, reference: normalizedReference, metadata }),
+    };
+    const existingIndex = byReference.get(normalizedReference);
+    if (existingIndex === undefined) {
+      byReference.set(normalizedReference, found.length);
+      found.push(candidate);
+      return;
+    }
+    const existing = found[existingIndex]!;
+    if (Object.keys(metadata).length > Object.keys(existing.sourceMetadata).length) {
+      found[existingIndex] = candidate;
+    }
   };
 
   const walk = (value: unknown, path: string) => {
@@ -241,6 +250,7 @@ function collectAttachmentReferences(
             const reference =
               stringOrNull(attachment.file_id) ??
               stringOrNull(attachment.asset_pointer) ??
+              stringOrNull(attachment.attachment_id) ??
               stringOrNull(attachment.id) ??
               `${nextPath}[${index}]`;
             add('attachments', reference, attachment);
@@ -422,6 +432,26 @@ export function analyzeChatGptConversation(value: unknown): ConversationAnalysis
           'Message contains source fields outside the currently normalized message contract.',
           { sourceConversationId, sourceNodeId: nodeId, sourceMessageId }
         );
+        if (author) {
+          recordUnknownFields(
+            events,
+            author,
+            new Set(['role', 'name', 'metadata']),
+            'SCHEMA_DRIFT_AUTHOR_FIELDS',
+            'Message author contains source fields outside the currently normalized author contract.',
+            { sourceConversationId, sourceNodeId: nodeId, sourceMessageId }
+          );
+        }
+        if (content) {
+          recordUnknownFields(
+            events,
+            content,
+            new Set(['content_type', 'parts']),
+            'SCHEMA_DRIFT_CONTENT_FIELDS',
+            'Message content contains source fields outside the currently normalized content contract.',
+            { sourceConversationId, sourceNodeId: nodeId, sourceMessageId }
+          );
+        }
         if (isRecord(message.metadata)) {
           recordUnknownFields(
             events,

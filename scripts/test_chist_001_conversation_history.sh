@@ -27,7 +27,8 @@ for migration in \
   20261025_010_native_chatgpt_live_reconciliation_snapshot_identity.sql \
   20261025_011_native_chatgpt_live_reconciliation_policy_hardening.sql \
   20261026_001_conversation_history_reader.sql \
-  20261026_002_conversation_history_baseline_certification.sql
+  20261026_002_conversation_history_baseline_certification.sql \
+  20261026_004_conversation_history_archive_derivation.sql
  do
   psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f "${root}/db/migrations/${migration}"
  done

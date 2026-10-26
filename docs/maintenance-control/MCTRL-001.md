@@ -39,6 +39,10 @@ It does not create a competing source of truth. Canonical facts remain in the ex
 5. `server/src/maintenance-control/cli.ts`
    - emits a JSON audit report;
    - exits nonzero on `FAIL`.
+6. `.github/workflows/mctrl-001-maintenance-control.yml`
+   - proves the contract against isolated PostgreSQL 17 on pull requests;
+   - after reviewed code lands on `main`, repeats the isolated proof and runs one bounded read-only audit against CoMind Test;
+   - preserves the live JSON audit report as a GitHub Actions artifact.
 
 ## Initial control coverage
 
@@ -109,7 +113,15 @@ MAINTENANCE_CONTROL_DATABASE_URL='postgresql://...' \
 npm run maintenance:audit
 ```
 
-The CLI intentionally does not accept `DATABASE_URL` as a fallback.
+The CLI intentionally does not accept `DATABASE_URL` as a fallback, and the test suite proves that refusal.
+
+### CI and live-Test proof
+
+Pull requests run only the isolated PostgreSQL 17 contract proof and receive no live Test database credential from the MCTRL workflow.
+
+A push of the reviewed MCTRL implementation to `main` runs the isolated proof first. Only after that job succeeds does the workflow use the existing governed Supabase session secret to execute one bounded read-only Test audit. The Supabase database CA is downloaded over HTTPS and its SHA-256 certificate fingerprint is checked against the repository's established pinned value before the connection is attempted.
+
+The live audit output is retained as `mctrl-001-live-test-audit` for 30 days. A failed audit fails the workflow; the report is still uploaded for diagnosis when a report file exists.
 
 ## Report semantics
 
@@ -151,7 +163,7 @@ The research session is recorded as `MCTRL-001-CONFIG-MAINTENANCE-BEST-PRACTICES
 
 ## Current limitations
 
-- v0.1 is manually invoked, not a continuous monitor;
+- v0.1 performs a bounded live Test audit when reviewed MCTRL code lands on `main`, but it is not a continuous monitor;
 - Drive document text/version checks are not executed by the database CLI itself;
 - GitHub state is not yet a live auditor input;
 - expected baselines remain version-controlled configuration and must be updated with intentional canonical changes;

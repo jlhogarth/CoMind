@@ -41,6 +41,9 @@ bash "${repository_root}/scripts/test_live_foundry_lf2_agent_substrate.sh"
 # disposable database back to the exact accepted live LF-2 pre-007 shape so
 # migration 007 is tested against what would actually have been deployed.
 psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 <<'SQL'
+DROP TABLE IF EXISTS comind.cm_conversation_promotion_candidate CASCADE;
+DROP TABLE IF EXISTS comind.cm_conversation_derivation CASCADE;
+DROP TABLE IF EXISTS comind.cm_conversation_derivation_run CASCADE;
 DROP TABLE IF EXISTS comind.cm_conversation_prune_manifest CASCADE;
 DROP TABLE IF EXISTS comind.cm_conversation_promotion_evaluation CASCADE;
 DROP TABLE IF EXISTS comind.cm_conversation_recovery_checkpoint CASCADE;

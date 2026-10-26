@@ -2,6 +2,7 @@
 
 Date: 2026-10-25  
 Issue: #202  
+Pull request: #203  
 Branch: `drule-003-governed-rule-activation`  
 Environment: CoMind Test / private `comind_pm` schema  
 Production: unchanged and not authorized by this work
@@ -176,7 +177,47 @@ DRULE-003 closes that gap with:
 - `scripts/test_drule_003_governed_rule_activation.sh`, which bootstraps an isolated PostgreSQL database, applies the PM Ledger and DRULE-002 prerequisites, applies migration `014`, runs the structural/behavioral verifier, applies the founder-authority seed twice, and asserts that the seed remains exactly one valid authority record;
 - `.github/workflows/drule-003-governed-rule-activation.yml`, a path-scoped workflow that checks out and verifies the exact PR head before running the isolated proof.
 
-At the time this provenance record was first committed, the workflow had not yet run because the draft pull request had not yet been opened. Merge eligibility therefore remained unproven at that checkpoint.
+## First exact-head PR matrix
+
+Draft PR #203 was opened from implementation head `de94e4d2854f218829fede0e1162085e4241c2b0` against `main` `152d5869035cf4253df3c838afd6a960e0a8b745`.
+
+Immediately before the PR opened, the branch was six commits ahead, zero commits behind, and the diff contained exactly six additive DRULE-003 files.
+
+The first exact-head GitHub Actions matrix contained 15 workflows. All 15 reached terminal success, including:
+
+- `DRULE-003 Governed Rule Activation`, whose isolated PostgreSQL proof reconstructed the PM/Rulebook prerequisites, applied migration `014`, ran the structural/behavioral verifier, replayed the founder seed twice, and proved idempotency;
+- general `CI`, including build/tests, PM Ledger, devcontainer, SDN ingestion, FinOps authority, Foundry substrate, conversation lifecycle, and browser-backed development-runtime verification;
+- `DRB-002 Query Contract`;
+- `No Placeholder Policy`;
+- `CoMind Repository Configuration`;
+- `Lane Health Sentinel Observe`;
+- `Runtime Budget Authority Adapter`;
+- `Governed Provider Execution`;
+- `Live Foundry Stage 1 Readiness`;
+- `Live Foundry LF-2 Readiness`;
+- `Live Foundry LF-3 Readiness`;
+- `Foundry Runtime Orchestration`;
+- `Foundry Work Lease Kernel`;
+- `Foundry Terminal Lifecycle`;
+- `Foundry Test one-shot local handoff`, including successful bounded local-model pull, isolated substrate verification, work-lease verification, one synthetic ATLAS-to-PROOF handoff, and evidence preservation.
+
+No workflow failed or required bypass/retry.
+
+A post-matrix read confirmed `main` was still `152d5869035cf4253df3c838afd6a960e0a8b745`, so no base refresh or migration renumbering was required before this final content freeze.
+
+## Final-head evidence protocol
+
+This provenance refresh is the final planned repository-content change before merge consideration.
+
+A repository file cannot contain CI proof for the commit that contains that proof without creating a new commit and invalidating the just-recorded head. DRULE-003 therefore uses the following non-self-referential evidence protocol:
+
+1. freeze repository content with this provenance refresh;
+2. run the complete PR workflow matrix against that new exact head;
+3. make no further repository-content change if the matrix is green and `main` remains compatible;
+4. record the immutable final-head SHA and terminal workflow evidence in PR #203 and the canonical Development Journal;
+5. merge only that exact verified head.
+
+This keeps the content head immutable between final verification and merge while still preserving durable final-head evidence outside the head being verified.
 
 ## Recoveries during implementation
 
@@ -185,17 +226,17 @@ Two small implementation-time errors were surfaced and handled without silent wo
 1. A Development Journal research write initially used unsupported `source_system='web'`. The row was rejected by the existing constraint. The constraint was inspected, the allowed vocabulary was established, and the research event was written with `source_system='manual'` while retaining the actual external URLs in evidence.
 2. The founder-authority seed write committed successfully, but the same multi-statement call's final readback query used an ambiguous unqualified `status` column. The write was not blindly replayed. A separate qualified readback established that the intended authority record already existed and matched the contract.
 
-## Remaining merge gate
+A later attempt to retrieve live logs for the still-initializing one-shot GitHub job returned no available log blob through the connector. This was treated as a visibility limitation, not as workflow failure; authoritative job-step state was used instead, and the job later completed successfully.
+
+## Remaining merge gate after content freeze
 
 Before DRULE-003 can merge:
 
-- open a draft PR linked to Issue #202;
-- reconcile the branch against the then-current `main`;
-- confirm migration `014` remains collision-free;
-- confirm the PR diff contains only the intended DRULE-003 work plus any explicitly justified integration change;
-- require the dedicated DRULE-003 exact-head workflow and all other current-head PR workflows to reach terminal success;
-- investigate and repair any failure rather than bypassing it;
-- update this provenance record with the final head and workflow evidence;
-- record the resulting milestone in the Development Journal.
+- the complete workflow matrix must reach terminal success on the new exact content head created by this provenance refresh;
+- any failure must be investigated and repaired rather than bypassed;
+- `main` must be checked once more for compatibility and migration `014` collision;
+- PR #203 and the Development Journal must record the immutable final-head SHA and workflow evidence;
+- the PR must be marked ready only after those gates pass;
+- merge must use the expected verified head SHA.
 
-Issue #202 owns the implementation lane. Step 3 of the broader Rulebook sequence remains the fuller Authority Hierarchy / Authority Graph and is intentionally not silently collapsed into this seed.
+Issue #202 owns this implementation lane. Step 3 of the broader Rulebook sequence remains the fuller Authority Hierarchy / Authority Graph and is intentionally not silently collapsed into this seed.

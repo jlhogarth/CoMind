@@ -37,7 +37,7 @@ GRANT SELECT ON TABLE
   comind.cm_conversation_analytics
 TO comind_conversation_history_reader;
 
--- Forced-RLS archive evidence requires an explicit reader policy.
+-- Forced-RLS evidence requires an explicit reader policy.
 DO $$
 DECLARE v_table text;
 BEGIN
@@ -67,13 +67,32 @@ BEGIN
 END
 $$;
 
--- The history reader is intentionally invisible to ordinary API identities.
+-- Keep all Conversation History evidence private from ordinary application/API identities.
+REVOKE ALL ON TABLE
+  comind.cm_archive_source,
+  comind.cm_archive_source_file,
+  comind.cm_archive_import,
+  comind.cm_archive_conversation_observation,
+  comind.cm_archive_node_observation,
+  comind.cm_archive_attachment_reference,
+  comind.cm_archive_parser_event,
+  comind.cm_archive_quarantine,
+  comind.cm_archive_diff_receipt,
+  comind.cm_conversation_reconciliation_receipt,
+  comind.cm_conversation_reconciliation_candidate,
+  comind.cm_conversation_derivation_run,
+  comind.cm_conversation_derivation,
+  comind.cm_conversation_promotion_candidate,
+  comind.cm_message_analytics,
+  comind.cm_conversation_analytics
+FROM PUBLIC;
+
 DO $$
 DECLARE v_role text;
 BEGIN
-  FOREACH v_role IN ARRAY ARRAY['PUBLIC', 'anon', 'authenticated', 'service_role']
+  FOREACH v_role IN ARRAY ARRAY['anon', 'authenticated', 'service_role']
   LOOP
-    IF v_role = 'PUBLIC' OR EXISTS (SELECT 1 FROM pg_roles WHERE rolname = v_role) THEN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = v_role) THEN
       EXECUTE format('REVOKE ALL ON TABLE comind.cm_archive_source FROM %I', v_role);
       EXECUTE format('REVOKE ALL ON TABLE comind.cm_archive_source_file FROM %I', v_role);
       EXECUTE format('REVOKE ALL ON TABLE comind.cm_archive_import FROM %I', v_role);

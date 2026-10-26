@@ -29,7 +29,7 @@ create table if not exists comind_pm.pm_authority_scope_bindings (
   check (capabilities <@ array['approve','activate','supersede','override','revoke','recommend']::text[]),
   check (authority_level is null or authority_level in ('C0','C1','C2','C3','C4')),
   check (jsonb_typeof(selector) = 'object'),
-  check (case when jsonb_typeof(evidence_refs)='array' then jsonb_array_length(evidence_refs)>0 else false end),
+  check (jsonb_typeof(evidence_refs) = 'array' and jsonb_array_length(evidence_refs) > 0),
   check (status in ('active','proposed','suspended','expired','revoked','superseded')),
   check (valid_until is null or valid_until > valid_from)
 );
@@ -57,8 +57,9 @@ create table if not exists comind_pm.pm_authority_basis_links (
   check ((basis_type='source_document')=(source_document_id is not null)),
   check ((basis_type='event')=(event_id is not null)),
   check ((basis_type='external')=(external_ref is not null)),
+  check (external_ref is null or nullif(btrim(external_ref),'') is not null),
   check (nullif(btrim(rationale),'') is not null),
-  check (case when jsonb_typeof(evidence_refs)='array' then jsonb_array_length(evidence_refs)>0 else false end)
+  check (jsonb_typeof(evidence_refs) = 'array' and jsonb_array_length(evidence_refs) > 0)
 );
 
 create table if not exists comind_pm.pm_authority_relationships (
@@ -91,7 +92,8 @@ create table if not exists comind_pm.pm_authority_relationships (
   check ((relationship_type='constrains' and constraint_effect in ('deny','require_human','limit')) or (relationship_type<>'constrains' and constraint_effect is null)),
   check (relationship_type<>'conflicts_with' or reconciliation_case_id is not null),
   check (nullif(btrim(rationale),'') is not null),
-  check (case when jsonb_typeof(evidence_refs)='array' then jsonb_array_length(evidence_refs)>0 else false end),
+  check (nullif(btrim(created_by),'') is not null),
+  check (jsonb_typeof(evidence_refs) = 'array' and jsonb_array_length(evidence_refs) > 0),
   check (valid_until is null or valid_until > valid_from)
 );
 
@@ -108,7 +110,7 @@ create table if not exists comind_pm.pm_authority_relationship_events (
   check (event_type in ('proposed','confirmed','rejected','superseded','revoked')),
   check (nullif(btrim(actor),'') is not null),
   check (nullif(btrim(rationale),'') is not null),
-  check (case when jsonb_typeof(evidence_refs)='array' then jsonb_array_length(evidence_refs)>0 else false end)
+  check (jsonb_typeof(evidence_refs) = 'array' and jsonb_array_length(evidence_refs) > 0)
 );
 
 create table if not exists comind_pm.pm_authority_requirements (
@@ -142,9 +144,9 @@ create table if not exists comind_pm.pm_authority_requirements (
   check (required_capability in ('approve','activate','supersede','override','revoke','recommend')),
   check (required_authority_level is null or required_authority_level in ('C0','C1','C2','C3','C4')),
   check ((governing_rule_id is null)=(governing_rule_version is null)),
-  check (jsonb_typeof(selector)='object'),
+  check (jsonb_typeof(selector) = 'object'),
   check (nullif(btrim(rationale),'') is not null),
-  check (case when jsonb_typeof(evidence_refs)='array' then jsonb_array_length(evidence_refs)>0 else false end),
+  check (jsonb_typeof(evidence_refs) = 'array' and jsonb_array_length(evidence_refs) > 0),
   check (status in ('active','proposed','superseded','revoked','expired')),
   check (valid_until is null or valid_until > valid_from)
 );
@@ -173,6 +175,26 @@ begin
 end;
 $$;
 
+create or replace function comind_pm.authority_dimension_matches(p_values text[],p_requested text)
+returns boolean
+language sql
+immutable
+security invoker
+set search_path=''
+as $$
+  select '*'=any(p_values) or p_requested=any(p_values)
+$$;
+
+create or replace function comind_pm.authority_level_rank(p_level text)
+returns integer
+language sql
+immutable
+security invoker
+set search_path=''
+as $$
+  select case p_level when 'C0' then 0 when 'C1' then 1 when 'C2' then 2 when 'C3' then 3 when 'C4' then 4 else null end
+$$;
+
 create or replace function comind_pm.validate_authority_scope_binding()
 returns trigger
 language plpgsql
@@ -180,49 +202,14 @@ security invoker
 set search_path=''
 as $$
 declare
-  v_authority_project uuid;
-  v_authority_capabilities text[];
+  v_project uuid;
+  v_capabilities text[];
 begin
-  select project_id,capabilities
-  into v_authority_project,v_authority_capabilities
-  from comind_pm.pm_rule_authorities
-  where id=new.authority_id;
-
-  if not found then
-    raise exception 'Authority % does not exist',new.authority_id;
-  end if;
-  if v_authority_project<>new.project_id then
-    raise exception 'Authority scope binding project does not match authority project';
-  end if;
-  if not (new.capabilities <@ v_authority_capabilities) then
-    raise exception 'Scope binding capabilities exceed authority capabilities';
-  end if;
-  return new;
-end;
-$$;
-
-create or replace function comind_pm.validate_authority_graph_project_links()
-returns trigger
-language plpgsql
-security invoker
-set search_path=''
-as $$
-declare
-  v_left_project uuid;
-  v_right_project uuid;
-  v_case_project uuid;
-begin
-  select project_id into v_left_project from comind_pm.pm_rule_authorities where id=new.authority_id;
-  select project_id into v_right_project from comind_pm.pm_rule_authorities where id=new.related_authority_id;
-  if v_left_project is null or v_right_project is null or v_left_project<>new.project_id or v_right_project<>new.project_id then
-    raise exception 'Authority relationship project mismatch';
-  end if;
-  if new.reconciliation_case_id is not null then
-    select project_id into v_case_project from comind_pm.pm_rule_reconciliation_cases where id=new.reconciliation_case_id;
-    if v_case_project is distinct from new.project_id then
-      raise exception 'Authority relationship reconciliation case project mismatch';
-    end if;
-  end if;
+  select project_id,capabilities into v_project,v_capabilities
+  from comind_pm.pm_rule_authorities where id=new.authority_id;
+  if not found then raise exception 'Authority % does not exist',new.authority_id; end if;
+  if v_project<>new.project_id then raise exception 'Authority scope binding project mismatch'; end if;
+  if not (new.capabilities <@ v_capabilities) then raise exception 'Scope binding capabilities exceed authority capabilities'; end if;
   return new;
 end;
 $$;
@@ -238,10 +225,7 @@ declare
   v_basis_project uuid;
 begin
   select project_id into v_authority_project from comind_pm.pm_rule_authorities where id=new.authority_id;
-  if v_authority_project is distinct from new.project_id then
-    raise exception 'Authority basis project does not match authority project';
-  end if;
-
+  if v_authority_project is distinct from new.project_id then raise exception 'Authority basis project mismatch'; end if;
   if new.rule_id is not null then
     select project_id into v_basis_project from comind_pm.pm_rules where id=new.rule_id;
   elsif new.source_document_id is not null then
@@ -251,9 +235,30 @@ begin
   else
     v_basis_project:=new.project_id;
   end if;
+  if v_basis_project is distinct from new.project_id then raise exception 'Authority basis evidence project mismatch'; end if;
+  return new;
+end;
+$$;
 
-  if v_basis_project is distinct from new.project_id then
-    raise exception 'Authority basis evidence project mismatch';
+create or replace function comind_pm.validate_authority_relationship()
+returns trigger
+language plpgsql
+security invoker
+set search_path=''
+as $$
+declare
+  v_left uuid;
+  v_right uuid;
+  v_case uuid;
+begin
+  select project_id into v_left from comind_pm.pm_rule_authorities where id=new.authority_id;
+  select project_id into v_right from comind_pm.pm_rule_authorities where id=new.related_authority_id;
+  if v_left is distinct from new.project_id or v_right is distinct from new.project_id then
+    raise exception 'Authority relationship project mismatch';
+  end if;
+  if new.reconciliation_case_id is not null then
+    select project_id into v_case from comind_pm.pm_rule_reconciliation_cases where id=new.reconciliation_case_id;
+    if v_case is distinct from new.project_id then raise exception 'Authority relationship reconciliation case project mismatch'; end if;
   end if;
   return new;
 end;
@@ -266,20 +271,15 @@ security invoker
 set search_path=''
 as $$
 declare
-  v_authority_project uuid;
-  v_rule_project uuid;
+  v_project uuid;
 begin
   if new.required_authority_id is not null then
-    select project_id into v_authority_project from comind_pm.pm_rule_authorities where id=new.required_authority_id;
-    if v_authority_project is distinct from new.project_id then
-      raise exception 'Authority requirement project does not match required authority project';
-    end if;
+    select project_id into v_project from comind_pm.pm_rule_authorities where id=new.required_authority_id;
+    if v_project is distinct from new.project_id then raise exception 'Authority requirement project mismatch'; end if;
   end if;
   if new.governing_rule_id is not null then
-    select project_id into v_rule_project from comind_pm.pm_rules where id=new.governing_rule_id;
-    if v_rule_project is distinct from new.project_id then
-      raise exception 'Authority requirement project does not match governing rule project';
-    end if;
+    select project_id into v_project from comind_pm.pm_rules where id=new.governing_rule_id;
+    if v_project is distinct from new.project_id then raise exception 'Authority requirement governing-rule project mismatch'; end if;
   end if;
   return new;
 end;
@@ -292,12 +292,8 @@ security invoker
 set search_path=''
 as $$
 begin
-  insert into comind_pm.pm_authority_relationship_events(
-    relationship_id,event_type,actor,rationale,evidence_refs,occurred_at,metadata
-  ) values (
-    new.id,'proposed',new.created_by,new.rationale,new.evidence_refs,new.created_at,
-    jsonb_build_object('relationship_type',new.relationship_type)
-  );
+  insert into comind_pm.pm_authority_relationship_events(relationship_id,event_type,actor,rationale,evidence_refs,occurred_at,metadata)
+  values(new.id,'proposed',new.created_by,new.rationale,new.evidence_refs,new.created_at,jsonb_build_object('relationship_type',new.relationship_type));
   return new;
 end;
 $$;
@@ -305,83 +301,43 @@ $$;
 create or replace view comind_pm.v_authority_scope_current
 with (security_invoker=true)
 as
-select s.*
-from comind_pm.pm_authority_scope_bindings s
-where s.version=(
-  select max(s2.version)
-  from comind_pm.pm_authority_scope_bindings s2
-  where s2.authority_id=s.authority_id and s2.binding_key=s.binding_key
-);
+select s.* from comind_pm.pm_authority_scope_bindings s
+where s.version=(select max(s2.version) from comind_pm.pm_authority_scope_bindings s2 where s2.authority_id=s.authority_id and s2.binding_key=s.binding_key);
 
 create or replace view comind_pm.v_authority_requirement_current
 with (security_invoker=true)
 as
-select r.*
-from comind_pm.pm_authority_requirements r
-where r.version=(
-  select max(r2.version)
-  from comind_pm.pm_authority_requirements r2
-  where r2.project_id=r.project_id and r2.requirement_key=r.requirement_key
-);
+select r.* from comind_pm.pm_authority_requirements r
+where r.version=(select max(r2.version) from comind_pm.pm_authority_requirements r2 where r2.project_id=r.project_id and r2.requirement_key=r.requirement_key);
 
 create or replace view comind_pm.v_authority_relationship_current
 with (security_invoker=true)
 as
-select
-  r.*,
-  e.event_type as relationship_status,
-  e.actor as status_actor,
-  e.rationale as status_rationale,
-  e.evidence_refs as status_evidence_refs,
-  e.occurred_at as status_at
+select r.*,e.event_type as relationship_status,e.actor as status_actor,e.rationale as status_rationale,e.evidence_refs as status_evidence_refs,e.occurred_at as status_at
 from comind_pm.pm_authority_relationships r
 join lateral (
-  select e1.*
-  from comind_pm.pm_authority_relationship_events e1
-  where e1.relationship_id=r.id
-  order by e1.occurred_at desc,e1.id desc
-  limit 1
+  select e1.* from comind_pm.pm_authority_relationship_events e1
+  where e1.relationship_id=r.id order by e1.occurred_at desc,e1.id desc limit 1
 ) e on true;
 
 create or replace view comind_pm.v_authority_delegation_lineage
 with (security_invoker=true)
 as
 with recursive delegation as (
-  select
-    r.project_id,
-    r.authority_id as root_authority_id,
-    r.related_authority_id as delegated_authority_id,
-    1 as depth,
-    array[r.authority_id,r.related_authority_id]::uuid[] as path
+  select r.project_id,r.authority_id as root_authority_id,r.related_authority_id as delegated_authority_id,1 as depth,
+         array[r.authority_id,r.related_authority_id]::uuid[] as path
   from comind_pm.v_authority_relationship_current r
-  where r.relationship_type='delegates_to'
-    and r.relationship_status='confirmed'
+  where r.relationship_type='delegates_to' and r.relationship_status='confirmed'
+    and r.valid_from<=now() and (r.valid_until is null or r.valid_until>now())
   union all
-  select
-    d.project_id,
-    d.root_authority_id,
-    r.related_authority_id,
-    d.depth+1,
-    d.path||r.related_authority_id
-  from delegation d
-  join comind_pm.v_authority_relationship_current r
-    on r.project_id=d.project_id
-   and r.authority_id=d.delegated_authority_id
-   and r.relationship_type='delegates_to'
-   and r.relationship_status='confirmed'
+  select d.project_id,d.root_authority_id,r.related_authority_id,d.depth+1,d.path||r.related_authority_id
+  from delegation d join comind_pm.v_authority_relationship_current r
+    on r.project_id=d.project_id and r.authority_id=d.delegated_authority_id
+   and r.relationship_type='delegates_to' and r.relationship_status='confirmed'
+   and r.valid_from<=now() and (r.valid_until is null or r.valid_until>now())
   where not r.related_authority_id=any(d.path)
 )
 select * from delegation;
-
-create or replace function comind_pm.authority_dimension_matches(p_values text[],p_requested text)
-returns boolean
-language sql
-immutable
-security invoker
-set search_path=''
-as $$
-  select '*'=any(p_values) or p_requested=any(p_values)
-$$;
 
 create or replace function comind_pm.enforce_authority_relationship_event()
 returns trigger
@@ -391,29 +347,36 @@ set search_path=''
 as $$
 declare
   v_relationship comind_pm.pm_authority_relationships%rowtype;
+  v_previous text;
   v_cycle boolean;
 begin
-  select * into v_relationship
-  from comind_pm.pm_authority_relationships
-  where id=new.relationship_id;
+  select * into v_relationship from comind_pm.pm_authority_relationships where id=new.relationship_id;
+  if not found then raise exception 'Authority relationship % does not exist',new.relationship_id; end if;
 
-  if not found then
-    raise exception 'Authority relationship % does not exist',new.relationship_id;
+  select event_type into v_previous
+  from comind_pm.pm_authority_relationship_events
+  where relationship_id=new.relationship_id
+  order by occurred_at desc,id desc limit 1;
+
+  if v_previous is null then
+    if new.event_type<>'proposed' then raise exception 'Authority relationship must begin as proposed'; end if;
+  elsif v_previous='proposed' then
+    if new.event_type not in ('confirmed','rejected','revoked') then raise exception 'Invalid authority relationship transition % -> %',v_previous,new.event_type; end if;
+  elsif v_previous='confirmed' then
+    if new.event_type not in ('superseded','revoked') then raise exception 'Invalid authority relationship transition % -> %',v_previous,new.event_type; end if;
+  else
+    raise exception 'Authority relationship state % is terminal',v_previous;
   end if;
 
   if new.event_type='confirmed' and v_relationship.relationship_type='delegates_to' then
     select exists(
-      select 1
-      from comind_pm.v_authority_delegation_lineage d
+      select 1 from comind_pm.v_authority_delegation_lineage d
       where d.project_id=v_relationship.project_id
         and d.root_authority_id=v_relationship.related_authority_id
         and d.delegated_authority_id=v_relationship.authority_id
     ) into v_cycle;
-    if v_cycle then
-      raise exception 'Confirmed delegation would create an authority cycle';
-    end if;
+    if v_cycle then raise exception 'Confirmed delegation would create an authority cycle'; end if;
   end if;
-
   return new;
 end;
 $$;
@@ -443,8 +406,8 @@ declare
   v_conflicts jsonb;
   v_superseders jsonb;
   v_constraints jsonb;
-  v_requirement_failures jsonb;
-  v_requirement_count integer:=0;
+  v_failures jsonb;
+  v_count integer:=0;
   v_level text;
 begin
   if p_capability not in ('approve','activate','supersede','override','revoke','recommend') then
@@ -454,47 +417,46 @@ begin
     return jsonb_build_object('determination','inapplicable','reason','context_must_be_object');
   end if;
 
-  select * into v_authority
-  from comind_pm.pm_rule_authorities
-  where id=p_authority_id and project_id=p_project_id;
-
-  if not found then
-    return jsonb_build_object('determination','inapplicable','reason','authority_not_found');
-  end if;
-
-  if v_authority.status<>'active'
-     or v_authority.valid_from>p_at
-     or (v_authority.valid_until is not null and v_authority.valid_until<=p_at)
-  then
+  select * into v_authority from comind_pm.pm_rule_authorities where id=p_authority_id and project_id=p_project_id;
+  if not found then return jsonb_build_object('determination','inapplicable','reason','authority_not_found'); end if;
+  if v_authority.status<>'active' or v_authority.valid_from>p_at or (v_authority.valid_until is not null and v_authority.valid_until<=p_at) then
     return jsonb_build_object('determination','inapplicable','reason','authority_not_active','authority_key',v_authority.authority_key);
   end if;
-
   if v_authority.authority_class in ('advisory','evidentiary_only') then
     return jsonb_build_object('determination','inapplicable','reason','authority_class_cannot_grant_permission','authority_key',v_authority.authority_key,'authority_class',v_authority.authority_class);
   end if;
-
   if not (p_capability=any(v_authority.capabilities)) then
     return jsonb_build_object('determination','insufficient','reason','capability_not_granted','authority_key',v_authority.authority_key);
   end if;
 
+  if exists(
+    select 1 from comind_pm.v_authority_scope_current s
+    where s.project_id=p_project_id and s.authority_id=p_authority_id and s.status='active'
+      and s.valid_from<=p_at and (s.valid_until is null or s.valid_until>p_at)
+      and p_capability=any(s.capabilities)
+      and comind_pm.authority_dimension_matches(s.domains,p_domain)
+      and comind_pm.authority_dimension_matches(s.environments,p_environment)
+      and comind_pm.authority_dimension_matches(s.operation_classes,p_action)
+      and comind_pm.authority_dimension_matches(s.resource_classes,p_resource_class)
+      and s.selector<>'{}'::jsonb
+  ) then
+    return jsonb_build_object('determination','unresolved','reason','scope_selector_requires_policy_evaluator','authority_key',v_authority.authority_key);
+  end if;
+
   select s.* into v_scope
   from comind_pm.v_authority_scope_current s
-  where s.project_id=p_project_id
-    and s.authority_id=p_authority_id
-    and s.status='active'
-    and s.valid_from<=p_at
-    and (s.valid_until is null or s.valid_until>p_at)
+  where s.project_id=p_project_id and s.authority_id=p_authority_id and s.status='active'
+    and s.valid_from<=p_at and (s.valid_until is null or s.valid_until>p_at)
     and p_capability=any(s.capabilities)
     and comind_pm.authority_dimension_matches(s.domains,p_domain)
     and comind_pm.authority_dimension_matches(s.environments,p_environment)
     and comind_pm.authority_dimension_matches(s.operation_classes,p_action)
     and comind_pm.authority_dimension_matches(s.resource_classes,p_resource_class)
-  order by s.version desc,s.created_at desc
+    and s.selector='{}'::jsonb
+  order by ((not '*'=any(s.domains))::int+(not '*'=any(s.environments))::int+(not '*'=any(s.operation_classes))::int+(not '*'=any(s.resource_classes))::int) desc,
+           s.version desc,s.binding_key asc
   limit 1;
-
-  if not found then
-    return jsonb_build_object('determination','inapplicable','reason','no_matching_authority_scope','authority_key',v_authority.authority_key);
-  end if;
+  if not found then return jsonb_build_object('determination','inapplicable','reason','no_matching_authority_scope','authority_key',v_authority.authority_key); end if;
   v_level:=v_scope.authority_level;
 
   if v_authority.authority_class='delegated_authority' then
@@ -502,14 +464,10 @@ begin
       select p_authority_id as authority_id,array[p_authority_id]::uuid[] as path,0 as depth
       union all
       select r.authority_id,c.path||r.authority_id,c.depth+1
-      from chain c
-      join comind_pm.v_authority_relationship_current r
-        on r.project_id=p_project_id
-       and r.related_authority_id=c.authority_id
-       and r.relationship_type='delegates_to'
-       and r.relationship_status='confirmed'
-       and r.valid_from<=p_at
-       and (r.valid_until is null or r.valid_until>p_at)
+      from chain c join comind_pm.v_authority_relationship_current r
+        on r.project_id=p_project_id and r.related_authority_id=c.authority_id
+       and r.relationship_type='delegates_to' and r.relationship_status='confirmed'
+       and r.valid_from<=p_at and (r.valid_until is null or r.valid_until>p_at)
        and (cardinality(r.capabilities)=0 or p_capability=any(r.capabilities))
        and comind_pm.authority_dimension_matches(r.domains,p_domain)
        and comind_pm.authority_dimension_matches(r.environments,p_environment)
@@ -517,33 +475,21 @@ begin
        and comind_pm.authority_dimension_matches(r.resource_classes,p_resource_class)
       where not r.authority_id=any(c.path)
     )
-    select c.path,c.authority_id
-    into v_delegation_path,v_delegation_root
-    from chain c
-    join comind_pm.pm_rule_authorities root on root.id=c.authority_id
-    where c.depth>0
-      and root.status='active'
-      and root.valid_from<=p_at
-      and (root.valid_until is null or root.valid_until>p_at)
-      and root.authority_class<>'delegated_authority'
-      and p_capability=any(root.capabilities)
+    select c.path,c.authority_id into v_delegation_path,v_delegation_root
+    from chain c join comind_pm.pm_rule_authorities root on root.id=c.authority_id
+    where c.depth>0 and root.status='active' and root.valid_from<=p_at and (root.valid_until is null or root.valid_until>p_at)
+      and root.authority_class<>'delegated_authority' and p_capability=any(root.capabilities)
       and exists(
-        select 1
-        from comind_pm.v_authority_scope_current rs
-        where rs.authority_id=root.id
-          and rs.project_id=p_project_id
-          and rs.status='active'
-          and rs.valid_from<=p_at
-          and (rs.valid_until is null or rs.valid_until>p_at)
-          and p_capability=any(rs.capabilities)
+        select 1 from comind_pm.v_authority_scope_current rs
+        where rs.authority_id=root.id and rs.project_id=p_project_id and rs.status='active'
+          and rs.valid_from<=p_at and (rs.valid_until is null or rs.valid_until>p_at)
+          and p_capability=any(rs.capabilities) and rs.selector='{}'::jsonb
           and comind_pm.authority_dimension_matches(rs.domains,p_domain)
           and comind_pm.authority_dimension_matches(rs.environments,p_environment)
           and comind_pm.authority_dimension_matches(rs.operation_classes,p_action)
           and comind_pm.authority_dimension_matches(rs.resource_classes,p_resource_class)
       )
-    order by c.depth
-    limit 1;
-
+    order by c.depth limit 1;
     if v_delegation_path is null then
       return jsonb_build_object('determination','insufficient','reason','delegated_authority_has_no_valid_delegation_lineage','authority_key',v_authority.authority_key);
     end if;
@@ -552,80 +498,50 @@ begin
     v_delegation_root:=p_authority_id;
   end if;
 
-  select coalesce(jsonb_agg(jsonb_build_object(
-      'relationship_id',r.id,
-      'authority_key',a.authority_key,
-      'case_key',c.case_key,
-      'case_status',c.status
-    ) order by a.authority_key),'[]'::jsonb)
+  select coalesce(jsonb_agg(jsonb_build_object('relationship_id',r.id,'authority_key',a.authority_key,'case_key',c.case_key,'case_status',c.status) order by a.authority_key),'[]'::jsonb)
   into v_conflicts
   from comind_pm.v_authority_relationship_current r
-  join comind_pm.pm_rule_authorities a
-    on a.id=case when r.authority_id=p_authority_id then r.related_authority_id else r.authority_id end
+  join comind_pm.pm_rule_authorities a on a.id=case when r.authority_id=p_authority_id then r.related_authority_id else r.authority_id end
   join comind_pm.pm_rule_reconciliation_cases c on c.id=r.reconciliation_case_id
-  where r.project_id=p_project_id
-    and r.relationship_type='conflicts_with'
-    and r.relationship_status='confirmed'
+  where r.project_id=p_project_id and r.relationship_type='conflicts_with' and r.relationship_status='confirmed'
     and (r.authority_id=p_authority_id or r.related_authority_id=p_authority_id)
     and c.status in ('open','under_review','deferred')
-    and r.valid_from<=p_at
-    and (r.valid_until is null or r.valid_until>p_at)
+    and r.valid_from<=p_at and (r.valid_until is null or r.valid_until>p_at)
     and (cardinality(r.capabilities)=0 or p_capability=any(r.capabilities))
     and comind_pm.authority_dimension_matches(r.domains,p_domain)
     and comind_pm.authority_dimension_matches(r.environments,p_environment)
     and comind_pm.authority_dimension_matches(r.operation_classes,p_action)
     and comind_pm.authority_dimension_matches(r.resource_classes,p_resource_class);
-
   if jsonb_array_length(v_conflicts)>0 then
     return jsonb_build_object('determination','unresolved','reason','open_authority_conflict','authority_key',v_authority.authority_key,'conflicts',v_conflicts,'delegation_path',to_jsonb(v_delegation_path));
   end if;
 
   select coalesce(jsonb_agg(jsonb_build_object('relationship_id',r.id,'authority_key',a.authority_key) order by a.authority_key),'[]'::jsonb)
   into v_superseders
-  from comind_pm.v_authority_relationship_current r
-  join comind_pm.pm_rule_authorities a on a.id=r.authority_id
-  where r.project_id=p_project_id
-    and r.relationship_type='supersedes'
-    and r.relationship_status='confirmed'
-    and r.related_authority_id=p_authority_id
-    and a.status='active'
-    and a.valid_from<=p_at
-    and (a.valid_until is null or a.valid_until>p_at)
-    and r.valid_from<=p_at
-    and (r.valid_until is null or r.valid_until>p_at)
+  from comind_pm.v_authority_relationship_current r join comind_pm.pm_rule_authorities a on a.id=r.authority_id
+  where r.project_id=p_project_id and r.relationship_type='supersedes' and r.relationship_status='confirmed'
+    and r.related_authority_id=p_authority_id and a.status='active' and a.valid_from<=p_at and (a.valid_until is null or a.valid_until>p_at)
+    and r.valid_from<=p_at and (r.valid_until is null or r.valid_until>p_at)
     and (cardinality(r.capabilities)=0 or p_capability=any(r.capabilities))
     and comind_pm.authority_dimension_matches(r.domains,p_domain)
     and comind_pm.authority_dimension_matches(r.environments,p_environment)
     and comind_pm.authority_dimension_matches(r.operation_classes,p_action)
     and comind_pm.authority_dimension_matches(r.resource_classes,p_resource_class);
-
   if jsonb_array_length(v_superseders)>0 then
     return jsonb_build_object('determination','inapplicable','reason','authority_superseded','authority_key',v_authority.authority_key,'superseded_by',v_superseders);
   end if;
 
-  select coalesce(jsonb_agg(jsonb_build_object(
-      'relationship_id',r.id,
-      'authority_key',a.authority_key,
-      'effect',r.constraint_effect
-    ) order by a.authority_key),'[]'::jsonb)
+  select coalesce(jsonb_agg(jsonb_build_object('relationship_id',r.id,'authority_key',a.authority_key,'effect',r.constraint_effect) order by a.authority_key),'[]'::jsonb)
   into v_constraints
-  from comind_pm.v_authority_relationship_current r
-  join comind_pm.pm_rule_authorities a on a.id=r.authority_id
-  where r.project_id=p_project_id
-    and r.relationship_type='constrains'
-    and r.relationship_status='confirmed'
-    and r.related_authority_id=p_authority_id
-    and a.status='active'
-    and a.valid_from<=p_at
-    and (a.valid_until is null or a.valid_until>p_at)
-    and r.valid_from<=p_at
-    and (r.valid_until is null or r.valid_until>p_at)
+  from comind_pm.v_authority_relationship_current r join comind_pm.pm_rule_authorities a on a.id=r.authority_id
+  where r.project_id=p_project_id and r.relationship_type='constrains' and r.relationship_status='confirmed'
+    and r.related_authority_id=p_authority_id and a.status='active' and a.valid_from<=p_at and (a.valid_until is null or a.valid_until>p_at)
+    and r.valid_from<=p_at and (r.valid_until is null or r.valid_until>p_at)
     and (cardinality(r.capabilities)=0 or p_capability=any(r.capabilities))
     and comind_pm.authority_dimension_matches(r.domains,p_domain)
     and comind_pm.authority_dimension_matches(r.environments,p_environment)
     and comind_pm.authority_dimension_matches(r.operation_classes,p_action)
     and comind_pm.authority_dimension_matches(r.resource_classes,p_resource_class);
-
   if exists(select 1 from jsonb_array_elements(v_constraints) e where e->>'effect'='deny') then
     return jsonb_build_object('determination','insufficient','reason','authority_constrained_deny','authority_key',v_authority.authority_key,'constraints',v_constraints);
   end if;
@@ -633,121 +549,86 @@ begin
     return jsonb_build_object('determination','insufficient','reason','constraint_requires_human','authority_key',v_authority.authority_key,'constraints',v_constraints);
   end if;
   if exists(select 1 from jsonb_array_elements(v_constraints) e where e->>'effect'='limit') then
-    return jsonb_build_object('determination','unresolved','reason','authority_constraint_requires_further_evaluation','authority_key',v_authority.authority_key,'constraints',v_constraints);
+    return jsonb_build_object('determination','unresolved','reason','authority_constraint_requires_policy_evaluation','authority_key',v_authority.authority_key,'constraints',v_constraints);
   end if;
 
-  select count(*),coalesce(jsonb_agg(failure order by failure->>'requirement_key'),'[]'::jsonb)
-  into v_requirement_count,v_requirement_failures
-  from (
-    select jsonb_build_object(
-      'requirement_key',req.requirement_key,
-      'version',req.version,
-      'reason',case
-        when req.human_required and v_authority.subject_type<>'human' then 'human_required'
-        when req.required_authority_level is not null and v_level is distinct from req.required_authority_level then 'authority_level_required:'||req.required_authority_level
-        when req.required_authority_id is not null and not (req.required_authority_id=any(v_delegation_path)) then 'required_authority_not_in_delegation_lineage'
-        else null
-      end,
-      'governing_rule_id',req.governing_rule_id,
-      'governing_rule_version',req.governing_rule_version
-    ) as failure
-    from comind_pm.v_authority_requirement_current req
-    where req.project_id=p_project_id
-      and req.status='active'
-      and req.valid_from<=p_at
-      and (req.valid_until is null or req.valid_until>p_at)
+  if exists(
+    select 1 from comind_pm.v_authority_requirement_current req
+    where req.project_id=p_project_id and req.status='active' and req.valid_from<=p_at and (req.valid_until is null or req.valid_until>p_at)
       and req.required_capability=p_capability
       and (req.operation_class='*' or req.operation_class=p_action)
       and (req.target_environment='*' or req.target_environment=p_environment)
       and (req.domain='*' or req.domain=p_domain)
       and (req.resource_class='*' or req.resource_class=p_resource_class)
-      and (
-        (req.human_required and v_authority.subject_type<>'human')
-        or (req.required_authority_level is not null and v_level is distinct from req.required_authority_level)
-        or (req.required_authority_id is not null and not (req.required_authority_id=any(v_delegation_path)))
-      )
-  ) failures;
+      and req.selector<>'{}'::jsonb
+  ) then
+    return jsonb_build_object('determination','unresolved','reason','authority_requirement_selector_requires_policy_evaluator','authority_key',v_authority.authority_key);
+  end if;
 
-  if v_requirement_count>0 then
-    return jsonb_build_object('determination','insufficient','reason','authority_requirements_not_satisfied','authority_key',v_authority.authority_key,'requirement_failures',v_requirement_failures,'delegation_path',to_jsonb(v_delegation_path),'scope_binding_key',v_scope.binding_key,'authority_level',v_level);
+  select count(*),coalesce(jsonb_agg(failure order by failure->>'requirement_key'),'[]'::jsonb)
+  into v_count,v_failures
+  from (
+    select jsonb_build_object(
+      'requirement_key',req.requirement_key,'version',req.version,
+      'reason',case
+        when req.human_required and v_authority.subject_type<>'human' then 'human_required'
+        when req.required_authority_level is not null and (v_level is null or comind_pm.authority_level_rank(v_level)<comind_pm.authority_level_rank(req.required_authority_level)) then 'authority_level_required:'||req.required_authority_level
+        when req.required_authority_id is not null and not (req.required_authority_id=any(v_delegation_path)) then 'required_authority_not_in_delegation_lineage'
+        else null end,
+      'governing_rule_id',req.governing_rule_id,'governing_rule_version',req.governing_rule_version
+    ) as failure
+    from comind_pm.v_authority_requirement_current req
+    where req.project_id=p_project_id and req.status='active' and req.valid_from<=p_at and (req.valid_until is null or req.valid_until>p_at)
+      and req.required_capability=p_capability
+      and (req.operation_class='*' or req.operation_class=p_action)
+      and (req.target_environment='*' or req.target_environment=p_environment)
+      and (req.domain='*' or req.domain=p_domain)
+      and (req.resource_class='*' or req.resource_class=p_resource_class)
+      and req.selector='{}'::jsonb
+      and ((req.human_required and v_authority.subject_type<>'human')
+        or (req.required_authority_level is not null and (v_level is null or comind_pm.authority_level_rank(v_level)<comind_pm.authority_level_rank(req.required_authority_level)))
+        or (req.required_authority_id is not null and not (req.required_authority_id=any(v_delegation_path))))
+  ) failures;
+  if v_count>0 then
+    return jsonb_build_object('determination','insufficient','reason','authority_requirements_not_satisfied','authority_key',v_authority.authority_key,'requirement_failures',v_failures,'delegation_path',to_jsonb(v_delegation_path),'scope_binding_key',v_scope.binding_key,'authority_level',v_level);
   end if;
 
   return jsonb_build_object(
-    'determination','sufficient',
-    'reason','authority_scope_and_constraints_satisfied',
-    'authority_key',v_authority.authority_key,
-    'authority_class',v_authority.authority_class,
-    'subject_type',v_authority.subject_type,
-    'subject_ref',v_authority.subject_ref,
-    'capability',p_capability,
-    'action',p_action,
-    'resource_class',p_resource_class,
-    'environment',p_environment,
-    'domain',p_domain,
-    'context',p_context,
-    'scope_binding_key',v_scope.binding_key,
-    'authority_level',v_level,
-    'delegation_root_authority_id',v_delegation_root,
-    'delegation_path',to_jsonb(v_delegation_path),
-    'constraints',v_constraints
+    'determination','sufficient','reason','authority_scope_and_constraints_satisfied','authority_key',v_authority.authority_key,
+    'authority_class',v_authority.authority_class,'subject_type',v_authority.subject_type,'subject_ref',v_authority.subject_ref,
+    'capability',p_capability,'action',p_action,'resource_class',p_resource_class,'environment',p_environment,'domain',p_domain,
+    'context',p_context,'scope_binding_key',v_scope.binding_key,'authority_level',v_level,
+    'delegation_root_authority_id',v_delegation_root,'delegation_path',to_jsonb(v_delegation_path),'constraints',v_constraints
   );
 end;
 $$;
 
 drop trigger if exists trg_authority_scope_binding_validate on comind_pm.pm_authority_scope_bindings;
-create trigger trg_authority_scope_binding_validate
-before insert on comind_pm.pm_authority_scope_bindings
-for each row execute function comind_pm.validate_authority_scope_binding();
-
+create trigger trg_authority_scope_binding_validate before insert on comind_pm.pm_authority_scope_bindings for each row execute function comind_pm.validate_authority_scope_binding();
 drop trigger if exists trg_authority_scope_binding_immutable on comind_pm.pm_authority_scope_bindings;
-create trigger trg_authority_scope_binding_immutable
-before update or delete on comind_pm.pm_authority_scope_bindings
-for each row execute function comind_pm.reject_authority_graph_history_mutation();
+create trigger trg_authority_scope_binding_immutable before update or delete on comind_pm.pm_authority_scope_bindings for each row execute function comind_pm.reject_authority_graph_history_mutation();
 
 drop trigger if exists trg_authority_basis_validate on comind_pm.pm_authority_basis_links;
-create trigger trg_authority_basis_validate
-before insert on comind_pm.pm_authority_basis_links
-for each row execute function comind_pm.validate_authority_basis_link();
-
+create trigger trg_authority_basis_validate before insert on comind_pm.pm_authority_basis_links for each row execute function comind_pm.validate_authority_basis_link();
 drop trigger if exists trg_authority_basis_immutable on comind_pm.pm_authority_basis_links;
-create trigger trg_authority_basis_immutable
-before update or delete on comind_pm.pm_authority_basis_links
-for each row execute function comind_pm.reject_authority_graph_history_mutation();
+create trigger trg_authority_basis_immutable before update or delete on comind_pm.pm_authority_basis_links for each row execute function comind_pm.reject_authority_graph_history_mutation();
 
 drop trigger if exists trg_authority_relationship_validate on comind_pm.pm_authority_relationships;
-create trigger trg_authority_relationship_validate
-before insert on comind_pm.pm_authority_relationships
-for each row execute function comind_pm.validate_authority_graph_project_links();
-
+create trigger trg_authority_relationship_validate before insert on comind_pm.pm_authority_relationships for each row execute function comind_pm.validate_authority_relationship();
 drop trigger if exists trg_authority_relationship_immutable on comind_pm.pm_authority_relationships;
-create trigger trg_authority_relationship_immutable
-before update or delete on comind_pm.pm_authority_relationships
-for each row execute function comind_pm.reject_authority_graph_history_mutation();
-
+create trigger trg_authority_relationship_immutable before update or delete on comind_pm.pm_authority_relationships for each row execute function comind_pm.reject_authority_graph_history_mutation();
 drop trigger if exists trg_authority_relationship_proposal on comind_pm.pm_authority_relationships;
-create trigger trg_authority_relationship_proposal
-after insert on comind_pm.pm_authority_relationships
-for each row execute function comind_pm.record_authority_relationship_proposal();
+create trigger trg_authority_relationship_proposal after insert on comind_pm.pm_authority_relationships for each row execute function comind_pm.record_authority_relationship_proposal();
 
 drop trigger if exists trg_authority_relationship_event_enforce on comind_pm.pm_authority_relationship_events;
-create trigger trg_authority_relationship_event_enforce
-before insert on comind_pm.pm_authority_relationship_events
-for each row execute function comind_pm.enforce_authority_relationship_event();
-
+create trigger trg_authority_relationship_event_enforce before insert on comind_pm.pm_authority_relationship_events for each row execute function comind_pm.enforce_authority_relationship_event();
 drop trigger if exists trg_authority_relationship_event_immutable on comind_pm.pm_authority_relationship_events;
-create trigger trg_authority_relationship_event_immutable
-before update or delete on comind_pm.pm_authority_relationship_events
-for each row execute function comind_pm.reject_authority_graph_history_mutation();
+create trigger trg_authority_relationship_event_immutable before update or delete on comind_pm.pm_authority_relationship_events for each row execute function comind_pm.reject_authority_graph_history_mutation();
 
 drop trigger if exists trg_authority_requirement_validate on comind_pm.pm_authority_requirements;
-create trigger trg_authority_requirement_validate
-before insert on comind_pm.pm_authority_requirements
-for each row execute function comind_pm.validate_authority_requirement();
-
+create trigger trg_authority_requirement_validate before insert on comind_pm.pm_authority_requirements for each row execute function comind_pm.validate_authority_requirement();
 drop trigger if exists trg_authority_requirement_immutable on comind_pm.pm_authority_requirements;
-create trigger trg_authority_requirement_immutable
-before update or delete on comind_pm.pm_authority_requirements
-for each row execute function comind_pm.reject_authority_graph_history_mutation();
+create trigger trg_authority_requirement_immutable before update or delete on comind_pm.pm_authority_requirements for each row execute function comind_pm.reject_authority_graph_history_mutation();
 
 alter table comind_pm.pm_authority_scope_bindings enable row level security;
 alter table comind_pm.pm_authority_basis_links enable row level security;
@@ -787,22 +668,24 @@ grant select on comind_pm.v_authority_relationship_current to service_role;
 grant select on comind_pm.v_authority_delegation_lineage to service_role;
 
 revoke all on function comind_pm.reject_authority_graph_history_mutation() from public,anon,authenticated;
+revoke all on function comind_pm.authority_dimension_matches(text[],text) from public,anon,authenticated;
+revoke all on function comind_pm.authority_level_rank(text) from public,anon,authenticated;
 revoke all on function comind_pm.validate_authority_scope_binding() from public,anon,authenticated;
-revoke all on function comind_pm.validate_authority_graph_project_links() from public,anon,authenticated;
 revoke all on function comind_pm.validate_authority_basis_link() from public,anon,authenticated;
+revoke all on function comind_pm.validate_authority_relationship() from public,anon,authenticated;
 revoke all on function comind_pm.validate_authority_requirement() from public,anon,authenticated;
 revoke all on function comind_pm.record_authority_relationship_proposal() from public,anon,authenticated;
-revoke all on function comind_pm.authority_dimension_matches(text[],text) from public,anon,authenticated;
 revoke all on function comind_pm.enforce_authority_relationship_event() from public,anon,authenticated;
 revoke all on function comind_pm.resolve_authority_request(uuid,uuid,text,text,text,text,text,jsonb,timestamptz) from public,anon,authenticated;
 
 grant execute on function comind_pm.reject_authority_graph_history_mutation() to service_role;
+grant execute on function comind_pm.authority_dimension_matches(text[],text) to service_role;
+grant execute on function comind_pm.authority_level_rank(text) to service_role;
 grant execute on function comind_pm.validate_authority_scope_binding() to service_role;
-grant execute on function comind_pm.validate_authority_graph_project_links() to service_role;
 grant execute on function comind_pm.validate_authority_basis_link() to service_role;
+grant execute on function comind_pm.validate_authority_relationship() to service_role;
 grant execute on function comind_pm.validate_authority_requirement() to service_role;
 grant execute on function comind_pm.record_authority_relationship_proposal() to service_role;
-grant execute on function comind_pm.authority_dimension_matches(text[],text) to service_role;
 grant execute on function comind_pm.enforce_authority_relationship_event() to service_role;
 grant execute on function comind_pm.resolve_authority_request(uuid,uuid,text,text,text,text,text,jsonb,timestamptz) to service_role;
 

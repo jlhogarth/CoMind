@@ -19,6 +19,9 @@ PY
   psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f MASTER.sql
 )
 
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
+  -f "${root}/db/verification/cfr_001g_local_source_read_compat.sql"
+
 psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 <<'SQL'
 DO $$
 BEGIN

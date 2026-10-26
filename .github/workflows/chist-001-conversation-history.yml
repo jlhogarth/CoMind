@@ -7,12 +7,15 @@ on:
       - 'db/migrations/20261026_002_conversation_history_baseline_certification.sql'
       - 'db/migrations/20261026_003_conversation_history_baseline_index_hardening.sql'
       - 'db/migrations/20261026_004_conversation_history_archive_derivation.sql'
+      - 'db/migrations/20261026_005_conversation_history_pit_diff.sql'
       - 'db/verification/chist_001_live_test.sql'
       - 'server/src/history/**'
+      - 'server/src/archive/chatgpt-export-diff*.ts'
       - 'scripts/test_chist_001_conversation_history.sh'
       - 'scripts/test_chist_001_archive_derivation.sh'
       - 'scripts/test_chist_001_archive_readback.sh'
       - 'scripts/test_chist_001_baseline_certification.sh'
+      - 'scripts/test_chist_001_pit_diff.sh'
       - '.github/workflows/chist-001-conversation-history.yml'
   workflow_dispatch:
 
@@ -79,3 +82,6 @@ jobs:
 
       - name: Run governed baseline certification proof
         run: bash scripts/test_chist_001_baseline_certification.sh
+
+      - name: Run governed point-in-time diff proof
+        run: bash scripts/test_chist_001_pit_diff.sh

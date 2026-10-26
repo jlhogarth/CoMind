@@ -12,7 +12,7 @@ async function main() {
 
   const args = process.argv.slice(2);
   if (args.length === 1 && args[0] === '--preflight') {
-    process.stdout.write(JSON.stringify({ ok: true, preflight }, null, 2) + '\n');
+    process.stdout.write(JSON.stringify({ status: 'PASS', ...preflight }, null, 2) + '\n');
     return;
   }
   if (args.length !== 2) {

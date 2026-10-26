@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'db/migrations/20261025_012_conversation_analytics_intent_derivation.sql'
+      - 'db/migrations/20261025_013_conversation_analytics_policy_hardening.sql'
       - 'db/verification/cfr_001g_execution_fixture.sql'
       - 'server/src/analytics/**'
       - 'server/test/conversation-derivation.test.mjs'
@@ -63,3 +64,28 @@ jobs:
 
       - name: Run governed PostgreSQL derivation proof
         run: bash scripts/test_cfr_001g_derivation.sh
+
+      - name: Apply forward source-policy hardening
+        run: psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f db/migrations/20261025_013_conversation_analytics_policy_hardening.sql
+
+      - name: Re-prove constrained source reads after policy hardening
+        env:
+          COMIND_DATABASE_PURPOSE: conversation_derivation
+          CONVERSATION_DERIVATION_DATABASE_URL: ${{ env.DERIVATION_WORKER_DATABASE_URL }}
+        run: |
+          node server/dist/analytics/conversation-derive-cli.js --preflight-only
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          BEGIN
+            IF EXISTS (
+              SELECT 1
+              FROM pg_policies
+              WHERE schemaname='comind'
+                AND tablename IN ('cm_conversation','cm_message')
+                AND policyname='cm_conversation_deriver_select'
+            ) THEN
+              RAISE EXCEPTION 'Redundant CFR-001G source-read policy remains after migration 013';
+            END IF;
+          END
+          $$;
+          SQL

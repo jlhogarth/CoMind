@@ -124,7 +124,7 @@ WITH reader_role AS (
     WHERE schemaname='comind' AND tablename='cm_conversation_history_baseline'
       AND indexname='idx_cm_conversation_history_baseline_source_archive')
   UNION ALL SELECT 'all_chist_migrations_recorded',
-    (SELECT count(*) FROM supabase_migrations.schema_migrations
+    (SELECT count(DISTINCT name) FROM supabase_migrations.schema_migrations
       WHERE name IN (
         'chist_001_conversation_history_reader',
         'chist_001_conversation_history_baseline_certification',

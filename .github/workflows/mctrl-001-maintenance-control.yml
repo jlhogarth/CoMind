@@ -1,0 +1,110 @@
+name: MCTRL-001 Maintenance Control
+
+on:
+  pull_request:
+    paths:
+      - 'config/maintenance-control.v1.json'
+      - 'server/src/maintenance-control/**'
+      - 'server/test/maintenance-control*.test.mjs'
+      - 'server/package.json'
+      - 'server/package-lock.json'
+      - 'docs/maintenance-control/**'
+      - '.github/workflows/mctrl-001-maintenance-control.yml'
+  push:
+    branches: ['main']
+    paths:
+      - 'config/maintenance-control.v1.json'
+      - 'server/src/maintenance-control/**'
+      - 'server/test/maintenance-control*.test.mjs'
+      - 'server/package.json'
+      - 'server/package-lock.json'
+      - 'docs/maintenance-control/**'
+      - '.github/workflows/mctrl-001-maintenance-control.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  maintenance-control:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: mctrl_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: mctrl_isolated_ci_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d mctrl_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    defaults:
+      run:
+        working-directory: server
+    env:
+      MCTRL_TEST_DATABASE_URL: postgresql://postgres:mctrl_isolated_ci_only@127.0.0.1:5432/mctrl_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run build
+      - run: node --test test/maintenance-control.test.mjs
+      - run: node --test test/maintenance-control.integration.test.mjs
+
+  live-test-audit:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: maintenance-control
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run build
+      - name: Install and verify Supabase database CA
+        shell: bash
+        run: |
+          set -euo pipefail
+          ca_path="$RUNNER_TEMP/supabase-prod-ca-2021.crt"
+          curl --fail --silent --show-error --location \
+            --proto '=https' --tlsv1.2 \
+            https://supabase-downloads.s3-ap-southeast-1.amazonaws.com/prod/ssl/prod-ca-2021.crt \
+            --output "$ca_path"
+          expected='807025AD50D4ED219D2C9C7D299C004F824EB00CF7F65AFEF607D07B72E6CAFA'
+          actual="$(openssl x509 -in "$ca_path" -noout -fingerprint -sha256 \
+            | cut -d= -f2 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+          if [ "$actual" != "$expected" ]; then
+            echo "Supabase CA fingerprint mismatch. Refusing database connection." >&2
+            exit 1
+          fi
+          echo "NODE_EXTRA_CA_CERTS=$ca_path" >> "$GITHUB_ENV"
+      - name: Execute bounded read-only Test audit
+        env:
+          MAINTENANCE_CONTROL_DATABASE_URL: ${{ secrets.SUPABASE_SESSION_DATABASE_URL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          node dist/maintenance-control/cli.js > artifacts/mctrl-001-live-test-audit.json
+      - name: Preserve maintenance audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mctrl-001-live-test-audit
+          path: server/artifacts/mctrl-001-live-test-audit.json
+          if-no-files-found: error
+          retention-days: 30

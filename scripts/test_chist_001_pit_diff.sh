@@ -71,7 +71,8 @@ import json
 pre=json.load(open('/tmp/chist_diff_preflight.json'))
 first=json.load(open('/tmp/chist_diff_first.json'))
 second=json.load(open('/tmp/chist_diff_second.json'))
-assert pre['status']=='PASS'
+assert pre['ok'] is True
+assert pre['preflight']['currentUser']=='comind_archive_ingestor'
 assert first['status']=='PASS'
 assert first['reused'] is False and second['reused'] is True
 assert first['diffReceiptId']==second['diffReceiptId']

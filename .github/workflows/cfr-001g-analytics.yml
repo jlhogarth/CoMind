@@ -1,0 +1,64 @@
+name: CFR-001G Analytics and Intent Derivation
+
+on:
+  pull_request:
+    paths:
+      - 'db/migrations/20261025_012_conversation_analytics_intent_derivation.sql'
+      - 'db/verification/cfr_001g_execution_fixture.sql'
+      - 'server/src/analytics/**'
+      - 'server/test/conversation-derivation.test.mjs'
+      - 'scripts/test_cfr_001g_derivation.sh'
+      - '.github/workflows/cfr-001g-analytics.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  governed-derivation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/comind_ci
+      DERIVATION_WORKER_DATABASE_URL: postgresql://cfr_001g_worker:cfr001g-local-only@127.0.0.1:5432/comind_ci
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Install server dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Typecheck and build deterministic derivation engine
+        working-directory: server
+        run: npm run build
+
+      - name: Run deterministic derivation unit cases
+        working-directory: server
+        run: node --test test/conversation-derivation.test.mjs
+
+      - name: Run governed PostgreSQL derivation proof
+        run: bash scripts/test_cfr_001g_derivation.sh

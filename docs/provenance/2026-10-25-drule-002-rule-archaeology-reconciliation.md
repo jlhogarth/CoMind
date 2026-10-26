@@ -153,13 +153,13 @@ No unresolved case is silently resolved by recency.
 
 This branch adds exactly five DRULE-002 files:
 
-- `db/migrations/20261025_005_durable_rulebook_registry.sql`
-- `db/migrations/20261025_006_drule_002_rule_archaeology_reconciliation.sql`
+- `db/migrations/20261025_012_durable_rulebook_registry.sql`
+- `db/migrations/20261025_013_drule_002_rule_archaeology_reconciliation.sql`
 - `db/sql/20261025_drule_002_layer0_archaeology_seed.sql`
 - `db/verification/20261025_drule_002_rule_archaeology_reconciliation_verification.sql`
 - this provenance record
 
-The first draft used migration sequence numbers `002` and `003`. Repository review found that CFR owns `20261025_002` through `20261025_004`, so DRULE-002 was renumbered to `005` and `006` before merge consideration.
+Migration numbering was reconciled twice as concurrent conversational-continuity work advanced on `main`. DRULE originally used `002` and `003`, then moved to `005` and `006`. Current CFR work now owns `20261025_001` through `20261025_011`, including `005` and `006`, so the final DRULE repository identities are `012` and `013`. The SQL bodies are unchanged by this renumbering.
 
 The repository migration is intentionally cleaner than the live construction sequence. Two intermediate relational defects were detected and repaired during live implementation:
 
@@ -168,7 +168,7 @@ The repository migration is intentionally cleaner than the live construction seq
 
 The repository version directly models `pm_rule_reconciliation_members` with its own UUID primary key, nullable `rule_id` / `candidate_id`, an XOR check, and partial uniqueness indexes.
 
-The branch was refreshed onto current `main` with a two-parent merge commit rather than a force update. Immediately before this provenance refresh the branch was zero commits behind `main`, and the PR diff remained exactly five DRULE-002 files.
+Before merge, the branch is refreshed onto the then-current `main` with a two-parent merge commit rather than a force update, and the PR diff is reverified to remain exactly five DRULE-002 files.
 
 ## Verification
 

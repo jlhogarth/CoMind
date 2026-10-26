@@ -18,3 +18,4 @@
 \i '15_conversation_promotion_pruning.sql'
 \i '15a_conversation_pruning_ci_cleanup.sql'
 \i '16_conversation_promotion_pruning_hardening.sql'
+\i '17_conversation_analytics_intent_derivation.sql'

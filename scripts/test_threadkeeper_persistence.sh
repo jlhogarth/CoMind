@@ -37,12 +37,17 @@ $$;
 GRANT USAGE ON SCHEMA comind TO service_role;
 SQL
 
-migration="${root}/db/migrations/20261026_008_threadkeeper_persistence.sql"
-verification="${root}/db/migrations/verify_20261026_008_threadkeeper_persistence.sql"
+migration_008="${root}/db/migrations/20261026_008_threadkeeper_persistence.sql"
+verification_008="${root}/db/migrations/verify_20261026_008_threadkeeper_persistence.sql"
+migration_009="${root}/db/migrations/20261026_009_threadkeeper_scope_integrity.sql"
+verification_009="${root}/db/migrations/verify_20261026_009_threadkeeper_scope_integrity.sql"
 
-psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f "${migration}"
-psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f "${migration}"
-psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f "${verification}"
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f "${migration_008}"
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f "${migration_008}"
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f "${verification_008}"
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f "${migration_009}"
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f "${migration_009}"
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f "${verification_009}"
 
 (
   cd "${root}/server"

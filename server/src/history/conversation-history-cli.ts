@@ -9,6 +9,7 @@ import {
   listHistoryConversations,
   searchHistoryConversations,
 } from './conversation-history.js';
+import { getArchiveHistoryAnalytics } from './archive-history-analytics.js';
 
 type Parsed = {
   command: 'preflight' | 'status' | 'list' | 'search' | 'show';
@@ -96,10 +97,24 @@ async function main() {
     return;
   }
 
-  process.stdout.write(JSON.stringify(await getHistoryConversation({
-    sourceConversationId: args.sourceConversationId!,
-    importId: args.importId,
-  }), null, 2) + '\n');
+  const sourceConversationId = args.sourceConversationId!;
+  const [conversation, archiveDerived] = await Promise.all([
+    getHistoryConversation({ sourceConversationId, importId: args.importId }),
+    getArchiveHistoryAnalytics({ sourceConversationId, importId: args.importId }),
+  ]);
+  process.stdout.write(JSON.stringify({
+    ...conversation,
+    derived: {
+      ...conversation.derived,
+      live: {
+        analytics: conversation.derived.analytics,
+        promotionCandidates: conversation.derived.promotionCandidates,
+        note: conversation.derived.note,
+      },
+      archive: archiveDerived,
+      note: 'Live-reconciled and archive-native derived evidence are presented separately. Neither is source truth or canonical promotion.',
+    },
+  }, null, 2) + '\n');
 }
 
 main()

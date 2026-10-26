@@ -43,7 +43,6 @@ const state = suffix => ({
   sensitivity: 'internal',
   retentionClass: 'durable',
 });
-
 const proposal = ({ id, parentCheckpointId, suffix, proposedAt }) => createCheckpointProposal({
   proposalId: id,
   scopeSemanticKey: semanticScopeKey(scopeBinding),
@@ -54,7 +53,6 @@ const proposal = ({ id, parentCheckpointId, suffix, proposedAt }) => createCheck
   policyRef: 'policy:continuity:test',
   state: state(suffix),
 });
-
 const signals = overrides => ({
   scopeStatus: 'valid',
   requiredEvidenceStatus: 'available',
@@ -74,20 +72,8 @@ test('isolated PostgreSQL ThreadKeeper persistence preserves governed lineage, e
 }, async () => {
   try {
     const semanticKey = semanticScopeKey(scopeBinding);
-    const scope = await registerContinuityScope(
-      query,
-      scopeBinding,
-      'actor:tk004:test',
-      'internal',
-      'durable'
-    );
-    const sameScope = await registerContinuityScope(
-      query,
-      scopeBinding,
-      'actor:tk004:retry',
-      'internal',
-      'durable'
-    );
+    const scope = await registerContinuityScope(query, scopeBinding, 'actor:tk004:test', 'internal', 'durable');
+    const sameScope = await registerContinuityScope(query, scopeBinding, 'actor:tk004:retry', 'internal', 'durable');
     assert.equal(sameScope.scope_id, scope.scope_id);
     assert.equal(scope.semantic_key, semanticKey);
 
@@ -96,6 +82,7 @@ test('isolated PostgreSQL ThreadKeeper persistence preserves governed lineage, e
          FROM pg_class c
          JOIN pg_namespace n ON n.oid=c.relnamespace
         WHERE n.nspname='comind'
+          AND c.relkind='r'
           AND c.relname LIKE 'cm_threadkeeper_%'
         ORDER BY c.relname`
     );
@@ -129,17 +116,11 @@ test('isolated PostgreSQL ThreadKeeper persistence preserves governed lineage, e
     assert.equal(rootRetry.checkpointId, root.checkpointId);
 
     await assert.rejects(
-      () => query(
-        'UPDATE comind.cm_threadkeeper_checkpoint SET digest=digest WHERE checkpoint_id=$1::uuid',
-        [root.checkpointId]
-      ),
+      () => query('UPDATE comind.cm_threadkeeper_checkpoint SET digest=digest WHERE checkpoint_id=$1::uuid', [root.checkpointId]),
       /append-only and immutable/
     );
     await assert.rejects(
-      () => query(
-        'DELETE FROM comind.cm_threadkeeper_scope WHERE scope_id=$1::uuid',
-        [scope.scope_id]
-      ),
+      () => query('DELETE FROM comind.cm_threadkeeper_scope WHERE scope_id=$1::uuid', [scope.scope_id]),
       /append-only and immutable/
     );
 

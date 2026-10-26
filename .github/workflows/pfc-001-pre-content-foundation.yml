@@ -1,0 +1,49 @@
+name: PFC-001 Pre-Content Foundation
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "config/pre-content-foundation.v1.json"
+      - "scripts/pfc_matrix.mjs"
+      - "server/test/pre-content-foundation-contract.test.mjs"
+      - "docs/architecture/pre-content-foundation-closure.md"
+      - "docs/provenance/*pfc-001*"
+      - ".github/workflows/pfc-001-pre-content-foundation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate PFC evidence contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Validate machine-readable coverage matrix
+        run: |
+          mkdir -p artifacts
+          node scripts/pfc_matrix.mjs | tee artifacts/pfc-coverage-validation.json
+
+      - name: Run PFC contract tests
+        run: node --test server/test/pre-content-foundation-contract.test.mjs
+
+      - name: Upload PFC validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pfc-001-coverage-validation
+          path: artifacts/pfc-coverage-validation.json
+          if-no-files-found: warn
+          retention-days: 14

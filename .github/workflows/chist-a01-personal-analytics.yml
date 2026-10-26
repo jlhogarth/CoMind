@@ -5,7 +5,9 @@ on:
     paths:
       - 'db/migrations/20261026_008_conversation_history_personal_analytics.sql'
       - 'db/migrations/20261026_009_conversation_history_personal_analytics_hash_hardening.sql'
+      - 'db/migrations/20261026_010_conversation_history_personal_analytics_fk_index.sql'
       - 'scripts/test_chist_a01_personal_analytics.sh'
+      - 'scripts/test_chist_a01_personal_analytics_fk_index.sh'
       - 'docs/architecture/chist-a01-personal-analytics.md'
       - '.github/workflows/chist-a01-personal-analytics.yml'
       - 'db/migrations/20261026_004_conversation_history_archive_derivation.sql'
@@ -55,4 +57,4 @@ jobs:
         run: npm ci
 
       - name: Run CHIST-A01 isolated acceptance
-        run: bash scripts/test_chist_a01_personal_analytics.sh
+        run: bash scripts/test_chist_a01_personal_analytics_fk_index.sh

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { maintenanceControlConfigSchema, loadMaintenanceControlConfig } from '../dist/maintenance-control/config.js';
 import { resolveChangeImpact, runMaintenanceAudit } from '../dist/maintenance-control/auditor.js';
 
@@ -27,6 +28,19 @@ test('repository maintenance control configuration is valid and internally refer
   assert.equal(config.controlSet, 'MCTRL-001');
   assert.ok(config.controls.length >= 10);
   assert.ok(config.impactRules.length >= 4);
+});
+
+test('CLI refuses generic DATABASE_URL fallback', () => {
+  const env = { ...process.env, DATABASE_URL: 'postgresql://unused:unused@127.0.0.1:1/unused' };
+  delete env.MAINTENANCE_CONTROL_DATABASE_URL;
+  const result = spawnSync(process.execPath, ['dist/maintenance-control/cli.js'], {
+    cwd: process.cwd(),
+    env,
+    encoding: 'utf8',
+  });
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /MAINTENANCE_CONTROL_DATABASE_URL is required/);
+  assert.doesNotMatch(result.stderr, /127\.0\.0\.1:1/);
 });
 
 test('configuration rejects impact rules that reference unknown controls', () => {

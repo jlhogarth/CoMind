@@ -2,6 +2,7 @@
 
 **Date:** 2026-10-26  
 **Issue:** #211  
+**Pull request:** #219  
 **Branch:** `ree-001-rule-evaluation-engine`  
 **Environment:** CoMind private Test  
 **Production:** Unchanged
@@ -11,9 +12,12 @@
 Applied successfully to private Test:
 
 - migration `ree_001_rule_evaluation_engine`
-- repository migration: `db/migrations/20261026_001_ree_001_rule_evaluation_engine.sql`
+- migration `ree_001_authority_time_hardening`
+- repository migrations:
+  - `db/migrations/20261026_001_ree_001_rule_evaluation_engine.sql`
+  - `db/migrations/20261026_002_ree_001_authority_time_hardening.sql`
 
-Before migration execution, Test was checked for REE-001 residue. `pm_rule_evaluation_requests`, `pm_rule_evaluation_results`, and `ree_evaluate_request_rule(uuid,uuid,integer)` were absent.
+Before the primary migration, Test was checked for REE-001 residue. `pm_rule_evaluation_requests`, `pm_rule_evaluation_results`, and `ree_evaluate_request_rule(uuid,uuid,integer)` were absent.
 
 ## Formalization-readiness classification
 
@@ -52,6 +56,48 @@ A rollback-only Test transaction successfully verified:
 
 All synthetic Test rows rolled back.
 
+## Authority-time hardening
+
+A second adversarial review found a temporal trust-boundary defect after the primary migration had already been applied to Test.
+
+### Defect
+
+`pm_rule_evaluation_requests.requested_at` was initially caller-supplied, and REE passed that value into AUTH-001 as the authority-resolution time.
+
+That allowed a service-role caller to ask AUTH to evaluate a consequential operation against a caller-selected historical or future governance state. In particular, a sufficiently old timestamp could predate a current authority requirement.
+
+### Demonstrated risk
+
+The Test regression created a synthetic delegated C2 production authority whose authority/delegation existed in year 2000. It then called AUTH-001 directly at `2000-01-02`.
+
+As expected, that historical AUTH evaluation returned `sufficient`, because the present production C4/human requirement did not exist in that historical view.
+
+This demonstrated that caller-controlled authority time was materially different from current governed authority.
+
+### Repair
+
+Migration `20261026_002_ree_001_authority_time_hardening.sql` now:
+
+- overwrites `requested_at` and `created_at` on insertion with PostgreSQL `statement_timestamp()`;
+- resolves authority at a server-controlled `statement_timestamp()` captured by the evaluator;
+- records `authority_evaluated_at` in evaluation diagnostics;
+- bumps evaluator semantics from `ree-001/evidence-requirements-v1` to `ree-001/evidence-requirements-v2`, preventing old-semantic result reuse.
+
+### Live verification
+
+A caller attempted to insert the same production REE request with `requested_at='2000-01-02'`.
+
+Verified:
+
+- stored `requested_at` was replaced by current database time;
+- REE evaluated AUTH using current database time;
+- current production C4/human requirements were applied;
+- the delegated C2 agent received `deny`;
+- `authority_evaluated_at` was preserved in diagnostics;
+- all synthetic rows rolled back.
+
+Result: **passed**.
+
 ## Access-control verification
 
 Live Test grants confirm:
@@ -80,7 +126,7 @@ Repair applied before Test deployment:
 - executable readiness also requires the canonical rule version's `validation.result = "allow_only_if_requirement_satisfied"` marker;
 - the request domain must match the rule's canonical domain.
 
-Because the defect was caught before migration execution, Test history required no repair migration.
+Because the defect was caught before migration execution, Test history required no repair migration for this issue.
 
 ### Development Journal source vocabulary enforcement
 
@@ -105,24 +151,28 @@ This avoids adding a policy language/runtime before current CoMind contracts jus
 
 ## Repository proof package
 
-At this checkpoint the branch contains:
+The branch contains:
 
 - `db/migrations/20261026_001_ree_001_rule_evaluation_engine.sql`
+- `db/migrations/20261026_002_ree_001_authority_time_hardening.sql`
 - `db/verification/20261026_ree_001_rule_evaluation_engine_verification.sql`
 - `db/verification/20261026_ree_001_domain_applicability_verification.sql`
+- `db/verification/20261026_ree_001_authority_time_verification.sql`
 - `scripts/test_ree_001_rule_evaluation_engine.sh`
 - `.github/workflows/ree-001-rule-evaluation-engine.yml`
 - architecture and live-evidence provenance documents
 
-The isolated runner reconstructs the exact dependency chain from PM Ledger through Rulebook, DRULE-002, DRULE-003, AUTH-001, and REE-001 using explicit migration filenames.
+The isolated runner reconstructs the exact dependency chain from PM Ledger through Rulebook, DRULE-002, DRULE-003, AUTH-001, and REE-001 using explicit migration filenames, then runs all three REE verification contracts.
 
 ## Current merge gate
 
-- live Test migration: **passed**
+- live Test primary migration: **passed**
+- live Test authority-time hardening: **passed**
 - live readiness classification: **passed**
 - live rollback behavioral verification: **passed**
+- live rollback authority-time regression: **passed**
 - production: **unchanged**
-- isolated GitHub exact-head CI: **pending PR execution**
-- full repository workflow matrix: **pending PR execution**
+- isolated GitHub exact-head CI: **pending corrected PR head execution**
+- full repository workflow matrix: **pending corrected PR head execution**
 
 REE-001 must not merge until exact-head CI and the complete PR workflow matrix are terminal green and current `main` has been rechecked for drift.

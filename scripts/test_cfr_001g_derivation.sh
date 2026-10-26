@@ -18,7 +18,6 @@ PY
   cd "${root}/db/sql/v2"
   psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f MASTER.sql
 )
-psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f "${root}/db/migrations/20261025_012_conversation_analytics_intent_derivation.sql"
 
 psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 <<'SQL'
 DO $$

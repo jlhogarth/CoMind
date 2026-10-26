@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'db/migrations/20261026_001_conversation_history_reader.sql'
+      - 'db/migrations/20261026_002_conversation_history_baseline_certification.sql'
       - 'server/src/history/**'
       - 'scripts/test_chist_001_conversation_history.sh'
       - '.github/workflows/chist-001-conversation-history.yml'

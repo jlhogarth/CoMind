@@ -4,6 +4,7 @@ import { dirname, resolve } from 'node:path';
 const RETRY_SAFE_STATES = new Map([
   ['timed_out', 'timed_out'],
   ['terminal_startup_failure', 'startup_failure'],
+  ['structured_transient_failure', 'failure'],
 ]);
 
 function parseArgs(argv) {
@@ -38,6 +39,20 @@ function attemptUrl(repositoryFullName, runId, attempt) {
   return `${runUrl(repositoryFullName, runId)}/attempts/${attempt}`;
 }
 
+function hasValidatedStructuredSignal(workflowResult) {
+  const signal = workflowResult?.structuredTransientSignal;
+  return Boolean(
+    workflowResult?.state === 'structured_transient_failure' &&
+    signal?.validated === true &&
+    signal?.classification === 'resource_timeout' &&
+    Number(signal?.exitCode) === 124 &&
+    Number(signal?.runId) === Number(workflowResult?.runId) &&
+    signal?.headSha === workflowResult?.observedHeadSha &&
+    signal?.workflow === workflowResult?.workflow &&
+    signal?.event === 'pull_request'
+  );
+}
+
 export function findRetryCandidates({ bundle, maxAutoRetriggers = 1 }) {
   if (!bundle || !Array.isArray(bundle.snapshots)) {
     throw new Error('Background bundle snapshots are required.');
@@ -56,6 +71,10 @@ export function findRetryCandidates({ bundle, maxAutoRetriggers = 1 }) {
       if (!workflowResult.runId) continue;
       if (workflowResult.observedHeadSha !== snapshot.exactHeadSha) continue;
       if (workflowResult.runEvent !== 'pull_request') continue;
+      if (
+        workflowResult.state === 'structured_transient_failure' &&
+        !hasValidatedStructuredSignal(workflowResult)
+      ) continue;
 
       candidates.push({
         prNumber: snapshot.prNumber,
@@ -66,6 +85,7 @@ export function findRetryCandidates({ bundle, maxAutoRetriggers = 1 }) {
         runId: Number(workflowResult.runId),
         runUrl: workflowResult.runUrl || runUrl(bundle.repository, workflowResult.runId),
         reason: workflowResult.reason,
+        structuredTransientSignal: workflowResult.structuredTransientSignal || null,
       });
     }
   }
@@ -113,6 +133,23 @@ export function planRetryAgainstCurrentEvidence({
   if (!runAttempt) {
     return { action: 'reject', reason: 'Workflow run attempt is missing or invalid.' };
   }
+
+  if (candidate.state === 'structured_transient_failure') {
+    const signal = candidate.structuredTransientSignal;
+    if (
+      signal?.validated !== true ||
+      signal?.classification !== 'resource_timeout' ||
+      Number(signal?.exitCode) !== 124 ||
+      Number(signal?.runId) !== Number(candidate.runId) ||
+      Number(signal?.runAttempt) !== runAttempt ||
+      signal?.headSha !== candidate.exactHeadSha ||
+      signal?.workflow !== candidate.workflow ||
+      signal?.event !== 'pull_request'
+    ) {
+      return { action: 'reject', reason: 'Trusted structured transient evidence no longer matches the current workflow run.' };
+    }
+  }
+
   if (runAttempt !== 1) {
     return {
       action: 'noop',
@@ -121,11 +158,15 @@ export function planRetryAgainstCurrentEvidence({
     };
   }
 
+  const retryReason = candidate.state === 'structured_transient_failure'
+    ? `Reviewed structured transient ${candidate.structuredTransientSignal.classification} exit ${candidate.structuredTransientSignal.exitCode} on exact head attempt 1.`
+    : `Retry-safe transient conclusion ${candidate.transientConclusion} on exact head attempt 1.`;
+
   return {
     action: 'rerun',
     runAttempt,
     retryAttempt: 2,
-    reason: `Retry-safe transient conclusion ${candidate.transientConclusion} on exact head attempt 1.`,
+    reason: retryReason,
   };
 }
 
@@ -231,7 +272,7 @@ export async function executeRetryFromBundle({
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const repositoryFullName = args.repository || process.env.GITHUB_REPOSITORY;
-  const bundlePath = resolve(args.bundle || 'artifacts/background/lane-health-background.json');
+  const bundlePath = resolve(args.bundle || 'artifacts/background/lane-health-background-enriched.json');
   const policyPath = resolve(args.policy || '.github/lane-health-sentinel.json');
   const outputPath = resolve(args.output || 'artifacts/lane-health-retry.json');
   if (!repositoryFullName) throw new Error('--repository or GITHUB_REPOSITORY is required.');

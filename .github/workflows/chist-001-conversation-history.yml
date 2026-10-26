@@ -12,6 +12,7 @@ on:
       - 'scripts/test_chist_001_conversation_history.sh'
       - 'scripts/test_chist_001_archive_derivation.sh'
       - 'scripts/test_chist_001_archive_readback.sh'
+      - 'scripts/test_chist_001_baseline_certification.sh'
       - '.github/workflows/chist-001-conversation-history.yml'
   workflow_dispatch:
 
@@ -75,3 +76,6 @@ jobs:
 
       - name: Verify archive-native analytics in history detail
         run: bash scripts/test_chist_001_archive_readback.sh
+
+      - name: Run governed baseline certification proof
+        run: bash scripts/test_chist_001_baseline_certification.sh

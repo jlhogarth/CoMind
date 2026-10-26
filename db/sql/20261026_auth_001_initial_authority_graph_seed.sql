@@ -53,7 +53,7 @@ with project_target as (
   from comind_pm.pm_events e
   join project_target p on p.project_id=e.project_id
   where e.source_ref='chat:2026-10-25:seven-step-rulebook-authorization'
-  order by e.occurred_at desc,e.created_at desc
+  order by e.created_at desc,e.id desc
   limit 1
 )
 insert into comind_pm.pm_authority_basis_links(

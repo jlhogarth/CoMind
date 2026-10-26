@@ -6,8 +6,11 @@ on:
       - 'db/migrations/20261026_001_conversation_history_reader.sql'
       - 'db/migrations/20261026_002_conversation_history_baseline_certification.sql'
       - 'db/migrations/20261026_003_conversation_history_baseline_index_hardening.sql'
+      - 'db/migrations/20261026_004_conversation_history_archive_derivation.sql'
+      - 'db/verification/chist_001_live_test.sql'
       - 'server/src/history/**'
       - 'scripts/test_chist_001_conversation_history.sh'
+      - 'scripts/test_chist_001_archive_derivation.sh'
       - '.github/workflows/chist-001-conversation-history.yml'
   workflow_dispatch:
 
@@ -65,3 +68,6 @@ jobs:
       - name: Verify CHIST baseline source-archive index
         run: |
           test "$(psql "$DATABASE_URL" -X -At -v ON_ERROR_STOP=1 -c "SELECT count(*) FROM pg_indexes WHERE schemaname='comind' AND tablename='cm_conversation_history_baseline' AND indexname='idx_cm_conversation_history_baseline_source_archive';")" = "1"
+
+      - name: Run archive-native deterministic analytics proof
+        run: bash scripts/test_chist_001_archive_derivation.sh

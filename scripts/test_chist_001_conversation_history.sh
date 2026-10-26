@@ -26,7 +26,8 @@ for migration in \
   20261025_009_native_chatgpt_live_reconciliation_ambiguity_hardening.sql \
   20261025_010_native_chatgpt_live_reconciliation_snapshot_identity.sql \
   20261025_011_native_chatgpt_live_reconciliation_policy_hardening.sql \
-  20261026_001_conversation_history_reader.sql
+  20261026_001_conversation_history_reader.sql \
+  20261026_002_conversation_history_baseline_certification.sql
  do
   psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f "${root}/db/migrations/${migration}"
  done
@@ -34,12 +35,14 @@ for migration in \
 psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 <<'SQL'
 DO $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='chist_history_login') THEN
-    DROP ROLE chist_history_login;
-  END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='chist_history_login') THEN DROP ROLE chist_history_login; END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='chist_certifier_login') THEN DROP ROLE chist_certifier_login; END IF;
   CREATE ROLE chist_history_login LOGIN PASSWORD 'history-test-password'
     NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+  CREATE ROLE chist_certifier_login LOGIN PASSWORD 'certifier-test-password'
+    NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
   GRANT comind_conversation_history_reader TO chist_history_login WITH INHERIT FALSE, SET TRUE;
+  GRANT comind_conversation_history_certifier TO chist_certifier_login WITH INHERIT FALSE, SET TRUE;
 END
 $$;
 
@@ -123,6 +126,30 @@ INSERT INTO comind.cm_conversation_promotion_candidate (
   'c2080001-0000-4000-8000-000000000302','memory','Conversation continuity intent','Preserve conversation continuity and history.',
   'Review-only fixture candidate.',0.95,0.95,'none','{"source":"fixture"}',repeat('1',64)
 );
+SQL
+
+# A technically PASS import must remain invisible until explicit CHIST certification.
+uncertified_count=$(PGPASSWORD=history-test-password psql -h localhost -U chist_history_login -d comind_ci -X -At -v ON_ERROR_STOP=1 \
+  -c "SET ROLE comind_conversation_history_reader; SELECT count(*) FROM comind.cm_archive_import;")
+if [[ "${uncertified_count##*$'\n'}" != "0" ]]; then
+  echo "History reader saw uncertified PASS evidence: ${uncertified_count}" >&2
+  exit 1
+fi
+
+# Certify the exact PASS import using a separate constrained SET-only authority.
+PGPASSWORD=certifier-test-password psql -h localhost -U chist_certifier_login -d comind_ci -X -v ON_ERROR_STOP=1 <<'SQL'
+SET ROLE comind_conversation_history_certifier;
+INSERT INTO comind.cm_conversation_history_baseline (
+  baseline_id,import_id,source_archive_id,source_archive_sha256,certification_version,
+  source_kind,certified_by,certification_reason,evidence,certification_sha256
+) VALUES (
+  'c2080001-0000-4000-8000-000000000401',
+  'c2080001-0000-4000-8000-000000000102',
+  'c2080001-0000-4000-8000-000000000101',repeat('1',64),'chist-cert-v1',
+  'native_openai_export','isolated-test-certifier','Synthetic fixture certification for governed acceptance only.',
+  '{"synthetic":true,"scope":"isolated_test_only"}'::jsonb,repeat('a',64)
+);
+RESET ROLE;
 SQL
 
 cd "${root}/server"

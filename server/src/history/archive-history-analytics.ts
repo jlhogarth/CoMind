@@ -36,6 +36,25 @@ export async function getArchiveHistoryAnalytics(options: {
   try {
     await client.query(`SET ROLE ${HISTORY_ROLE}`);
     const importId = await resolveCertifiedImportId(client, options.importId);
+
+    const capability = (await client.query<{ available: boolean }>(
+      `SELECT to_regclass('comind.cm_archive_derivation_run') IS NOT NULL
+              AND to_regclass('comind.cm_archive_derivation') IS NOT NULL
+              AND to_regclass('comind.cm_archive_promotion_candidate') IS NOT NULL
+              AS available`,
+    )).rows[0];
+
+    if (!capability?.available) {
+      return {
+        provenanceLayer: 'derived_evidence' as const,
+        sourceBasis: 'certified_archive' as const,
+        run: null,
+        analytics: [],
+        promotionCandidates: [],
+        note: 'Archive-native analytics capability is not deployed yet; certified source history remains available without derived analytics.',
+      };
+    }
+
     const run = (await client.query<{
       archive_derivation_run_id: string;
       policy_version: string;

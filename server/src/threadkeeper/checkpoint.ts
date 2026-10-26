@@ -123,7 +123,8 @@ export function acceptCheckpointProposal(
   if (!verifyCheckpointProposal(proposal)) {
     return { accepted: false, reasonCode: 'checkpoint_proposal_integrity_invalid' };
   }
-  if (proposal.parentCheckpointId !== currentAcceptedCheckpointId) {
+  if (proposal.parentCheckpointId !== currentAcceptedCheckpointId
+      || proposal.currentAcceptedCheckpointId !== currentAcceptedCheckpointId) {
     return { accepted: false, reasonCode: 'checkpoint_acceptance_stale_head' };
   }
   if (!authority.valid) return { accepted: false, reasonCode: 'authority_validation_failed' };

@@ -1,0 +1,58 @@
+name: CHIST-001 Conversation History
+
+on:
+  pull_request:
+    paths:
+      - 'db/migrations/20261026_001_conversation_history_reader.sql'
+      - 'server/src/history/**'
+      - 'scripts/test_chist_001_conversation_history.sh'
+      - '.github/workflows/chist-001-conversation-history.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  governed-history-reader:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.6-pg17-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/comind_ci
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Install server dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Typecheck and build Conversation History reader
+        working-directory: server
+        run: npm run build
+
+      - name: Run governed Conversation History retrieval proof
+        run: bash scripts/test_chist_001_conversation_history.sh

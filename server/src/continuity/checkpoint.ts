@@ -111,6 +111,19 @@ function safeHexEqual(left: string, right: string): boolean {
   return timingSafeEqual(Buffer.from(left, 'hex'), Buffer.from(right, 'hex'));
 }
 
+export function canonicalizeForIntegrity(value: unknown): string {
+  rejectSecrets(value);
+  return canonical(value);
+}
+
+export function fingerprintCanonicalValue(value: unknown): string {
+  return sha256(canonicalizeForIntegrity(value));
+}
+
+export function assertNoCredentialMaterial(value: unknown): void {
+  rejectSecrets(value);
+}
+
 export function fingerprintState(state: ContinuityState): string {
   validateState(state);
   rejectSecrets(state);

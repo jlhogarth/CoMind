@@ -99,7 +99,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts
-          npm run maintenance:audit > artifacts/mctrl-001-live-test-audit.json
+          node dist/maintenance-control/cli.js > artifacts/mctrl-001-live-test-audit.json
       - name: Preserve maintenance audit evidence
         if: always()
         uses: actions/upload-artifact@v4

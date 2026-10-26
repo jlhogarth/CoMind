@@ -4,13 +4,28 @@
 BEGIN;
 
 DO $$
+DECLARE
+  v_role record;
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'comind_conversation_history_reader') THEN
     CREATE ROLE comind_conversation_history_reader
       NOLOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
-  ELSE
-    ALTER ROLE comind_conversation_history_reader
-      NOLOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+  END IF;
+
+  SELECT rolcanlogin, rolinherit, rolsuper, rolcreatedb, rolcreaterole, rolreplication, rolbypassrls
+    INTO v_role
+    FROM pg_roles
+   WHERE rolname = 'comind_conversation_history_reader';
+
+  IF NOT FOUND
+     OR v_role.rolcanlogin
+     OR v_role.rolinherit
+     OR v_role.rolsuper
+     OR v_role.rolcreatedb
+     OR v_role.rolcreaterole
+     OR v_role.rolreplication
+     OR v_role.rolbypassrls THEN
+    RAISE EXCEPTION 'comind_conversation_history_reader exists with prohibited role attributes';
   END IF;
 END
 $$;

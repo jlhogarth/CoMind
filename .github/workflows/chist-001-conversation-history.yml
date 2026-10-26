@@ -8,6 +8,7 @@ on:
       - 'db/migrations/20261026_003_conversation_history_baseline_index_hardening.sql'
       - 'db/migrations/20261026_004_conversation_history_archive_derivation.sql'
       - 'db/migrations/20261026_005_conversation_history_pit_diff.sql'
+      - 'db/migrations/20261026_006_conversation_history_archive_derivation_fk_indexes.sql'
       - 'db/verification/chist_001_live_test.sql'
       - 'server/src/history/**'
       - 'server/src/archive/chatgpt-export-diff*.ts'
@@ -76,6 +77,14 @@ jobs:
 
       - name: Run archive-native deterministic analytics proof
         run: bash scripts/test_chist_001_archive_derivation.sh
+
+      - name: Apply archive derivation FK index hardening
+        run: psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f db/migrations/20261026_006_conversation_history_archive_derivation_fk_indexes.sql
+
+      - name: Verify archive derivation composite FK indexes
+        run: |
+          test "$(psql "$DATABASE_URL" -X -At -v ON_ERROR_STOP=1 -c "SELECT count(*) FROM pg_indexes WHERE schemaname='comind' AND tablename='cm_archive_derivation' AND indexname='idx_cm_archive_derivation_run_scope_fk';")" = "1"
+          test "$(psql "$DATABASE_URL" -X -At -v ON_ERROR_STOP=1 -c "SELECT count(*) FROM pg_indexes WHERE schemaname='comind' AND tablename='cm_archive_promotion_candidate' AND indexname='idx_cm_archive_candidate_run_scope_fk';")" = "1"
 
       - name: Verify archive-native analytics in history detail
         run: bash scripts/test_chist_001_archive_readback.sh

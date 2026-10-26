@@ -11,6 +11,7 @@ on:
       - 'server/src/history/**'
       - 'scripts/test_chist_001_conversation_history.sh'
       - 'scripts/test_chist_001_archive_derivation.sh'
+      - 'scripts/test_chist_001_archive_readback.sh'
       - '.github/workflows/chist-001-conversation-history.yml'
   workflow_dispatch:
 
@@ -71,3 +72,6 @@ jobs:
 
       - name: Run archive-native deterministic analytics proof
         run: bash scripts/test_chist_001_archive_derivation.sh
+
+      - name: Verify archive-native analytics in history detail
+        run: bash scripts/test_chist_001_archive_readback.sh

@@ -107,6 +107,26 @@ test('healthy exact head with a prior sentinel comment resolves it in place', ()
   assert.match(plan.body, /State: `resolved`/);
 });
 
+test('in-progress exact head preserves an existing alert instead of resolving it early', () => {
+  const prior = renderSentinelComment({ snapshot: snapshot() });
+  const inProgress = snapshot({
+    laneSummary: {
+      state: 'in_progress',
+      severity: 'info',
+      attentionRequired: false,
+      alertFingerprint: null,
+    },
+    escalations: [],
+  });
+  const plan = planNotification({
+    snapshot: inProgress,
+    existingComment: existingFrom(prior),
+    currentHeadSha: head,
+  });
+  assert.equal(plan.action, 'noop');
+  assert.match(plan.reason, /not healthy/);
+});
+
 test('healthy lane with no prior comment stays silent', () => {
   const healthy = snapshot({
     laneSummary: {

@@ -1,0 +1,215 @@
+{
+  "schemaVersion": 1,
+  "controlSet": "MCTRL-001",
+  "environment": "Test",
+  "authorityBoundary": "read_only_audit",
+  "controls": [
+    {
+      "id": "MCTRL-SCHEMA-001",
+      "kind": "required_columns",
+      "description": "Canonical entity contract exposes the columns required by maintenance controls.",
+      "severity": "fail",
+      "schema": "comind_development",
+      "relation": "entity",
+      "columns": ["entity_id", "tracking_key", "entity_type", "title", "status", "canonical_payload", "current_version", "source_of_truth"],
+      "remediation": "Reconcile the auditor with the approved entity schema change before trusting downstream checks."
+    },
+    {
+      "id": "MCTRL-SCHEMA-002",
+      "kind": "required_columns",
+      "description": "Canonical relationship contract exposes identity, endpoints, lifecycle, and payload columns.",
+      "severity": "fail",
+      "schema": "comind_development",
+      "relation": "relationship",
+      "columns": ["relationship_id", "relationship_key", "subject_entity_id", "predicate", "object_entity_id", "evidence_entity_id", "valid_from", "valid_to", "relationship_payload"],
+      "remediation": "Reconcile the auditor with the approved relationship schema change before trusting graph checks."
+    },
+    {
+      "id": "MCTRL-CANON-001",
+      "kind": "concept_count",
+      "description": "Canonical concept registry count matches the governed CCI/MLC baseline.",
+      "severity": "warning",
+      "expected": 51,
+      "remediation": "Reconcile new, retired, split, or merged concepts through CCI/MLC and update this baseline in the same governed change."
+    },
+    {
+      "id": "MCTRL-GRAPH-001",
+      "kind": "concept_relationship_counts",
+      "description": "Typed concept graph matches the DPE-002 baseline.",
+      "severity": "warning",
+      "expected": {"active": 43, "retired": 1, "weighted": 40},
+      "remediation": "Reconcile the graph through DPE-002, preserve retired lineage, then update the baseline and recompute dependent projections."
+    },
+    {
+      "id": "MCTRL-GRAPH-002",
+      "kind": "noncanonical_active_edges",
+      "description": "Candidate, proposed, or unresolved relationships have not leaked into the active canonical graph.",
+      "severity": "fail",
+      "expected": 0,
+      "remediation": "Retire or quarantine the relationship until accepted evidence establishes canonical status."
+    },
+    {
+      "id": "MCTRL-PROJ-001",
+      "kind": "entity_version",
+      "description": "CCI projection version is the governed current version.",
+      "severity": "warning",
+      "trackingKey": "CCI-001",
+      "expected": 4,
+      "remediation": "Reconcile the CCI projection and update the maintenance baseline in the same reviewed change."
+    },
+    {
+      "id": "MCTRL-PROJ-002",
+      "kind": "entity_version",
+      "description": "MLC lifecycle projection version is the governed current version.",
+      "severity": "warning",
+      "trackingKey": "MLC-001",
+      "expected": 1,
+      "remediation": "Reconcile MLC lifecycle evidence and update the baseline only after the projection is verified."
+    },
+    {
+      "id": "MCTRL-PROJ-003",
+      "kind": "entity_version",
+      "description": "DPE priority projection version reflects the DPE-002 recomputation.",
+      "severity": "warning",
+      "trackingKey": "DPE-001",
+      "expected": 2,
+      "remediation": "Recompute DPE from current MLC and relationship inputs, verify the projection, then update the baseline."
+    },
+    {
+      "id": "MCTRL-PROJ-004",
+      "kind": "entity_version",
+      "description": "Dependency/unlock graph projection version is current.",
+      "severity": "warning",
+      "trackingKey": "DPE-002",
+      "expected": 1,
+      "remediation": "Reconcile DPE-002 canonical and candidate edges, then update the baseline after verification."
+    },
+    {
+      "id": "MCTRL-PROJ-005",
+      "kind": "entity_payload_equals",
+      "description": "DPE-001 graph inputs agree with the canonical graph baseline.",
+      "severity": "fail",
+      "trackingKey": "DPE-001",
+      "expected": {
+        "version": "0.2",
+        "concept_count": 51,
+        "graph_counts.active_typed_edges": 43,
+        "graph_counts.retired_edges": 1,
+        "graph_counts.active_weighted_edges": 40
+      },
+      "remediation": "Recompute DPE-001 from current canonical inputs; never hand-edit score outputs to make this check pass."
+    },
+    {
+      "id": "MCTRL-MLC-001",
+      "kind": "entity_payload_equals",
+      "description": "MLC module and concept baselines remain internally consistent.",
+      "severity": "fail",
+      "trackingKey": "MLC-001",
+      "expected": {
+        "version": "0.1",
+        "concept_count": 51,
+        "module_count": 3,
+        "module_current_lifecycle.concept:aris": "Conceived",
+        "module_current_lifecycle.concept:cris": "Conceived",
+        "module_current_lifecycle.concept:agent-colony": "Conceived"
+      },
+      "remediation": "Reconcile lifecycle evidence before changing canonical maturity; historical maturity must not silently promote current state."
+    },
+    {
+      "id": "MCTRL-ORPHAN-001",
+      "kind": "orphan_relationships",
+      "description": "Every structured relationship resolves its required entity endpoints and optional evidence reference.",
+      "severity": "fail",
+      "expected": 0,
+      "remediation": "Repair or retire the broken relationship through a governed evidence-preserving change."
+    },
+    {
+      "id": "MCTRL-ORPHAN-002",
+      "kind": "orphan_artifacts",
+      "description": "Every structured artifact row resolves to its owning canonical entity.",
+      "severity": "fail",
+      "expected": 0,
+      "remediation": "Restore the owning canonical entity or remove the invalid artifact row through an approved repair."
+    },
+    {
+      "id": "MCTRL-RLS-001",
+      "kind": "rls_states",
+      "description": "Declared Test control-plane RLS posture has not changed silently.",
+      "severity": "warning",
+      "expected": [
+        {"schema": "comind_development", "relation": "entity", "enabled": false},
+        {"schema": "comind_development", "relation": "journal_entry", "enabled": false},
+        {"schema": "comind_development", "relation": "relationship", "enabled": false},
+        {"schema": "comind_development", "relation": "external_reference", "enabled": false},
+        {"schema": "comind_development", "relation": "artifact", "enabled": false},
+        {"schema": "comind_pm", "relation": "pm_research_sessions", "enabled": false}
+      ],
+      "remediation": "Determine whether the RLS change was intentional. If intentional, verify policies/access first and update this declared Test posture in the same reviewed change."
+    },
+    {
+      "id": "MCTRL-JOURNAL-001",
+      "kind": "journal_verified",
+      "description": "The DPE-002 completion journal remains present and verified.",
+      "severity": "fail",
+      "trackingKey": "JRN-20261026-0001",
+      "expected": "verified",
+      "remediation": "Restore or reconcile the canonical milestone journal evidence before relying on DPE-002 state."
+    },
+    {
+      "id": "MCTRL-RESEARCH-001",
+      "kind": "research_session",
+      "description": "Maintenance-control external best-practice research was written through to the research evidence system.",
+      "severity": "warning",
+      "sessionKey": "MCTRL-001-CONFIG-MAINTENANCE-BEST-PRACTICES-20261026",
+      "expected": "complete",
+      "remediation": "Capture the research session and sources in pm_research_sessions before treating external guidance as design evidence."
+    }
+  ],
+  "impactRules": [
+    {
+      "id": "MCTRL-IMPACT-001",
+      "status": "current",
+      "triggerKinds": ["concept.created", "concept.updated", "concept.retired", "concept.split", "concept.merged"],
+      "affectedArtifacts": ["CCI-001", "MLC-001", "DPE-001", "DPE-002", "EDG-001"],
+      "requiredChecks": ["MCTRL-CANON-001", "MCTRL-PROJ-001", "MCTRL-PROJ-002", "MCTRL-PROJ-003", "MCTRL-PROJ-004", "MCTRL-PROJ-005", "MCTRL-MLC-001"],
+      "severityIfStale": "warning",
+      "rationale": "Concept identity changes affect canonical indexing, lifecycle classification, graph topology, priority scoring, and documentation relationships."
+    },
+    {
+      "id": "MCTRL-IMPACT-002",
+      "status": "current",
+      "triggerKinds": ["relationship.created", "relationship.updated", "relationship.retired"],
+      "affectedArtifacts": ["CCI-001", "DPE-001", "DPE-002", "EDG-001"],
+      "requiredChecks": ["MCTRL-GRAPH-001", "MCTRL-GRAPH-002", "MCTRL-PROJ-001", "MCTRL-PROJ-003", "MCTRL-PROJ-004", "MCTRL-PROJ-005", "MCTRL-ORPHAN-001"],
+      "severityIfStale": "warning",
+      "rationale": "Relationship changes alter dependency topology and may change derived prioritization and documentation navigation."
+    },
+    {
+      "id": "MCTRL-IMPACT-003",
+      "status": "current",
+      "triggerKinds": ["lifecycle.evidence_added", "lifecycle.promoted", "lifecycle.demoted", "lifecycle.corrected"],
+      "affectedArtifacts": ["MLC-001", "DPE-001", "CCI-001"],
+      "requiredChecks": ["MCTRL-PROJ-001", "MCTRL-PROJ-002", "MCTRL-PROJ-003", "MCTRL-MLC-001"],
+      "severityIfStale": "fail",
+      "rationale": "Lifecycle state is evidence-gated and directly affects development planning; stale lifecycle projections can create false maturity claims."
+    },
+    {
+      "id": "MCTRL-IMPACT-004",
+      "status": "current",
+      "triggerKinds": ["schema.changed", "rls.changed", "privilege.changed"],
+      "affectedArtifacts": ["canonical-evidence-contract", "MCTRL-001"],
+      "requiredChecks": ["MCTRL-SCHEMA-001", "MCTRL-SCHEMA-002", "MCTRL-RLS-001", "MCTRL-ORPHAN-001", "MCTRL-ORPHAN-002"],
+      "severityIfStale": "fail",
+      "rationale": "Schema and access-control changes can invalidate audit assumptions and must be reconciled before a PASS is trustworthy."
+    },
+    {
+      "id": "MCTRL-IMPACT-005",
+      "status": "current",
+      "triggerKinds": ["research.external_completed", "research.external_corrected"],
+      "affectedArtifacts": ["research-evidence-projection"],
+      "requiredChecks": ["MCTRL-RESEARCH-001"],
+      "severityIfStale": "warning",
+      "rationale": "External research must write through to the evidence system as it occurs rather than depend on later backfill."
+    }
+  ]
+}

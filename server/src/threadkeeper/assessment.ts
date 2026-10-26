@@ -46,14 +46,6 @@ export function assessContinuity(context: AssessmentContext): ContinuityAssessme
       1,
       signals.scopeStatus === 'ambiguous' ? 1 : 0
     );
-  } else if (signals.requiredEvidenceStatus === 'conflicting') {
-    result = decision(
-      'UNRESOLVED_CONFLICT',
-      ['authoritative_evidence_conflict'],
-      ['contradictory_accepted_state'],
-      0.95,
-      1
-    );
   } else if (signals.requiredEvidenceStatus === 'missing'
       || signals.requiredEvidenceStatus === 'unverifiable') {
     result = decision(
@@ -95,10 +87,12 @@ export function assessContinuity(context: AssessmentContext): ContinuityAssessme
       1,
       0
     );
-  } else if (signals.authoritativeConflict) {
+  } else if (signals.requiredEvidenceStatus === 'conflicting' || signals.authoritativeConflict) {
     result = decision(
       'UNRESOLVED_CONFLICT',
-      ['authoritative_state_conflict'],
+      [signals.requiredEvidenceStatus === 'conflicting'
+        ? 'authoritative_evidence_conflict'
+        : 'authoritative_state_conflict'],
       ['contradictory_accepted_state'],
       0.95,
       1

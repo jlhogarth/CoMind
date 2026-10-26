@@ -92,6 +92,12 @@
       "requiredForAllPullRequests": false,
       "fallbackNormalSeconds": 120,
       "allowTransientRetrigger": true
+    },
+    {
+      "name": "Lane Health Sentinel Retry Proof",
+      "requiredForAllPullRequests": false,
+      "fallbackNormalSeconds": 90,
+      "allowTransientRetrigger": true
     }
   ]
 }

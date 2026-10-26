@@ -73,10 +73,11 @@ test('scope resolution preserves an exact known scope id', () => {
   assert.equal(resolved.scopeId, scopeId);
 });
 
-test('intact continuity requires all deterministic invariants', () => {
+test('intact continuity requires all deterministic invariants and produces no route', () => {
   const result = assessment({});
   assert.equal(result.classification, 'INTACT');
   assert.deepEqual(result.reasonCodes, ['continuity_invariants_hold']);
+  assert.throws(() => recommendRoute(result), /No route required for intact continuity/);
 });
 
 test('missing required evidence blocks and routes to evidence request', () => {
@@ -92,7 +93,16 @@ test('ambiguous semantic identity blocks and routes to human review', () => {
   assert.equal(recommendRoute(result).routeCode, 'REQUEST_HUMAN_REVIEW');
 });
 
-test('conflicting authoritative evidence remains unresolved', () => {
+test('checkpoint integrity failure takes precedence over conflicting evidence', () => {
+  const result = assessment({
+    requiredEvidenceStatus: 'conflicting',
+    checkpointIntegrityValid: false,
+  });
+  assert.equal(result.classification, 'BLOCKED');
+  assert.deepEqual(result.reasonCodes, ['checkpoint_integrity_invalid']);
+});
+
+test('conflicting authoritative evidence remains unresolved after baseline checks', () => {
   const result = assessment({ requiredEvidenceStatus: 'conflicting' });
   assert.equal(result.classification, 'UNRESOLVED_CONFLICT');
   assert.equal(recommendRoute(result).routeCode, 'REQUEST_EPISTEMIC_REVIEW');

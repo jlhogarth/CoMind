@@ -1,0 +1,44 @@
+name: Lane Health Sentinel Retry Proof
+
+on:
+  pull_request:
+    paths:
+      - docs/provenance/lane-health-retry-proof/**
+
+permissions:
+  contents: read
+
+jobs:
+  controlled-retry-proof:
+    name: Controlled transient retry proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Check out exact pull request candidate
+        uses: actions/checkout@v4
+
+      - name: Execute controlled retry fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          fixture="docs/provenance/lane-health-retry-proof/mode.txt"
+          test -f "${fixture}"
+          mode="$(tr -d '\r\n' < "${fixture}")"
+          printf 'Controlled retry fixture mode: %s; run attempt: %s\n' "${mode}" "${GITHUB_RUN_ATTEMPT}"
+
+          case "${mode}" in
+            transient-repeat-timeout)
+              sleep 75
+              ;;
+            deterministic-failure)
+              printf 'Controlled deterministic failure. This must not be automatically retried.\n'
+              exit 1
+              ;;
+            healthy)
+              printf 'Controlled retry proof is healthy.\n'
+              ;;
+            *)
+              printf 'Unsupported controlled retry proof mode: %s\n' "${mode}" >&2
+              exit 2
+              ;;
+          esac

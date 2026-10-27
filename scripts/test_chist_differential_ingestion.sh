@@ -42,6 +42,8 @@ env -u DATABASE_URL \
   CHATGPT_ARCHIVE_DATABASE_URL="${archive_url}" \
   CHATGPT_ARCHIVE_DIFFERENTIAL_DB_TEST=1 \
   TEST_ADMIN_DATABASE_URL="${admin_url}" \
-  node --test --test-concurrency=1 test/chatgpt-differential-ingestion.integration.test.mjs
+  node --test --test-concurrency=1 \
+    test/chatgpt-differential-ingestion.integration.test.mjs \
+    test/chatgpt-differential-recovery.integration.test.mjs
 
-echo 'CHIST differential ingestion A-B-C acceptance: PASS'
+echo 'CHIST differential ingestion and recovery acceptance: PASS'

@@ -1,15 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 
 import { assessContinuity } from '../dist/threadkeeper/assessment.js';
 import { createCheckpointProposal } from '../dist/threadkeeper/checkpoint.js';
 import { semanticScopeKey } from '../dist/threadkeeper/scope.js';
 
+// Process identifiers are reusable across short-lived Node test processes.
+// Give every proof invocation an unambiguous fixture identity so an isolated
+// PostgreSQL suite can never alias state merely because the OS reused a PID.
+const testRunId = randomUUID();
+
 const scopeBinding = {
   scopeType: 'plan',
   namespace: 'comind.competitive.proofs',
-  subjectRef: `plan:cp01-cp02-cp03:${process.pid}`,
+  subjectRef: `plan:cp01-cp02-cp03:${testRunId}`,
 };
 
 const evidence = [{ provider: 'competitive-proof', kind: 'fixture', ref: 'evidence:cp03:authorized-change' }];
@@ -90,7 +96,7 @@ test('CP-03 stale state is never current and CP-01/CP-02 handoff state survives 
     );
 
     const proposalA = checkpointProposal({
-      id: `proposal:cp03:a:${process.pid}`,
+      id: `proposal:cp03:a:${testRunId}`,
       parentCheckpointId: null,
       suffix: 'A',
       proposedAt: '2026-10-27T02:00:00.000Z',
@@ -107,19 +113,19 @@ test('CP-03 stale state is never current and CP-01/CP-02 handoff state survives 
     const assessment = assessContinuity({
       scopeSemanticKey: semanticKey,
       checkpointId: checkpointA.checkpointId,
-      observationId: `observation:cp03:material-change:${process.pid}`,
+      observationId: `observation:cp03:material-change:${testRunId}`,
       evidenceRefs: evidence,
       signals: signals({ materialChange: true }),
     });
     assert.equal(assessment.classification, 'SUSPECTED_BREAK');
     const storedAssessment = await persistAssessment(query, {
-      idempotencyKey: `assessment:cp03:${process.pid}`,
+      idempotencyKey: `assessment:cp03:${testRunId}`,
       assessment,
       createdAt: '2026-10-27T02:02:00.000Z',
     });
 
     const opened = await openContinuityCase({
-      caseKey: `case:cp03:${process.pid}`,
+      caseKey: `case:cp03:${testRunId}`,
       scopeSemanticKey: semanticKey,
       openedFromAssessmentId: storedAssessment.assessment_id,
       openedAt: '2026-10-27T02:03:00.000Z',
@@ -127,7 +133,7 @@ test('CP-03 stale state is never current and CP-01/CP-02 handoff state survives 
       evidenceRefs: evidence,
     });
     const assessed = await appendCaseTransition({
-      transitionKey: `transition:cp03:assessed:${process.pid}`,
+      transitionKey: `transition:cp03:assessed:${testRunId}`,
       caseId: opened.case.case_id,
       expectedPriorTransitionId: opened.transition.transition_id,
       toState: 'ASSESSED',
@@ -136,7 +142,7 @@ test('CP-03 stale state is never current and CP-01/CP-02 handoff state survives 
       recordedAt: '2026-10-27T02:04:00.000Z',
     });
     const routed = await appendCaseTransition({
-      transitionKey: `transition:cp03:routed:${process.pid}`,
+      transitionKey: `transition:cp03:routed:${testRunId}`,
       caseId: opened.case.case_id,
       expectedPriorTransitionId: assessed.transition_id,
       toState: 'ROUTED',
@@ -147,7 +153,7 @@ test('CP-03 stale state is never current and CP-01/CP-02 handoff state survives 
     });
 
     const proposalB = checkpointProposal({
-      id: `proposal:cp03:b:${process.pid}`,
+      id: `proposal:cp03:b:${testRunId}`,
       parentCheckpointId: checkpointA.checkpointId,
       suffix: 'B',
       proposedAt: '2026-10-27T02:06:00.000Z',
@@ -159,7 +165,7 @@ test('CP-03 stale state is never current and CP-01/CP-02 handoff state survives 
     );
 
     const accepted = await appendCaseTransition({
-      transitionKey: `transition:cp03:accepted-divergence:${process.pid}`,
+      transitionKey: `transition:cp03:accepted-divergence:${testRunId}`,
       caseId: opened.case.case_id,
       expectedPriorTransitionId: routed.transition_id,
       toState: 'ACCEPTED_DIVERGENCE',

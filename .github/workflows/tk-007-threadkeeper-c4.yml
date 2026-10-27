@@ -97,7 +97,7 @@ jobs:
             exit 1
           fi
           echo "NODE_EXTRA_CA_CERTS=$ca_path" >> "$GITHUB_ENV"
-      - name: Execute bounded live Test operational proof through runtime role
+      - name: Execute bounded live Test operational proof through explicit runtime boundary
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_SESSION_DATABASE_URL }}
           THREADKEEPER_C4_DATABASE_URL: ${{ secrets.SUPABASE_SESSION_DATABASE_URL }}
@@ -105,13 +105,50 @@ jobs:
           THREADKEEPER_C4_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
           THREADKEEPER_C4_ENVIRONMENT: Test
           THREADKEEPER_C4_EVIDENCE_PATH: ${{ github.workspace }}/server/artifacts/tk-007-c4-live-test.json
-          PGOPTIONS: '-c role=comind_threadkeeper_runtime'
+          THREADKEEPER_C4_HEAD_SHA: ${{ github.sha }}
         shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
           mkdir -p artifacts
+          artifact="$THREADKEEPER_C4_EVIDENCE_PATH"
+
+          write_failure_receipt() {
+            phase="$1"
+            status_code="$2"
+            if [ ! -f "$artifact" ]; then
+              python3 - "$artifact" "$phase" "$status_code" <<'PY'
+          import json, os, sys
+          path, phase, status_code = sys.argv[1:]
+          payload = {
+              "environment": os.environ.get("THREADKEEPER_C4_ENVIRONMENT", "Test"),
+              "runKey": os.environ.get("THREADKEEPER_C4_RUN_ID"),
+              "headSha": os.environ.get("THREADKEEPER_C4_HEAD_SHA"),
+              "status": "failed",
+              "failedPhase": phase,
+              "exitCode": int(status_code),
+              "canonicalPromotionPerformed": False,
+              "productionActivation": False,
+          }
+          with open(path, "w", encoding="utf-8") as handle:
+              json.dump(payload, handle, indent=2, sort_keys=True)
+              handle.write("\n")
+          PY
+            fi
+          }
+
           node --test test/threadkeeper-c4-runtime-role.test.mjs
+          role_status=$?
+          if [ "$role_status" -ne 0 ]; then
+            write_failure_receipt runtime_role_preflight "$role_status"
+            exit "$role_status"
+          fi
+
           node --test test/threadkeeper-c4-operational.integration.test.mjs
+          proof_status=$?
+          if [ "$proof_status" -ne 0 ]; then
+            write_failure_receipt sustained_operational_proof "$proof_status"
+            exit "$proof_status"
+          fi
       - name: Preserve C4 live Test evidence
         if: always()
         uses: actions/upload-artifact@v4

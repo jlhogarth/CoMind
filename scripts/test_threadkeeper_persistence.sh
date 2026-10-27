@@ -35,6 +35,8 @@ migration_009="${root}/db/migrations/20261026_009_threadkeeper_scope_integrity.s
 verification_009="${root}/db/migrations/verify_20261026_009_threadkeeper_scope_integrity.sql"
 migration_010="${root}/db/migrations/20261026_010_threadkeeper_fk_indexes.sql"
 verification_010="${root}/db/migrations/verify_20261026_010_threadkeeper_fk_indexes.sql"
+migration_007="${root}/db/migrations/20261027_007_threadkeeper_c4_operational_events.sql"
+verification_007="${root}/db/migrations/verify_20261027_007_threadkeeper_c4_operational_events.sql"
 
 psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f "${migration_008}"
 psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f "${migration_008}"
@@ -45,6 +47,13 @@ psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f "${verification_009}"
 psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f "${migration_010}"
 psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f "${migration_010}"
 psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f "${verification_010}"
+
+# TK-004 is a persistence regression over current ThreadKeeper code. Current
+# repository transactions require the bounded runtime role introduced by TK-007,
+# so install and verify that additive runtime substrate before executing the
+# legacy persistence scenarios. This does not change TK-004 maturity evidence.
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f "${migration_007}"
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f "${verification_007}"
 
 (
   cd "${root}/server"

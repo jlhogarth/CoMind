@@ -13,24 +13,19 @@ if p.scheme not in ('postgres','postgresql') or p.hostname not in ('localhost','
     raise SystemExit(2)
 PY
 
+# The C3 compatibility regression now bootstraps and verifies the current
+# ThreadKeeper runtime schema before exercising current repository code.
 bash "${root}/scripts/test_threadkeeper_c3.sh"
-
-psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
-  -f "${root}/db/migrations/20261027_007_threadkeeper_c4_operational_events.sql"
-psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
-  -f "${root}/db/migrations/verify_20261027_007_threadkeeper_c4_operational_events.sql"
 
 (
   cd "${root}/server"
   THREADKEEPER_C4_DB_TEST=1 \
-  PGOPTIONS='-c role=comind_threadkeeper_runtime' \
   node --test test/threadkeeper-c4-runtime-role.test.mjs
 
   THREADKEEPER_C4_DB_TEST=1 \
   THREADKEEPER_C4_RUN_ID=isolated \
   THREADKEEPER_C4_BASE_TIME=2026-10-27T21:00:00Z \
   THREADKEEPER_C4_ENVIRONMENT=isolated \
-  PGOPTIONS='-c role=comind_threadkeeper_runtime' \
   node --test test/threadkeeper-c4-operational.integration.test.mjs
 )
 

@@ -1,6 +1,7 @@
-import { pool, type QueryFunction } from '../db.js';
+import type { QueryFunction } from '../db.js';
 import { fingerprintCanonicalValue } from '../continuity/checkpoint.js';
 import { acceptCheckpointProposal, verifyCheckpointProposal } from './checkpoint.js';
+import { withThreadKeeperRuntimeTransaction } from './database.js';
 import { semanticScopeKey, validateScopeBinding } from './scope.js';
 import type {
   AuthorityValidationResult,
@@ -161,30 +162,10 @@ async function withThreadKeeperTransaction<T>(
   work: (query: QueryFunction) => Promise<T>
 ): Promise<T> {
   boundedString(lockKey, 'ThreadKeeper transaction lock key', 4096);
-  const client = await pool.connect();
-  let discardConnection = false;
-  const query: QueryFunction = async <Row>(text: string, params?: any[]) => {
-    const result = await client.query(text, params);
-    return { rows: result.rows as Row[] };
-  };
-
-  try {
-    await client.query('BEGIN');
-    await client.query('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
-    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [lockKey]);
-    const result = await work(query);
-    await client.query('COMMIT');
-    return result;
-  } catch (error) {
-    try {
-      await client.query('ROLLBACK');
-    } catch {
-      discardConnection = true;
-    }
-    throw error;
-  } finally {
-    client.release(discardConnection ? new Error('Discarding PostgreSQL connection after ThreadKeeper transaction failure') : undefined);
-  }
+  return withThreadKeeperRuntimeTransaction(
+    query => work(query),
+    { serializable: true, advisoryLockKey: lockKey },
+  );
 }
 
 async function scopeBySemanticKey(query: QueryFunction, semanticKey: string): Promise<StoredThreadKeeperScope | null> {

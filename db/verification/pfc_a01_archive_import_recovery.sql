@@ -130,9 +130,9 @@ DO $$
 DECLARE
   v_role text;
 BEGIN
-  FOREACH v_role IN ARRAY ARRAY['PUBLIC','anon','authenticated','service_role','comind_archive_ingestor']
+  FOREACH v_role IN ARRAY ARRAY['anon','authenticated','service_role','comind_archive_ingestor']
   LOOP
-    IF v_role='PUBLIC' OR EXISTS (SELECT 1 FROM pg_roles WHERE rolname=v_role) THEN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname=v_role) THEN
       IF has_function_privilege(v_role,'comind.cm_guard_archive_import_lineage()','EXECUTE') THEN
         RAISE EXCEPTION 'Role % can directly execute PFC-A01 lineage trigger helper', v_role;
       END IF;
@@ -145,6 +145,10 @@ DO $$
 DECLARE
   v_table text;
 BEGIN
+  IF EXISTS (SELECT 1 FROM pg_proc p, LATERAL aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a
+    WHERE p.oid='comind.cm_guard_archive_import_lineage()'::regprocedure AND a.grantee=0 AND a.privilege_type='EXECUTE') THEN
+    RAISE EXCEPTION 'PUBLIC can execute recovery helper';
+  END IF;
   -- Recovery must not widen immutable source/evidence mutation authority.
   FOREACH v_table IN ARRAY ARRAY[
     'cm_archive_source',

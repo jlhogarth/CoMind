@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS comind.cm_embedding (
 CREATE INDEX IF NOT EXISTS idx_embedding_doc ON comind.cm_embedding(doc_id);
 CREATE INDEX IF NOT EXISTS idx_embedding_chunk ON comind.cm_embedding(chunk_id);
 CREATE INDEX IF NOT EXISTS idx_embedding_vec
-  ON comind.cm_embedding USING ivfflat (vec extensions.vector_cosine_ops) WITH (lists=100);
+  ON comind.cm_embedding USING ivfflat (vec vector_cosine_ops) WITH (lists=100);
 SQL
 
 # Prove fail-closed behavior if a legacy environment already contains embeddings.

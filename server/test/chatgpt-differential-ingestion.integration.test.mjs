@@ -63,7 +63,7 @@ if (process.env.CHATGPT_ARCHIVE_DIFFERENTIAL_DB_TEST !== '1') {
     userChildren.push('assistant');
     const assistantChildren = appended ? ['followup'] : [];
     const metadata = attachment
-      ? { attachments: [{ asset_pointer: 'file-service://asset.bin', name: 'asset.bin', mime_type: 'application/octet-stream' }] }
+      ? { attachments: [{ asset_pointer: 'file-service://asset.dat', name: 'asset.dat', mime_type: 'application/octet-stream' }] }
       : {};
     const mapping = {
       root: { id: 'root', parent: null, children: ['user'], message: null },
@@ -90,7 +90,7 @@ if (process.env.CHATGPT_ARCHIVE_DIFFERENTIAL_DB_TEST !== '1') {
     await writeFile(path.join(root, 'conversations.json'), JSON.stringify(conversations), 'utf8');
     if (assetBytes !== null) {
       await mkdir(path.join(root, 'assets'), { recursive: true });
-      await writeFile(path.join(root, 'assets', 'asset.bin'), assetBytes);
+      await writeFile(path.join(root, 'assets', 'asset.dat'), assetBytes);
     }
     return root;
   }
@@ -192,6 +192,17 @@ if (process.env.CHATGPT_ARCHIVE_DIFFERENTIAL_DB_TEST !== '1') {
     assert.equal(bById.get('conv-missing').prior_observation_import_id, a.importId);
     assert.equal(bById.get('conv-attachment').classification, 'attachment_changed');
     assert.equal(bById.get('conv-raw').classification, 'raw_changed');
+
+    const attachmentVersions = await admin.query(
+      `SELECT import_id::text,source_metadata->>'resolved_sha256' AS resolved_sha256
+         FROM comind.cm_archive_attachment_reference
+        WHERE source_conversation_id='conv-attachment' AND import_id IN ($1::uuid,$2::uuid)`,
+      [a.importId,b.importId],
+    );
+    const attachmentByImport = new Map(attachmentVersions.rows.map((row) => [row.import_id, row.resolved_sha256]));
+    assert.ok(attachmentByImport.get(a.importId));
+    assert.ok(attachmentByImport.get(b.importId));
+    assert.notEqual(attachmentByImport.get(a.importId), attachmentByImport.get(b.importId), 'changed attachment bytes must retain distinct export provenance');
 
     const unchangedAuthority = await admin.query(
       `SELECT count(*)::int AS n FROM comind.cm_archive_conversation_observation WHERE source_conversation_id='conv-unchanged'`,

@@ -20,17 +20,19 @@ function firstProven(matrix) {
     .find(item => item.status === 'proven');
 }
 
-test('canonical ThreadKeeper C3 matrix validates with only explicit promotion unresolved', () => {
+test('canonical ThreadKeeper C3 matrix validates after explicit governed promotion', () => {
   const matrix = loadThreadKeeperC3Matrix();
   assert.deepEqual(validateThreadKeeperC3Matrix(matrix, { repoRoot }), []);
   const summary = matrixSummary(matrix);
   assert.equal(summary.gateRequirementCount, 17);
   assert.equal(summary.scenarioRequirementCount, 12);
-  assert.equal(summary.byStatus.proven, 28);
+  assert.equal(summary.byStatus.proven, 29);
   assert.equal(summary.byStatus.partial ?? 0, 0);
-  assert.equal(summary.byStatus.missing, 1);
-  assert.equal(summary.promotionReady, false);
-  assert.deepEqual(summary.unresolvedIds, ['C3-17']);
+  assert.equal(summary.byStatus.missing ?? 0, 0);
+  assert.equal(summary.currentMaturity, 'C3 Integrated');
+  assert.equal(summary.promotionReady, true);
+  assert.deepEqual(summary.unresolvedIds, []);
+  assert.equal(matrix.promotionBoundary.promotionJournalKey, 'JRN-20261027-0009');
 });
 
 test('C3 proven claims fail without repository evidence', () => {
@@ -49,11 +51,11 @@ test('C3 nonexistent evidence path fails validation', () => {
   assert.ok(errors.some(message => message.includes('evidence path does not exist')), errors.join('\n'));
 });
 
-test('C3 cannot promote while any evidence remains unresolved', () => {
+test('C3 cannot remain promotion-ready if any required evidence becomes unresolved', () => {
   const matrix = clone(loadThreadKeeperC3Matrix());
-  matrix.promotionBoundary.ready = true;
-  matrix.promotionBoundary.currentMaturity = 'C3 Integrated';
-  matrix.promotionBoundary.promotionJournalKey = 'JRN-premature-c3';
+  const promotion = matrix.gateRequirements.find(item => item.id === 'C3-17');
+  promotion.status = 'missing';
+  promotion.nextAction = 'Restore verified promotion evidence before treating C3 as promotion-ready.';
   const errors = validateThreadKeeperC3Matrix(matrix, { repoRoot });
   assert.ok(errors.some(message => message.includes('required entries remain partial or missing')), errors.join('\n'));
   assert.ok(errors.some(message => message.includes('requires C3-17 to be proven')), errors.join('\n'));
@@ -61,7 +63,8 @@ test('C3 cannot promote while any evidence remains unresolved', () => {
 
 test('C3 promotion journal cannot appear while ready is false', () => {
   const matrix = clone(loadThreadKeeperC3Matrix());
-  matrix.promotionBoundary.promotionJournalKey = 'JRN-premature-c3';
+  matrix.promotionBoundary.ready = false;
+  matrix.promotionBoundary.currentMaturity = 'C2 Implemented';
   const errors = validateThreadKeeperC3Matrix(matrix, { repoRoot });
   assert.ok(errors.some(message => message.includes('promotionJournalKey must remain null')), errors.join('\n'));
 });
@@ -78,7 +81,8 @@ test('C3 required ids cannot be silently dropped or duplicated', () => {
 
 test('C3 cannot claim current C3 maturity before promotion readiness', () => {
   const matrix = clone(loadThreadKeeperC3Matrix());
-  matrix.promotionBoundary.currentMaturity = 'C3 Integrated';
+  matrix.promotionBoundary.ready = false;
+  matrix.promotionBoundary.promotionJournalKey = null;
   const errors = validateThreadKeeperC3Matrix(matrix, { repoRoot });
   assert.ok(errors.some(message => message.includes('pre-promotion matrix must remain C2 Implemented')), errors.join('\n'));
 });

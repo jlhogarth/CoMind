@@ -23,10 +23,15 @@ psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
 (
   cd "${root}/server"
   THREADKEEPER_C4_DB_TEST=1 \
+  PGOPTIONS='-c role=comind_threadkeeper_runtime' \
+  node --test test/threadkeeper-c4-runtime-role.test.mjs
+
+  THREADKEEPER_C4_DB_TEST=1 \
   THREADKEEPER_C4_RUN_ID=isolated \
   THREADKEEPER_C4_BASE_TIME=2026-10-27T21:00:00Z \
   THREADKEEPER_C4_ENVIRONMENT=isolated \
+  PGOPTIONS='-c role=comind_threadkeeper_runtime' \
   node --test test/threadkeeper-c4-operational.integration.test.mjs
 )
 
-echo 'TK-007 isolated operational, authority, failure, recovery, and observability proof: PASS'
+echo 'TK-007 isolated operational, least-privilege, authority, failure, recovery, and observability proof: PASS'

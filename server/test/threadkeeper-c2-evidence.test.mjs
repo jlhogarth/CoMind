@@ -20,19 +20,20 @@ function firstProven(matrix) {
     .find((candidate) => candidate.status === 'proven');
 }
 
-test('canonical ThreadKeeper C2 matrix validates while promotion remains gated', () => {
+test('canonical ThreadKeeper C2 matrix validates while final promotion controls remain gated', () => {
   const matrix = loadThreadKeeperC2Matrix();
   assert.deepEqual(validateThreadKeeperC2Matrix(matrix, { repoRoot }), []);
 
   const summary = matrixSummary(matrix);
   assert.equal(summary.gateRequirementCount, 16);
   assert.equal(summary.testRequirementCount, 50);
-  assert.equal(summary.byStatus.proven, 31);
-  assert.equal(summary.byStatus.partial, 15);
-  assert.equal(summary.byStatus.missing, 19);
+  assert.equal(summary.byStatus.proven, 62);
+  assert.equal(summary.byStatus.partial, 1);
+  assert.equal(summary.byStatus.missing, 2);
   assert.equal(summary.byStatus.not_applicable, 1);
   assert.equal(summary.promotionReady, false);
-  assert.equal(summary.unresolvedIds.length, 34);
+  assert.equal(summary.unresolvedIds.length, 3);
+  assert.deepEqual(summary.unresolvedIds, ['C2-14', 'C2-15', 'C2-16']);
 });
 
 test('proven claims fail without repository evidence', () => {

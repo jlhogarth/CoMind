@@ -101,9 +101,7 @@ function validateRequirement(item, expectedIds, seenIds, root, errors, options =
   seenIds.add(id);
 
   if (!nonEmptyString(item.title)) errors.push(`${id}: title is required`);
-  if (!ALLOWED_STATUSES.has(item.status)) {
-    errors.push(`${id}: invalid status ${JSON.stringify(item.status)}`);
-  }
+  if (!ALLOWED_STATUSES.has(item.status)) errors.push(`${id}: invalid status ${JSON.stringify(item.status)}`);
   if (options.requireGroup) {
     const prefix = GROUP_PREFIX.get(item.group);
     if (!prefix) errors.push(`${id}: invalid test group ${JSON.stringify(item.group)}`);
@@ -111,9 +109,7 @@ function validateRequirement(item, expectedIds, seenIds, root, errors, options =
   }
 
   const repoEvidenceCount = validateEvidence(id, item.evidence, root, errors);
-  if (item.status === 'proven' && repoEvidenceCount === 0) {
-    errors.push(`${id}: proven entries require at least one repo_path evidence item`);
-  }
+  if (item.status === 'proven' && repoEvidenceCount === 0) errors.push(`${id}: proven entries require at least one repo_path evidence item`);
   if (item.status === 'not_applicable') {
     if (!nonEmptyString(item.rationale)) errors.push(`${id}: not_applicable requires rationale`);
     if (repoEvidenceCount === 0) errors.push(`${id}: not_applicable requires a repository source supporting the rationale`);
@@ -127,18 +123,14 @@ function assertExactIds(label, expected, seen, errors) {
   for (const id of expected) {
     if (!seen.has(id)) errors.push(`${label}: missing required id ${id}`);
   }
-  if (seen.size !== expected.size) {
-    errors.push(`${label}: expected exactly ${expected.size} unique ids, found ${seen.size}`);
-  }
+  if (seen.size !== expected.size) errors.push(`${label}: expected exactly ${expected.size} unique ids, found ${seen.size}`);
 }
 
 export function validateThreadKeeperC2Matrix(matrix, options = {}) {
   const root = options.repoRoot ? path.resolve(options.repoRoot) : repoRoot;
   const errors = [];
 
-  if (!matrix || typeof matrix !== 'object' || Array.isArray(matrix)) {
-    return ['matrix must be a JSON object'];
-  }
+  if (!matrix || typeof matrix !== 'object' || Array.isArray(matrix)) return ['matrix must be a JSON object'];
   if (matrix.schemaVersion !== 1) errors.push('schemaVersion must equal 1');
   if (matrix.lane !== 'TK-005') errors.push('lane must equal TK-005');
   if (matrix.issue !== 248) errors.push('issue must equal 248');
@@ -149,48 +141,39 @@ export function validateThreadKeeperC2Matrix(matrix, options = {}) {
   if (!boundary || typeof boundary !== 'object' || Array.isArray(boundary)) {
     errors.push('promotionBoundary is required');
   } else {
-    if (boundary.currentMaturity !== 'C1 Contracted') errors.push('promotionBoundary.currentMaturity must remain C1 Contracted until explicit promotion');
     if (boundary.targetMaturity !== 'C2 Implemented') errors.push('promotionBoundary.targetMaturity must equal C2 Implemented');
     if (boundary.automaticPromotionAllowed !== false) errors.push('automaticPromotionAllowed must be false');
     if (boundary.productionActivationRequired !== false) errors.push('productionActivationRequired must be false');
     if (boundary.publicHttpEndpointRequired !== false) errors.push('publicHttpEndpointRequired must be false');
     if (boundary.sdnRegistrationRequired !== false) errors.push('sdnRegistrationRequired must be false');
     if (typeof boundary.ready !== 'boolean') errors.push('promotionBoundary.ready must be boolean');
+    if (boundary.ready === true && boundary.currentMaturity !== boundary.targetMaturity) {
+      errors.push('promotion-ready matrix must report currentMaturity equal to targetMaturity');
+    }
+    if (boundary.ready === false && boundary.currentMaturity !== 'C1 Contracted') {
+      errors.push('pre-promotion matrix must remain C1 Contracted');
+    }
   }
 
-  if (!Array.isArray(matrix.gateRequirements)) {
-    errors.push('gateRequirements must be an array');
-  }
-  if (!Array.isArray(matrix.testRequirements)) {
-    errors.push('testRequirements must be an array');
-  }
+  if (!Array.isArray(matrix.gateRequirements)) errors.push('gateRequirements must be an array');
+  if (!Array.isArray(matrix.testRequirements)) errors.push('testRequirements must be an array');
 
   const gateSeen = new Set();
-  for (const item of matrix.gateRequirements ?? []) {
-    validateRequirement(item, REQUIRED_GATE_IDS, gateSeen, root, errors, { kind: 'gate requirement' });
-  }
+  for (const item of matrix.gateRequirements ?? []) validateRequirement(item, REQUIRED_GATE_IDS, gateSeen, root, errors, { kind: 'gate requirement' });
   assertExactIds('gateRequirements', REQUIRED_GATE_IDS, gateSeen, errors);
 
   const testSeen = new Set();
-  for (const item of matrix.testRequirements ?? []) {
-    validateRequirement(item, REQUIRED_TEST_IDS, testSeen, root, errors, { kind: 'test requirement', requireGroup: true });
-  }
+  for (const item of matrix.testRequirements ?? []) validateRequirement(item, REQUIRED_TEST_IDS, testSeen, root, errors, { kind: 'test requirement', requireGroup: true });
   assertExactIds('testRequirements', REQUIRED_TEST_IDS, testSeen, errors);
 
   const allItems = [...(matrix.gateRequirements ?? []), ...(matrix.testRequirements ?? [])];
   const unresolved = allItems.filter(item => item?.status === 'partial' || item?.status === 'missing');
 
   if (boundary?.ready === true) {
-    if (unresolved.length > 0) {
-      errors.push(`promotionBoundary.ready cannot be true while ${unresolved.length} required entries remain partial or missing`);
-    }
-    if (!nonEmptyString(boundary.promotionJournalKey)) {
-      errors.push('promotionBoundary.ready requires promotionJournalKey');
-    }
+    if (unresolved.length > 0) errors.push(`promotionBoundary.ready cannot be true while ${unresolved.length} required entries remain partial or missing`);
+    if (!nonEmptyString(boundary.promotionJournalKey)) errors.push('promotionBoundary.ready requires promotionJournalKey');
     const promotionRequirement = (matrix.gateRequirements ?? []).find(item => item.id === 'C2-16');
-    if (promotionRequirement?.status !== 'proven') {
-      errors.push('promotionBoundary.ready requires C2-16 to be proven');
-    }
+    if (promotionRequirement?.status !== 'proven') errors.push('promotionBoundary.ready requires C2-16 to be proven');
   } else if (boundary?.promotionJournalKey !== null) {
     errors.push('promotionJournalKey must remain null while promotionBoundary.ready is false');
   }
@@ -209,9 +192,7 @@ export function matrixSummary(matrix) {
     byGroup[group].total += 1;
     if (item.status in byGroup[group]) byGroup[group][item.status] += 1;
   }
-  const unresolvedIds = allItems
-    .filter(item => item.status === 'partial' || item.status === 'missing')
-    .map(item => item.id);
+  const unresolvedIds = allItems.filter(item => item.status === 'partial' || item.status === 'missing').map(item => item.id);
   return {
     lane: matrix.lane,
     issue: matrix.issue,

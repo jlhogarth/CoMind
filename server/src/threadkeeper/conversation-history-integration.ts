@@ -32,27 +32,35 @@ import type {
 
 export const THREADKEEPER_C3_INTEGRATION_VERSION = 'tk-c3-integration-v1';
 export const CONVERSATION_HISTORY_PROVIDER = 'comind.conversation-history';
-export const CONVERSATION_HISTORY_EVIDENCE_KIND = 'certified-conversation-summary';
-export const CONVERSATION_HISTORY_EVIDENCE_VERSION = 'chist-certified-summary-v1';
+export const CONVERSATION_HISTORY_EVIDENCE_KIND = 'accepted-conversation-snapshot';
+export const CONVERSATION_HISTORY_EVIDENCE_VERSION = 'chist-accepted-snapshot-v1';
 export const CONVERSATION_HISTORY_READER_ROLE = 'comind_conversation_history_reader';
 export const CONVERSATION_HISTORY_SCOPE_NAMESPACE = 'comind.conversation-history';
 
 const SHA256_PATTERN = /^[a-f0-9]{64}$/i;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const SNAPSHOT_CLASSIFICATIONS = new Set([
+  'baseline', 'unchanged', 'new', 'content_changed', 'structurally_changed',
+  'raw_changed', 'attachment_changed', 'absent',
+]);
 
 export interface CertifiedConversationHistorySummary {
   baselineId: string;
   certificationSha256: string;
+  archiveCheckpointId: string;
+  archiveStreamId: string;
+  sequenceNo: number;
+  checkpointKind: 'baseline' | 'differential';
   importId: string;
+  acceptedAt: string;
   sourceConversationId: string;
-  createdAt: string | null;
-  updatedAt: string | null;
-  rawSourceHash: string;
-  normalizedHash: string;
-  topologyHash: string;
-  nodeCount: number;
-  messageCount: number;
-  attachmentReferenceCount: number;
+  classification: string;
+  present: boolean;
+  observationImportId: string | null;
+  rawSourceHash: string | null;
+  normalizedHash: string | null;
+  topologyHash: string | null;
+  attachmentSetHash: string | null;
 }
 
 export interface ConversationHistorySummaryReader {
@@ -140,28 +148,70 @@ function normalizeTimestamp(value: string, field: string): string {
   return new Date(parsed).toISOString();
 }
 
+function optionalSha(value: string | null, field: string): string | null {
+  if (value === null) return null;
+  if (!SHA256_PATTERN.test(value)) throw new Error(`Invalid ${field}`);
+  return value.toLowerCase();
+}
+
 function normalizedSummary(summary: CertifiedConversationHistorySummary): CertifiedConversationHistorySummary {
-  if (!UUID_PATTERN.test(summary.baselineId)) throw new Error('Invalid Conversation History baseline id');
-  if (!UUID_PATTERN.test(summary.importId)) throw new Error('Invalid Conversation History import id');
+  for (const [field, value] of [
+    ['Conversation History baseline id', summary.baselineId],
+    ['Conversation History archive checkpoint id', summary.archiveCheckpointId],
+    ['Conversation History archive stream id', summary.archiveStreamId],
+    ['Conversation History import id', summary.importId],
+  ] as const) {
+    if (!UUID_PATTERN.test(value)) throw new Error(`Invalid ${field}`);
+  }
+  if (summary.observationImportId !== null && !UUID_PATTERN.test(summary.observationImportId)) {
+    throw new Error('Invalid Conversation History observation import id');
+  }
+  if (!SHA256_PATTERN.test(summary.certificationSha256)) throw new Error('Invalid Conversation History certification digest');
   boundedString(summary.sourceConversationId, 'Conversation History source conversation id', 2048);
-  for (const [field, value] of [
-    ['Conversation History certification digest', summary.certificationSha256],
-    ['Conversation History raw source hash', summary.rawSourceHash],
-    ['Conversation History normalized hash', summary.normalizedHash],
-    ['Conversation History topology hash', summary.topologyHash],
-  ] as const) {
-    if (!SHA256_PATTERN.test(value)) throw new Error(`Invalid ${field}`);
+  if (!Number.isSafeInteger(summary.sequenceNo) || summary.sequenceNo < 1) {
+    throw new Error('Invalid Conversation History checkpoint sequence');
   }
-  for (const [field, value] of [
-    ['Conversation History node count', summary.nodeCount],
-    ['Conversation History message count', summary.messageCount],
-    ['Conversation History attachment reference count', summary.attachmentReferenceCount],
-  ] as const) {
-    if (!Number.isSafeInteger(value) || value < 0) throw new Error(`Invalid ${field}`);
+  if (!['baseline', 'differential'].includes(summary.checkpointKind)) {
+    throw new Error('Invalid Conversation History checkpoint kind');
   }
-  if (summary.createdAt !== null) normalizeTimestamp(summary.createdAt, 'Conversation History created timestamp');
-  if (summary.updatedAt !== null) normalizeTimestamp(summary.updatedAt, 'Conversation History updated timestamp');
-  return structuredClone(summary);
+  if ((summary.sequenceNo === 1) !== (summary.checkpointKind === 'baseline')) {
+    throw new Error('Conversation History checkpoint sequence and kind disagree');
+  }
+  if (!SNAPSHOT_CLASSIFICATIONS.has(summary.classification)) {
+    throw new Error('Invalid Conversation History snapshot classification');
+  }
+  normalizeTimestamp(summary.acceptedAt, 'Conversation History checkpoint acceptance timestamp');
+
+  const rawSourceHash = optionalSha(summary.rawSourceHash, 'Conversation History raw source hash');
+  const normalizedHash = optionalSha(summary.normalizedHash, 'Conversation History normalized hash');
+  const topologyHash = optionalSha(summary.topologyHash, 'Conversation History topology hash');
+  const attachmentSetHash = optionalSha(summary.attachmentSetHash, 'Conversation History attachment set hash');
+  if (summary.present) {
+    if (!summary.observationImportId || !rawSourceHash || !normalizedHash || !topologyHash) {
+      throw new Error('Present Conversation History snapshot requires observation identity and content hashes');
+    }
+  } else if (summary.observationImportId || rawSourceHash || normalizedHash || topologyHash || attachmentSetHash) {
+    throw new Error('Absent Conversation History snapshot must not claim current observation content');
+  }
+
+  return {
+    baselineId: summary.baselineId,
+    certificationSha256: summary.certificationSha256.toLowerCase(),
+    archiveCheckpointId: summary.archiveCheckpointId,
+    archiveStreamId: summary.archiveStreamId,
+    sequenceNo: summary.sequenceNo,
+    checkpointKind: summary.checkpointKind,
+    importId: summary.importId,
+    acceptedAt: normalizeTimestamp(summary.acceptedAt, 'Conversation History checkpoint acceptance timestamp'),
+    sourceConversationId: summary.sourceConversationId,
+    classification: summary.classification,
+    present: summary.present,
+    observationImportId: summary.observationImportId,
+    rawSourceHash,
+    normalizedHash,
+    topologyHash,
+    attachmentSetHash,
+  };
 }
 
 function encodedConversationId(value: string): string {
@@ -175,24 +225,30 @@ function decodedConversationId(value: string): string {
 }
 
 function evidenceUrn(summary: CertifiedConversationHistorySummary): string {
-  return `urn:comind:chist:${summary.baselineId}:${summary.importId}:${encodedConversationId(summary.sourceConversationId)}`;
+  return `urn:comind:chist:${summary.baselineId}:checkpoint:${summary.archiveCheckpointId}:${encodedConversationId(summary.sourceConversationId)}`;
 }
 
 function summaryDigest(summary: CertifiedConversationHistorySummary): string {
-  return fingerprintCanonicalValue({
-    baselineId: summary.baselineId,
-    certificationSha256: summary.certificationSha256,
-    importId: summary.importId,
-    sourceConversationId: summary.sourceConversationId,
-    createdAt: summary.createdAt,
-    updatedAt: summary.updatedAt,
-    rawSourceHash: summary.rawSourceHash,
-    normalizedHash: summary.normalizedHash,
-    topologyHash: summary.topologyHash,
-    nodeCount: summary.nodeCount,
-    messageCount: summary.messageCount,
-    attachmentReferenceCount: summary.attachmentReferenceCount,
-  });
+  return fingerprintCanonicalValue(summary);
+}
+
+function stateRefs(summary: CertifiedConversationHistorySummary): string[] {
+  if (!summary.present) return ['urn:comind:chist:presence:absent'];
+  const refs = [
+    `urn:comind:chist:presence:present`,
+    `urn:comind:chist:raw:${summary.rawSourceHash}`,
+    `urn:comind:chist:normalized:${summary.normalizedHash}`,
+    `urn:comind:chist:topology:${summary.topologyHash}`,
+  ];
+  if (summary.attachmentSetHash) refs.push(`urn:comind:chist:attachments:${summary.attachmentSetHash}`);
+  return refs;
+}
+
+function sameStateRefs(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) return false;
+  const a = [...left].sort();
+  const b = [...right].sort();
+  return a.every((value, index) => value === b[index]);
 }
 
 export function buildConversationHistoryEvidenceRef(
@@ -211,7 +267,7 @@ export function buildConversationHistoryEvidenceRef(
 
 function parseEvidenceRef(ref: EvidenceRef): {
   baselineId: string;
-  importId: string;
+  archiveCheckpointId: string;
   sourceConversationId: string;
 } | null {
   if (ref.provider !== CONVERSATION_HISTORY_PROVIDER
@@ -221,12 +277,12 @@ function parseEvidenceRef(ref: EvidenceRef): {
       || !SHA256_PATTERN.test(ref.digest)) {
     return null;
   }
-  const match = /^urn:comind:chist:([0-9a-f-]{36}):([0-9a-f-]{36}):([A-Za-z0-9_-]+)$/i.exec(ref.ref);
+  const match = /^urn:comind:chist:([0-9a-f-]{36}):checkpoint:([0-9a-f-]{36}):([A-Za-z0-9_-]+)$/i.exec(ref.ref);
   if (!match || !UUID_PATTERN.test(match[1]) || !UUID_PATTERN.test(match[2])) return null;
   try {
     return {
       baselineId: match[1],
-      importId: match[2],
+      archiveCheckpointId: match[2],
       sourceConversationId: decodedConversationId(match[3]),
     };
   } catch {
@@ -235,11 +291,11 @@ function parseEvidenceRef(ref: EvidenceRef): {
 }
 
 /**
- * Build the smallest Conversation History reader needed by ThreadKeeper.
- * The supplied query MUST already execute as the governed
- * comind_conversation_history_reader role. The function verifies that role on
- * every read and selects only certified summary fields; raw conversation and
- * message text are deliberately not selected.
+ * Resolve accepted Conversation History snapshot membership using the governed
+ * reader role. The supplied query MUST already execute as
+ * comind_conversation_history_reader. Only checkpoint/membership provenance and
+ * hashes are selected. Raw conversation JSON, titles, messages, and attachment
+ * contents are deliberately outside this contract.
  */
 export function createCertifiedConversationHistoryReader(query: QueryFunction): ConversationHistorySummaryReader {
   return {
@@ -255,34 +311,42 @@ export function createCertifiedConversationHistoryReader(query: QueryFunction): 
       const result = await query<{
         baseline_id: string;
         certification_sha256: string;
+        checkpoint_id: string;
+        archive_stream_id: string;
+        sequence_no: string;
+        checkpoint_kind: 'baseline' | 'differential';
         import_id: string;
+        accepted_at: string;
         source_conversation_id: string;
-        created_at: string | null;
-        updated_at: string | null;
-        raw_source_hash: string;
-        normalized_hash: string;
-        topology_hash: string;
-        node_count: string;
-        message_count: string;
-        attachment_reference_count: string;
+        classification: string;
+        present: boolean;
+        observation_import_id: string | null;
+        raw_source_hash: string | null;
+        normalized_hash: string | null;
+        topology_hash: string | null;
+        attachment_set_hash: string | null;
       }>(
         `SELECT b.baseline_id::text,
                 b.certification_sha256::text,
-                o.import_id::text,
-                o.source_conversation_id,
-                o.created_at::text,
-                o.updated_at::text,
-                o.raw_source_hash::text,
-                o.normalized_hash::text,
-                o.topology_hash::text,
-                o.node_count::text,
-                o.message_count::text,
-                o.attachment_reference_count::text
-           FROM comind.cm_conversation_history_baseline b
-           JOIN comind.cm_archive_import i ON i.import_id=b.import_id AND i.status='PASS'
-           JOIN comind.cm_archive_conversation_observation o ON o.import_id=b.import_id
-          WHERE b.import_id=$1::uuid
-            AND o.source_conversation_id=$2`,
+                c.checkpoint_id::text,
+                c.archive_stream_id::text,
+                c.sequence_no::text,
+                c.checkpoint_kind,
+                c.import_id::text,
+                c.accepted_at::text,
+                s.source_conversation_id,
+                s.classification,
+                s.present,
+                s.observation_import_id::text,
+                s.raw_source_hash::text,
+                s.normalized_hash::text,
+                s.topology_hash::text,
+                s.attachment_set_hash::text
+           FROM comind.cm_archive_checkpoint c
+           JOIN comind.cm_conversation_history_baseline b ON b.baseline_id=c.baseline_id
+           JOIN comind.cm_archive_snapshot_conversation s ON s.import_id=c.import_id
+          WHERE c.import_id=$1::uuid
+            AND s.source_conversation_id=$2`,
         [input.importId, input.sourceConversationId],
       );
       const row = result.rows[0];
@@ -290,16 +354,20 @@ export function createCertifiedConversationHistoryReader(query: QueryFunction): 
       return normalizedSummary({
         baselineId: row.baseline_id,
         certificationSha256: row.certification_sha256,
+        archiveCheckpointId: row.checkpoint_id,
+        archiveStreamId: row.archive_stream_id,
+        sequenceNo: Number(row.sequence_no),
+        checkpointKind: row.checkpoint_kind,
         importId: row.import_id,
+        acceptedAt: row.accepted_at,
         sourceConversationId: row.source_conversation_id,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
+        classification: row.classification,
+        present: row.present,
+        observationImportId: row.observation_import_id,
         rawSourceHash: row.raw_source_hash,
         normalizedHash: row.normalized_hash,
         topologyHash: row.topology_hash,
-        nodeCount: Number(row.node_count),
-        messageCount: Number(row.message_count),
-        attachmentReferenceCount: Number(row.attachment_reference_count),
+        attachmentSetHash: row.attachment_set_hash,
       });
     },
   };
@@ -318,10 +386,15 @@ export class ConversationHistoryEvidenceResolver implements EvidenceResolver {
 
     let summary: CertifiedConversationHistorySummary | null;
     try {
-      summary = await this.#reader.read({
-        importId: parsed.importId,
+      const checkpoint = await this.#reader.readByCheckpoint?.({
+        archiveCheckpointId: parsed.archiveCheckpointId,
         sourceConversationId: parsed.sourceConversationId,
       });
+      if (checkpoint !== undefined) {
+        summary = checkpoint;
+      } else {
+        return { status: 'unverifiable', ref: structuredClone(ref) };
+      }
     } catch {
       return { status: 'unverifiable', ref: structuredClone(ref) };
     }
@@ -329,6 +402,7 @@ export class ConversationHistoryEvidenceResolver implements EvidenceResolver {
 
     const canonical = buildConversationHistoryEvidenceRef(summary);
     if (summary.baselineId !== parsed.baselineId
+        || summary.archiveCheckpointId !== parsed.archiveCheckpointId
         || canonical.ref !== ref.ref
         || canonical.digest !== ref.digest) {
       return { status: 'conflicting', ref: structuredClone(ref) };
@@ -340,10 +414,7 @@ export class ConversationHistoryEvidenceResolver implements EvidenceResolver {
 export interface BuildConversationHistoryObservationInput {
   summary: CertifiedConversationHistorySummary;
   scopeId?: string;
-  observedAt: string;
   priorCheckpointRef?: string;
-  correlationId?: string;
-  traceId?: string;
 }
 
 export function buildConversationHistoryObservation(
@@ -351,7 +422,6 @@ export function buildConversationHistoryObservation(
 ): ContinuityObservation {
   const summary = normalizedSummary(input.summary);
   const evidenceRef = buildConversationHistoryEvidenceRef(summary);
-  const observedAt = normalizeTimestamp(input.observedAt, 'ThreadKeeper C3 observation timestamp');
   const scopeBinding: ScopeBinding = {
     ...(input.scopeId ? { scopeId: input.scopeId } : {}),
     scopeType: 'conversation',
@@ -359,30 +429,25 @@ export function buildConversationHistoryObservation(
     subjectRef: `chatgpt:${summary.sourceConversationId}`,
   };
   const observationId = `tk-c3-chist:${fingerprintCanonicalValue({
-    baselineId: summary.baselineId,
-    importId: summary.importId,
+    archiveCheckpointId: summary.archiveCheckpointId,
     sourceConversationId: summary.sourceConversationId,
-    evidenceDigest: evidenceRef.digest,
+    priorCheckpointRef: input.priorCheckpointRef ?? null,
   })}`;
 
   return {
     observationId,
-    eventType: 'conversation_history.certified_summary',
+    eventType: 'conversation_history.accepted_snapshot',
     sourceSystem: 'conversation_history',
-    observedAt,
+    observedAt: summary.acceptedAt,
     scopeBinding,
     ...(input.priorCheckpointRef ? { priorCheckpointRef: input.priorCheckpointRef } : {}),
-    currentStateRefs: [
-      `urn:comind:chist:raw:${summary.rawSourceHash}`,
-      `urn:comind:chist:normalized:${summary.normalizedHash}`,
-      `urn:comind:chist:topology:${summary.topologyHash}`,
-    ],
+    currentStateRefs: stateRefs(summary),
+    findingType: summary.classification,
     evidenceRefs: [evidenceRef],
     actorRef: 'system:conversation-history-reader',
     policyRef: THREADKEEPER_C3_INTEGRATION_VERSION,
-    correlationId: input.correlationId ?? `chist-baseline:${summary.baselineId}`,
+    correlationId: `tk-c3:${summary.archiveCheckpointId}:${fingerprintCanonicalValue(summary.sourceConversationId)}`,
     causationRef: evidenceRef.ref,
-    ...(input.traceId ? { traceId: input.traceId } : {}),
     sensitivity: 'restricted',
     retentionClass: 'durable',
   };
@@ -408,10 +473,8 @@ export type ConversationIntegrationAssessmentResult =
 export interface AssessCertifiedConversationInput {
   importId: string;
   sourceConversationId: string;
-  observedAt: string;
+  assessedAt: string;
   authority?: AuthorityValidationResult;
-  correlationId?: string;
-  traceId?: string;
 }
 
 export interface AcceptCertifiedConversationCheckpointInput {
@@ -450,7 +513,9 @@ export class ThreadKeeperConversationHistoryIntegration {
   ): Promise<ConversationIntegrationAssessmentResult> {
     const started = this.#nowMs();
     try {
+      normalizeTimestamp(input.assessedAt, 'ThreadKeeper C3 assessment timestamp');
       let summary: CertifiedConversationHistorySummary | null;
+      const sourceStarted = this.#nowMs();
       try {
         summary = await this.#historyReader.read({
           importId: input.importId,
@@ -459,10 +524,12 @@ export class ThreadKeeperConversationHistoryIntegration {
       } catch {
         this.#observability.historyEvidence('unverifiable');
         return { status: 'source_unverifiable', reasonCode: 'conversation_history_reader_failure' };
+      } finally {
+        this.#observability.latency('history_summary_read', this.#nowMs() - sourceStarted);
       }
       if (!summary) {
         this.#observability.historyEvidence('missing');
-        return { status: 'source_unavailable', reasonCode: 'certified_conversation_history_unavailable' };
+        return { status: 'source_unavailable', reasonCode: 'accepted_conversation_history_snapshot_unavailable' };
       }
       this.#observability.historyEvidence('available');
 
@@ -485,19 +552,12 @@ export class ThreadKeeperConversationHistoryIntegration {
       const observation = buildConversationHistoryObservation({
         summary,
         scopeId: scope.scope_id,
-        observedAt: input.observedAt,
         ...(current ? { priorCheckpointRef: current.checkpoint_id } : {}),
-        ...(input.correlationId ? { correlationId: input.correlationId } : {}),
-        ...(input.traceId ? { traceId: input.traceId } : {}),
       });
       const receipt = await this.#service.observe(observation, [scope.scope_id]);
-
-      const priorSource = current?.proposal.state.sourceRefs.find(ref => (
-        ref.provider === CONVERSATION_HISTORY_PROVIDER
-        && ref.kind === CONVERSATION_HISTORY_EVIDENCE_KIND
-      ));
       const materialChange = current !== null
-        && (priorSource?.digest !== evidenceRef.digest || priorSource?.ref !== evidenceRef.ref);
+        && !sameStateRefs(current.proposal.state.contextRefs, observation.currentStateRefs);
+
       const lineage = await getCheckpointLineage(this.#query, scope.semantic_key);
       let predecessorStatus: 'valid' | 'broken' = 'valid';
       for (let index = 1; index < lineage.length; index += 1) {
@@ -530,10 +590,13 @@ export class ThreadKeeperConversationHistoryIntegration {
         materialChange,
         incompatibilityProven: false,
       });
+      const authorityIdentity = input.authority?.valid
+        ? fingerprintCanonicalValue(input.authority)
+        : 'no-authority';
       const storedAssessment = await persistAssessment(this.#query, {
-        idempotencyKey: `tk006:${observation.observationId}:${current?.checkpoint_id ?? 'no-checkpoint'}`,
+        idempotencyKey: `tk006:${observation.observationId}:${current?.checkpoint_id ?? 'no-checkpoint'}:${authorityIdentity}`,
         assessment,
-        createdAt: input.observedAt,
+        createdAt: input.assessedAt,
       });
 
       return {
@@ -585,7 +648,7 @@ export class ThreadKeeperConversationHistoryIntegration {
         decisionRefs: [],
         commitmentRefs: [],
         obligationRefs: [],
-        contextRefs: [input.assessed.evidenceRef.ref],
+        contextRefs: structuredClone(input.assessed.observation.currentStateRefs),
         evidenceRefs: [structuredClone(input.assessed.evidenceRef)],
         sourceRefs: [structuredClone(input.assessed.evidenceRef)],
         sensitivity: 'restricted',
@@ -618,11 +681,8 @@ export class ThreadKeeperConversationHistoryIntegration {
       this.#observability.handoff('resolved');
       return handoff;
     } catch (error) {
-      if (error instanceof ContinuityHandoffError) {
-        this.#observability.handoff(error.code);
-      } else {
-        this.#observability.handoff('error');
-      }
+      if (error instanceof ContinuityHandoffError) this.#observability.handoff(error.code);
+      else this.#observability.handoff('error');
       throw error;
     } finally {
       this.#observability.latency('handoff_resolution', this.#nowMs() - started);

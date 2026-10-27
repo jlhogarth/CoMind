@@ -3,6 +3,7 @@
   "lane": "TK-006",
   "issue": 256,
   "baseCommit": "5e86005d3016824cefd3cc056fa7ad157ab1ce60",
+  "implementationCommit": "665d52b7d92f89e98aec0cfb5210b9fed6e8aa8c",
   "purpose": "Fail-closed evidence gate for ThreadKeeper C3 Integrated maturity.",
   "promotionBoundary": {
     "currentMaturity": "C2 Implemented",
@@ -17,161 +18,36 @@
   "statuses": ["proven", "partial", "missing", "not_applicable"],
   "evidenceTypes": ["repo_path", "github_run", "cde_key"],
   "gateRequirements": [
-    {
-      "id": "C3-01",
-      "title": "Accepted C2 ThreadKeeper baseline",
-      "status": "proven",
-      "evidence": [
-        {"type": "repo_path", "path": "config/threadkeeper-c2-evidence.v1.json"},
-        {"type": "repo_path", "path": "docs/provenance/2026-10-26-tk-005-threadkeeper-c2-evidence.md"}
-      ]
-    },
-    {
-      "id": "C3-02",
-      "title": "Exact C3 implementation commit",
-      "status": "partial",
-      "evidence": [{"type": "repo_path", "path": "server/src/threadkeeper/conversation-history-integration.ts"}],
-      "nextAction": "Freeze the exact C3 implementation head after technical verification."
-    },
-    {
-      "id": "C3-03",
-      "title": "Real certified Conversation History upstream contract",
-      "status": "partial",
-      "evidence": [
-        {"type": "repo_path", "path": "server/src/threadkeeper/conversation-history-integration.ts"},
-        {"type": "repo_path", "path": "db/migrations/20261026_002_conversation_history_baseline_certification.sql"}
-      ],
-      "nextAction": "Run the exact-head PostgreSQL C3 integration proof."
-    },
-    {
-      "id": "C3-04",
-      "title": "Conversation History read-only authority boundary",
-      "status": "partial",
-      "evidence": [
-        {"type": "repo_path", "path": "server/test/threadkeeper-c3-postgres.integration.test.mjs"},
-        {"type": "repo_path", "path": "db/migrations/20261026_001_conversation_history_reader.sql"}
-      ],
-      "nextAction": "Prove the restricted reader session can read certified summaries and cannot mutate source evidence."
-    },
-    {
-      "id": "C3-05",
-      "title": "Reference-over-copy source evidence boundary",
-      "status": "partial",
-      "evidence": [
-        {"type": "repo_path", "path": "server/test/threadkeeper-c3-service.test.mjs"},
-        {"type": "repo_path", "path": "server/test/threadkeeper-c3-postgres.integration.test.mjs"}
-      ],
-      "nextAction": "Prove raw transcript and title canaries never enter ThreadKeeper observations, persistence, or metrics."
-    },
-    {
-      "id": "C3-06",
-      "title": "ThreadKeeper C3 integration facade",
-      "status": "partial",
-      "evidence": [{"type": "repo_path", "path": "server/src/threadkeeper/conversation-history-integration.ts"}],
-      "nextAction": "Verify assessment, persistence, checkpoint acceptance, and restart behavior on the exact head."
-    },
-    {
-      "id": "C3-07",
-      "title": "Real continuity-handoff downstream contract",
-      "status": "partial",
-      "evidence": [
-        {"type": "repo_path", "path": "server/src/continuity/handoff.ts"},
-        {"type": "repo_path", "path": "server/test/threadkeeper-c3-postgres.integration.test.mjs"}
-      ],
-      "nextAction": "Prove the existing handoff resolves the integrated accepted checkpoint and lineage."
-    },
-    {
-      "id": "C3-08",
-      "title": "Downstream consumer authority remains independent",
-      "status": "partial",
-      "evidence": [
-        {"type": "repo_path", "path": "server/src/continuity/handoff.ts"},
-        {"type": "repo_path", "path": "server/test/threadkeeper-c3-postgres.integration.test.mjs"}
-      ],
-      "nextAction": "Verify the downstream envelope remains requires_independent_validation."
-    },
-    {
-      "id": "C3-09",
-      "title": "Exact-head isolated PostgreSQL end-to-end proof",
-      "status": "missing",
-      "evidence": [{"type": "repo_path", "path": "scripts/test_threadkeeper_c3.sh"}],
-      "nextAction": "Run TK-006 dedicated PostgreSQL 17 workflow."
-    },
-    {
-      "id": "C3-10",
-      "title": "Replay, stale-state, conflict, and degraded-source proof",
-      "status": "missing",
-      "evidence": [{"type": "repo_path", "path": "server/test/threadkeeper-c3-postgres.integration.test.mjs"}],
-      "nextAction": "Run the C3 failure/degraded scenarios on the exact head."
-    },
-    {
-      "id": "C3-11",
-      "title": "Restart durability and lineage recovery",
-      "status": "missing",
-      "evidence": [{"type": "repo_path", "path": "server/test/threadkeeper-c3-postgres.integration.test.mjs"}],
-      "nextAction": "Prove the current checkpoint and lineage survive connection restart."
-    },
-    {
-      "id": "C3-12",
-      "title": "Cross-system observability without sensitive labels",
-      "status": "partial",
-      "evidence": [
-        {"type": "repo_path", "path": "server/src/threadkeeper/conversation-history-integration.ts"},
-        {"type": "repo_path", "path": "server/test/threadkeeper-c3-service.test.mjs"}
-      ],
-      "nextAction": "Run observability and canary-exclusion tests."
-    },
-    {
-      "id": "C3-13",
-      "title": "Adjacent-system non-absorption remains proven",
-      "status": "partial",
-      "evidence": [
-        {"type": "repo_path", "path": "server/src/threadkeeper/conversation-history-integration.ts"},
-        {"type": "repo_path", "path": "docs/architecture/threadkeeper-capability-contract.md"}
-      ],
-      "nextAction": "Verify no new mutation/execution authority is granted to ThreadKeeper."
-    },
-    {
-      "id": "C3-14",
-      "title": "Bounded Supabase Test integration verification",
-      "status": "missing",
-      "evidence": [{"type": "repo_path", "path": "docs/provenance/2026-10-27-tk-006-threadkeeper-c3-integration.md"}],
-      "nextAction": "After isolated proof, verify Test contracts and zero-baseline fail-closed behavior without loading synthetic shared data."
-    },
-    {
-      "id": "C3-15",
-      "title": "Canonical Development Evidence and governed projection reconciliation",
-      "status": "missing",
-      "evidence": [{"type": "repo_path", "path": "docs/provenance/2026-10-27-tk-006-threadkeeper-c3-integration.md"}],
-      "nextAction": "Reconcile CDE and CCI/MLC/DPE/EDG only after technical and Test evidence passes."
-    },
-    {
-      "id": "C3-16",
-      "title": "Post-change MCTRL PASS",
-      "status": "missing",
-      "evidence": [{"type": "repo_path", "path": "config/maintenance-control.v1.json"}],
-      "nextAction": "Run exact-head MCTRL after governed maturity projection changes."
-    },
-    {
-      "id": "C3-17",
-      "title": "Explicit C2 to C3 promotion journal event",
-      "status": "missing",
-      "evidence": [{"type": "repo_path", "path": "docs/provenance/2026-10-27-tk-006-threadkeeper-c3-integration.md"}],
-      "nextAction": "Append the C2 to C3 journal only after all other C3 gates are proven."
-    }
+    {"id":"C3-01","title":"Accepted C2 ThreadKeeper baseline","status":"proven","evidence":[{"type":"repo_path","path":"config/threadkeeper-c2-evidence.v1.json"},{"type":"repo_path","path":"docs/provenance/2026-10-26-tk-005-threadkeeper-c2-evidence.md"}]},
+    {"id":"C3-02","title":"Exact C3 implementation commit","status":"proven","evidence":[{"type":"repo_path","path":"server/src/threadkeeper/conversation-history-integration.ts"},{"type":"github_run","runId":40562386747}],"note":"C3 implementation code is frozen at 665d52b7d92f89e98aec0cfb5210b9fed6e8aa8c; later TK-006 commits may change evidence/projection metadata only unless implementation is deliberately reopened."},
+    {"id":"C3-03","title":"Real certified Conversation History upstream contract","status":"proven","evidence":[{"type":"repo_path","path":"server/src/threadkeeper/conversation-history-integration.ts"},{"type":"repo_path","path":"db/migrations/20261027_002_chatgpt_differential_ingestion.sql"},{"type":"github_run","runId":40562386747}]},
+    {"id":"C3-04","title":"Conversation History read-only authority boundary","status":"proven","evidence":[{"type":"repo_path","path":"db/migrations/20261027_004_threadkeeper_c3_history_read_boundary.sql"},{"type":"repo_path","path":"db/migrations/verify_20261027_004_threadkeeper_c3_history_read_boundary.sql"},{"type":"github_run","runId":40562386747}]},
+    {"id":"C3-05","title":"Reference-over-copy source evidence boundary","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-c3-service.test.mjs"},{"type":"repo_path","path":"server/test/threadkeeper-c3-postgres.integration.test.mjs"},{"type":"github_run","runId":40562386747}]},
+    {"id":"C3-06","title":"ThreadKeeper C3 integration facade","status":"proven","evidence":[{"type":"repo_path","path":"server/src/threadkeeper/conversation-history-integration.ts"},{"type":"repo_path","path":"server/test/threadkeeper-c3-postgres.integration.test.mjs"},{"type":"github_run","runId":40562386747}]},
+    {"id":"C3-07","title":"Real continuity-handoff downstream contract","status":"proven","evidence":[{"type":"repo_path","path":"server/src/continuity/handoff.ts"},{"type":"repo_path","path":"server/test/threadkeeper-c3-postgres.integration.test.mjs"},{"type":"github_run","runId":40562386747}]},
+    {"id":"C3-08","title":"Downstream consumer authority remains independent","status":"proven","evidence":[{"type":"repo_path","path":"server/src/continuity/handoff.ts"},{"type":"repo_path","path":"server/test/threadkeeper-c3-postgres.integration.test.mjs"},{"type":"github_run","runId":40562386747}]},
+    {"id":"C3-09","title":"Exact-head isolated PostgreSQL end-to-end proof","status":"proven","evidence":[{"type":"repo_path","path":"scripts/test_threadkeeper_c3.sh"},{"type":"github_run","runId":40562386747}]},
+    {"id":"C3-10","title":"Replay, stale-state, conflict, and degraded-source proof","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-c3-postgres.integration.test.mjs"},{"type":"github_run","runId":40562386747}]},
+    {"id":"C3-11","title":"Restart durability and lineage recovery","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-c3-postgres.integration.test.mjs"},{"type":"github_run","runId":40562386747}]},
+    {"id":"C3-12","title":"Cross-system observability without sensitive labels","status":"proven","evidence":[{"type":"repo_path","path":"server/src/threadkeeper/conversation-history-integration.ts"},{"type":"repo_path","path":"server/test/threadkeeper-c3-service.test.mjs"},{"type":"github_run","runId":40562386747}]},
+    {"id":"C3-13","title":"Adjacent-system non-absorption remains proven","status":"proven","evidence":[{"type":"repo_path","path":"docs/architecture/threadkeeper-capability-contract.md"},{"type":"repo_path","path":"server/test/threadkeeper-c3-postgres.integration.test.mjs"},{"type":"github_run","runId":40562386747}]},
+    {"id":"C3-14","title":"Bounded Supabase Test integration verification","status":"proven","evidence":[{"type":"repo_path","path":"docs/provenance/2026-10-27-tk-006-threadkeeper-c3-integration.md"},{"type":"cde_key","key":"JRN-20261027-0007"}],"note":"Test migration threadkeeper_c3_history_read_boundary applied successfully. Reader SELECT is enabled only on accepted checkpoint/snapshot membership; DML remains denied; Test has zero certified baselines/checkpoints and reader sees zero rows; pre-existing ThreadKeeper 1-scope/2-checkpoint state was not mutated."},
+    {"id":"C3-15","title":"Canonical Development Evidence and governed projection reconciliation","status":"missing","evidence":[{"type":"repo_path","path":"docs/provenance/2026-10-27-tk-006-threadkeeper-c3-integration.md"}],"nextAction":"Reconcile CCI/MLC/DPE/EDG and canonical CDE to the verified C3 claim while preserving topology where unchanged."},
+    {"id":"C3-16","title":"Post-change MCTRL PASS","status":"missing","evidence":[{"type":"repo_path","path":"config/maintenance-control.v1.json"}],"nextAction":"Run exact-head MCTRL after governed maturity projection changes and bind the successful run."},
+    {"id":"C3-17","title":"Explicit C2 to C3 promotion journal event","status":"missing","evidence":[{"type":"repo_path","path":"docs/provenance/2026-10-27-tk-006-threadkeeper-c3-integration.md"}],"nextAction":"Append the explicit C2 Implemented to C3 Integrated promotion journal only after C3-15 and C3-16 are proven."}
   ],
   "scenarioRequirements": [
-    {"id": "E-01", "title": "Certified baseline source resolves through the restricted Conversation History role", "status": "missing", "evidence": [{"type": "repo_path", "path": "server/test/threadkeeper-c3-postgres.integration.test.mjs"}], "nextAction": "Run exact-head C3 PostgreSQL proof."},
-    {"id": "E-02", "title": "Uncertified PASS source remains invisible and unavailable", "status": "missing", "evidence": [{"type": "repo_path", "path": "server/test/threadkeeper-c3-postgres.integration.test.mjs"}], "nextAction": "Run exact-head C3 PostgreSQL proof."},
-    {"id": "E-03", "title": "Initial source can establish a checkpoint only with external authority", "status": "missing", "evidence": [{"type": "repo_path", "path": "server/test/threadkeeper-c3-postgres.integration.test.mjs"}], "nextAction": "Run exact-head C3 PostgreSQL proof."},
-    {"id": "E-04", "title": "Replay of unchanged certified source is idempotent and INTACT", "status": "missing", "evidence": [{"type": "repo_path", "path": "server/test/threadkeeper-c3-postgres.integration.test.mjs"}], "nextAction": "Run exact-head C3 PostgreSQL proof."},
-    {"id": "E-05", "title": "Changed certified source is detected as a material continuity change", "status": "missing", "evidence": [{"type": "repo_path", "path": "server/test/threadkeeper-c3-postgres.integration.test.mjs"}], "nextAction": "Run exact-head C3 PostgreSQL proof."},
-    {"id": "E-06", "title": "Externally accepted changed source preserves predecessor lineage", "status": "missing", "evidence": [{"type": "repo_path", "path": "server/test/threadkeeper-c3-postgres.integration.test.mjs"}], "nextAction": "Run exact-head C3 PostgreSQL proof."},
-    {"id": "E-07", "title": "Downstream stale checkpoint expectation is rejected", "status": "missing", "evidence": [{"type": "repo_path", "path": "server/test/threadkeeper-c3-postgres.integration.test.mjs"}], "nextAction": "Run exact-head C3 PostgreSQL proof."},
-    {"id": "E-08", "title": "Downstream current handoff returns current checkpoint and complete lineage", "status": "missing", "evidence": [{"type": "repo_path", "path": "server/test/threadkeeper-c3-postgres.integration.test.mjs"}], "nextAction": "Run exact-head C3 PostgreSQL proof."},
-    {"id": "E-09", "title": "Conversation History reader cannot mutate source evidence", "status": "missing", "evidence": [{"type": "repo_path", "path": "server/test/threadkeeper-c3-postgres.integration.test.mjs"}], "nextAction": "Run exact-head C3 PostgreSQL proof."},
-    {"id": "E-10", "title": "Resolver outage remains source_unverifiable and does not fabricate continuity", "status": "missing", "evidence": [{"type": "repo_path", "path": "server/test/threadkeeper-c3-postgres.integration.test.mjs"}], "nextAction": "Run exact-head C3 PostgreSQL proof."},
-    {"id": "E-11", "title": "Connection restart preserves accepted checkpoint and lineage", "status": "missing", "evidence": [{"type": "repo_path", "path": "server/test/threadkeeper-c3-postgres.integration.test.mjs"}], "nextAction": "Run exact-head C3 PostgreSQL proof."},
-    {"id": "E-12", "title": "Raw transcript and private-title canaries never enter ThreadKeeper state or metrics", "status": "missing", "evidence": [{"type": "repo_path", "path": "server/test/threadkeeper-c3-service.test.mjs"}, {"type": "repo_path", "path": "server/test/threadkeeper-c3-postgres.integration.test.mjs"}], "nextAction": "Run exact-head C3 unit and PostgreSQL proof."}
+    {"id":"E-01","title":"Certified baseline source resolves through the restricted Conversation History role","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-c3-postgres.integration.test.mjs"},{"type":"github_run","runId":40562386747}]},
+    {"id":"E-02","title":"Uncertified PASS source remains invisible and unavailable","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-c3-postgres.integration.test.mjs"},{"type":"github_run","runId":40562386747}]},
+    {"id":"E-03","title":"Initial source can establish a checkpoint only with external authority","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-c3-postgres.integration.test.mjs"},{"type":"github_run","runId":40562386747}]},
+    {"id":"E-04","title":"Replay of unchanged certified source is idempotent and INTACT","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-c3-postgres.integration.test.mjs"},{"type":"github_run","runId":40562386747}]},
+    {"id":"E-05","title":"Changed certified source is detected as a material continuity change","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-c3-postgres.integration.test.mjs"},{"type":"github_run","runId":40562386747}]},
+    {"id":"E-06","title":"Externally accepted changed source preserves predecessor lineage","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-c3-postgres.integration.test.mjs"},{"type":"github_run","runId":40562386747}]},
+    {"id":"E-07","title":"Downstream stale checkpoint expectation is rejected","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-c3-postgres.integration.test.mjs"},{"type":"github_run","runId":40562386747}]},
+    {"id":"E-08","title":"Downstream current handoff returns current checkpoint and complete lineage","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-c3-postgres.integration.test.mjs"},{"type":"github_run","runId":40562386747}]},
+    {"id":"E-09","title":"Conversation History reader cannot mutate source evidence","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-c3-postgres.integration.test.mjs"},{"type":"github_run","runId":40562386747}]},
+    {"id":"E-10","title":"Resolver outage remains source_unverifiable and does not fabricate continuity","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-c3-postgres.integration.test.mjs"},{"type":"github_run","runId":40562386747}]},
+    {"id":"E-11","title":"Connection restart preserves accepted checkpoint and lineage","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-c3-postgres.integration.test.mjs"},{"type":"github_run","runId":40562386747}]},
+    {"id":"E-12","title":"Raw transcript and private-title canaries never enter ThreadKeeper state or metrics","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-c3-service.test.mjs"},{"type":"repo_path","path":"server/test/threadkeeper-c3-postgres.integration.test.mjs"},{"type":"github_run","runId":40562386747}]}
   ]
 }

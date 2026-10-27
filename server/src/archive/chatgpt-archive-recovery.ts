@@ -35,6 +35,8 @@ interface PartialEvidenceCounts {
   parserErrors: number;
   parserWarnings: number;
   quarantinedFragments: number;
+  snapshotConversations: number;
+  snapshotNodes: number;
 }
 
 function requireReason(reason: string): string {
@@ -80,6 +82,24 @@ async function partialEvidenceCounts(client: import('pg').PoolClient, importId: 
   );
   const row = result.rows[0];
   if (!row) throw new Error('Archive recovery could not inspect partial evidence counts');
+
+  let snapshotConversations = 0;
+  let snapshotNodes = 0;
+  const differentialTables = (await client.query<{ available: boolean }>(
+    `SELECT to_regclass('comind.cm_archive_snapshot_conversation') IS NOT NULL
+            AND to_regclass('comind.cm_archive_snapshot_node') IS NOT NULL AS available`
+  )).rows[0]?.available === true;
+  if (differentialTables) {
+    const snapshot = (await client.query<{ conversations: string; nodes: string }>(
+      `SELECT
+         (SELECT count(*) FROM comind.cm_archive_snapshot_conversation WHERE import_id=$1)::text AS conversations,
+         (SELECT count(*) FROM comind.cm_archive_snapshot_node WHERE import_id=$1)::text AS nodes`,
+      [importId]
+    )).rows[0];
+    snapshotConversations = Number(snapshot?.conversations ?? 0);
+    snapshotNodes = Number(snapshot?.nodes ?? 0);
+  }
+
   return {
     conversations: Number(row.conversations),
     nodes: Number(row.nodes),
@@ -89,6 +109,8 @@ async function partialEvidenceCounts(client: import('pg').PoolClient, importId: 
     parserErrors: Number(row.parser_errors),
     parserWarnings: Number(row.parser_warnings),
     quarantinedFragments: Number(row.quarantined),
+    snapshotConversations,
+    snapshotNodes,
   };
 }
 
@@ -111,7 +133,6 @@ export async function recoverInterruptedArchiveImport(
     )).rows[0];
     if (!source) throw new Error(`Archive import attempt ${importId} does not exist`);
     sourceLock = `archive:${source.hash}`;
-    // Serialize recovery with ingestion as well as other recovery requests.
     await client.query("SET lock_timeout = '5s'");
     await client.query('SELECT pg_advisory_lock(hashtextextended($1,0))', [sourceLock]);
     await client.query('BEGIN');

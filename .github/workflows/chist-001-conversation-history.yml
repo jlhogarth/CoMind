@@ -10,16 +10,25 @@ on:
       - 'db/migrations/20261026_005_conversation_history_pit_diff.sql'
       - 'db/migrations/20261026_006_conversation_history_archive_derivation_fk_indexes.sql'
       - 'db/migrations/20261026_007_chatgpt_archive_parser_info_events.sql'
+      - 'db/migrations/20261027_001_pfc_a01_archive_import_recovery.sql'
+      - 'db/migrations/20261027_002_chatgpt_differential_ingestion.sql'
+      - 'db/migrations/20261027_003_chatgpt_differential_recovery_access.sql'
       - 'db/verification/chist_001_live_test.sql'
+      - 'db/verification/chist_002_differential_ingestion.sql'
       - 'server/src/history/**'
       - 'server/src/archive/chatgpt-export.ts'
       - 'server/src/archive/chatgpt-export-ingest.ts'
+      - 'server/src/archive/chatgpt-export-scan.ts'
       - 'server/src/archive/chatgpt-export-diff*.ts'
+      - 'server/src/archive/chatgpt-differential-ingest.ts'
+      - 'server/test/chatgpt-differential-ingestion.integration.test.mjs'
+      - 'server/test/chatgpt-differential-recovery.integration.test.mjs'
       - 'scripts/test_chist_001_conversation_history.sh'
       - 'scripts/test_chist_001_archive_derivation.sh'
       - 'scripts/test_chist_001_archive_readback.sh'
       - 'scripts/test_chist_001_baseline_certification.sh'
       - 'scripts/test_chist_001_pit_diff.sh'
+      - 'scripts/test_chist_differential_ingestion.sh'
       - '.github/workflows/chist-001-conversation-history.yml'
   workflow_dispatch:
 
@@ -57,8 +66,8 @@ jobs:
           cache: npm
           cache-dependency-path: server/package-lock.json
 
-      - name: Install PostgreSQL client
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Install PostgreSQL client and unzip
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client unzip
 
       - name: Install server dependencies
         working-directory: server
@@ -102,3 +111,17 @@ jobs:
         run: |
           psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f db/migrations/20261027_001_pfc_a01_archive_import_recovery.sql
           bash scripts/test_pfc_a01_abandoned_certification.sh
+
+      - name: Apply differential checkpoint schema and recovery hardening
+        run: |
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f db/migrations/20261026_007_chatgpt_archive_parser_info_events.sql
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f db/migrations/20261027_002_chatgpt_differential_ingestion.sql
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f db/migrations/20261027_003_chatgpt_differential_recovery_access.sql
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f db/migrations/20261027_002_chatgpt_differential_ingestion.sql
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f db/migrations/20261027_003_chatgpt_differential_recovery_access.sql
+
+      - name: Verify differential schema, RLS, and bounded authority
+        run: psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f db/verification/chist_002_differential_ingestion.sql
+
+      - name: Run A-B-C differential ingestion acceptance proof
+        run: bash scripts/test_chist_differential_ingestion.sh

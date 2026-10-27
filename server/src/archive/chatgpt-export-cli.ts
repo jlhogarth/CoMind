@@ -18,9 +18,23 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (inputPath === '--recover') {
+    const importId = process.argv[3];
+    const reason = process.argv[4];
+    if (!importId || !reason) {
+      throw new Error(
+        'Usage: node dist/archive/chatgpt-export-cli.js --recover <interrupted-import-id> <reason>'
+      );
+    }
+    const { recoverInterruptedArchiveImport } = await import('./chatgpt-archive-recovery.js');
+    const result = await recoverInterruptedArchiveImport(importId, reason);
+    process.stdout.write(`${JSON.stringify({ status: 'PASS', ...result }, null, 2)}\n`);
+    return;
+  }
+
   if (!inputPath) {
     throw new Error(
-      'Usage: node dist/archive/chatgpt-export-cli.js --preflight | <chatgpt-export.zip|extracted-directory>'
+      'Usage: node dist/archive/chatgpt-export-cli.js --preflight | --recover <interrupted-import-id> <reason> | <chatgpt-export.zip|extracted-directory>'
     );
   }
 

@@ -454,6 +454,13 @@ async function beginArchiveAttempt(
 ): Promise<{ sourceArchiveId: string; importId: string; existingStatus: string | null; existingReceipt: unknown; existingReceiptSha256: string | null }> {
   await client.query('BEGIN');
   try {
+    // Serialize attempt selection by immutable source identity without granting
+    // UPDATE on the append-only archive source table merely to obtain a row lock.
+    await client.query(
+      `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`,
+      [source.sourceArchiveSha256]
+    );
+
     await client.query(
       `INSERT INTO comind.cm_archive_source
          (source_system, source_archive_name, source_archive_sha256, source_archive_bytes, source_uri, source_metadata)
@@ -462,7 +469,9 @@ async function beginArchiveAttempt(
       [source.sourceArchiveName, source.sourceArchiveSha256, source.sourceArchiveBytes, source.sourceUri, JSON.stringify({ inventoryVersion: 2 })]
     );
     const sourceResult = await client.query<{ source_archive_id: string }>(
-      `SELECT source_archive_id FROM comind.cm_archive_source WHERE source_system='chatgpt' AND source_archive_sha256=$1`,
+      `SELECT source_archive_id
+         FROM comind.cm_archive_source
+        WHERE source_system='chatgpt' AND source_archive_sha256=$1`,
       [source.sourceArchiveSha256]
     );
     const sourceArchiveId = sourceResult.rows[0]?.source_archive_id;
@@ -478,19 +487,31 @@ async function beginArchiveAttempt(
       );
     }
 
-    await client.query(
-      `INSERT INTO comind.cm_archive_import (source_archive_id, parser_version, schema_version)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (source_archive_id, parser_version, schema_version) DO NOTHING`,
+    let importResult = await client.query<{ import_id: string; status: string; receipt: unknown; receipt_sha256: string | null }>(
+      `SELECT import_id,status,receipt,receipt_sha256
+         FROM comind.cm_archive_import
+        WHERE source_archive_id=$1 AND parser_version=$2 AND schema_version=$3
+        ORDER BY attempt_number DESC
+        LIMIT 1`,
       [sourceArchiveId, CHATGPT_ARCHIVE_PARSER_VERSION, CHATGPT_ARCHIVE_SCHEMA_VERSION]
     );
-    const importResult = await client.query<{ import_id: string; status: string; receipt: unknown; receipt_sha256: string | null }>(
-      `SELECT import_id,status,receipt,receipt_sha256 FROM comind.cm_archive_import
-       WHERE source_archive_id=$1 AND parser_version=$2 AND schema_version=$3`,
-      [sourceArchiveId, CHATGPT_ARCHIVE_PARSER_VERSION, CHATGPT_ARCHIVE_SCHEMA_VERSION]
-    );
+
+    if (importResult.rows.length === 0) {
+      importResult = await client.query<{ import_id: string; status: string; receipt: unknown; receipt_sha256: string | null }>(
+        `INSERT INTO comind.cm_archive_import
+           (source_archive_id, parser_version, schema_version, attempt_number)
+         VALUES ($1, $2, $3, 1)
+         RETURNING import_id,status,receipt,receipt_sha256`,
+        [sourceArchiveId, CHATGPT_ARCHIVE_PARSER_VERSION, CHATGPT_ARCHIVE_SCHEMA_VERSION]
+      );
+    }
+
     const row = importResult.rows[0];
     if (!row) throw new Error('Archive import attempt could not be established');
+    if (row.status === 'ABANDONED') {
+      throw new Error('Latest archive import attempt is ABANDONED without a successor; recovery lineage is inconsistent');
+    }
+
     await client.query('COMMIT');
     return {
       sourceArchiveId,
@@ -663,13 +684,22 @@ export async function ingestChatGptExport(inputPath: string): Promise<ArchiveImp
   assertArchiveDatabaseSessionPrepared();
   const prepared = await prepareSource(inputPath);
   const client = await pool.connect();
+  let locked = false;
   try {
+    locked = (await client.query<{ locked: boolean }>(
+      'SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS locked',
+      [`archive:${prepared.sourceArchiveSha256}`]
+    )).rows[0]?.locked === true;
+    if (!locked) throw new Error('Archive source is busy; retry after the active operation terminates');
     const files = await listFiles(prepared.sourceRoot);
     const conversationFiles = files.filter((file) => file.fileRole === 'conversation_json').sort((a, b) => a.sourcePath.localeCompare(b.sourcePath));
     if (conversationFiles.length === 0) throw new Error('No ChatGPT conversation JSON files were detected in the export');
 
     const attempt = await beginArchiveAttempt(client, prepared, files);
     if (attempt.existingStatus && attempt.existingStatus !== 'PENDING') {
+      if (attempt.existingStatus === 'ABANDONED') {
+        throw new Error('Abandoned archive import cannot be reused as a finalized import');
+      }
       if (!attempt.existingReceipt || !attempt.existingReceiptSha256) throw new Error('Existing finalized import is missing its integrity receipt');
       return {
         importId: attempt.importId,
@@ -682,11 +712,13 @@ export async function ingestChatGptExport(inputPath: string): Promise<ArchiveImp
     }
 
     const existingObservation = await client.query<{ count: string }>(
-      `SELECT count(*)::text AS count FROM comind.cm_archive_conversation_observation WHERE import_id=$1`,
+      `SELECT ((SELECT count(*) FROM comind.cm_archive_conversation_observation WHERE import_id=$1)
+       + (SELECT count(*) FROM comind.cm_archive_parser_event WHERE import_id=$1)
+       + (SELECT count(*) FROM comind.cm_archive_quarantine WHERE import_id=$1))::text AS count`,
       [attempt.importId]
     );
     if (Number(existingObservation.rows[0]?.count ?? '0') > 0) {
-      throw new Error('Existing PENDING import contains observations; resume semantics are intentionally not implemented in V0');
+      throw new Error('Existing PENDING import contains observations; explicit recovery is required before retry');
     }
 
     const sourceCounts = { conversations: 0, messages: 0, nodes: 0, assets: files.filter((file) => file.fileRole === 'asset').length };
@@ -766,6 +798,7 @@ export async function ingestChatGptExport(inputPath: string): Promise<ArchiveImp
 
     return await finalizeImport(client, attempt.importId, attempt.sourceArchiveId, sourceCounts, telemetry, conversationFiles);
   } finally {
+    if (locked) await client.query('SELECT pg_advisory_unlock(hashtextextended($1,0))', [`archive:${prepared.sourceArchiveSha256}`]);
     client.release();
     await prepared.cleanup();
   }

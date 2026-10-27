@@ -7,11 +7,13 @@ on:
       - 'server/src/db.ts'
       - 'server/src/scripts/import_chatgpt_export.ts'
       - 'server/test/chatgpt-archive-ingestion*.test.mjs'
+      - 'server/test/chatgpt-archive-recovery*.test.mjs'
       - 'server/test/chatgpt-archive-load*.test.mjs'
       - 'db/migrations/20261012_001_chatgpt_archive_ingestion.sql'
       - 'db/migrations/20261012_002_chatgpt_archive_quarantine.sql'
       - 'db/migrations/20261012_003_chatgpt_archive_access_hardening.sql'
       - 'db/migrations/20261026_007_chatgpt_archive_parser_info_events.sql'
+      - 'db/migrations/20261027_001_pfc_a01_archive_import_recovery.sql'
       - 'db/migrations/verify_20261012_001_chatgpt_archive_ingestion.sql'
       - 'db/migrations/verify_20261012_003_chatgpt_archive_access_hardening.sql'
       - 'scripts/test_chatgpt_archive_ingestion.sh'
@@ -27,11 +29,13 @@ on:
       - 'server/src/db.ts'
       - 'server/src/scripts/import_chatgpt_export.ts'
       - 'server/test/chatgpt-archive-ingestion*.test.mjs'
+      - 'server/test/chatgpt-archive-recovery*.test.mjs'
       - 'server/test/chatgpt-archive-load*.test.mjs'
       - 'db/migrations/20261012_001_chatgpt_archive_ingestion.sql'
       - 'db/migrations/20261012_002_chatgpt_archive_quarantine.sql'
       - 'db/migrations/20261012_003_chatgpt_archive_access_hardening.sql'
       - 'db/migrations/20261026_007_chatgpt_archive_parser_info_events.sql'
+      - 'db/migrations/20261027_001_pfc_a01_archive_import_recovery.sql'
       - 'db/migrations/verify_20261012_001_chatgpt_archive_ingestion.sql'
       - 'db/migrations/verify_20261012_003_chatgpt_archive_access_hardening.sql'
       - 'scripts/test_chatgpt_archive_ingestion.sh'
@@ -73,7 +77,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes postgresql-client unzip
-      - name: Verify lossless and access-hardened ChatGPT archive ingestion
+      - name: Verify lossless, access-hardened, recoverable ChatGPT archive ingestion
         run: bash scripts/test_chatgpt_archive_ingestion.sh
       - name: Upload PIT-0 synthetic archive load evidence
         if: always()

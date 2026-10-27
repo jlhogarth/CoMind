@@ -141,8 +141,7 @@ BEGIN
     FROM comind.cm_archive_checkpoint
     WHERE archive_stream_id=NEW.archive_stream_id
     ORDER BY sequence_no DESC
-    LIMIT 1
-    FOR SHARE;
+    LIMIT 1;
     IF NOT FOUND THEN RAISE EXCEPTION 'differential checkpoint requires an accepted predecessor'; END IF;
     IF NEW.sequence_no <> v_previous.sequence_no + 1 OR NEW.predecessor_checkpoint_id <> v_previous.checkpoint_id THEN
       RAISE EXCEPTION 'checkpoint must extend the latest accepted predecessor';

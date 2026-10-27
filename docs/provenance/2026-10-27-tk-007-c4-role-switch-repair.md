@@ -57,6 +57,23 @@ The repair adapts the existing governed archive database principle already prese
 
 ThreadKeeper uses transaction-local switching rather than a session-wide role because pooled application connections must not retain authority state across unrelated borrowers.
 
+## Repair-harness sequencing failure
+
+The first integrated TK-007B repair head, `1a86676c6ee5f706d95b5e173627e63378427d09`, failed the isolated C4 workflow before reaching the new C4 assertions.
+
+The failure occurred in the legacy TK-006 C3 PostgreSQL compatibility regression. Current `repository.ts` code now correctly routes checkpoint and case transactions through the constrained ThreadKeeper runtime boundary, but `scripts/test_threadkeeper_c3.sh` executed its C3 database tests before the TK-007 runtime-role migration had been applied. PostgreSQL therefore reported that `comind_threadkeeper_runtime` did not exist.
+
+This was a test-bootstrap sequencing defect, not a relaxation candidate. No runtime fallback was added.
+
+The correction is:
+
+- the C3 database regression now installs and verifies the current TK-007 runtime schema after its C3 prerequisite migrations and before running current repository code;
+- C3 evidence semantics remain C3 and the C3 matrix is unchanged;
+- the test is explicitly a C3 compatibility regression under the current ThreadKeeper runtime schema, not a claim that C4 existed historically;
+- the C4 wrapper no longer applies migration 007 a second time.
+
+This preserves fail-closed runtime behavior while ensuring historical maturity regression tests execute against the schema required by current application code.
+
 ## Files
 
 - `server/src/threadkeeper/database.ts`
@@ -69,8 +86,11 @@ ThreadKeeper uses transaction-local switching rather than a session-wide role be
 - `server/test/threadkeeper-c4-runtime-role.test.mjs`
   - proves the role is assumed inside the ThreadKeeper transaction
   - proves the role is cleared after transaction completion
+- `scripts/test_threadkeeper_c3.sh`
+  - runs C3 compatibility regression against the current ThreadKeeper runtime schema
 - `scripts/test_threadkeeper_c4.sh`
   - removes the `PGOPTIONS` assumption
+  - reuses the runtime schema already bootstrapped by the C3 compatibility regression
 - `.github/workflows/tk-007-threadkeeper-c4.yml`
   - removes the `PGOPTIONS` assumption
   - preserves a bounded JSON failure receipt even when a live preflight fails before the main operational artifact can be produced
@@ -81,6 +101,7 @@ This repair is acceptable only if the exact repair head passes:
 
 - isolated TK-007 C4 proof;
 - runtime-role assumption and role-leak negative proof;
+- C3 compatibility regression under the current runtime schema;
 - MCTRL;
 - broad CI;
 - freshness/race check against `main`.

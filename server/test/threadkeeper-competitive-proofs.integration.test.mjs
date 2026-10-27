@@ -101,13 +101,17 @@ test('CP-03 stale state is never current and CP-01/CP-02 handoff state survives 
       '2026-10-27T02:01:00.000Z'
     );
 
+    // At observation time the material change is unexplained, so it is
+    // actionable and routed for review. Authority is established later when
+    // the case resolves as ACCEPTED_DIVERGENCE and checkpoint B is accepted.
     const assessment = assessContinuity({
       scopeSemanticKey: semanticKey,
       checkpointId: checkpointA.checkpointId,
-      observationId: `observation:cp03:authorized-change:${process.pid}`,
+      observationId: `observation:cp03:material-change:${process.pid}`,
       evidenceRefs: evidence,
-      signals: signals({ authorizedChange: true, materialChange: true }),
+      signals: signals({ materialChange: true }),
     });
+    assert.equal(assessment.classification, 'SUSPECTED_BREAK');
     const storedAssessment = await persistAssessment(query, {
       idempotencyKey: `assessment:cp03:${process.pid}`,
       assessment,

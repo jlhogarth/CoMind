@@ -1,0 +1,59 @@
+name: CHIST-K01 Hybrid Retrieval
+
+on:
+  pull_request:
+    paths:
+      - 'db/migrations/20261026_013_conversation_history_hybrid_rag.sql'
+      - 'scripts/test_chist_k01_hybrid_rag.sh'
+      - 'docs/architecture/chist-k01-hybrid-rag.md'
+      - '.github/workflows/chist-k01-hybrid-rag.yml'
+      - 'db/sql/v2/03_schema_graph_rag.sql'
+      - 'db/sql/v2/08_indexes_constraints.sql'
+      - 'db/sql/v2/10_rls_policies.sql'
+      - 'db/migrations/20261026_002_conversation_history_baseline_certification.sql'
+      - 'db/migrations/20261026_012_conversation_history_sessionization_deployment_reconciliation.sql'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  governed-hybrid-retrieval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.6-pg17-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/comind_ci
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install PostgreSQL client and Python
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client python3
+
+      - name: Install server dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Run CHIST-K01 isolated acceptance
+        run: bash scripts/test_chist_k01_hybrid_rag.sh

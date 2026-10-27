@@ -23,7 +23,7 @@ if (process.env.CHATGPT_ARCHIVE_DB_TEST !== '1') {
     sha256Canonical,
     sha256Text,
   } = await import('../dist/archive/chatgpt-export.js');
-  const { closePool, prepareArchiveDatabaseSession, query } = await import('../dist/db.js');
+  const { closePool, pool, prepareArchiveDatabaseSession, query } = await import('../dist/db.js');
   await prepareArchiveDatabaseSession();
   after(async () => closePool());
 
@@ -100,11 +100,12 @@ if (process.env.CHATGPT_ARCHIVE_DB_TEST !== '1') {
       currentNodeId: analysis.currentNodeId,
     });
 
-    // This transaction is the durable state left by an abrupt process death
-    // after one conversation commit but before the import receipt is finalized.
-    await query('BEGIN');
+    // This committed conversation transaction is the exact durable state left
+    // by an abrupt process death before the import receipt is finalized.
+    const client = await pool.connect();
     try {
-      await query(
+      await client.query('BEGIN');
+      await client.query(
         `INSERT INTO comind.cm_archive_conversation_observation
            (import_id,source_conversation_id,title,source_created_at,source_updated_at,created_at,updated_at,
             raw_source_hash,normalized_hash,topology_hash,node_count,message_count,attachment_reference_count,raw_conversation)
@@ -117,7 +118,7 @@ if (process.env.CHATGPT_ARCHIVE_DB_TEST !== '1') {
         ]
       );
       for (const node of analysis.nodes) {
-        await query(
+        await client.query(
           `INSERT INTO comind.cm_archive_node_observation
              (import_id,source_conversation_id,source_node_id,parent_source_node_id,child_source_node_ids,
               source_message_id,role,source_created_at,source_updated_at,created_at,updated_at,content_type,
@@ -130,10 +131,12 @@ if (process.env.CHATGPT_ARCHIVE_DB_TEST !== '1') {
           ]
         );
       }
-      await query('COMMIT');
+      await client.query('COMMIT');
     } catch (error) {
-      await query('ROLLBACK');
+      await client.query('ROLLBACK');
       throw error;
+    } finally {
+      client.release();
     }
 
     return { root, item, importId, sourceArchiveId };

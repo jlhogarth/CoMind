@@ -62,6 +62,16 @@ for migration in \
   psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f "${root}/db/migrations/${migration}"
  done
 
+# C3 is a maturity/evidence regression, not a frozen historical-schema runtime.
+# Current ThreadKeeper repository transactions deliberately require the bounded
+# runtime role introduced for TK-007. Bootstrap the current runtime schema here
+# before executing C3 integration tests so the regression proves C3 behavior
+# remains compatible with the current least-privilege database boundary.
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
+  -f "${root}/db/migrations/20261027_007_threadkeeper_c4_operational_events.sql"
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
+  -f "${root}/db/migrations/verify_20261027_007_threadkeeper_c4_operational_events.sql"
+
 node "${root}/scripts/threadkeeper_c3_matrix.mjs"
 
 (
@@ -73,4 +83,4 @@ node "${root}/scripts/threadkeeper_c3_matrix.mjs"
   THREADKEEPER_C3_ISOLATED_DB_TEST=1 node --test test/threadkeeper-c3-postgres.integration.test.mjs
 )
 
-echo 'TK-006 isolated Conversation History -> ThreadKeeper -> continuity handoff integration: PASS'
+echo 'TK-006 C3 compatibility regression under current ThreadKeeper runtime schema: PASS'

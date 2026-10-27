@@ -25,7 +25,7 @@ psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 <<'SQL'
 INSERT INTO comind.cm_archive_source (
   source_archive_id,source_system,source_archive_name,source_archive_sha256,source_archive_bytes,source_metadata
 ) VALUES (
-  'c2410001-0000-4000-8000-000000000501','chatgpt','pfc-a01-abandoned.zip',repeat('5',64),512,
+  'c2410001-0000-4000-8000-000000000501','chatgpt','pfc-a01-abandoned.zip','34272eab6aa7a420c8868539968d6ae0e4abe725eb2876e29b47b4c99d808da1',512,
   '{"pfc_a01":true,"private_user_data":false}'::jsonb
 )
 ON CONFLICT (source_system,source_archive_sha256) DO NOTHING;
@@ -55,7 +55,7 @@ INSERT INTO comind.cm_conversation_history_baseline (
 ) VALUES (
   'c2410001-0000-4000-8000-000000000503',
   'c2410001-0000-4000-8000-000000000502',
-  'c2410001-0000-4000-8000-000000000501',repeat('5',64),'pfc-a01-cert-v1',
+  'c2410001-0000-4000-8000-000000000501','34272eab6aa7a420c8868539968d6ae0e4abe725eb2876e29b47b4c99d808da1','pfc-a01-cert-v1',
   'native_openai_export','isolated-pfc-a01-certifier','ABANDONED attempts must never certify.',
   '{"pfc_a01":true,"synthetic":true}'::jsonb,repeat('7',64)
 );

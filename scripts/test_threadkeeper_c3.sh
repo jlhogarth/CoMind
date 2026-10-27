@@ -30,10 +30,13 @@ for migration in \
   20261026_001_conversation_history_reader.sql \
   20261026_002_conversation_history_baseline_certification.sql \
   20261027_002_chatgpt_differential_ingestion.sql \
-  20261027_003_chatgpt_differential_recovery_access.sql
+  20261027_003_chatgpt_differential_recovery_access.sql \
+  20261027_004_threadkeeper_c3_history_read_boundary.sql
  do
   psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f "${root}/db/migrations/${migration}"
  done
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
+  -f "${root}/db/migrations/verify_20261027_004_threadkeeper_c3_history_read_boundary.sql"
 
 psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 <<'SQL'
 CREATE SCHEMA IF NOT EXISTS comind;

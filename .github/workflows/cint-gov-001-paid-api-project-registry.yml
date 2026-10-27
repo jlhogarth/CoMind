@@ -1,0 +1,100 @@
+name: CINT-GOV-001 Paid API and Project Registry
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/cint-gov-001-paid-api-project-registry.yml'
+      - 'db/migrations/20261027_008_cint_paid_api_project_registry.sql'
+      - 'db/migrations/20261027_009_cint_paid_api_project_registry_hardening.sql'
+      - 'db/migrations/20261027_010_cint_identity_reconciliation_guards.sql'
+      - 'db/migrations/20261027_011_foundry_unit_economics_and_api_cost_register.sql'
+      - 'db/migrations/20261027_012_foundry_unit_economics_fanout_hardening.sql'
+      - 'db/migrations/verify_20261027_008_cint_paid_api_project_registry.sql'
+      - 'db/migrations/verify_20261027_010_cint_identity_reconciliation_guards.sql'
+      - 'db/migrations/verify_20261027_011_foundry_unit_economics_and_api_cost_register.sql'
+      - 'db/migrations/verify_20261027_012_foundry_unit_economics_behavior.sql'
+      - 'db/migrations/20261006_001_comind_pm_ledger.sql'
+      - 'db/migrations/20261006_002_comind_pm_ledger_hardening.sql'
+      - 'db/migrations/20260910_001_comind_finops_resource_governor.sql'
+      - 'db/migrations/20261008_001_paid_provider_budget_authority_hardening.sql'
+      - 'db/migrations/20261008_002_current_runtime_budget_authority_adapter.sql'
+      - 'db/migrations/20261008_003_current_runtime_budget_authority_adapter_function_hardening.sql'
+      - 'db/migrations/20261008_004_current_runtime_budget_authority_adapter_lifecycle_hardening.sql'
+      - 'db/migrations/20261008_005_current_runtime_budget_authority_adapter_telemetry_role_hardening.sql'
+      - 'db/migrations/20261008_006_foundry_agent_substrate.sql'
+      - 'db/migrations/20261008_007_foundry_security_prerequisites.sql'
+      - 'db/test/**'
+      - 'db/sql/v2/**'
+      - 'scripts/test_foundry_agent_substrate.sh'
+      - 'scripts/test_cint_gov_001_paid_api_project_registry.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cint-governance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.6-pg17-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+    steps:
+      - name: Checkout exact workflow head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+      - name: Verify CINT-GOV-001 base and budget hardening
+        run: bash ./scripts/test_cint_gov_001_paid_api_project_registry.sh
+      - name: Verify stable project identity and reconciliation invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          for _ in 1 2; do
+            psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 \
+              -f ./db/migrations/20261027_010_cint_identity_reconciliation_guards.sql
+          done
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 \
+            -f ./db/migrations/verify_20261027_010_cint_identity_reconciliation_guards.sql
+      - name: Verify Foundry unit economics and API cost register
+        shell: bash
+        run: |
+          set -euo pipefail
+          for _ in 1 2; do
+            psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 \
+              -f ./db/migrations/20261027_011_foundry_unit_economics_and_api_cost_register.sql
+          done
+          for _ in 1 2; do
+            psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 \
+              -f ./db/migrations/20261027_012_foundry_unit_economics_fanout_hardening.sql
+          done
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 \
+            -f ./db/migrations/verify_20261027_011_foundry_unit_economics_and_api_cost_register.sql
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 \
+            -f ./db/migrations/verify_20261027_012_foundry_unit_economics_behavior.sql

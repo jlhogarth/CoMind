@@ -40,6 +40,18 @@ jobs:
     steps:
       - name: Check out exact candidate
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checked-out candidate
+        shell: bash
+        run: |
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected" || {
+            echo "Expected exact candidate $expected but checked out $actual" >&2
+            exit 1
+          }
 
       - name: Set up Node.js
         uses: actions/setup-node@v4

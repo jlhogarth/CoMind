@@ -4,6 +4,16 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 : "${DATABASE_URL:?DATABASE_URL required for isolated CHIST-K01 hardening verification}"
 
+# psql prints command tags such as "INSERT 0 1" after INSERT ... RETURNING.
+# K01 captures selected fixture identifiers from stdout, so make the acceptance
+# entrypoint quiet at the client layer while preserving row/query output.
+# Exporting the function carries the same deterministic behavior into the
+# child acceptance script without changing database semantics.
+psql() {
+  command psql -q "$@"
+}
+export -f psql
+
 # Prove the complete K01 behavior first.
 bash "${root}/scripts/test_chist_k01_hybrid_rag.sh"
 

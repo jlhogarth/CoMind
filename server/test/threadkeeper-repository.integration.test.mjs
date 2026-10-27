@@ -229,15 +229,37 @@ test('isolated PostgreSQL ThreadKeeper persistence preserves governed lineage, e
     assert.equal(assessedHead.rows[0].to_state, 'ASSESSED');
 
     await assert.rejects(
-      () => appendCaseTransition({
-        transitionKey: `transition:${process.pid}:illegal-resolve`,
-        caseId: opened.case.case_id,
-        expectedPriorTransitionId: assessedHead.rows[0].transition_id,
-        toState: 'RESOLVED',
-        actorRef: 'actor:tk004:test',
-        resolutionRef: 'resolution:invalid-direct',
-        recordedAt: '2026-10-26T22:42:00.000Z',
-      }),
+      () => query(
+        `INSERT INTO comind.cm_threadkeeper_case_transition (
+           transition_key, case_id, prior_transition_id, from_state, to_state,
+           route_code, actor_ref, authority_evidence_ref, evidence_refs,
+           resolution_ref, successor_checkpoint_id, recorded_at, transition_digest, transition
+         ) VALUES (
+           $1,$2::uuid,$3::uuid,'ASSESSED','RESOLVED',NULL,$4,NULL,$5::jsonb,
+           $6,NULL,$7::timestamptz,$8,$9::jsonb
+         )`,
+        [
+          `transition:${process.pid}:illegal-resolve`,
+          opened.case.case_id,
+          assessedHead.rows[0].transition_id,
+          'actor:tk004:test',
+          JSON.stringify(evidence),
+          'resolution:invalid-direct',
+          '2026-10-26T22:42:00.000Z',
+          '0'.repeat(64),
+          JSON.stringify({
+            fromState: 'ASSESSED',
+            toState: 'RESOLVED',
+            routeCode: null,
+            actorRef: 'actor:tk004:test',
+            authorityEvidenceRef: null,
+            evidenceRefs: evidence,
+            resolutionRef: 'resolution:invalid-direct',
+            successorCheckpointId: null,
+            recordedAt: '2026-10-26T22:42:00.000Z',
+          }),
+        ]
+      ),
       /Illegal ThreadKeeper case transition/
     );
 

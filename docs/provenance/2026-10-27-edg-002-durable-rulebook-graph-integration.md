@@ -3,7 +3,7 @@
 **Date:** 2026-10-27  
 **Issue:** #221  
 **Pull request:** #269  
-**Status:** Isolated CI and private Test verified; final freshness/matrix pending  
+**Status:** Isolated CI, private Test, and freshness reconciliation verified; final matrix pending  
 **Environment:** Private Test verified  
 **Production:** Unchanged
 
@@ -19,7 +19,7 @@ Canonical rule text, exact versions, lifecycle, authority, reconciliation, evalu
 
 ## Verified starting state
 
-Implementation was refreshed onto `main` at `dfcae33a517689c38c2a045bc8d04181e4198a35` before the repository package was authored.
+Implementation was initially refreshed onto `main` at `dfcae33a517689c38c2a045bc8d04181e4198a35` before the repository package was authored.
 
 Private Test inspection established:
 
@@ -216,6 +216,27 @@ Development Journal Test verification event:
 
 `52712417-cf9d-47f6-aabc-95105eba7e72`
 
+## Final freshness reconciliation
+
+After Test verification and before final acceptance, `main` advanced from `dfcae33a517689c38c2a045bc8d04181e4198a35` to `5385eae4bf7f6fdade540d05342f442ed40af1f1` through 18 intervening commits.
+
+The intervening diff contained 12 files limited to ThreadKeeper governed-evidence hardening, maintenance-control configuration, provenance, workflow changes, and evidence verifier scripts.
+
+Inspection found:
+
+- no new or modified database migration;
+- no `comind_development` schema change;
+- no Durable Rulebook schema change;
+- no REE, RCO, AUTH, DRULE, or EDG dependency change;
+- no use of migration slots `20261027_005` or `20261027_006`;
+- no collision with the seven-file EDG package.
+
+The exact verified EDG file blobs were rebuilt directly on `main` `5385eae4...` under force-with-lease as freshness commit:
+
+`83c0d7ece6a3671f3a7a7fa8eb9d0b7b1f500d64`
+
+No Test schema/data replay was required because the intervening work did not change any EDG or Rulebook dependency contract. The final acceptance matrix must nevertheless run on the post-provenance exact head.
+
 ## Verification package
 
 - `db/verification/20261027_edg_002_rulebook_graph_integration_verification.sql`
@@ -228,12 +249,14 @@ At this checkpoint:
 
 - repository package: **authored**;
 - draft PR #269: **open**;
-- isolated exact-head EDG CI on `e51ea32b...`: **passed**;
+- isolated EDG CI: **passed**;
 - private Test migration: **passed**;
 - private Test behavioral/security proof: **passed**;
 - Development Journal Test evidence: **recorded**;
-- final current-main freshness reconciliation: **pending**;
-- final exact-head repository matrix after this provenance update/freshness reconciliation: **pending**;
+- current-main freshness reconciliation: **passed** against `5385eae4...`;
+- migration/schema collision review: **passed**;
+- final exact-head repository matrix: **pending**;
+- final current-main/diff race check: **pending**;
 - production: **unchanged**.
 
-PR #269 must remain draft until the branch is reconciled against then-current `main`, migration/schema collisions are rechecked, the final immutable exact-head matrix is terminal green, and the final diff/race check passes.
+PR #269 must remain draft until the final immutable exact-head matrix is terminal green and the final current-main/diff race check passes.

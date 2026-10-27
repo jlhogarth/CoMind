@@ -36,9 +36,9 @@ test('canonical PFC matrix validates and covers domains A-I', () => {
 
   const summary = matrixSummary(matrix);
   assert.equal(summary.scenarioCount, 44);
-  assert.equal(summary.statuses.proven, 22);
+  assert.equal(summary.statuses.proven, 23);
   assert.equal(summary.statuses.partial, 11);
-  assert.equal(summary.statuses.missing, 10);
+  assert.equal(summary.statuses.missing, 9);
   assert.equal(summary.statuses.deferred_content, 1);
 });
 

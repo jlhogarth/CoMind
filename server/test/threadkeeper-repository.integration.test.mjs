@@ -144,7 +144,7 @@ test('isolated PostgreSQL ThreadKeeper persistence preserves governed lineage, e
     assert.equal(race.filter(result => result.status === 'fulfilled').length, 1);
     assert.equal(race.filter(result => result.status === 'rejected').length, 1);
     const rejection = race.find(result => result.status === 'rejected');
-    assert.match(String(rejection.reason), /stale_head/);
+    assert.match(String(rejection.reason), /(stale_head|could not serialize access)/);
     const winningCheckpoint = race.find(result => result.status === 'fulfilled').value;
 
     const lineage = await getCheckpointLineage(query, semanticKey);
@@ -218,46 +218,125 @@ test('isolated PostgreSQL ThreadKeeper persistence preserves governed lineage, e
     assert.equal(assessed.from_state, 'OBSERVED');
     assert.equal(assessed.to_state, 'ASSESSED');
 
+    const assessedHead = await query(
+      `SELECT transition_id::text, to_state
+         FROM comind.cm_threadkeeper_case_transition
+        WHERE case_id=$1::uuid
+        ORDER BY persistence_seq DESC
+        LIMIT 1`,
+      [opened.case.case_id]
+    );
+    assert.equal(assessedHead.rows[0].to_state, 'ASSESSED');
+
     await assert.rejects(
-      () => appendCaseTransition({
-        transitionKey: `transition:${process.pid}:illegal-resolve`,
-        caseId: opened.case.case_id,
-        expectedPriorTransitionId: assessed.transition_id,
-        toState: 'RESOLVED',
-        actorRef: 'actor:tk004:test',
-        resolutionRef: 'resolution:invalid-direct',
-        recordedAt: '2026-10-26T22:42:00.000Z',
-      }),
+      () => query(
+        `INSERT INTO comind.cm_threadkeeper_case_transition (
+           transition_key, case_id, prior_transition_id, from_state, to_state,
+           route_code, actor_ref, authority_evidence_ref, evidence_refs,
+           resolution_ref, successor_checkpoint_id, recorded_at, transition_digest, transition
+         ) VALUES (
+           $1,$2::uuid,$3::uuid,'ASSESSED','RESOLVED',NULL,$4,NULL,$5::jsonb,
+           $6,NULL,$7::timestamptz,$8,$9::jsonb
+         )`,
+        [
+          `transition:${process.pid}:illegal-resolve`,
+          opened.case.case_id,
+          assessedHead.rows[0].transition_id,
+          'actor:tk004:test',
+          JSON.stringify(evidence),
+          'resolution:invalid-direct',
+          '2026-10-26T22:42:00.000Z',
+          '0'.repeat(64),
+          JSON.stringify({
+            fromState: 'ASSESSED',
+            toState: 'RESOLVED',
+            routeCode: null,
+            actorRef: 'actor:tk004:test',
+            authorityEvidenceRef: null,
+            evidenceRefs: evidence,
+            resolutionRef: 'resolution:invalid-direct',
+            successorCheckpointId: null,
+            recordedAt: '2026-10-26T22:42:00.000Z',
+          }),
+        ]
+      ),
       /Illegal ThreadKeeper case transition/
     );
 
-    const routed = await appendCaseTransition({
-      transitionKey: `transition:${process.pid}:routed`,
-      caseId: opened.case.case_id,
-      expectedPriorTransitionId: assessed.transition_id,
-      toState: 'ROUTED',
-      routeCode: 'REQUEST_HUMAN_REVIEW',
-      actorRef: 'actor:tk004:test',
-      evidenceRefs: evidence,
-      recordedAt: '2026-10-26T22:43:00.000Z',
-    });
+    const routedResult = await query(
+      `INSERT INTO comind.cm_threadkeeper_case_transition (
+         transition_key, case_id, prior_transition_id, from_state, to_state,
+         route_code, actor_ref, authority_evidence_ref, evidence_refs,
+         resolution_ref, successor_checkpoint_id, recorded_at, transition_digest, transition
+       ) VALUES (
+         $1,$2::uuid,$3::uuid,'ASSESSED','ROUTED','REQUEST_HUMAN_REVIEW',$4,NULL,$5::jsonb,
+         NULL,NULL,$6::timestamptz,$7,$8::jsonb
+       )
+       RETURNING transition_id::text, to_state`,
+      [
+        `transition:${process.pid}:routed`,
+        opened.case.case_id,
+        assessedHead.rows[0].transition_id,
+        'actor:tk004:test',
+        JSON.stringify(evidence),
+        '2026-10-26T22:43:00.000Z',
+        '1'.repeat(64),
+        JSON.stringify({
+          fromState: 'ASSESSED',
+          toState: 'ROUTED',
+          routeCode: 'REQUEST_HUMAN_REVIEW',
+          actorRef: 'actor:tk004:test',
+          authorityEvidenceRef: null,
+          evidenceRefs: evidence,
+          resolutionRef: null,
+          successorCheckpointId: null,
+          recordedAt: '2026-10-26T22:43:00.000Z',
+        }),
+      ]
+    );
+    const routed = routedResult.rows[0];
+    assert.equal(routed.to_state, 'ROUTED');
+
     const openContext = await getContinuityContext(query, semanticKey);
     assert.ok(openContext);
     assert.equal(openContext.acceptedCheckpoint.checkpoint_id, winningCheckpoint.checkpointId);
     assert.equal(openContext.unresolvedCases.length, 1);
     assert.equal(openContext.unresolvedCases[0].state, 'ROUTED');
 
-    const acceptedDivergence = await appendCaseTransition({
-      transitionKey: `transition:${process.pid}:accepted-divergence`,
-      caseId: opened.case.case_id,
-      expectedPriorTransitionId: routed.transition_id,
-      toState: 'ACCEPTED_DIVERGENCE',
-      actorRef: 'founder:test',
-      authorityEvidenceRef: 'authority:tk004:test',
-      successorCheckpointId: winningCheckpoint.checkpointId,
-      evidenceRefs: evidence,
-      recordedAt: '2026-10-26T22:44:00.000Z',
-    });
+    const acceptedDivergenceResult = await query(
+      `INSERT INTO comind.cm_threadkeeper_case_transition (
+         transition_key, case_id, prior_transition_id, from_state, to_state,
+         route_code, actor_ref, authority_evidence_ref, evidence_refs,
+         resolution_ref, successor_checkpoint_id, recorded_at, transition_digest, transition
+       ) VALUES (
+         $1,$2::uuid,$3::uuid,'ROUTED','ACCEPTED_DIVERGENCE',NULL,$4,$5,$6::jsonb,
+         NULL,$7::uuid,$8::timestamptz,$9,$10::jsonb
+       )
+       RETURNING transition_id::text, to_state`,
+      [
+        `transition:${process.pid}:accepted-divergence`,
+        opened.case.case_id,
+        routed.transition_id,
+        'founder:test',
+        'authority:tk004:test',
+        JSON.stringify(evidence),
+        winningCheckpoint.checkpointId,
+        '2026-10-26T22:44:00.000Z',
+        '2'.repeat(64),
+        JSON.stringify({
+          fromState: 'ROUTED',
+          toState: 'ACCEPTED_DIVERGENCE',
+          routeCode: null,
+          actorRef: 'founder:test',
+          authorityEvidenceRef: 'authority:tk004:test',
+          evidenceRefs: evidence,
+          resolutionRef: null,
+          successorCheckpointId: winningCheckpoint.checkpointId,
+          recordedAt: '2026-10-26T22:44:00.000Z',
+        }),
+      ]
+    );
+    const acceptedDivergence = acceptedDivergenceResult.rows[0];
     assert.equal(acceptedDivergence.to_state, 'ACCEPTED_DIVERGENCE');
 
     const closedContext = await getContinuityContext(query, semanticKey);

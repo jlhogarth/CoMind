@@ -11,16 +11,7 @@
       "severity": "fail",
       "schema": "comind_development",
       "relation": "entity",
-      "columns": [
-        "entity_id",
-        "tracking_key",
-        "entity_type",
-        "title",
-        "status",
-        "canonical_payload",
-        "current_version",
-        "source_of_truth"
-      ],
+      "columns": ["entity_id","tracking_key","entity_type","title","status","canonical_payload","current_version","source_of_truth"],
       "remediation": "Reconcile the auditor with the approved entity schema change before trusting downstream checks."
     },
     {
@@ -30,17 +21,7 @@
       "severity": "fail",
       "schema": "comind_development",
       "relation": "relationship",
-      "columns": [
-        "relationship_id",
-        "relationship_key",
-        "subject_entity_id",
-        "predicate",
-        "object_entity_id",
-        "evidence_entity_id",
-        "valid_from",
-        "valid_to",
-        "relationship_payload"
-      ],
+      "columns": ["relationship_id","relationship_key","subject_entity_id","predicate","object_entity_id","evidence_entity_id","valid_from","valid_to","relationship_payload"],
       "remediation": "Reconcile the auditor with the approved relationship schema change before trusting graph checks."
     },
     {
@@ -56,11 +37,7 @@
       "kind": "concept_relationship_counts",
       "description": "Typed concept graph matches the DPE-002 baseline.",
       "severity": "warning",
-      "expected": {
-        "active": 44,
-        "retired": 1,
-        "weighted": 41
-      },
+      "expected": {"active":44,"retired":1,"weighted":41},
       "remediation": "Reconcile the graph through DPE-002, preserve retired lineage, then update the baseline and recompute dependent projections."
     },
     {
@@ -77,7 +54,7 @@
       "description": "CCI projection version is the governed current version.",
       "severity": "warning",
       "trackingKey": "CCI-001",
-      "expected": 5,
+      "expected": 6,
       "remediation": "Reconcile the CCI projection and update the maintenance baseline in the same reviewed change."
     },
     {
@@ -86,16 +63,16 @@
       "description": "MLC lifecycle projection version is the governed current version.",
       "severity": "warning",
       "trackingKey": "MLC-001",
-      "expected": 2,
+      "expected": 3,
       "remediation": "Reconcile MLC lifecycle evidence and update the baseline only after the projection is verified."
     },
     {
       "id": "MCTRL-PROJ-003",
       "kind": "entity_version",
-      "description": "DPE priority projection version reflects the DPE-002 recomputation.",
+      "description": "DPE priority projection version reflects the latest governed recomputation.",
       "severity": "warning",
       "trackingKey": "DPE-001",
-      "expected": 3,
+      "expected": 4,
       "remediation": "Recompute DPE from current MLC and relationship inputs, verify the projection, then update the baseline."
     },
     {
@@ -113,13 +90,7 @@
       "description": "DPE-001 graph inputs agree with the canonical graph baseline.",
       "severity": "fail",
       "trackingKey": "DPE-001",
-      "expected": {
-        "version": "0.3",
-        "concept_count": 51,
-        "graph_counts.active_typed_edges": 44,
-        "graph_counts.retired_edges": 1,
-        "graph_counts.active_weighted_edges": 41
-      },
+      "expected": {"version":"0.4","concept_count":51,"graph_counts.active_typed_edges":44,"graph_counts.retired_edges":1,"graph_counts.active_weighted_edges":41},
       "remediation": "Recompute DPE-001 from current canonical inputs; never hand-edit score outputs to make this check pass."
     },
     {
@@ -137,30 +108,17 @@
       "description": "MLC module and concept baselines remain internally consistent.",
       "severity": "fail",
       "trackingKey": "MLC-001",
-      "expected": {
-        "version": "0.2",
-        "concept_count": 51,
-        "module_count": 3,
-        "module_current_lifecycle.concept:aris": "Conceived",
-        "module_current_lifecycle.concept:cris": "Conceived",
-        "module_current_lifecycle.concept:agent-colony": "Conceived"
-      },
+      "expected": {"version":"0.3","concept_count":51,"module_count":3,"module_current_lifecycle.concept:aris":"Conceived","module_current_lifecycle.concept:cris":"Conceived","module_current_lifecycle.concept:agent-colony":"Conceived","threadkeeper_capability_maturity":"C2 Implemented","threadkeeper_implementation_proven":true},
       "remediation": "Reconcile lifecycle evidence before changing canonical maturity; historical maturity must not silently promote current state."
     },
     {
       "id": "MCTRL-TK-001",
       "kind": "entity_payload_equals",
-      "description": "ThreadKeeper remains a specified Capability at C1 Contracted without implementation promotion.",
+      "description": "ThreadKeeper is a bounded Capability at C2 Implemented with the TK-005 evidence gate complete and no production activation claim.",
       "severity": "fail",
       "trackingKey": "concept:threadkeeper",
-      "expected": {
-        "mlc_primary_classification": "Capability",
-        "capability_maturity": "C1 Contracted",
-        "module_lifecycle_applies": false,
-        "implementation_proven": false,
-        "canonical_contract_key": "TK-001"
-      },
-      "remediation": "Reconcile ThreadKeeper through TK-001, CCI, MLC, DPE, and canonical evidence. Do not infer implementation from historical code or adjacent ACP primitives."
+      "expected": {"mlc_primary_classification":"Capability","capability_maturity":"C2 Implemented","module_lifecycle_applies":false,"implementation_proven":true,"c2_gate_complete":true,"canonical_contract_key":"TK-001"},
+      "remediation": "Reconcile ThreadKeeper through TK-001/TK-002, TK-005 evidence, CCI, MLC, DPE, and canonical Development Evidence. Do not infer C3 integration or production activation from C2 implementation."
     },
     {
       "id": "MCTRL-ORPHAN-001",
@@ -184,36 +142,12 @@
       "description": "Declared Test control-plane RLS posture has not changed silently.",
       "severity": "warning",
       "expected": [
-        {
-          "schema": "comind_development",
-          "relation": "entity",
-          "enabled": false
-        },
-        {
-          "schema": "comind_development",
-          "relation": "journal_entry",
-          "enabled": false
-        },
-        {
-          "schema": "comind_development",
-          "relation": "relationship",
-          "enabled": false
-        },
-        {
-          "schema": "comind_development",
-          "relation": "external_reference",
-          "enabled": false
-        },
-        {
-          "schema": "comind_development",
-          "relation": "artifact",
-          "enabled": false
-        },
-        {
-          "schema": "comind_pm",
-          "relation": "pm_research_sessions",
-          "enabled": false
-        }
+        {"schema":"comind_development","relation":"entity","enabled":false},
+        {"schema":"comind_development","relation":"journal_entry","enabled":false},
+        {"schema":"comind_development","relation":"relationship","enabled":false},
+        {"schema":"comind_development","relation":"external_reference","enabled":false},
+        {"schema":"comind_development","relation":"artifact","enabled":false},
+        {"schema":"comind_pm","relation":"pm_research_sessions","enabled":false}
       ],
       "remediation": "Determine whether the RLS change was intentional. If intentional, verify policies/access first and update this declared Test posture in the same reviewed change."
     },
@@ -237,124 +171,10 @@
     }
   ],
   "impactRules": [
-    {
-      "id": "MCTRL-IMPACT-001",
-      "status": "current",
-      "triggerKinds": [
-        "concept.created",
-        "concept.updated",
-        "concept.retired",
-        "concept.split",
-        "concept.merged"
-      ],
-      "affectedArtifacts": [
-        "CCI-001",
-        "MLC-001",
-        "DPE-001",
-        "DPE-002",
-        "EDG-001"
-      ],
-      "requiredChecks": [
-        "MCTRL-CANON-001",
-        "MCTRL-PROJ-001",
-        "MCTRL-PROJ-002",
-        "MCTRL-PROJ-003",
-        "MCTRL-PROJ-004",
-        "MCTRL-PROJ-005",
-        "MCTRL-PROJ-006",
-        "MCTRL-MLC-001",
-        "MCTRL-TK-001"
-      ],
-      "severityIfStale": "warning",
-      "rationale": "Concept identity changes affect canonical indexing, lifecycle classification, graph topology, priority scoring, and documentation relationships."
-    },
-    {
-      "id": "MCTRL-IMPACT-002",
-      "status": "current",
-      "triggerKinds": [
-        "relationship.created",
-        "relationship.updated",
-        "relationship.retired"
-      ],
-      "affectedArtifacts": [
-        "CCI-001",
-        "DPE-001",
-        "DPE-002",
-        "EDG-001"
-      ],
-      "requiredChecks": [
-        "MCTRL-GRAPH-001",
-        "MCTRL-GRAPH-002",
-        "MCTRL-PROJ-001",
-        "MCTRL-PROJ-003",
-        "MCTRL-PROJ-004",
-        "MCTRL-PROJ-005",
-        "MCTRL-PROJ-006",
-        "MCTRL-ORPHAN-001"
-      ],
-      "severityIfStale": "warning",
-      "rationale": "Relationship changes alter dependency topology and may change derived prioritization and documentation navigation."
-    },
-    {
-      "id": "MCTRL-IMPACT-003",
-      "status": "current",
-      "triggerKinds": [
-        "lifecycle.evidence_added",
-        "lifecycle.promoted",
-        "lifecycle.demoted",
-        "lifecycle.corrected"
-      ],
-      "affectedArtifacts": [
-        "MLC-001",
-        "DPE-001",
-        "CCI-001"
-      ],
-      "requiredChecks": [
-        "MCTRL-PROJ-001",
-        "MCTRL-PROJ-002",
-        "MCTRL-PROJ-003",
-        "MCTRL-MLC-001"
-      ],
-      "severityIfStale": "fail",
-      "rationale": "Lifecycle state is evidence-gated and directly affects development planning; stale lifecycle projections can create false maturity claims."
-    },
-    {
-      "id": "MCTRL-IMPACT-004",
-      "status": "current",
-      "triggerKinds": [
-        "schema.changed",
-        "rls.changed",
-        "privilege.changed"
-      ],
-      "affectedArtifacts": [
-        "canonical-evidence-contract",
-        "MCTRL-001"
-      ],
-      "requiredChecks": [
-        "MCTRL-SCHEMA-001",
-        "MCTRL-SCHEMA-002",
-        "MCTRL-RLS-001",
-        "MCTRL-ORPHAN-001",
-        "MCTRL-ORPHAN-002"
-      ],
-      "severityIfStale": "fail",
-      "rationale": "Schema and access-control changes can invalidate audit assumptions and must be reconciled before a PASS is trustworthy."
-    },
-    {
-      "id": "MCTRL-IMPACT-005",
-      "status": "current",
-      "triggerKinds": [
-        "research.external_completed",
-        "research.external_corrected"
-      ],
-      "affectedArtifacts": [
-        "research-evidence-projection"
-      ],
-      "requiredChecks": [
-        "MCTRL-RESEARCH-001"
-      ],
-      "severityIfStale": "warning",
-      "rationale": "External research must write through to the evidence system as it occurs rather than depend on later backfill."
-    }
+    {"id":"MCTRL-IMPACT-001","status":"current","triggerKinds":["concept.created","concept.updated","concept.retired","concept.split","concept.merged"],"affectedArtifacts":["CCI-001","MLC-001","DPE-001","DPE-002","EDG-001"],"requiredChecks":["MCTRL-CANON-001","MCTRL-PROJ-001","MCTRL-PROJ-002","MCTRL-PROJ-003","MCTRL-PROJ-004","MCTRL-PROJ-005","MCTRL-PROJ-006","MCTRL-MLC-001","MCTRL-TK-001"],"severityIfStale":"warning","rationale":"Concept identity changes affect canonical indexing, lifecycle classification, graph topology, priority scoring, and documentation relationships."},
+    {"id":"MCTRL-IMPACT-002","status":"current","triggerKinds":["relationship.created","relationship.updated","relationship.retired"],"affectedArtifacts":["CCI-001","DPE-001","DPE-002","EDG-001"],"requiredChecks":["MCTRL-GRAPH-001","MCTRL-GRAPH-002","MCTRL-PROJ-001","MCTRL-PROJ-003","MCTRL-PROJ-004","MCTRL-PROJ-005","MCTRL-PROJ-006","MCTRL-ORPHAN-001"],"severityIfStale":"warning","rationale":"Relationship changes alter dependency topology and may change derived prioritization and documentation navigation."},
+    {"id":"MCTRL-IMPACT-003","status":"current","triggerKinds":["lifecycle.evidence_added","lifecycle.promoted","lifecycle.demoted","lifecycle.corrected"],"affectedArtifacts":["MLC-001","DPE-001","CCI-001"],"requiredChecks":["MCTRL-PROJ-001","MCTRL-PROJ-002","MCTRL-PROJ-003","MCTRL-MLC-001"],"severityIfStale":"fail","rationale":"Lifecycle state is evidence-gated and directly affects development planning; stale lifecycle projections can create false maturity claims."},
+    {"id":"MCTRL-IMPACT-004","status":"current","triggerKinds":["schema.changed","rls.changed","privilege.changed"],"affectedArtifacts":["canonical-evidence-contract","MCTRL-001"],"requiredChecks":["MCTRL-SCHEMA-001","MCTRL-SCHEMA-002","MCTRL-RLS-001","MCTRL-ORPHAN-001","MCTRL-ORPHAN-002"],"severityIfStale":"fail","rationale":"Schema and access-control changes can invalidate audit assumptions and must be reconciled before a PASS is trustworthy."},
+    {"id":"MCTRL-IMPACT-005","status":"current","triggerKinds":["research.external_completed","research.external_corrected"],"affectedArtifacts":["research-evidence-projection"],"requiredChecks":["MCTRL-RESEARCH-001"],"severityIfStale":"warning","rationale":"External research must write through to the evidence system as it occurs rather than depend on later backfill."}
   ]
 }

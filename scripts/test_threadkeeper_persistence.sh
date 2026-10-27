@@ -21,17 +21,9 @@ psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 <<'SQL'
 CREATE SCHEMA IF NOT EXISTS comind;
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='anon') THEN
-    CREATE ROLE anon NOLOGIN;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='authenticated') THEN
-    CREATE ROLE authenticated NOLOGIN;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN
-    CREATE ROLE service_role NOLOGIN BYPASSRLS;
-  ELSE
-    ALTER ROLE service_role BYPASSRLS;
-  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='anon') THEN CREATE ROLE anon NOLOGIN; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='authenticated') THEN CREATE ROLE authenticated NOLOGIN; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN CREATE ROLE service_role NOLOGIN BYPASSRLS; ELSE ALTER ROLE service_role BYPASSRLS; END IF;
 END;
 $$;
 GRANT USAGE ON SCHEMA comind TO service_role;
@@ -58,12 +50,10 @@ psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f "${verification_010}"
   cd "${root}/server"
   npm ci
   npm run build
-
-  # Keep test-file lifecycle isolated. The repository integration test includes
-  # deliberate failed transactions and concurrency races; running independent
-  # files in one node:test harness can make error-order assertions dependent on
-  # cross-file runner lifecycle rather than ThreadKeeper semantics.
   THREADKEEPER_ISOLATED_DB_TEST=1 node --test test/threadkeeper-core.test.mjs
+  THREADKEEPER_ISOLATED_DB_TEST=1 node --test test/threadkeeper-c2-core-gaps.test.mjs
+  THREADKEEPER_ISOLATED_DB_TEST=1 node --test test/threadkeeper-service.test.mjs
   THREADKEEPER_ISOLATED_DB_TEST=1 node --test test/threadkeeper-repository.integration.test.mjs
+  THREADKEEPER_ISOLATED_DB_TEST=1 node --test test/threadkeeper-c2-postgres.integration.test.mjs
   THREADKEEPER_ISOLATED_DB_TEST=1 node --test test/threadkeeper-competitive-proofs.integration.test.mjs
 )

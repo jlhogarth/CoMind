@@ -13,11 +13,35 @@ import type {
 } from './types.js';
 
 const MAX_THREADKEEPER_CHECKPOINT_BYTES = 65536;
+const CHECKPOINT_STATE_KEYS = new Set([
+  'objectiveRefs',
+  'decisionRefs',
+  'commitmentRefs',
+  'obligationRefs',
+  'contextRefs',
+  'evidenceRefs',
+  'sourceRefs',
+  'sensitivity',
+  'retentionClass',
+]);
+const EVIDENCE_REF_KEYS = new Set([
+  'provider',
+  'kind',
+  'ref',
+  'version',
+  'digest',
+  'sensitivity',
+]);
 
 function boundedString(value: unknown, field: string, max = 2048): asserts value is string {
   if (typeof value !== 'string' || value.length === 0 || value.length > max || value.trim() !== value) {
     throw new Error(`Invalid ${field}`);
   }
+}
+
+function assertExactKeys(value: Record<string, unknown>, allowed: Set<string>, field: string): void {
+  const unexpected = Object.keys(value).filter(key => !allowed.has(key));
+  if (unexpected.length > 0) throw new Error(`Unsupported ${field} field`);
 }
 
 function validTimestamp(value: string, field: string): string {
@@ -33,7 +57,8 @@ function validateStringRefs(values: string[], field: string): void {
 }
 
 function validateEvidenceRef(ref: EvidenceRef): void {
-  if (!ref || typeof ref !== 'object') throw new Error('Invalid evidence reference');
+  if (!ref || typeof ref !== 'object' || Array.isArray(ref)) throw new Error('Invalid evidence reference');
+  assertExactKeys(ref as unknown as Record<string, unknown>, EVIDENCE_REF_KEYS, 'evidence reference');
   boundedString(ref.provider, 'evidence provider', 256);
   boundedString(ref.kind, 'evidence kind', 256);
   boundedString(ref.ref, 'evidence ref', 4096);
@@ -43,7 +68,8 @@ function validateEvidenceRef(ref: EvidenceRef): void {
 }
 
 function validateState(state: ThreadKeeperCheckpointState): void {
-  if (!state || typeof state !== 'object') throw new Error('Invalid ThreadKeeper checkpoint state');
+  if (!state || typeof state !== 'object' || Array.isArray(state)) throw new Error('Invalid ThreadKeeper checkpoint state');
+  assertExactKeys(state as unknown as Record<string, unknown>, CHECKPOINT_STATE_KEYS, 'checkpoint state');
   validateStringRefs(state.objectiveRefs, 'objective reference');
   validateStringRefs(state.decisionRefs, 'decision reference');
   validateStringRefs(state.commitmentRefs, 'commitment reference');

@@ -73,6 +73,8 @@ export interface ContinuityHandoffEnvelope {
   };
 }
 
+type CanonicalContinuityHandoff = Omit<ContinuityHandoffEnvelope, 'continuityDigest' | 'consumer'>;
+
 function boundedString(value: unknown, field: string, max = 4096): asserts value is string {
   if (typeof value !== 'string' || value.length === 0 || value.length > max || value.trim() !== value) {
     throw new Error(`Invalid ${field}`);
@@ -139,7 +141,7 @@ export async function resolveContinuityHandoff(
   }
 
   const unresolvedCases = context.unresolvedCases.map(item => ({ ...item }));
-  const canonicalContinuity = {
+  const canonicalContinuity: CanonicalContinuityHandoff = {
     version: CONTINUITY_HANDOFF_VERSION,
     scopeSemanticKey: input.scopeSemanticKey,
     currentCheckpoint: {

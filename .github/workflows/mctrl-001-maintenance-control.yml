@@ -5,7 +5,9 @@ on:
     paths:
       - 'config/maintenance-control.v1.json'
       - 'config/threadkeeper-c2-evidence.v1.json'
+      - 'config/threadkeeper-c3-evidence.v1.json'
       - 'scripts/threadkeeper_c2_matrix.mjs'
+      - 'scripts/threadkeeper_c3_matrix.mjs'
       - 'server/src/maintenance-control/**'
       - 'server/src/threadkeeper/**'
       - 'server/test/maintenance-control*.test.mjs'
@@ -18,12 +20,15 @@ on:
       - 'docs/provenance/*threadkeeper*'
       - '.github/workflows/mctrl-001-maintenance-control.yml'
       - '.github/workflows/tk-005-threadkeeper-c2.yml'
+      - '.github/workflows/tk-006-threadkeeper-c3.yml'
   push:
     branches: ['main']
     paths:
       - 'config/maintenance-control.v1.json'
       - 'config/threadkeeper-c2-evidence.v1.json'
+      - 'config/threadkeeper-c3-evidence.v1.json'
       - 'scripts/threadkeeper_c2_matrix.mjs'
+      - 'scripts/threadkeeper_c3_matrix.mjs'
       - 'server/src/maintenance-control/**'
       - 'server/src/threadkeeper/**'
       - 'server/test/maintenance-control*.test.mjs'
@@ -36,6 +41,7 @@ on:
       - 'docs/provenance/*threadkeeper*'
       - '.github/workflows/mctrl-001-maintenance-control.yml'
       - '.github/workflows/tk-005-threadkeeper-c2.yml'
+      - '.github/workflows/tk-006-threadkeeper-c3.yml'
   workflow_dispatch:
 
 permissions:
@@ -78,6 +84,10 @@ jobs:
         run: node ../scripts/threadkeeper_c2_matrix.mjs
       - name: Prove ThreadKeeper C2 evidence gate fails closed
         run: node --test test/threadkeeper-c2-evidence.test.mjs
+      - name: Validate ThreadKeeper C3 evidence contract
+        run: node ../scripts/threadkeeper_c3_matrix.mjs
+      - name: Prove ThreadKeeper C3 evidence gate fails closed
+        run: node --test test/threadkeeper-c3-evidence.test.mjs
 
   live-test-audit:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'

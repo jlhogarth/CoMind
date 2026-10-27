@@ -37,6 +37,7 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/comind_ci
+      PGOPTIONS: -c search_path=public,extensions
     steps:
       - name: Check out exact candidate
         uses: actions/checkout@v4

@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "repository": "jlhogarth/CoMind",
+  "lanes": {
+    "TK-005": {
+      "issue": 248,
+      "implementationCommit": "3eb07decd173734d9c2c899635307b90c6f5f098",
+      "githubRuns": {
+        "40436467686": {
+          "workflowPath": ".github/workflows/threadkeeper-persistence.yml",
+          "expectedHeadSha": "3eb07decd173734d9c2c899635307b90c6f5f098",
+          "event": "pull_request",
+          "conclusion": "success",
+          "bindsImplementation": true
+        },
+        "40466464418": {
+          "workflowPath": ".github/workflows/mctrl-001-maintenance-control.yml",
+          "expectedHeadSha": "88fe50dc4c176e8cb753479ba740d680742d71f0",
+          "event": "pull_request",
+          "conclusion": "success",
+          "bindsImplementation": false,
+          "historical": true
+        },
+        "40467605004": {
+          "workflowPath": ".github/workflows/mctrl-001-maintenance-control.yml",
+          "expectedHeadSha": "f73381f2d6e76fdb5d2f7d52183969d604c88a7b",
+          "event": "pull_request",
+          "conclusion": "success",
+          "bindsImplementation": false
+        },
+        "40467605066": {
+          "workflowPath": ".github/workflows/tk-005-threadkeeper-c2.yml",
+          "expectedHeadSha": "f73381f2d6e76fdb5d2f7d52183969d604c88a7b",
+          "event": "pull_request",
+          "conclusion": "success",
+          "bindsImplementation": false
+        },
+        "40467885710": {
+          "workflowPath": ".github/workflows/mctrl-001-maintenance-control.yml",
+          "expectedHeadSha": "3eecf7c199e520db5574b7c7525598ba6002e7ea",
+          "event": "push",
+          "conclusion": "success",
+          "bindsImplementation": false
+        }
+      },
+      "finalAcceptanceRunIds": [40467605066, 40467605004, 40467885710],
+      "cdeKeys": {
+        "JRN-20261027-0004": {
+          "verificationState": "verified",
+          "mctrlControlId": "MCTRL-JOURNAL-TK-C2"
+        }
+      }
+    },
+    "TK-006": {
+      "issue": 256,
+      "implementationCommit": "665d52b7d92f89e98aec0cfb5210b9fed6e8aa8c",
+      "githubRuns": {
+        "40562386747": {
+          "workflowPath": ".github/workflows/tk-006-threadkeeper-c3.yml",
+          "expectedHeadSha": "665d52b7d92f89e98aec0cfb5210b9fed6e8aa8c",
+          "event": "pull_request",
+          "conclusion": "success",
+          "bindsImplementation": true
+        },
+        "40568980282": {
+          "workflowPath": ".github/workflows/tk-006-threadkeeper-c3.yml",
+          "expectedHeadSha": "9de1ddbad359b3cc4b1673a908f2704f47bc22c9",
+          "event": "pull_request",
+          "conclusion": "success",
+          "bindsImplementation": false,
+          "historical": true
+        },
+        "40571223848": {
+          "workflowPath": ".github/workflows/mctrl-001-maintenance-control.yml",
+          "expectedHeadSha": "985fb5e52b5987baf9b5f61a7257c0858394a71b",
+          "event": "pull_request",
+          "conclusion": "success",
+          "bindsImplementation": false,
+          "historical": true
+        },
+        "40572027441": {
+          "workflowPath": ".github/workflows/mctrl-001-maintenance-control.yml",
+          "expectedHeadSha": "ad9605db192761ee80cc48ba3b733e5079e15160",
+          "event": "pull_request",
+          "conclusion": "success",
+          "bindsImplementation": false
+        },
+        "40572027624": {
+          "workflowPath": ".github/workflows/tk-006-threadkeeper-c3.yml",
+          "expectedHeadSha": "ad9605db192761ee80cc48ba3b733e5079e15160",
+          "event": "pull_request",
+          "conclusion": "success",
+          "bindsImplementation": false
+        }
+      },
+      "finalAcceptanceRunIds": [40572027624, 40572027441],
+      "cdeKeys": {
+        "JRN-20261027-0007": {
+          "verificationState": "verified",
+          "mctrlControlId": "MCTRL-JOURNAL-TK-C3-TEST"
+        },
+        "JRN-20261027-0008": {
+          "verificationState": "verified",
+          "mctrlControlId": "MCTRL-JOURNAL-TK-C3-RECONCILE"
+        },
+        "JRN-20261027-0009": {
+          "verificationState": "verified",
+          "mctrlControlId": "MCTRL-JOURNAL-TK-C3-PROMOTION"
+        }
+      }
+    }
+  }
+}

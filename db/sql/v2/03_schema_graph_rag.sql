@@ -1,6 +1,6 @@
 -- CoMind One‑Shot v2 - 03_schema_graph_rag.sql
 BEGIN;
-SET search_path TO comind, public;
+SET search_path TO comind, public, extensions;
 
 -- Generic document & chunk store
 CREATE TABLE IF NOT EXISTS cm_doc (

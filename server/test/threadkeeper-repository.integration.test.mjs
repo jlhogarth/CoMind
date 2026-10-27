@@ -218,11 +218,21 @@ test('isolated PostgreSQL ThreadKeeper persistence preserves governed lineage, e
     assert.equal(assessed.from_state, 'OBSERVED');
     assert.equal(assessed.to_state, 'ASSESSED');
 
+    const assessedHead = await query(
+      `SELECT transition_id::text, to_state
+         FROM comind.cm_threadkeeper_case_transition
+        WHERE case_id=$1::uuid
+        ORDER BY persistence_seq DESC
+        LIMIT 1`,
+      [opened.case.case_id]
+    );
+    assert.equal(assessedHead.rows[0].to_state, 'ASSESSED');
+
     await assert.rejects(
       () => appendCaseTransition({
         transitionKey: `transition:${process.pid}:illegal-resolve`,
         caseId: opened.case.case_id,
-        expectedPriorTransitionId: assessed.transition_id,
+        expectedPriorTransitionId: assessedHead.rows[0].transition_id,
         toState: 'RESOLVED',
         actorRef: 'actor:tk004:test',
         resolutionRef: 'resolution:invalid-direct',
@@ -234,7 +244,7 @@ test('isolated PostgreSQL ThreadKeeper persistence preserves governed lineage, e
     const routed = await appendCaseTransition({
       transitionKey: `transition:${process.pid}:routed`,
       caseId: opened.case.case_id,
-      expectedPriorTransitionId: assessed.transition_id,
+      expectedPriorTransitionId: assessedHead.rows[0].transition_id,
       toState: 'ROUTED',
       routeCode: 'REQUEST_HUMAN_REVIEW',
       actorRef: 'actor:tk004:test',

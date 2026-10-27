@@ -10,6 +10,8 @@
 - Accepted C2 package: TK-005
 - Accepted maturity: **C3 Integrated**
 - Promotion journal: `JRN-20261027-0009`
+- Final PR head: `ad9605db192761ee80cc48ba3b733e5079e15160`
+- Merge commit: `60c7a070699585f0b005a16ff7f0dd56b3ef6179`
 - Next maturity gate: **C4 Operational**
 - Production activation: **false**
 - Public HTTP endpoint required for C3: **false**
@@ -30,7 +32,7 @@ Frozen C3 runtime implementation commit: `665d52b7d92f89e98aec0cfb5210b9fed6e8aa
 
 ## Isolated implementation evidence
 
-GitHub Actions run `40562386747` passed the isolated PostgreSQL C3 proof. It established:
+GitHub Actions run `40562386747` passed the isolated PostgreSQL C3 proof on the frozen implementation commit. It established:
 
 - C3 evidence-contract validation and fail-closed behavior;
 - service/reference/privacy tests;
@@ -41,15 +43,15 @@ GitHub Actions run `40562386747` passed the isolated PostgreSQL C3 proof. It est
 - stale downstream checkpoint rejection;
 - current downstream handoff with complete lineage;
 - uncertified evidence invisibility;
-- resolver outage as unverifiable/fail-closed;
+- resolver outage as unverifiable and fail-closed;
 - restart durability;
-- raw transcript/title canaries excluded from ThreadKeeper state and metrics.
+- raw transcript and title canaries excluded from ThreadKeeper state and metrics.
 
-The aggregate-CI harness exposed one test-only configuration coupling. Runtime code was not reopened. The C3 service unit test now supplies an unreachable loopback database sentinel before dynamic import so accidental database access fails closed. Commit `fed3066b74ec09d18e24b372a4f3e0e6076aea38`.
+The aggregate CI harness exposed one test-only configuration coupling. Runtime code was not reopened. The C3 service unit test supplies an unreachable loopback database sentinel before dynamic import so accidental database access fails closed. Commit `fed3066b74ec09d18e24b372a4f3e0e6076aea38`.
 
 ## Supabase Test boundary
 
-Migration `threadkeeper_c3_history_read_boundary` was applied to CoMind Test project `sbgfuanxiqepcoboxzcl` only after isolated proof passed.
+Migration `threadkeeper_c3_history_read_boundary` was applied to CoMind Test only after isolated proof passed.
 
 Verification established:
 
@@ -70,15 +72,15 @@ While TK-006 was open, `main` advanced through accepted RCO-001 work to `54505b0
 
 TK-006 preserves these ownership boundaries:
 
-- Conversation History retains archive/event ownership and mutation authority.
-- Agent Communication retains transport/routing/addressing ownership.
+- Conversation History retains archive and event ownership and mutation authority.
+- Agent Communication retains transport, routing, and addressing ownership.
 - Foundry retains execution, lease, retry, fencing, and outcome authority.
 - Helper Matrix recommendations do not execute helpers.
 - SEAL recommendations do not execute revisions.
 - Memory Graph remains separate durable memory authority.
-- EIK retains epistemic/truth authority.
+- EIK retains epistemic and truth authority.
 - Digital Twin identity remains outside ThreadKeeper.
-- ACP remains a distinct continuity/recovery substrate.
+- ACP remains a distinct continuity and recovery substrate.
 
 No CHIST-K01 retrieval schema or implementation was modified by TK-006.
 
@@ -102,7 +104,7 @@ A late pre-promotion regression wave correctly blocked promotion when TK-004 run
 
 Inspection found the test fixture used `process.pid` as part of durable semantic scope and proof identity. Short-lived Node processes may reuse a PID, allowing a fixture to alias older proof state in the same isolated database. Commit `21919df154366872ee76e47bae3110d1803a1c72` replaced that identity source with a cryptographically random `randomUUID()` per proof invocation and used it consistently across the semantic scope, proposals, observation, assessment, case, and transition keys. This did not weaken stale-state rejection or alter ThreadKeeper runtime behavior.
 
-After the repair and subsequent freshness/evidence reconciliation, exact pre-promotion head `c3b28bc4d69df0b092edfdd299e83ab92a43837d` passed:
+After the repair and subsequent freshness and evidence reconciliation, exact pre-promotion head `c3b28bc4d69df0b092edfdd299e83ab92a43837d` passed:
 
 - MCTRL: `40569816447`;
 - TK-006: `40569816435`;
@@ -115,10 +117,10 @@ After the exact pre-promotion gates passed, the canonical promotion was executed
 
 `JRN-20261027-0009` records:
 
-- `C2 Implemented` -> `C3 Integrated`;
+- `C2 Implemented` to `C3 Integrated`;
 - result `PASS`;
 - verification state `verified`;
-- issue #256 / PR #257;
+- issue #256 and PR #257;
 - implementation commit `665d52b7d92f89e98aec0cfb5210b9fed6e8aa8c`;
 - pre-promotion accepted head `c3b28bc4d69df0b092edfdd299e83ab92a43837d`;
 - production activation `false`;
@@ -134,13 +136,13 @@ Canonical state after the transaction:
 - DPE-002 v0.2, topology unchanged;
 - EDG-001 v0.2, topology unchanged.
 
-The Drive projections were refreshed and read back. CCI v0.8 and MLC v0.5 state C3 Integrated. DPE v0.6 preserves the formula-driven 79.1/P1 score while issue #256 remains open for merge closure. DPE-002 retained v0.2 because topology did not change; its stale ThreadKeeper summary label was corrected from P0 to the formula-consistent P1. EDG retained v0.2 because TK-006 changed no documentation-graph relationship.
+The Drive projections were refreshed and read back. CCI v0.8 and MLC v0.5 state C3 Integrated. DPE v0.6 preserved the formula-driven 79.1/P1 score while issue #256 remained open for merge closure. DPE-002 retained v0.2 because topology did not change. EDG retained v0.2 because TK-006 changed no documentation-graph relationship.
 
 ## Accepted C3 maintenance-control proof
 
-Repository commit `985fb5e52b5987baf9b5f61a7257c0858394a71b` reconciled `config/maintenance-control.v1.json` to the accepted C3 canonical/projection state.
+Repository commit `985fb5e52b5987baf9b5f61a7257c0858394a71b` reconciled `config/maintenance-control.v1.json` to the accepted C3 canonical and projection state.
 
-[MCTRL run 40571223848](https://github.com/jlhogarth/CoMind/actions/runs/40571223848) passed on that exact commit. Its maintenance-control job passed:
+MCTRL run `40571223848` passed on that exact commit. Its maintenance-control job passed:
 
 - build;
 - maintenance-control unit tests;
@@ -150,13 +152,30 @@ Repository commit `985fb5e52b5987baf9b5f61a7257c0858394a71b` reconciled `config/
 - ThreadKeeper C3 evidence validation;
 - C3 fail-closed evidence tests.
 
-This proves the accepted C3 database and projection state without relying on the promotion matrix to certify itself.
+This established an independent accepted-C3 maintenance proof before final PR closure.
+
+## Final exact-head acceptance and merge
+
+The final evidence and fixture reconciliation produced exact PR head:
+
+`ad9605db192761ee80cc48ba3b733e5079e15160`
+
+The final exact-head acceptance sweep included:
+
+- TK-006 ThreadKeeper C3 Integration `40572027624`: PASS
+- MCTRL-001 Maintenance Control `40572027441`: PASS
+- TK-004 ThreadKeeper Persistence: PASS
+- CI: PASS
+- TK-005 C2 evidence regression: PASS
+- applicable repository regression gates: PASS
+
+PR #257 then merged as `60c7a070699585f0b005a16ff7f0dd56b3ef6179`. Later DPE closure reconciliation advanced planning evidence without changing the accepted C3 runtime implementation, maturity, authority boundaries, or production activation state.
 
 ## Final evidence matrix state
 
 `config/threadkeeper-c3-evidence.v1.json` governs 29 items: 17 formal C3 gate requirements and 12 end-to-end scenarios.
 
-With `JRN-20261027-0009` present and the accepted C3 MCTRL baseline independently proven, the final state is:
+Final accepted state:
 
 - proven: **29**;
 - partial: **0**;
@@ -164,8 +183,24 @@ With `JRN-20261027-0009` present and the accepted C3 MCTRL baseline independentl
 - canonical maturity: **C3 Integrated**;
 - promotion ready: **true**.
 
-The final matrix/evidence-only repository head must still pass its own exact-head TK-006, MCTRL, TK-004, CI, and relevant regression sweep before merge. This prevents matrix or documentation closure from bypassing executable verification.
+## EVID-001 external evidence hardening
+
+A later review of TK-005 identified that the original matrix-validator pattern verified repository evidence strongly but treated GitHub run IDs and CDE keys too syntactically. TK-006 had inherited that validator pattern, even though its actual final evidence was independently present and green.
+
+Issue #261, EVID-001, corrects the shared governance pattern without reopening the accepted C3 runtime implementation:
+
+- immutable external run facts are maintained separately in `config/governed-evidence-bindings.v1.json`;
+- implementation run `40562386747` is bound to exact implementation commit `665d52b7d92f89e98aec0cfb5210b9fed6e8aa8c`;
+- final acceptance is bound to TK-006 run `40572027624` and MCTRL run `40572027441` on exact head `ad9605db192761ee80cc48ba3b733e5079e15160`;
+- CI verifies bound GitHub runs live using read-only Actions authority and checks repository, completed state, successful conclusion, exact head SHA, workflow identity, and event type;
+- MCTRL verifies canonical CDE records `JRN-20261027-0007`, `JRN-20261027-0008`, and `JRN-20261027-0009` directly against Test Canonical Development Evidence with required `verification_state=verified`;
+- fabricated positive run IDs, wrong-head runs, failed runs, wrong workflow or event bindings, and fabricated non-empty CDE keys fail closed;
+- implementation commit ancestry is verified from full Git history in CI.
+
+The canonical Test database was read during EVID-001 review and all four ThreadKeeper journals checked by the hardened controls, including the historical C2 promotion journal, were present with `verification_state=verified`.
+
+EVID-001 strengthens how the accepted C3 result is machine-verified. It does not change ThreadKeeper runtime behavior, re-promote C3, activate production, or expand authority.
 
 ## C4 boundary
 
-C3 does not establish operational maturity. C4 Operational is a separate future gate requiring target-environment evidence for sustained runtime behavior, observability, governance, failure/recovery characteristics, and objective acceptance criteria. Production activation remains a separately governed decision.
+C3 does not establish operational maturity. C4 Operational is a separate future gate requiring target-environment evidence for sustained runtime behavior, observability, governance, failure and recovery characteristics, and objective acceptance criteria. Production activation remains a separately governed decision.

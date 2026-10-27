@@ -1,0 +1,122 @@
+name: TK-007 ThreadKeeper C4 Operational
+
+on:
+  pull_request:
+    paths:
+      - 'server/src/threadkeeper/**'
+      - 'server/test/threadkeeper-c4-*.test.mjs'
+      - 'server/test/threadkeeper-c4-*.integration.test.mjs'
+      - 'db/migrations/20261027_007_threadkeeper_c4_operational_events.sql'
+      - 'db/migrations/verify_20261027_007_threadkeeper_c4_operational_events.sql'
+      - 'scripts/test_threadkeeper_c4.sh'
+      - 'config/threadkeeper-c4-evidence.v1.json'
+      - 'docs/provenance/*tk-007*'
+      - '.github/workflows/tk-007-threadkeeper-c4.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'server/src/threadkeeper/**'
+      - 'server/test/threadkeeper-c4-*.test.mjs'
+      - 'server/test/threadkeeper-c4-*.integration.test.mjs'
+      - 'db/migrations/20261027_007_threadkeeper_c4_operational_events.sql'
+      - 'db/migrations/verify_20261027_007_threadkeeper_c4_operational_events.sql'
+      - 'scripts/test_threadkeeper_c4.sh'
+      - 'config/threadkeeper-c4-evidence.v1.json'
+      - 'docs/provenance/*tk-007*'
+      - '.github/workflows/tk-007-threadkeeper-c4.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  c4-isolated-operational-proof:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.6-pg17-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+    steps:
+      - name: Checkout exact head with history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+      - name: Run isolated C4 proof
+        run: bash scripts/test_threadkeeper_c4.sh
+
+  c4-live-test-proof:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: c4-isolated-operational-proof
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run build
+      - name: Install and verify Supabase database CA
+        shell: bash
+        run: |
+          set -euo pipefail
+          ca_path="$RUNNER_TEMP/supabase-prod-ca-2021.crt"
+          curl --fail --silent --show-error --location \
+            --proto '=https' --tlsv1.2 \
+            https://supabase-downloads.s3-ap-southeast-1.amazonaws.com/prod/ssl/prod-ca-2021.crt \
+            --output "$ca_path"
+          expected='807025AD50D4ED219D2C9C7D299C004F824EB00CF7F65AFEF607D07B72E6CAFA'
+          actual="$(openssl x509 -in "$ca_path" -noout -fingerprint -sha256 \
+            | cut -d= -f2 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+          if [ "$actual" != "$expected" ]; then
+            echo "Supabase CA fingerprint mismatch. Refusing database connection." >&2
+            exit 1
+          fi
+          echo "NODE_EXTRA_CA_CERTS=$ca_path" >> "$GITHUB_ENV"
+      - name: Execute bounded live Test operational proof through runtime role
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_SESSION_DATABASE_URL }}
+          THREADKEEPER_C4_DATABASE_URL: ${{ secrets.SUPABASE_SESSION_DATABASE_URL }}
+          THREADKEEPER_C4_DB_TEST: '1'
+          THREADKEEPER_C4_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          THREADKEEPER_C4_ENVIRONMENT: Test
+          THREADKEEPER_C4_EVIDENCE_PATH: ${{ github.workspace }}/server/artifacts/tk-007-c4-live-test.json
+          PGOPTIONS: '-c role=comind_threadkeeper_runtime'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          node --test test/threadkeeper-c4-runtime-role.test.mjs
+          node --test test/threadkeeper-c4-operational.integration.test.mjs
+      - name: Preserve C4 live Test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tk-007-c4-live-test
+          path: server/artifacts/tk-007-c4-live-test.json
+          if-no-files-found: error
+          retention-days: 30

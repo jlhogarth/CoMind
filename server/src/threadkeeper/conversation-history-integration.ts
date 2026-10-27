@@ -68,6 +68,10 @@ export interface ConversationHistorySummaryReader {
     importId: string;
     sourceConversationId: string;
   }): Promise<CertifiedConversationHistorySummary | null>;
+  readByCheckpoint(input: {
+    archiveCheckpointId: string;
+    sourceConversationId: string;
+  }): Promise<CertifiedConversationHistorySummary | null>;
 }
 
 export type HistoryEvidenceOutcome = 'available' | 'missing' | 'unverifiable' | 'conflicting';
@@ -180,8 +184,8 @@ function normalizedSummary(summary: CertifiedConversationHistorySummary): Certif
   if (!SNAPSHOT_CLASSIFICATIONS.has(summary.classification)) {
     throw new Error('Invalid Conversation History snapshot classification');
   }
-  normalizeTimestamp(summary.acceptedAt, 'Conversation History checkpoint acceptance timestamp');
 
+  const acceptedAt = normalizeTimestamp(summary.acceptedAt, 'Conversation History checkpoint acceptance timestamp');
   const rawSourceHash = optionalSha(summary.rawSourceHash, 'Conversation History raw source hash');
   const normalizedHash = optionalSha(summary.normalizedHash, 'Conversation History normalized hash');
   const topologyHash = optionalSha(summary.topologyHash, 'Conversation History topology hash');
@@ -202,7 +206,7 @@ function normalizedSummary(summary: CertifiedConversationHistorySummary): Certif
     sequenceNo: summary.sequenceNo,
     checkpointKind: summary.checkpointKind,
     importId: summary.importId,
-    acceptedAt: normalizeTimestamp(summary.acceptedAt, 'Conversation History checkpoint acceptance timestamp'),
+    acceptedAt,
     sourceConversationId: summary.sourceConversationId,
     classification: summary.classification,
     present: summary.present,
@@ -235,7 +239,7 @@ function summaryDigest(summary: CertifiedConversationHistorySummary): string {
 function stateRefs(summary: CertifiedConversationHistorySummary): string[] {
   if (!summary.present) return ['urn:comind:chist:presence:absent'];
   const refs = [
-    `urn:comind:chist:presence:present`,
+    'urn:comind:chist:presence:present',
     `urn:comind:chist:raw:${summary.rawSourceHash}`,
     `urn:comind:chist:normalized:${summary.normalizedHash}`,
     `urn:comind:chist:topology:${summary.topologyHash}`,
@@ -251,9 +255,7 @@ function sameStateRefs(left: string[], right: string[]): boolean {
   return a.every((value, index) => value === b[index]);
 }
 
-export function buildConversationHistoryEvidenceRef(
-  summaryInput: CertifiedConversationHistorySummary,
-): EvidenceRef {
+export function buildConversationHistoryEvidenceRef(summaryInput: CertifiedConversationHistorySummary): EvidenceRef {
   const summary = normalizedSummary(summaryInput);
   return {
     provider: CONVERSATION_HISTORY_PROVIDER,
@@ -292,85 +294,107 @@ function parseEvidenceRef(ref: EvidenceRef): {
 
 /**
  * Resolve accepted Conversation History snapshot membership using the governed
- * reader role. The supplied query MUST already execute as
- * comind_conversation_history_reader. Only checkpoint/membership provenance and
- * hashes are selected. Raw conversation JSON, titles, messages, and attachment
- * contents are deliberately outside this contract.
+ * reader role. The query MUST already execute as comind_conversation_history_reader.
+ * Raw conversation JSON, titles, messages, and attachment contents are outside
+ * this contract by construction.
  */
 export function createCertifiedConversationHistoryReader(query: QueryFunction): ConversationHistorySummaryReader {
-  return {
-    async read(input) {
-      if (!UUID_PATTERN.test(input.importId)) throw new Error('Invalid Conversation History import id');
-      boundedString(input.sourceConversationId, 'Conversation History source conversation id', 2048);
-
-      const identity = await query<{ current_user: string }>('SELECT current_user::text AS current_user');
-      if (identity.rows[0]?.current_user !== CONVERSATION_HISTORY_READER_ROLE) {
-        throw new Error(`Conversation History integration requires ${CONVERSATION_HISTORY_READER_ROLE}`);
-      }
-
-      const result = await query<{
-        baseline_id: string;
-        certification_sha256: string;
-        checkpoint_id: string;
-        archive_stream_id: string;
-        sequence_no: string;
-        checkpoint_kind: 'baseline' | 'differential';
-        import_id: string;
-        accepted_at: string;
-        source_conversation_id: string;
-        classification: string;
-        present: boolean;
-        observation_import_id: string | null;
-        raw_source_hash: string | null;
-        normalized_hash: string | null;
-        topology_hash: string | null;
-        attachment_set_hash: string | null;
-      }>(
-        `SELECT b.baseline_id::text,
-                b.certification_sha256::text,
-                c.checkpoint_id::text,
-                c.archive_stream_id::text,
-                c.sequence_no::text,
-                c.checkpoint_kind,
-                c.import_id::text,
-                c.accepted_at::text,
-                s.source_conversation_id,
-                s.classification,
-                s.present,
-                s.observation_import_id::text,
-                s.raw_source_hash::text,
-                s.normalized_hash::text,
-                s.topology_hash::text,
-                s.attachment_set_hash::text
-           FROM comind.cm_archive_checkpoint c
-           JOIN comind.cm_conversation_history_baseline b ON b.baseline_id=c.baseline_id
-           JOIN comind.cm_archive_snapshot_conversation s ON s.import_id=c.import_id
-          WHERE c.import_id=$1::uuid
-            AND s.source_conversation_id=$2`,
-        [input.importId, input.sourceConversationId],
-      );
-      const row = result.rows[0];
-      if (!row) return null;
-      return normalizedSummary({
-        baselineId: row.baseline_id,
-        certificationSha256: row.certification_sha256,
-        archiveCheckpointId: row.checkpoint_id,
-        archiveStreamId: row.archive_stream_id,
-        sequenceNo: Number(row.sequence_no),
-        checkpointKind: row.checkpoint_kind,
-        importId: row.import_id,
-        acceptedAt: row.accepted_at,
-        sourceConversationId: row.source_conversation_id,
-        classification: row.classification,
-        present: row.present,
-        observationImportId: row.observation_import_id,
-        rawSourceHash: row.raw_source_hash,
-        normalizedHash: row.normalized_hash,
-        topologyHash: row.topology_hash,
-        attachmentSetHash: row.attachment_set_hash,
-      });
-    },
+  const assertReaderRole = async (): Promise<void> => {
+    const identity = await query<{ current_user: string }>('SELECT current_user::text AS current_user');
+    if (identity.rows[0]?.current_user !== CONVERSATION_HISTORY_READER_ROLE) {
+      throw new Error(`Conversation History integration requires ${CONVERSATION_HISTORY_READER_ROLE}`);
+    }
   };
+
+  const read = async (input: {
+    importId: string;
+    sourceConversationId: string;
+  }): Promise<CertifiedConversationHistorySummary | null> => {
+    if (!UUID_PATTERN.test(input.importId)) throw new Error('Invalid Conversation History import id');
+    boundedString(input.sourceConversationId, 'Conversation History source conversation id', 2048);
+    await assertReaderRole();
+    const result = await query<{
+      baseline_id: string;
+      certification_sha256: string;
+      checkpoint_id: string;
+      archive_stream_id: string;
+      sequence_no: string;
+      checkpoint_kind: 'baseline' | 'differential';
+      import_id: string;
+      accepted_at: string;
+      source_conversation_id: string;
+      classification: string;
+      present: boolean;
+      observation_import_id: string | null;
+      raw_source_hash: string | null;
+      normalized_hash: string | null;
+      topology_hash: string | null;
+      attachment_set_hash: string | null;
+    }>(
+      `SELECT b.baseline_id::text,
+              b.certification_sha256::text,
+              c.checkpoint_id::text,
+              c.archive_stream_id::text,
+              c.sequence_no::text,
+              c.checkpoint_kind,
+              c.import_id::text,
+              c.accepted_at::text,
+              s.source_conversation_id,
+              s.classification,
+              s.present,
+              s.observation_import_id::text,
+              s.raw_source_hash::text,
+              s.normalized_hash::text,
+              s.topology_hash::text,
+              s.attachment_set_hash::text
+         FROM comind.cm_archive_checkpoint c
+         JOIN comind.cm_conversation_history_baseline b ON b.baseline_id=c.baseline_id
+         JOIN comind.cm_archive_snapshot_conversation s ON s.import_id=c.import_id
+        WHERE c.import_id=$1::uuid
+          AND s.source_conversation_id=$2`,
+      [input.importId, input.sourceConversationId],
+    );
+    const row = result.rows[0];
+    if (!row) return null;
+    return normalizedSummary({
+      baselineId: row.baseline_id,
+      certificationSha256: row.certification_sha256,
+      archiveCheckpointId: row.checkpoint_id,
+      archiveStreamId: row.archive_stream_id,
+      sequenceNo: Number(row.sequence_no),
+      checkpointKind: row.checkpoint_kind,
+      importId: row.import_id,
+      acceptedAt: row.accepted_at,
+      sourceConversationId: row.source_conversation_id,
+      classification: row.classification,
+      present: row.present,
+      observationImportId: row.observation_import_id,
+      rawSourceHash: row.raw_source_hash,
+      normalizedHash: row.normalized_hash,
+      topologyHash: row.topology_hash,
+      attachmentSetHash: row.attachment_set_hash,
+    });
+  };
+
+  const readByCheckpoint = async (input: {
+    archiveCheckpointId: string;
+    sourceConversationId: string;
+  }): Promise<CertifiedConversationHistorySummary | null> => {
+    if (!UUID_PATTERN.test(input.archiveCheckpointId)) throw new Error('Invalid Conversation History archive checkpoint id');
+    boundedString(input.sourceConversationId, 'Conversation History source conversation id', 2048);
+    await assertReaderRole();
+    const result = await query<{ import_id: string }>(
+      `SELECT import_id::text
+         FROM comind.cm_archive_checkpoint
+        WHERE checkpoint_id=$1::uuid`,
+      [input.archiveCheckpointId],
+    );
+    const importId = result.rows[0]?.import_id;
+    if (!importId) return null;
+    return read({ importId, sourceConversationId: input.sourceConversationId });
+  };
+
+  return { read, readByCheckpoint };
 }
 
 export class ConversationHistoryEvidenceResolver implements EvidenceResolver {
@@ -386,15 +410,10 @@ export class ConversationHistoryEvidenceResolver implements EvidenceResolver {
 
     let summary: CertifiedConversationHistorySummary | null;
     try {
-      const checkpoint = await this.#reader.readByCheckpoint?.({
+      summary = await this.#reader.readByCheckpoint({
         archiveCheckpointId: parsed.archiveCheckpointId,
         sourceConversationId: parsed.sourceConversationId,
       });
-      if (checkpoint !== undefined) {
-        summary = checkpoint;
-      } else {
-        return { status: 'unverifiable', ref: structuredClone(ref) };
-      }
     } catch {
       return { status: 'unverifiable', ref: structuredClone(ref) };
     }
@@ -417,9 +436,7 @@ export interface BuildConversationHistoryObservationInput {
   priorCheckpointRef?: string;
 }
 
-export function buildConversationHistoryObservation(
-  input: BuildConversationHistoryObservationInput,
-): ContinuityObservation {
+export function buildConversationHistoryObservation(input: BuildConversationHistoryObservationInput): ContinuityObservation {
   const summary = normalizedSummary(input.summary);
   const evidenceRef = buildConversationHistoryEvidenceRef(summary);
   const scopeBinding: ScopeBinding = {
@@ -454,10 +471,7 @@ export function buildConversationHistoryObservation(
 }
 
 export type ConversationIntegrationAssessmentResult =
-  | {
-      status: 'source_unavailable' | 'source_unverifiable';
-      reasonCode: string;
-    }
+  | { status: 'source_unavailable' | 'source_unverifiable'; reasonCode: string }
   | {
       status: 'assessed';
       summary: CertifiedConversationHistorySummary;
@@ -508,9 +522,7 @@ export class ThreadKeeperConversationHistoryIntegration {
     this.#nowMs = input.nowMs ?? (() => performance.now());
   }
 
-  async assessCertifiedConversation(
-    input: AssessCertifiedConversationInput,
-  ): Promise<ConversationIntegrationAssessmentResult> {
+  async assessCertifiedConversation(input: AssessCertifiedConversationInput): Promise<ConversationIntegrationAssessmentResult> {
     const started = this.#nowMs();
     try {
       normalizeTimestamp(input.assessedAt, 'ThreadKeeper C3 assessment timestamp');
@@ -617,18 +629,11 @@ export class ThreadKeeperConversationHistoryIntegration {
 
   async acceptCertifiedConversationCheckpoint(
     input: AcceptCertifiedConversationCheckpointInput,
-  ): Promise<{
-    checkpointId: string;
-    proposal: CheckpointProposal;
-    acceptedAt: string;
-  }> {
+  ): Promise<{ checkpointId: string; proposal: CheckpointProposal; acceptedAt: string }> {
     if (!input.authority.valid || input.authority.source !== 'external') {
       throw new Error('ThreadKeeper C3 checkpoint acceptance requires valid external authority');
     }
-    const context = await getContinuityContext(
-      this.#query,
-      input.assessed.assessment.scopeSemanticKey,
-    );
+    const context = await getContinuityContext(this.#query, input.assessed.assessment.scopeSemanticKey);
     if (!context) throw new Error('ThreadKeeper C3 scope unavailable for checkpoint acceptance');
     const currentCheckpointId = context.acceptedCheckpoint?.checkpoint_id ?? null;
     if (currentCheckpointId !== input.assessed.assessment.checkpointId) {
@@ -655,12 +660,7 @@ export class ThreadKeeperConversationHistoryIntegration {
         retentionClass: 'durable',
       },
     });
-    const preview = this.#service.acceptCheckpoint(
-      proposal,
-      currentCheckpointId,
-      input.authority,
-      input.acceptedAt,
-    );
+    const preview = this.#service.acceptCheckpoint(proposal, currentCheckpointId, input.authority, input.acceptedAt);
     if (!preview.accepted) {
       throw new Error(`ThreadKeeper C3 checkpoint acceptance rejected: ${preview.reasonCode}`);
     }

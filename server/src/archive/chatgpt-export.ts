@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-export const CHATGPT_ARCHIVE_PARSER_VERSION = 'chatgpt-export-v0.3.0';
+export const CHATGPT_ARCHIVE_PARSER_VERSION = 'chatgpt-export-v0.4.0';
 export const CHATGPT_ARCHIVE_SCHEMA_VERSION = 'comind-archive-v1';
 
 export type IntegrityStatus = 'PASS' | 'WARN' | 'FAIL';
@@ -337,6 +337,7 @@ export function analyzeChatGptConversation(value: unknown): ConversationAnalysis
   const nodes: NodeObservation[] = [];
   const attachments: AttachmentReference[] = [];
   const messageIds = new Set<string>();
+  const nodesWithExplicitChildren = new Set<string>();
 
   if (mapping) {
     for (const [nodeId, rawNodeValue] of Object.entries(mapping)) {
@@ -377,9 +378,11 @@ export function analyzeChatGptConversation(value: unknown): ConversationAnalysis
       }
 
       const parentSourceNodeId = stringOrNull(rawNode.parent);
+      const hasExplicitChildren = Object.prototype.hasOwnProperty.call(rawNode, 'children');
+      if (hasExplicitChildren) nodesWithExplicitChildren.add(nodeId);
       const rawChildren = rawNode.children;
       const childSourceNodeIds = normalizeChildren(rawChildren);
-      if (rawChildren !== undefined && !Array.isArray(rawChildren)) {
+      if (hasExplicitChildren && !Array.isArray(rawChildren)) {
         events.push(
           makeEvent(
             'ERROR',
@@ -552,6 +555,39 @@ export function analyzeChatGptConversation(value: unknown): ConversationAnalysis
 
   const nodeIds = new Set(nodes.map((node) => node.sourceNodeId));
   const nodesById = new Map(nodes.map((node) => [node.sourceNodeId, node]));
+
+  let derivedEdgeCount = 0;
+  const derivedParentIds = new Set<string>();
+  for (const node of nodes) {
+    if (!node.parentSourceNodeId) continue;
+    const parent = nodesById.get(node.parentSourceNodeId);
+    if (!parent || nodesWithExplicitChildren.has(parent.sourceNodeId)) continue;
+    if (!parent.childSourceNodeIds.includes(node.sourceNodeId)) {
+      parent.childSourceNodeIds.push(node.sourceNodeId);
+      derivedEdgeCount += 1;
+      derivedParentIds.add(parent.sourceNodeId);
+    }
+  }
+  for (const parentId of derivedParentIds) {
+    nodesById.get(parentId)?.childSourceNodeIds.sort((a, b) => a.localeCompare(b));
+  }
+
+  const nodesWithoutExplicitChildren = nodes.length - nodesWithExplicitChildren.size;
+  if (nodesWithoutExplicitChildren > 0) {
+    events.push(
+      makeEvent(
+        'INFO',
+        'TOPOLOGY_CHILDREN_DERIVED_FROM_PARENT_LINKS',
+        'Some mapping nodes omit children arrays; normalized child edges were derived from preserved parent links without modifying raw source evidence.',
+        {
+          nodesWithoutExplicitChildren,
+          derivedParentCount: derivedParentIds.size,
+          derivedEdgeCount,
+        },
+        { sourceConversationId }
+      )
+    );
+  }
 
   if (currentNodeId && !nodeIds.has(currentNodeId)) {
     events.push(

@@ -97,3 +97,22 @@ Scale/performance measurement is also incomplete and must become measured rather
 After the evidence contract itself is green, PFC should rank missing/partial scenarios by consequence and cross-system leverage. The first implementation targets should favor failure modes closest to the arriving real export, while continuing to use synthetic content only.
 
 No semantic-quality claim is authorized by this provenance record.
+
+## Evidence-audit correction after gate #1
+
+The first PFC evidence audit found three scenarios that the initial inventory had conservatively classified as missing even though executable regression evidence already existed:
+
+- `A-04` schema drift / novel source fields are preserved and reported through `SCHEMA_DRIFT_*` events;
+- `A-05` orphan parent topology fails explicitly through `MISSING_PARENT_NODE`;
+- `A-06` invalid message timestamps retain the raw source value, normalize to null, and emit `INVALID_MESSAGE_TIMESTAMP`.
+
+All three behaviors are exercised in `server/test/chatgpt-archive-ingestion.test.mjs`. No parser runtime change was needed.
+
+Current inventory after this correction:
+
+- 22 proven
+- 11 partial
+- 10 missing
+- 1 deferred to content-dependent evaluation
+
+This transition is evidence-driven rather than a maturity re-rating: the implementation already existed and PFC corrected its own inventory.

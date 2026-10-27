@@ -4,8 +4,11 @@ on:
   pull_request:
     paths:
       - 'db/migrations/20261026_011_conversation_history_sessionization.sql'
+      - 'db/migrations/20261026_012_conversation_history_sessionization_deployment_reconciliation.sql'
       - 'scripts/test_chist_a02_sessionization.sh'
+      - 'scripts/test_chist_a02_deployment_reconciliation.sh'
       - 'docs/architecture/chist-a02-sessionization-temporal-rollups.md'
+      - 'docs/provenance/2026-10-26-chist-a02-test-deployment-reconciliation.md'
       - '.github/workflows/chist-a02-sessionization.yml'
       - 'db/migrations/20261026_008_conversation_history_personal_analytics.sql'
       - 'db/migrations/20261026_009_conversation_history_personal_analytics_hash_hardening.sql'
@@ -57,5 +60,5 @@ jobs:
         working-directory: server
         run: npm ci
 
-      - name: Run CHIST-A02 isolated acceptance
-        run: bash scripts/test_chist_a02_sessionization.sh
+      - name: Run CHIST-A02 isolated acceptance and deployment reconciliation
+        run: bash scripts/test_chist_a02_deployment_reconciliation.sh

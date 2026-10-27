@@ -1,0 +1,72 @@
+name: RCO-001 Rule Composition Ordering
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/rco-001-rule-composition-ordering.yml'
+      - '.github/workflows/ree-001-rule-evaluation-engine.yml'
+      - 'db/test/bootstrap_supabase_compat.sql'
+      - 'db/migrations/20261006_001_comind_pm_ledger.sql'
+      - 'db/migrations/20261006_002_comind_pm_ledger_hardening.sql'
+      - 'db/migrations/20261025_012_durable_rulebook_registry.sql'
+      - 'db/migrations/20261025_013_drule_002_rule_archaeology_reconciliation.sql'
+      - 'db/migrations/20261025_014_drule_003_governed_rule_activation.sql'
+      - 'db/migrations/20261025_015_auth_001_authority_graph.sql'
+      - 'db/migrations/20261025_016_auth_001_event_ordering_hardening.sql'
+      - 'db/migrations/20261026_001_ree_001_rule_evaluation_engine.sql'
+      - 'db/migrations/20261026_002_ree_001_authority_time_hardening.sql'
+      - 'db/migrations/20261026_013_rco_001_rule_composition_ordering.sql'
+      - 'db/sql/20261025_drule_003_founder_authority_seed.sql'
+      - 'db/sql/20261026_auth_001_initial_authority_graph_seed.sql'
+      - 'db/verification/20261026_ree_001_rule_evaluation_engine_verification.sql'
+      - 'db/verification/20261026_ree_001_domain_applicability_verification.sql'
+      - 'db/verification/20261026_ree_001_authority_time_verification.sql'
+      - 'db/verification/20261026_rco_001_rule_composition_ordering_verification.sql'
+      - 'db/verification/20261026_rco_001_reconciliation_supersession_verification.sql'
+      - 'scripts/test_ree_001_rule_evaluation_engine.sh'
+      - 'scripts/test_rco_001_rule_composition_ordering.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rule-composition-ordering:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+    steps:
+      - name: Checkout exact workflow head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+      - name: Verify RCO-001 rule composition ordering
+        run: bash ./scripts/test_rco_001_rule_composition_ordering.sh

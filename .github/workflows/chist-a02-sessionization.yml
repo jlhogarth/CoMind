@@ -1,0 +1,61 @@
+name: CHIST-A02 Sessionization
+
+on:
+  pull_request:
+    paths:
+      - 'db/migrations/20261026_011_conversation_history_sessionization.sql'
+      - 'scripts/test_chist_a02_sessionization.sh'
+      - 'docs/architecture/chist-a02-sessionization-temporal-rollups.md'
+      - '.github/workflows/chist-a02-sessionization.yml'
+      - 'db/migrations/20261026_008_conversation_history_personal_analytics.sql'
+      - 'db/migrations/20261026_009_conversation_history_personal_analytics_hash_hardening.sql'
+      - 'db/migrations/20261026_010_conversation_history_personal_analytics_fk_index.sql'
+      - 'scripts/test_chist_a01_personal_analytics.sh'
+      - 'scripts/test_chist_a01_personal_analytics_fk_index.sh'
+      - 'db/migrations/20261026_002_conversation_history_baseline_certification.sql'
+      - 'db/migrations/20261026_004_conversation_history_archive_derivation.sql'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deterministic-sessionization:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.6-pg17-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/comind_ci
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Install server dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Run CHIST-A02 isolated acceptance
+        run: bash scripts/test_chist_a02_sessionization.sh

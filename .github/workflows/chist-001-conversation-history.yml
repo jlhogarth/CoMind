@@ -14,6 +14,7 @@ on:
       - 'db/migrations/20261027_002_chatgpt_differential_ingestion.sql'
       - 'db/migrations/20261027_003_chatgpt_differential_recovery_access.sql'
       - 'db/verification/chist_001_live_test.sql'
+      - 'db/verification/chist_002_differential_ingestion.sql'
       - 'server/src/history/**'
       - 'server/src/archive/chatgpt-export.ts'
       - 'server/src/archive/chatgpt-export-ingest.ts'
@@ -21,6 +22,7 @@ on:
       - 'server/src/archive/chatgpt-export-diff*.ts'
       - 'server/src/archive/chatgpt-differential-ingest.ts'
       - 'server/test/chatgpt-differential-ingestion.integration.test.mjs'
+      - 'server/test/chatgpt-differential-recovery.integration.test.mjs'
       - 'scripts/test_chist_001_conversation_history.sh'
       - 'scripts/test_chist_001_archive_derivation.sh'
       - 'scripts/test_chist_001_archive_readback.sh'
@@ -117,6 +119,9 @@ jobs:
           psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f db/migrations/20261027_003_chatgpt_differential_recovery_access.sql
           psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f db/migrations/20261027_002_chatgpt_differential_ingestion.sql
           psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f db/migrations/20261027_003_chatgpt_differential_recovery_access.sql
+
+      - name: Verify differential schema, RLS, and bounded authority
+        run: psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f db/verification/chist_002_differential_ingestion.sql
 
       - name: Run A-B-C differential ingestion acceptance proof
         run: bash scripts/test_chist_differential_ingestion.sh

@@ -7,7 +7,10 @@ import {
   loadEvidenceBindings,
   verifyGitHubRunReferences,
 } from '../../scripts/governed_evidence_verifier.mjs';
-import { loadThreadKeeperC2Matrix } from '../../scripts/threadkeeper_c2_matrix.mjs';
+import {
+  loadThreadKeeperC2Matrix,
+  validateThreadKeeperC2Matrix,
+} from '../../scripts/threadkeeper_c2_matrix.mjs';
 import { loadThreadKeeperC3Matrix } from '../../scripts/threadkeeper_c3_matrix.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -62,12 +65,26 @@ for (const [name, loadMatrix] of [
   });
 }
 
-test('a nonexistent positive GitHub run ID fails closed', async () => {
+test('a fabricated positive GitHub run ID cannot become evidence by syntax alone', () => {
   const matrix = structuredClone(loadThreadKeeperC2Matrix());
   const run = matrix.gateRequirements.find((item) => item.id === 'C2-03').evidence
     .find((item) => item.type === 'github_run');
   run.runId = 99999999999;
-  const errors = await verifyGitHubRunReferences(matrix, {
+  const errors = validateThreadKeeperC2Matrix(matrix, { repoRoot });
+  assert.ok(errors.some((message) => message.includes('has no governed external binding')), errors.join('\n'));
+});
+
+test('a fabricated nonempty CDE key cannot become evidence by syntax alone', () => {
+  const matrix = structuredClone(loadThreadKeeperC2Matrix());
+  const cde = matrix.gateRequirements.find((item) => item.id === 'C2-16').evidence
+    .find((item) => item.type === 'cde_key');
+  cde.key = 'JRN-FAKE-BUT-NONEMPTY';
+  const errors = validateThreadKeeperC2Matrix(matrix, { repoRoot });
+  assert.ok(errors.some((message) => message.includes('has no governed CDE binding')), errors.join('\n'));
+});
+
+test('a bound GitHub run that cannot be retrieved fails closed', async () => {
+  const errors = await verifyGitHubRunReferences(loadThreadKeeperC2Matrix(), {
     repoRoot,
     token: 'unit-test-token',
     fetchImpl: async () => response(404, { message: 'Not Found' }),

@@ -4,7 +4,7 @@ on:
   pull_request:
     paths:
       - 'server/src/threadkeeper/**'
-      - 'server/src/continuity/checkpoint.ts'
+      - 'server/src/continuity/**'
       - 'server/src/db.ts'
       - 'server/test/threadkeeper-*.test.mjs'
       - 'server/test/threadkeeper-*.integration.test.mjs'
@@ -22,7 +22,7 @@ on:
     branches: [main]
     paths:
       - 'server/src/threadkeeper/**'
-      - 'server/src/continuity/checkpoint.ts'
+      - 'server/src/continuity/**'
       - 'server/src/db.ts'
       - 'server/test/threadkeeper-*.test.mjs'
       - 'server/test/threadkeeper-*.integration.test.mjs'
@@ -71,5 +71,5 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes postgresql-client
-      - name: Verify ThreadKeeper migration, repository, security, lineage, and case lifecycle
+      - name: Verify ThreadKeeper migration, repository, security, lineage, case lifecycle, and competitive handoffs
         run: bash scripts/test_threadkeeper_persistence.sh

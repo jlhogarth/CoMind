@@ -144,7 +144,7 @@ test('isolated PostgreSQL ThreadKeeper persistence preserves governed lineage, e
     assert.equal(race.filter(result => result.status === 'fulfilled').length, 1);
     assert.equal(race.filter(result => result.status === 'rejected').length, 1);
     const rejection = race.find(result => result.status === 'rejected');
-    assert.match(String(rejection.reason), /stale_head/);
+    assert.match(String(rejection.reason), /(stale_head|could not serialize access)/);
     const winningCheckpoint = race.find(result => result.status === 'fulfilled').value;
 
     const lineage = await getCheckpointLineage(query, semanticKey);

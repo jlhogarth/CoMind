@@ -54,7 +54,7 @@
       "description": "CCI projection version is the governed current version.",
       "severity": "warning",
       "trackingKey": "CCI-001",
-      "expected": 6,
+      "expected": 7,
       "remediation": "Reconcile the CCI projection and update the maintenance baseline in the same reviewed change."
     },
     {
@@ -63,7 +63,7 @@
       "description": "MLC lifecycle projection version is the governed current version.",
       "severity": "warning",
       "trackingKey": "MLC-001",
-      "expected": 3,
+      "expected": 4,
       "remediation": "Reconcile MLC lifecycle evidence and update the baseline only after the projection is verified."
     },
     {
@@ -72,7 +72,7 @@
       "description": "DPE priority projection version reflects the latest governed recomputation.",
       "severity": "warning",
       "trackingKey": "DPE-001",
-      "expected": 4,
+      "expected": 5,
       "remediation": "Recompute DPE from current MLC and relationship inputs, verify the projection, then update the baseline."
     },
     {
@@ -90,7 +90,7 @@
       "description": "DPE-001 graph inputs agree with the canonical graph baseline.",
       "severity": "fail",
       "trackingKey": "DPE-001",
-      "expected": {"version":"0.4","concept_count":51,"graph_counts.active_typed_edges":44,"graph_counts.retired_edges":1,"graph_counts.active_weighted_edges":41},
+      "expected": {"version":"0.5","concept_count":51,"graph_counts.active_typed_edges":44,"graph_counts.retired_edges":1,"graph_counts.active_weighted_edges":41},
       "remediation": "Recompute DPE-001 from current canonical inputs; never hand-edit score outputs to make this check pass."
     },
     {
@@ -105,20 +105,20 @@
     {
       "id": "MCTRL-MLC-001",
       "kind": "entity_payload_equals",
-      "description": "MLC module and concept baselines remain internally consistent.",
+      "description": "MLC module and concept baselines remain internally consistent while ThreadKeeper C3 technical integration awaits explicit promotion.",
       "severity": "fail",
       "trackingKey": "MLC-001",
-      "expected": {"version":"0.3","concept_count":51,"module_count":3,"module_current_lifecycle.concept:aris":"Conceived","module_current_lifecycle.concept:cris":"Conceived","module_current_lifecycle.concept:agent-colony":"Conceived","threadkeeper_capability_maturity":"C2 Implemented","threadkeeper_implementation_proven":true},
-      "remediation": "Reconcile lifecycle evidence before changing canonical maturity; historical maturity must not silently promote current state."
+      "expected": {"version":"0.4","concept_count":51,"module_count":3,"module_current_lifecycle.concept:aris":"Conceived","module_current_lifecycle.concept:cris":"Conceived","module_current_lifecycle.concept:agent-colony":"Conceived","threadkeeper_capability_maturity":"C2 Implemented","threadkeeper_implementation_proven":true,"threadkeeper_c3_technical_proven":true,"threadkeeper_c3_promotion_pending":true},
+      "remediation": "Reconcile lifecycle evidence before changing canonical maturity; technical integration proof alone must not silently promote ThreadKeeper."
     },
     {
       "id": "MCTRL-TK-001",
       "kind": "entity_payload_equals",
-      "description": "ThreadKeeper is a bounded Capability at C2 Implemented with the TK-005 evidence gate complete and no production activation claim.",
+      "description": "ThreadKeeper remains C2 Implemented while TK-006 C3 technical integration is proven and explicit promotion is still pending.",
       "severity": "fail",
       "trackingKey": "concept:threadkeeper",
-      "expected": {"mlc_primary_classification":"Capability","capability_maturity":"C2 Implemented","module_lifecycle_applies":false,"implementation_proven":true,"c2_gate_complete":true,"canonical_contract_key":"TK-001"},
-      "remediation": "Reconcile ThreadKeeper through TK-001/TK-002, TK-005 evidence, CCI, MLC, DPE, and canonical Development Evidence. Do not infer C3 integration or production activation from C2 implementation."
+      "expected": {"mlc_primary_classification":"Capability","capability_maturity":"C2 Implemented","module_lifecycle_applies":false,"implementation_proven":true,"c2_gate_complete":true,"canonical_contract_key":"TK-001","integration_lane_key":"TK-006","c3_technical_integration_proven":true,"c3_promotion_pending":true,"production_activation":false},
+      "remediation": "Reconcile ThreadKeeper through TK-001/TK-002/TK-005/TK-006, CCI, MLC, DPE, EDG, and canonical Development Evidence. Do not infer C3 from technical proof before the explicit promotion event."
     },
     {
       "id": "MCTRL-ORPHAN-001",

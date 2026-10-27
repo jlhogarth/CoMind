@@ -1,0 +1,267 @@
+{
+  "schemaVersion": 1,
+  "lane": "TK-005",
+  "issue": 248,
+  "baseCommit": "b43ad4cabc3d776fe0fb7e54560ddf7e7c5e0e35",
+  "purpose": "Provide a machine-readable, fail-closed evidence gate for ThreadKeeper C2 Implemented maturity.",
+  "promotionBoundary": {
+    "currentMaturity": "C1 Contracted",
+    "targetMaturity": "C2 Implemented",
+    "automaticPromotionAllowed": false,
+    "productionActivationRequired": false,
+    "publicHttpEndpointRequired": false,
+    "sdnRegistrationRequired": false,
+    "ready": false,
+    "promotionJournalKey": null
+  },
+  "statuses": ["proven", "partial", "missing", "not_applicable"],
+  "evidenceTypes": ["repo_path", "github_run", "cde_key"],
+  "gateRequirements": [
+    {
+      "id": "C2-01",
+      "title": "Accepted TK-001 capability contract",
+      "source": "TK-002 section 21 item 1",
+      "status": "proven",
+      "evidence": [
+        {"type":"repo_path","path":"docs/architecture/threadkeeper-capability-contract.md"},
+        {"type":"cde_key","key":"JRN-20261026-0005"}
+      ],
+      "nextAction": "Retain TK-001 as the controlling capability contract."
+    },
+    {
+      "id": "C2-02",
+      "title": "Accepted TK-002 implementation design",
+      "source": "TK-002 section 21 item 2",
+      "status": "proven",
+      "evidence": [
+        {"type":"repo_path","path":"docs/architecture/threadkeeper-implementation-design.md"}
+      ],
+      "nextAction": "Retain TK-002 as the controlling C2 implementation and evidence design."
+    },
+    {
+      "id": "C2-03",
+      "title": "Exact final C2 implementation commit",
+      "source": "TK-002 section 21 item 3",
+      "status": "partial",
+      "evidence": [
+        {"type":"repo_path","path":"server/src/threadkeeper/assessment.ts"},
+        {"type":"repo_path","path":"server/src/threadkeeper/checkpoint.ts"},
+        {"type":"repo_path","path":"server/src/threadkeeper/repository.ts"},
+        {"type":"repo_path","path":"server/src/threadkeeper/routing.ts"},
+        {"type":"repo_path","path":"server/src/threadkeeper/scope.ts"},
+        {"type":"repo_path","path":"server/src/threadkeeper/types.ts"}
+      ],
+      "limitations": "TK-003 and TK-004 provide accepted implementation slices, but the final C2 commit cannot be bound until TK-005 evidence-completion changes are frozen.",
+      "nextAction": "Bind the exact final implementation SHA only after TK-005 code and evidence are complete."
+    },
+    {
+      "id": "C2-04",
+      "title": "Isolated migration and schema evidence",
+      "source": "TK-002 section 21 item 4",
+      "status": "proven",
+      "evidence": [
+        {"type":"repo_path","path":"db/migrations/20261026_008_threadkeeper_persistence.sql"},
+        {"type":"repo_path","path":"db/migrations/20261026_009_threadkeeper_scope_integrity.sql"},
+        {"type":"repo_path","path":"db/migrations/20261026_010_threadkeeper_fk_indexes.sql"},
+        {"type":"repo_path","path":"scripts/test_threadkeeper_persistence.sh"},
+        {"type":"repo_path","path":".github/workflows/threadkeeper-persistence.yml"},
+        {"type":"github_run","runId":40427693053},
+        {"type":"cde_key","key":"JRN-20261026-0014"}
+      ],
+      "nextAction": "Retain TK-004 persistence verification as a C2 prerequisite."
+    },
+    {
+      "id": "C2-05",
+      "title": "Unit-test evidence",
+      "source": "TK-002 section 21 item 5",
+      "status": "proven",
+      "evidence": [
+        {"type":"repo_path","path":"server/test/threadkeeper-core.test.mjs"},
+        {"type":"repo_path","path":".github/workflows/threadkeeper-persistence.yml"},
+        {"type":"github_run","runId":40427693053}
+      ],
+      "nextAction": "Extend rather than replace the accepted core regression suite when closing remaining C2 gaps."
+    },
+    {
+      "id": "C2-06",
+      "title": "Isolated PostgreSQL integration evidence",
+      "source": "TK-002 section 21 item 6",
+      "status": "proven",
+      "evidence": [
+        {"type":"repo_path","path":"server/test/threadkeeper-repository.integration.test.mjs"},
+        {"type":"repo_path","path":"scripts/test_threadkeeper_persistence.sh"},
+        {"type":"repo_path","path":".github/workflows/threadkeeper-persistence.yml"},
+        {"type":"github_run","runId":40427693053}
+      ],
+      "nextAction": "Retain the disposable PostgreSQL 17 proof as the persistence integration gate."
+    },
+    {
+      "id": "C2-07",
+      "title": "Required failure-injection evidence",
+      "source": "TK-002 section 21 item 7",
+      "status": "partial",
+      "evidence": [
+        {"type":"repo_path","path":"server/test/threadkeeper-core.test.mjs"},
+        {"type":"repo_path","path":"server/test/threadkeeper-repository.integration.test.mjs"}
+      ],
+      "limitations": "Digest tamper, ambiguous identity, conflicting evidence, stale-head concurrency, illegal transition, and idempotency conflicts are proven. Evidence timeout, missing provenance, stale authority, dependency outage, route cycle, storage failure, and false-positive dismissal remain incomplete.",
+      "nextAction": "Add only the missing failure fixtures and preserve fail-closed or explicit unresolved behavior."
+    },
+    {
+      "id": "C2-08",
+      "title": "ACP regression preservation",
+      "source": "TK-002 section 21 item 8",
+      "status": "proven",
+      "evidence": [
+        {"type":"repo_path","path":"server/test/threadkeeper-core.test.mjs"},
+        {"type":"repo_path","path":"server/test/continuity-checkpoint.test.mjs"}
+      ],
+      "nextAction": "Rerun ACP regression if TK-005 changes shared continuity primitives."
+    },
+    {
+      "id": "C2-09",
+      "title": "Security and privacy boundary review",
+      "source": "TK-002 section 21 item 9",
+      "status": "partial",
+      "evidence": [
+        {"type":"repo_path","path":"server/test/threadkeeper-core.test.mjs"},
+        {"type":"repo_path","path":"server/test/threadkeeper-repository.integration.test.mjs"},
+        {"type":"repo_path","path":"db/migrations/20261026_008_threadkeeper_persistence.sql"}
+      ],
+      "limitations": "Secret rejection, RLS, least privilege, immutability, and external acceptance authority are proven. Explicit reference-over-copy and sensitive log/metric canary proofs are still required.",
+      "nextAction": "Add focused canary and reference-only tests without broadening data access."
+    },
+    {
+      "id": "C2-10",
+      "title": "Authority-boundary tests",
+      "source": "TK-002 section 21 item 10",
+      "status": "proven",
+      "evidence": [
+        {"type":"repo_path","path":"server/test/threadkeeper-core.test.mjs"},
+        {"type":"repo_path","path":"server/test/threadkeeper-repository.integration.test.mjs"}
+      ],
+      "nextAction": "Retain self-approval prohibition, external validation, and stale-head enforcement as regression invariants."
+    },
+    {
+      "id": "C2-11",
+      "title": "Adjacent-system non-absorption proof",
+      "source": "TK-002 section 21 item 11",
+      "status": "partial",
+      "evidence": [
+        {"type":"repo_path","path":"docs/architecture/threadkeeper-capability-contract.md"},
+        {"type":"repo_path","path":"docs/architecture/threadkeeper-implementation-design.md"}
+      ],
+      "limitations": "The ownership boundaries are canonical in contract and design, but C2 still requires executable boundary-adapter tests proving references and routes do not invoke or absorb neighboring systems.",
+      "nextAction": "Add injected fake/read-only boundary resolvers and no-execution assertions."
+    },
+    {
+      "id": "C2-12",
+      "title": "Vendor-neutral observability baseline",
+      "source": "TK-002 section 21 item 12 and section 17",
+      "status": "missing",
+      "evidence": [],
+      "limitations": "No ThreadKeeper observability adapter currently exists under server/src/threadkeeper.",
+      "nextAction": "Implement bounded counters and latency observations with no sensitive evidence payloads and no vendor lock-in."
+    },
+    {
+      "id": "C2-13",
+      "title": "Canonical Development Evidence records",
+      "source": "TK-002 section 21 item 13",
+      "status": "partial",
+      "evidence": [
+        {"type":"cde_key","key":"TK-004"},
+        {"type":"cde_key","key":"JRN-20261026-0014"}
+      ],
+      "limitations": "TK-004 persistence acceptance is canonical. TK-005 completion and final C2 evidence have not yet been recorded.",
+      "nextAction": "Write TK-005 evidence through CDE as it is produced and append final promotion only after all gates pass."
+    },
+    {
+      "id": "C2-14",
+      "title": "Governed projection reconciliation",
+      "source": "TK-002 section 21 item 14",
+      "status": "partial",
+      "evidence": [
+        {"type":"repo_path","path":"docs/architecture/threadkeeper-capability-contract.md"}
+      ],
+      "limitations": "C1 projections are reconciled. A successful C2 promotion changes the governed maturity claim and therefore requires the relevant CCI/MLC/DPE/EDG projection update and verification.",
+      "nextAction": "Reconcile only after C2 evidence is otherwise complete, then rerun MCTRL."
+    },
+    {
+      "id": "C2-15",
+      "title": "Post-change MCTRL PASS",
+      "source": "TK-002 section 21 item 15",
+      "status": "partial",
+      "evidence": [
+        {"type":"repo_path","path":"config/maintenance-control.v1.json"},
+        {"type":"github_run","runId":40427693035}
+      ],
+      "limitations": "TK-004 post-merge MCTRL passed 18/18, but TK-005 requires a new post-change MCTRL result on the final C2 evidence head.",
+      "nextAction": "Run MCTRL after all TK-005 code, evidence, and projection changes are frozen."
+    },
+    {
+      "id": "C2-16",
+      "title": "Explicit governed C2 maturity promotion journal",
+      "source": "TK-002 section 21 item 16",
+      "status": "missing",
+      "evidence": [],
+      "limitations": "Promotion is intentionally absent while any required evidence remains partial or missing.",
+      "nextAction": "Append the C2 promotion journal only after the matrix is fully satisfied and post-change MCTRL passes."
+    }
+  ],
+  "testRequirements": [
+    {"id":"U-01","group":"unit","title":"Exact scope binding succeeds","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-core.test.mjs"}],"nextAction":"Retain regression."},
+    {"id":"U-02","group":"unit","title":"Ambiguous scope binding fails","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-core.test.mjs"}],"nextAction":"Retain regression."},
+    {"id":"U-03","group":"unit","title":"Duplicate scope registration is idempotent","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-repository.integration.test.mjs"}],"nextAction":"Retain regression."},
+    {"id":"U-04","group":"unit","title":"Canonical checkpoint digest is deterministic","status":"partial","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-core.test.mjs"}],"limitations":"Integrity is checked, but the ThreadKeeper test does not yet explicitly compare equivalent proposals for identical digest output.","nextAction":"Add exact deterministic digest equivalence assertion."},
+    {"id":"U-05","group":"unit","title":"Secret material is rejected","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-core.test.mjs"}],"nextAction":"Retain regression."},
+    {"id":"U-06","group":"unit","title":"Tampered checkpoint proposal fails integrity","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-core.test.mjs"}],"nextAction":"Retain regression."},
+    {"id":"U-07","group":"unit","title":"Stale or invalid authority fails","status":"partial","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-core.test.mjs"}],"limitations":"Self-authority and stale accepted head are covered; a dedicated stale external authority fixture remains required.","nextAction":"Add stale external authority validation fixture."},
+    {"id":"U-08","group":"unit","title":"Missing accepted baseline blocks assessment","status":"missing","evidence":[],"nextAction":"Add deterministic missing-baseline assessment fixture."},
+    {"id":"U-09","group":"unit","title":"Intact observation returns INTACT","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-core.test.mjs"}],"nextAction":"Retain regression."},
+    {"id":"U-10","group":"unit","title":"Authorized material change returns CHANGED_WITH_LINEAGE","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-core.test.mjs"}],"nextAction":"Retain regression."},
+    {"id":"U-11","group":"unit","title":"Unexplained material change returns SUSPECTED_BREAK","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-core.test.mjs"}],"nextAction":"Retain regression."},
+    {"id":"U-12","group":"unit","title":"Proven incompatible state returns CONFIRMED_BREAK","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-core.test.mjs"}],"nextAction":"Retain regression."},
+    {"id":"U-13","group":"unit","title":"Contradictory authoritative evidence returns UNRESOLVED_CONFLICT","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-core.test.mjs"}],"nextAction":"Retain regression."},
+    {"id":"U-14","group":"unit","title":"Missing required evidence cannot return INTACT","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-core.test.mjs"}],"nextAction":"Retain regression."},
+    {"id":"U-15","group":"unit","title":"Route policy is deterministic and versioned","status":"partial","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-core.test.mjs"},{"type":"repo_path","path":"server/src/threadkeeper/routing.ts"}],"limitations":"Route codes are exercised, but policy-version preservation needs an explicit assertion.","nextAction":"Add route policy version test."},
+    {"id":"U-16","group":"unit","title":"Checkpoint proposal preserves accepted predecessor","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-core.test.mjs"}],"nextAction":"Retain regression."},
+    {"id":"U-17","group":"unit","title":"ThreadKeeper cannot self-approve checkpoint","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-core.test.mjs"}],"nextAction":"Retain regression."},
+    {"id":"U-18","group":"unit","title":"Stale-head checkpoint acceptance fails","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-core.test.mjs"},{"type":"repo_path","path":"server/test/threadkeeper-repository.integration.test.mjs"}],"nextAction":"Retain regression."},
+    {"id":"U-19","group":"unit","title":"Lineage traversal detects cycles or broken links","status":"partial","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-core.test.mjs"},{"type":"repo_path","path":"server/test/threadkeeper-repository.integration.test.mjs"}],"limitations":"Broken predecessor classification and valid lineage traversal are covered; explicit corrupted-cycle/broken-link traversal injection remains absent.","nextAction":"Add fail-closed lineage corruption fixture."},
+    {"id":"U-20","group":"unit","title":"Context projection returns references rather than duplicated payloads","status":"partial","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-repository.integration.test.mjs"}],"limitations":"Context projection is exercised, but raw-payload exclusion is not asserted explicitly.","nextAction":"Add canary payload exclusion assertion."},
+
+    {"id":"I-01","group":"postgres","title":"Migration applies twice safely","status":"proven","evidence":[{"type":"repo_path","path":"scripts/test_threadkeeper_persistence.sh"}],"nextAction":"Retain regression."},
+    {"id":"I-02","group":"postgres","title":"Scope identity uniqueness and idempotency","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-repository.integration.test.mjs"}],"nextAction":"Retain regression."},
+    {"id":"I-03","group":"postgres","title":"Accepted checkpoint immutability","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-repository.integration.test.mjs"}],"nextAction":"Retain regression."},
+    {"id":"I-04","group":"postgres","title":"Assessment immutability","status":"partial","evidence":[{"type":"repo_path","path":"db/migrations/20261026_008_threadkeeper_persistence.sql"}],"limitations":"The shared immutability trigger covers assessments, but a direct negative integration assertion is still desirable.","nextAction":"Add UPDATE/DELETE rejection assertion for assessment."},
+    {"id":"I-05","group":"postgres","title":"Case transition append-only behavior","status":"partial","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-repository.integration.test.mjs"}],"limitations":"Illegal terminal transition is rejected, but direct UPDATE/DELETE rejection is not asserted in the integration test.","nextAction":"Add direct transition immutability assertion."},
+    {"id":"I-06","group":"postgres","title":"Parent checkpoint foreign-key integrity","status":"partial","evidence":[{"type":"repo_path","path":"db/migrations/20261026_008_threadkeeper_persistence.sql"}],"limitations":"Constraint exists, but explicit negative integration evidence is not yet mapped.","nextAction":"Add invalid-parent insertion fixture."},
+    {"id":"I-07","group":"postgres","title":"Atomic accepted-head successor transition","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-repository.integration.test.mjs"}],"nextAction":"Retain regression."},
+    {"id":"I-08","group":"postgres","title":"Concurrent stale-head acceptance rejection","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-repository.integration.test.mjs"}],"nextAction":"Retain regression."},
+    {"id":"I-09","group":"postgres","title":"Idempotent duplicate observation handling","status":"missing","evidence":[],"limitations":"Assessment idempotency is proven, but observation receipt/idempotency is not yet represented as an explicit ThreadKeeper service contract.","nextAction":"Implement bounded observation receipt semantics without adding a competing raw event store."},
+    {"id":"I-10","group":"postgres","title":"Conflicting duplicate observation rejection","status":"missing","evidence":[],"limitations":"Conflicting assessment idempotency is proven, but duplicate observation identity conflict is not explicit.","nextAction":"Add service-level conflicting observation receipt rejection."},
+    {"id":"I-11","group":"postgres","title":"Restart persistence roundtrip","status":"missing","evidence":[],"nextAction":"Add isolated database reconnect/restart-style readback proof without introducing new persistence state."},
+    {"id":"I-12","group":"postgres","title":"No forbidden schema or privilege exposure","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-repository.integration.test.mjs"},{"type":"repo_path","path":"db/migrations/20261026_008_threadkeeper_persistence.sql"}],"nextAction":"Retain regression."},
+
+    {"id":"B-01","group":"boundary","title":"Conversation History reference resolves without raw transcript copy","status":"missing","evidence":[],"nextAction":"Add injected read-only reference resolver and raw-content canary exclusion assertion."},
+    {"id":"B-02","group":"boundary","title":"Foundry outcome remains authoritative outside ThreadKeeper","status":"missing","evidence":[],"nextAction":"Add fake/read-only Foundry resolver proving ThreadKeeper consumes evidence without writing execution state."},
+    {"id":"B-03","group":"boundary","title":"Unavailable evidence resolver remains unresolved or degraded","status":"missing","evidence":[],"nextAction":"Add resolver timeout/unavailable fixture and fail-closed result."},
+    {"id":"B-04","group":"boundary","title":"Helper Matrix route is emitted without helper execution","status":"missing","evidence":[],"nextAction":"Add no-call fake adapter assertion around REQUEST_HELPER_ANALYSIS."},
+    {"id":"B-05","group":"boundary","title":"SEAL route is emitted without revision execution","status":"missing","evidence":[],"nextAction":"Add no-call fake adapter assertion around REQUEST_SEAL_REVIEW."},
+    {"id":"B-06","group":"boundary","title":"Agent Communication is not invoked","status":"missing","evidence":[],"nextAction":"Add explicit no-transport-invocation boundary assertion."},
+
+    {"id":"F-01","group":"failure","title":"Corrupt digest fails closed","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-core.test.mjs"}],"nextAction":"Retain regression."},
+    {"id":"F-02","group":"failure","title":"Expired checkpoint handling where expiry policy applies","status":"not_applicable","evidence":[{"type":"repo_path","path":"docs/architecture/threadkeeper-implementation-design.md"}],"rationale":"TK-002 defaults accepted semantic checkpoints to no global expiry. ACP expiry remains a separate continuity substrate behavior and is not silently imported into ThreadKeeper semantic scope validity.","nextAction":"Reopen only if a future scope-specific expiry policy is approved."},
+    {"id":"F-03","group":"failure","title":"Ambiguous identity fails closed","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-core.test.mjs"}],"nextAction":"Retain regression."},
+    {"id":"F-04","group":"failure","title":"Missing required provenance fails closed","status":"missing","evidence":[],"nextAction":"Add missing-provenance fixture distinct from generic missing-evidence behavior."},
+    {"id":"F-05","group":"failure","title":"Stale external authority fails closed","status":"missing","evidence":[],"nextAction":"Add explicit stale/revoked external authority fixture."},
+    {"id":"F-06","group":"failure","title":"Evidence source timeout remains unresolved","status":"missing","evidence":[],"nextAction":"Add injected resolver timeout and verify no fabricated continuity result."},
+    {"id":"F-07","group":"failure","title":"Conflicting source evidence remains unresolved","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-core.test.mjs"}],"nextAction":"Retain regression."},
+    {"id":"F-08","group":"failure","title":"Dependency outage cannot produce false completion","status":"missing","evidence":[],"nextAction":"Add dependency-unavailable route/resolution fixture."},
+    {"id":"F-09","group":"failure","title":"Repeated route cycle escalates without looping","status":"missing","evidence":[],"nextAction":"Add bounded route-cycle detection and human/governance escalation fixture."},
+    {"id":"F-10","group":"failure","title":"Concurrent checkpoint acceptance produces one winner","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-repository.integration.test.mjs"}],"nextAction":"Retain regression."},
+    {"id":"F-11","group":"failure","title":"Storage write failure is explicit and does not invent persistence","status":"missing","evidence":[],"nextAction":"Inject repository write failure and assert explicit failure with no accepted result."},
+    {"id":"F-12","group":"failure","title":"False-positive break dismissal preserves original assessment evidence","status":"missing","evidence":[],"nextAction":"Add append-only dismissal/resolution fixture proving the original assessment remains immutable."
+    }
+  ]
+}

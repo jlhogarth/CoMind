@@ -1,6 +1,6 @@
 -- CoMind One‑Shot v2 - 08_indexes_constraints.sql
 BEGIN;
-SET search_path TO comind, public;
+SET search_path TO comind, public, extensions;
 
 -- Common indexes
 CREATE INDEX IF NOT EXISTS idx_actor_org ON cm_actor(org_id);

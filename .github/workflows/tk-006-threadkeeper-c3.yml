@@ -8,6 +8,7 @@ on:
       - 'server/src/history/**'
       - 'server/test/threadkeeper-c3-*.test.mjs'
       - 'server/test/threadkeeper-c3-*.integration.test.mjs'
+      - 'server/test/threadkeeper-evidence-reference-verifier.test.mjs'
       - 'db/migrations/20261012_001_chatgpt_archive_ingestion.sql'
       - 'db/migrations/20261012_002_chatgpt_archive_quarantine.sql'
       - 'db/migrations/20261012_003_chatgpt_archive_access_hardening.sql'
@@ -27,7 +28,9 @@ on:
       - 'db/migrations/20261026_010_threadkeeper_fk_indexes.sql'
       - 'scripts/test_threadkeeper_c3.sh'
       - 'config/threadkeeper-c3-evidence.v1.json'
+      - 'config/governed-evidence-bindings.v1.json'
       - 'scripts/threadkeeper_c3_matrix.mjs'
+      - 'scripts/governed_evidence_verifier.mjs'
       - 'docs/provenance/*tk-006*'
       - '.github/workflows/tk-006-threadkeeper-c3.yml'
   push:
@@ -38,17 +41,21 @@ on:
       - 'server/src/history/**'
       - 'server/test/threadkeeper-c3-*.test.mjs'
       - 'server/test/threadkeeper-c3-*.integration.test.mjs'
+      - 'server/test/threadkeeper-evidence-reference-verifier.test.mjs'
       - 'db/migrations/20261027_004_threadkeeper_c3_history_read_boundary.sql'
       - 'db/migrations/verify_20261027_004_threadkeeper_c3_history_read_boundary.sql'
       - 'scripts/test_threadkeeper_c3.sh'
       - 'config/threadkeeper-c3-evidence.v1.json'
+      - 'config/governed-evidence-bindings.v1.json'
       - 'scripts/threadkeeper_c3_matrix.mjs'
+      - 'scripts/governed_evidence_verifier.mjs'
       - 'docs/provenance/*tk-006*'
       - '.github/workflows/tk-006-threadkeeper-c3.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   c3-real-contract-integration:
@@ -72,8 +79,10 @@ jobs:
       THREADKEEPER_C3_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       THREADKEEPER_C3_BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
     steps:
-      - name: Checkout exact head
+      - name: Checkout exact head with history
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -83,3 +92,9 @@ jobs:
           sudo apt-get install --yes postgresql-client
       - name: Prove Conversation History to ThreadKeeper to continuity-handoff integration
         run: bash scripts/test_threadkeeper_c3.sh
+      - name: Verify governed C3 external evidence and implementation ancestry
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/threadkeeper_c3_matrix.mjs --verify-git --verify-github
+      - name: Prove external evidence references fail closed
+        run: node --test server/test/threadkeeper-evidence-reference-verifier.test.mjs

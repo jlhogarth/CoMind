@@ -6,8 +6,10 @@ on:
       - 'config/maintenance-control.v1.json'
       - 'config/threadkeeper-c2-evidence.v1.json'
       - 'config/threadkeeper-c3-evidence.v1.json'
+      - 'config/governed-evidence-bindings.v1.json'
       - 'scripts/threadkeeper_c2_matrix.mjs'
       - 'scripts/threadkeeper_c3_matrix.mjs'
+      - 'scripts/governed_evidence_verifier.mjs'
       - 'server/src/maintenance-control/**'
       - 'server/src/threadkeeper/**'
       - 'server/test/maintenance-control*.test.mjs'
@@ -27,8 +29,10 @@ on:
       - 'config/maintenance-control.v1.json'
       - 'config/threadkeeper-c2-evidence.v1.json'
       - 'config/threadkeeper-c3-evidence.v1.json'
+      - 'config/governed-evidence-bindings.v1.json'
       - 'scripts/threadkeeper_c2_matrix.mjs'
       - 'scripts/threadkeeper_c3_matrix.mjs'
+      - 'scripts/governed_evidence_verifier.mjs'
       - 'server/src/maintenance-control/**'
       - 'server/src/threadkeeper/**'
       - 'server/test/maintenance-control*.test.mjs'
@@ -46,6 +50,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   maintenance-control:
@@ -70,7 +75,10 @@ jobs:
     env:
       MCTRL_TEST_DATABASE_URL: postgresql://postgres:mctrl_isolated_ci_only@127.0.0.1:5432/mctrl_test
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout exact head with history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -80,14 +88,20 @@ jobs:
       - run: npm run build
       - run: node --test test/maintenance-control.test.mjs
       - run: node --test test/maintenance-control.integration.test.mjs
-      - name: Validate ThreadKeeper C2 evidence contract
-        run: node ../scripts/threadkeeper_c2_matrix.mjs
+      - name: Validate ThreadKeeper C2 evidence contract and external references
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node ../scripts/threadkeeper_c2_matrix.mjs --verify-git --verify-github
       - name: Prove ThreadKeeper C2 evidence gate fails closed
         run: node --test test/threadkeeper-c2-evidence.test.mjs
-      - name: Validate ThreadKeeper C3 evidence contract
-        run: node ../scripts/threadkeeper_c3_matrix.mjs
+      - name: Validate ThreadKeeper C3 evidence contract and external references
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node ../scripts/threadkeeper_c3_matrix.mjs --verify-git --verify-github
       - name: Prove ThreadKeeper C3 evidence gate fails closed
         run: node --test test/threadkeeper-c3-evidence.test.mjs
+      - name: Prove external evidence references fail closed
+        run: node --test test/threadkeeper-evidence-reference-verifier.test.mjs
 
   live-test-audit:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'

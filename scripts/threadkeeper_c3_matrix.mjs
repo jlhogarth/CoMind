@@ -157,7 +157,7 @@ async function main() {
 
   const errors = validateThreadKeeperC3Matrix(matrix);
   if (verifyGit) errors.push(...verifyImplementationAncestor(matrix.implementationCommit, repoRoot));
-  if (verifyGitHub) errors.push(...await verifyGitHubRunReferences(matrix));
+  if (verifyGitHub) errors.push(...await verifyGitHubRunReferences(matrix, { repoRoot }));
 
   const summary = matrixSummary(matrix);
   console.log(JSON.stringify({

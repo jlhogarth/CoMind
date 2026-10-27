@@ -97,7 +97,7 @@ jobs:
             exit 1
           fi
           echo "NODE_EXTRA_CA_CERTS=$ca_path" >> "$GITHUB_ENV"
-      - name: Execute bounded live Test operational proof
+      - name: Execute bounded live Test operational proof through runtime role
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_SESSION_DATABASE_URL }}
           THREADKEEPER_C4_DATABASE_URL: ${{ secrets.SUPABASE_SESSION_DATABASE_URL }}
@@ -105,10 +105,12 @@ jobs:
           THREADKEEPER_C4_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
           THREADKEEPER_C4_ENVIRONMENT: Test
           THREADKEEPER_C4_EVIDENCE_PATH: ${{ github.workspace }}/server/artifacts/tk-007-c4-live-test.json
+          PGOPTIONS: '-c role=comind_threadkeeper_runtime'
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p artifacts
+          node --test test/threadkeeper-c4-runtime-role.test.mjs
           node --test test/threadkeeper-c4-operational.integration.test.mjs
       - name: Preserve C4 live Test evidence
         if: always()

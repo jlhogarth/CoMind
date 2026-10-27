@@ -2,22 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
 
-import { closePool } from '../dist/db.js';
 import { assessContinuity } from '../dist/threadkeeper/assessment.js';
 import { createCheckpointProposal } from '../dist/threadkeeper/checkpoint.js';
-import {
-  appendCaseTransition,
-  getCheckpointLineage,
-  getContinuityContext,
-  openContinuityCase,
-  persistAcceptedCheckpoint,
-  persistAssessment,
-  registerContinuityScope,
-} from '../dist/threadkeeper/repository.js';
 import { semanticScopeKey } from '../dist/threadkeeper/scope.js';
-
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
-const query = async (sql, params) => ({ rows: (await pool.query(sql, params)).rows });
 
 const scopeBinding = {
   scopeType: 'plan',
@@ -70,6 +57,20 @@ const signals = overrides => ({
 test('isolated PostgreSQL ThreadKeeper persistence preserves governed lineage, evidence, cases, ACLs, and concurrency', {
   skip: process.env.THREADKEEPER_ISOLATED_DB_TEST !== '1',
 }, async () => {
+  const { closePool } = await import('../dist/db.js');
+  const {
+    appendCaseTransition,
+    getCheckpointLineage,
+    getContinuityContext,
+    openContinuityCase,
+    persistAcceptedCheckpoint,
+    persistAssessment,
+    registerContinuityScope,
+  } = await import('../dist/threadkeeper/repository.js');
+
+  const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+  const query = async (sql, params) => ({ rows: (await pool.query(sql, params)).rows });
+
   try {
     const semanticKey = semanticScopeKey(scopeBinding);
     const scope = await registerContinuityScope(query, scopeBinding, 'actor:tk004:test', 'internal', 'durable');

@@ -10,522 +10,76 @@
     "productionMutationAllowed": false,
     "automaticPromotionAllowed": false
   },
-  "statuses": [
-    "proven",
-    "partial",
-    "missing",
-    "not_applicable",
-    "deferred_content"
-  ],
-  "priorities": [
-    "P0",
-    "P1",
-    "P2"
-  ],
+  "statuses": ["proven", "partial", "missing", "not_applicable", "deferred_content"],
+  "priorities": ["P0", "P1", "P2"],
   "research": [
-    {
-      "title": "NIST SP 800-160 Vol. 2 Rev. 1 — Developing Cyber-Resilient Systems",
-      "url": "https://csrc.nist.gov/pubs/sp/800/160/v2/r1/final",
-      "use": "Resilience framing: anticipate, withstand, recover, adapt."
-    },
-    {
-      "title": "NIST AI Resource Center / TEVV",
-      "url": "https://airc.nist.gov/",
-      "use": "Evaluation and TEVV pattern source; no conformity claim."
-    },
-    {
-      "title": "NIST TEVV-Athlon",
-      "url": "https://www.nist.gov/artificial-intelligence/ai-research/tevv-athlon-framework-evaluating-ai-systems",
-      "use": "Evaluation framework pattern source; no conformity claim."
-    },
-    {
-      "title": "AWS Well-Architected Reliability REL 12",
-      "url": "https://docs.aws.amazon.com/wellarchitected/2024-06-27/framework/rel-12.html",
-      "use": "Recovery, scale, resiliency/chaos, and game-day testing pattern source."
-    }
+    {"title":"NIST SP 800-160 Vol. 2 Rev. 1 — Developing Cyber-Resilient Systems","url":"https://csrc.nist.gov/pubs/sp/800/160/v2/r1/final","use":"Resilience framing: anticipate, withstand, recover, adapt."},
+    {"title":"NIST AI Resource Center / TEVV","url":"https://airc.nist.gov/","use":"Evaluation and TEVV pattern source; no conformity claim."},
+    {"title":"NIST TEVV-Athlon","url":"https://www.nist.gov/artificial-intelligence/ai-research/tevv-athlon-framework-evaluating-ai-systems","use":"Evaluation framework pattern source; no conformity claim."},
+    {"title":"AWS Well-Architected Reliability REL 12","url":"https://docs.aws.amazon.com/wellarchitected/2024-06-27/framework/rel-12.html","use":"Recovery, scale, resiliency/chaos, and game-day testing pattern source."}
   ],
   "domains": [
-    {
-      "id": "A",
-      "title": "Synthetic corpus and malformed-input resilience",
-      "scenarios": [
-        {
-          "id": "A-01",
-          "title": "Bounded large archive load envelope",
-          "priority": "P0",
-          "status": "partial",
-          "owner": "PFC-001",
-          "nextAction": "Increase the bounded synthetic corpus in controlled tiers and record throughput/resource observations without claiming production capacity.",
-          "evidence": [
-            {"type": "repo_path", "path": "server/test/chatgpt-archive-load.integration.test.mjs"},
-            {"type": "repo_path", "path": ".github/workflows/chatgpt-archive-ingestion.yml"}
-          ],
-          "limitations": "Current PIT-0 load is a bounded engineering fixture, not a production-capacity guarantee."
-        },
-        {
-          "id": "A-02",
-          "title": "Branch topology preservation",
-          "priority": "P0",
-          "status": "proven",
-          "owner": "PFC-001",
-          "nextAction": "Retain as a regression invariant when adversarial fixtures are added.",
-          "evidence": [{"type": "repo_path", "path": "server/test/chatgpt-archive-ingestion.test.mjs"}]
-        },
-        {
-          "id": "A-03",
-          "title": "Logical attachment reference de-duplication",
-          "priority": "P0",
-          "status": "proven",
-          "owner": "PFC-001",
-          "nextAction": "Retain one-observation-per-logical-reference semantics in future fixtures.",
-          "evidence": [
-            {"type": "repo_path", "path": "server/test/chatgpt-archive-ingestion.test.mjs"},
-            {"type": "repo_path", "path": "server/test/chatgpt-archive-load.integration.test.mjs"}
-          ]
-        },
-        {
-          "id": "A-04",
-          "title": "Unknown or novel source shapes remain explicit",
-          "priority": "P0",
-          "status": "missing",
-          "owner": "PFC-001",
-          "nextAction": "Add adversarial archive fixtures proving unknown object shapes are reported/quarantined rather than silently invented."
-        },
-        {
-          "id": "A-05",
-          "title": "Orphan or missing-parent topology is handled explicitly",
-          "priority": "P0",
-          "status": "missing",
-          "owner": "PFC-001",
-          "nextAction": "Add branch fixtures with missing parents and prove the importer preserves/reports the anomaly without fabricating ancestry."
-        },
-        {
-          "id": "A-06",
-          "title": "Invalid timestamp and ordering anomalies are explicit",
-          "priority": "P1",
-          "status": "missing",
-          "owner": "PFC-001",
-          "nextAction": "Add invalid/missing/out-of-order timestamp fixtures and define fail/warn preservation behavior."
-        },
-        {
-          "id": "A-07",
-          "title": "Repeated and partially changed point-in-time exports classify without deletion inference",
-          "priority": "P0",
-          "status": "proven",
-          "owner": "PFC-001",
-          "nextAction": "Keep five-way PIT classification and absence-is-not-deletion semantics in the PFC regression set.",
-          "evidence": [{"type": "repo_path", "path": "scripts/test_chist_001_pit_diff.sh"}]
-        }
-      ]
-    },
-    {
-      "id": "B",
-      "title": "Transactionality, idempotency, replay, and retry",
-      "scenarios": [
-        {
-          "id": "B-01",
-          "title": "Exact archive import is idempotent",
-          "priority": "P0",
-          "status": "proven",
-          "owner": "PFC-001",
-          "nextAction": "Retain exact-input idempotency in archive regression coverage.",
-          "evidence": [
-            {"type": "repo_path", "path": "server/test/chatgpt-archive-ingestion.integration.test.mjs"},
-            {"type": "repo_path", "path": "server/test/chatgpt-archive-load.integration.test.mjs"}
-          ]
-        },
-        {
-          "id": "B-02",
-          "title": "PIT comparison receipt reuse is idempotent",
-          "priority": "P0",
-          "status": "proven",
-          "owner": "PFC-001",
-          "nextAction": "Retain deterministic receipt reuse for identical comparison inputs.",
-          "evidence": [{"type": "repo_path", "path": "scripts/test_chist_001_pit_diff.sh"}]
-        },
-        {
-          "id": "B-03",
-          "title": "Interrupted archive import can be safely retried",
-          "priority": "P0",
-          "status": "partial",
-          "owner": "PFC-001",
-          "nextAction": "Add an executable process/interruption-and-retry proof around archive ingestion.",
-          "evidence": [{"type": "repo_path", "path": "docs/CHATGPT-ARCHIVE-INGESTION.md"}],
-          "limitations": "Operational contract exists; an explicit kill/retry executable proof is still required."
-        },
-        {
-          "id": "B-04",
-          "title": "Downstream derivation failure cannot corrupt immutable source evidence",
-          "priority": "P0",
-          "status": "missing",
-          "owner": "PFC-001",
-          "nextAction": "Inject a bounded archive-derivation failure after source acceptance and prove source/archive evidence is unchanged and replayable."
-        },
-        {
-          "id": "B-05",
-          "title": "Automatic retry authority is bounded and cannot loop indefinitely",
-          "priority": "P0",
-          "status": "proven",
-          "owner": "PFC-001",
-          "nextAction": "Retain retry-budget and current-evidence checks as a cross-system invariant.",
-          "evidence": [
-            {"type": "repo_path", "path": "scripts/lane_health_retry.mjs"},
-            {"type": "repo_path", "path": "server/test/lane-health-retry.test.mjs"}
-          ]
-        }
-      ]
-    },
-    {
-      "id": "C",
-      "title": "Recovery and failure injection",
-      "scenarios": [
-        {
-          "id": "C-01",
-          "title": "Conversation interruption reconstruction preserves recoverable truth",
-          "priority": "P0",
-          "status": "proven",
-          "owner": "PFC-001",
-          "nextAction": "Retain interruption reconstruction as a cross-system recovery invariant.",
-          "evidence": [{"type": "repo_path", "path": "db/verification/cfr_001_interruption_recovery.sql"}]
-        },
-        {
-          "id": "C-02",
-          "title": "Synthetic database recovery path is executable",
-          "priority": "P0",
-          "status": "proven",
-          "owner": "PFC-001",
-          "nextAction": "Reuse SDN recovery proof patterns for future PFC failure injection rather than creating a parallel recovery framework.",
-          "evidence": [{"type": "repo_path", "path": "sdn/scripts/sdn-002-acceptance.sh"}]
-        },
-        {
-          "id": "C-03",
-          "title": "Stale lease or lost owner is fenced and reclaimable",
-          "priority": "P0",
-          "status": "proven",
-          "owner": "PFC-001",
-          "nextAction": "Retain lease fencing/reclaim verification as the concurrency ownership invariant.",
-          "evidence": [{"type": "repo_path", "path": "db/migrations/verify_20261009_009_foundry_work_lease_kernel.sql"}]
-        },
-        {
-          "id": "C-04",
-          "title": "Provider timeout/failure after durable reservation has a bounded recovery path",
-          "priority": "P0",
-          "status": "partial",
-          "owner": "PFC-001",
-          "nextAction": "Map existing provider recovery tests to reservation/settlement invariants and add any missing exact failure fixture.",
-          "limitations": "Existing provider recovery substrate is present, but PFC has not yet certified the exact cross-system invariant."
-        },
-        {
-          "id": "C-05",
-          "title": "Schema or version mismatch fails closed",
-          "priority": "P0",
-          "status": "missing",
-          "owner": "PFC-001",
-          "nextAction": "Add stale/newer-schema fixtures for the archive/history and one additional critical subsystem; require explicit unsupported/fail-closed result."
-        },
-        {
-          "id": "C-06",
-          "title": "Evidence artifact write failure does not erase primary truth",
-          "priority": "P1",
-          "status": "missing",
-          "owner": "PFC-001",
-          "nextAction": "Inject artifact-output failure after a successful primary operation and prove the source/DB truth remains durable while evidence publication is marked incomplete."
-        }
-      ]
-    },
-    {
-      "id": "D",
-      "title": "Scale and performance envelope",
-      "scenarios": [
-        {
-          "id": "D-01",
-          "title": "Archive ingestion throughput is measured on bounded synthetic tiers",
-          "priority": "P0",
-          "status": "partial",
-          "owner": "PFC-001",
-          "nextAction": "Capture elapsed time, records/sec, fixture identity, and environment for at least two bounded corpus tiers.",
-          "evidence": [{"type": "repo_path", "path": "server/test/chatgpt-archive-load.integration.test.mjs"}],
-          "limitations": "Functional load exists; standardized performance observations are not yet captured."
-        },
-        {
-          "id": "D-02",
-          "title": "Conversation History list/search/detail latency is measured",
-          "priority": "P1",
-          "status": "missing",
-          "owner": "PFC-001",
-          "nextAction": "Add bounded synthetic latency measurements for list/search/detail at multiple corpus sizes."
-        },
-        {
-          "id": "D-03",
-          "title": "PIT comparison throughput is measured",
-          "priority": "P1",
-          "status": "missing",
-          "owner": "PFC-001",
-          "nextAction": "Add bounded timing and row-count observations for unchanged and changed synthetic exports."
-        },
-        {
-          "id": "D-04",
-          "title": "Database and index growth is measured",
-          "priority": "P1",
-          "status": "missing",
-          "owner": "PFC-001",
-          "nextAction": "Record table/index size deltas for bounded synthetic corpus tiers in isolated PostgreSQL."
-        },
-        {
-          "id": "D-05",
-          "title": "Concurrent ingestion/retrieval behavior is measured and bounded",
-          "priority": "P1",
-          "status": "missing",
-          "owner": "PFC-001",
-          "nextAction": "Add a small deterministic concurrency fixture that establishes safe behavior and explicit unsupported load beyond the measured envelope."
-        }
-      ]
-    },
-    {
-      "id": "E",
-      "title": "Migration and schema compatibility",
-      "scenarios": [
-        {
-          "id": "E-01",
-          "title": "Conversation History reader works across supported staged deployment states",
-          "priority": "P0",
-          "status": "proven",
-          "owner": "PFC-001",
-          "nextAction": "Retain pre/post archive-analytics staged reader compatibility in CHIST acceptance.",
-          "evidence": [
-            {"type": "repo_path", "path": "scripts/test_chist_001_conversation_history.sh"},
-            {"type": "repo_path", "path": ".github/workflows/chist-001-conversation-history.yml"}
-          ]
-        },
-        {
-          "id": "E-02",
-          "title": "Critical migrations have exact object/authority verification",
-          "priority": "P0",
-          "status": "partial",
-          "owner": "PFC-001",
-          "nextAction": "Inventory migration verifiers and close any P0 migration lacking an exact postcondition check.",
-          "evidence": [{"type": "repo_path", "path": "db/verification/chist_001_live_test.sql"}],
-          "limitations": "CHIST has strong exact verification; PFC has not yet established repository-wide critical-migration coverage."
-        },
-        {
-          "id": "E-03",
-          "title": "Stale schema fails closed before unsafe work",
-          "priority": "P0",
-          "status": "missing",
-          "owner": "PFC-001",
-          "nextAction": "Create an executable stale-schema fixture for at least archive/history and one runtime subsystem."
-        },
-        {
-          "id": "E-04",
-          "title": "Canonical bootstrap/current schema parity is demonstrated for P0 subsystems",
-          "priority": "P1",
-          "status": "partial",
-          "owner": "PFC-001",
-          "nextAction": "Inventory bootstrap-vs-forward-migration parity and add a machine-checkable comparison for P0 subsystems.",
-          "limitations": "Existing lane-specific verification exists; repository-wide parity is not yet certified by PFC."
-        }
-      ]
-    },
-    {
-      "id": "F",
-      "title": "Authority, privacy, and negative access",
-      "scenarios": [
-        {
-          "id": "F-01",
-          "title": "Conversation History roles enforce least privilege",
-          "priority": "P0",
-          "status": "proven",
-          "owner": "PFC-001",
-          "nextAction": "Keep history reader/certifier/deriver negative privilege checks in the PFC security set.",
-          "evidence": [{"type": "repo_path", "path": "db/verification/chist_001_live_test.sql"}]
-        },
-        {
-          "id": "F-02",
-          "title": "Private history evidence is excluded from ordinary Data API roles",
-          "priority": "P0",
-          "status": "proven",
-          "owner": "PFC-001",
-          "nextAction": "Retain anon/authenticated/service_role exclusion checks.",
-          "evidence": [{"type": "repo_path", "path": "db/verification/chist_001_live_test.sql"}]
-        },
-        {
-          "id": "F-03",
-          "title": "Synthetic archive evidence cannot qualify as the real certified baseline",
-          "priority": "P0",
-          "status": "proven",
-          "owner": "PFC-001",
-          "nextAction": "Retain explicit certification authority and real-baseline guard semantics.",
-          "evidence": [
-            {"type": "repo_path", "path": "scripts/test_chist_001_baseline_certification.sh"},
-            {"type": "repo_path", "path": "server/src/history/baseline-certification.ts"}
-          ]
-        },
-        {
-          "id": "F-04",
-          "title": "Purpose-specific credentials do not silently fall back to generic database authority",
-          "priority": "P0",
-          "status": "partial",
-          "owner": "PFC-001",
-          "nextAction": "Promote existing purpose-specific credential assertions into a reusable negative test contract.",
-          "evidence": [{"type": "repo_path", "path": "docs/provenance/2026-10-26-chist-001-conversation-history.md"}],
-          "limitations": "CHIST documents and tests this boundary; PFC has not yet generalized the negative contract."
-        },
-        {
-          "id": "F-05",
-          "title": "Private source material cannot leak into logs or generated test artifacts",
-          "priority": "P0",
-          "status": "missing",
-          "owner": "PFC-001",
-          "nextAction": "Add synthetic canary secrets/content and assert they do not appear in workflow logs or shareable artifacts outside explicitly authorized evidence."
-        }
-      ]
-    },
-    {
-      "id": "G",
-      "title": "Observability and operational continuity",
-      "scenarios": [
-        {
-          "id": "G-01",
-          "title": "Exact-head workflow stall/failure state is classified",
-          "priority": "P0",
-          "status": "proven",
-          "owner": "PFC-001",
-          "nextAction": "Retain exact-head lane health observation and resolved-state behavior.",
-          "evidence": [
-            {"type": "repo_path", "path": "scripts/lane_health_sentinel.mjs"},
-            {"type": "repo_path", "path": "server/test/lane-health-sentinel.test.mjs"},
-            {"type": "repo_path", "path": ".github/workflows/lane-health-sentinel-observe.yml"}
-          ]
-        },
-        {
-          "id": "G-02",
-          "title": "Notification authority remains separate from remediation authority",
-          "priority": "P0",
-          "status": "proven",
-          "owner": "PFC-001",
-          "nextAction": "Retain separate observer/notification/retry authority and bounded retry proof.",
-          "evidence": [
-            {"type": "repo_path", "path": "scripts/lane_health_notify.mjs"},
-            {"type": "repo_path", "path": "scripts/lane_health_retry.mjs"},
-            {"type": "repo_path", "path": "docs/operations/lane-health-sentinel.md"}
-          ]
-        },
-        {
-          "id": "G-03",
-          "title": "Last-known-good checkpoint remains recoverable after interruption",
-          "priority": "P0",
-          "status": "partial",
-          "owner": "PFC-001",
-          "nextAction": "Unify checkpoint evidence expectations across conversational and operational work without introducing a new checkpoint store.",
-          "evidence": [
-            {"type": "repo_path", "path": "db/verification/cfr_001_interruption_recovery.sql"},
-            {"type": "repo_path", "path": "docs/ACP-001-OPERATIONS.md"}
-          ],
-          "limitations": "Strong lane-specific checkpoint/recovery evidence exists; cross-system operator contract is not yet frozen."
-        },
-        {
-          "id": "G-04",
-          "title": "Original failure evidence survives recovery/retry",
-          "priority": "P1",
-          "status": "partial",
-          "owner": "PFC-001",
-          "nextAction": "Select representative archive, Foundry, and lane-health failures and prove recovery appends evidence rather than replacing the original failure.",
-          "limitations": "Existing systems are append-oriented, but PFC has not yet certified this across representative subsystems."
-        }
-      ]
-    },
-    {
-      "id": "H",
-      "title": "Retrieval mechanics without private semantics",
-      "scenarios": [
-        {
-          "id": "H-01",
-          "title": "Conversation History retrieval is chronological and branch-aware",
-          "priority": "P0",
-          "status": "proven",
-          "owner": "PFC-001",
-          "nextAction": "Retain branch-aware retrieval proof on synthetic history.",
-          "evidence": [{"type": "repo_path", "path": "scripts/test_chist_001_conversation_history.sh"}]
-        },
-        {
-          "id": "H-02",
-          "title": "Source evidence and derived evidence remain explicitly distinct",
-          "priority": "P0",
-          "status": "proven",
-          "owner": "PFC-001",
-          "nextAction": "Retain provenance-separated readback and no-fabrication behavior.",
-          "evidence": [
-            {"type": "repo_path", "path": "scripts/test_chist_001_archive_readback.sh"},
-            {"type": "repo_path", "path": "docs/provenance/2026-10-26-chist-001-conversation-history.md"}
-          ]
-        },
-        {
-          "id": "H-03",
-          "title": "Large-history pagination/cursor behavior is deterministic",
-          "priority": "P1",
-          "status": "missing",
-          "owner": "PFC-001",
-          "nextAction": "Add synthetic list/search pagination or cursor tests with deterministic tie-breaking."
-        },
-        {
-          "id": "H-04",
-          "title": "Context/result assembly is bounded",
-          "priority": "P1",
-          "status": "partial",
-          "owner": "PFC-001",
-          "nextAction": "Convert existing memory-context bounds into a reusable measurable retrieval contract for PFC.",
-          "evidence": [{"type": "repo_path", "path": "docs/provenance/2026-10-07-memory-retrieval-context.md"}],
-          "limitations": "A bounded context design exists; PFC has not yet measured generic history/retrieval assembly across corpus tiers."
-        }
-      ]
-    },
-    {
-      "id": "I",
-      "title": "Evaluation infrastructure",
-      "scenarios": [
-        {
-          "id": "I-01",
-          "title": "Machine-readable cross-system coverage matrix exists",
-          "priority": "P0",
-          "status": "proven",
-          "owner": "PFC-001",
-          "nextAction": "Keep the matrix versioned and update it only with evidence-bearing status transitions.",
-          "evidence": [
-            {"type": "repo_path", "path": "config/pre-content-foundation.v1.json"},
-            {"type": "repo_path", "path": "scripts/pfc_matrix.mjs"},
-            {"type": "repo_path", "path": "server/test/pre-content-foundation-contract.test.mjs"}
-          ]
-        },
-        {
-          "id": "I-02",
-          "title": "Unsupported proven claims fail validation",
-          "priority": "P0",
-          "status": "proven",
-          "owner": "PFC-001",
-          "nextAction": "Keep negative contract tests for missing and nonexistent proof references.",
-          "evidence": [
-            {"type": "repo_path", "path": "scripts/pfc_matrix.mjs"},
-            {"type": "repo_path", "path": "server/test/pre-content-foundation-contract.test.mjs"}
-          ]
-        },
-        {
-          "id": "I-03",
-          "title": "Performance observations use a common evidence shape",
-          "priority": "P1",
-          "status": "partial",
-          "owner": "PFC-001",
-          "nextAction": "Define the minimal versioned performance observation schema and use it in bounded scale fixtures."
-        },
-        {
-          "id": "I-04",
-          "title": "Semantic-quality evaluation framework",
-          "priority": "P2",
-          "status": "deferred_content",
-          "owner": "PFC-001",
-          "nextAction": "Design semantic-quality benchmarks only after certified corpus evidence or separately justified external research provides target meaning.",
-          "rationale": "Content-free engineering can validate deterministic mechanics but cannot establish whether inferred topics, salience, personality, or memory importance are semantically correct for the user's real corpus."
-        }
-      ]
-    }
+    {"id":"A","title":"Synthetic corpus and malformed-input resilience","scenarios":[
+      {"id":"A-01","title":"Bounded large archive load envelope","priority":"P0","status":"partial","owner":"PFC-001","nextAction":"Increase the bounded synthetic corpus in controlled tiers and record throughput/resource observations without claiming production capacity.","evidence":[{"type":"repo_path","path":"server/test/chatgpt-archive-load.integration.test.mjs"},{"type":"repo_path","path":".github/workflows/chatgpt-archive-ingestion.yml"}],"limitations":"Current PIT-0 load is a bounded engineering fixture, not a production-capacity guarantee."},
+      {"id":"A-02","title":"Branch topology preservation","priority":"P0","status":"proven","owner":"PFC-001","nextAction":"Retain as a regression invariant when adversarial fixtures are added.","evidence":[{"type":"repo_path","path":"server/test/chatgpt-archive-ingestion.test.mjs"}]},
+      {"id":"A-03","title":"Logical attachment reference de-duplication","priority":"P0","status":"proven","owner":"PFC-001","nextAction":"Retain one-observation-per-logical-reference semantics in future fixtures.","evidence":[{"type":"repo_path","path":"server/test/chatgpt-archive-ingestion.test.mjs"},{"type":"repo_path","path":"server/test/chatgpt-archive-load.integration.test.mjs"}]},
+      {"id":"A-04","title":"Unknown or novel source shapes remain explicit","priority":"P0","status":"proven","owner":"PFC-001","nextAction":"Retain schema-drift preservation/reporting as a regression invariant when new export shapes appear.","evidence":[{"type":"repo_path","path":"server/test/chatgpt-archive-ingestion.test.mjs"}]},
+      {"id":"A-05","title":"Orphan or missing-parent topology is handled explicitly","priority":"P0","status":"proven","owner":"PFC-001","nextAction":"Retain missing-parent fail-closed behavior and raw topology preservation.","evidence":[{"type":"repo_path","path":"server/test/chatgpt-archive-ingestion.test.mjs"}]},
+      {"id":"A-06","title":"Invalid timestamp and ordering anomalies are explicit","priority":"P1","status":"proven","owner":"PFC-001","nextAction":"Retain invalid-timestamp raw-value preservation and explicit error reporting.","evidence":[{"type":"repo_path","path":"server/test/chatgpt-archive-ingestion.test.mjs"}]},
+      {"id":"A-07","title":"Repeated and partially changed point-in-time exports classify without deletion inference","priority":"P0","status":"proven","owner":"PFC-001","nextAction":"Keep five-way PIT classification and absence-is-not-deletion semantics in the PFC regression set.","evidence":[{"type":"repo_path","path":"scripts/test_chist_001_pit_diff.sh"}]}
+    ]},
+    {"id":"B","title":"Transactionality, idempotency, replay, and retry","scenarios":[
+      {"id":"B-01","title":"Exact archive import is idempotent","priority":"P0","status":"proven","owner":"PFC-001","nextAction":"Retain exact-input idempotency in archive regression coverage.","evidence":[{"type":"repo_path","path":"server/test/chatgpt-archive-ingestion.integration.test.mjs"},{"type":"repo_path","path":"server/test/chatgpt-archive-load.integration.test.mjs"}]},
+      {"id":"B-02","title":"PIT comparison receipt reuse is idempotent","priority":"P0","status":"proven","owner":"PFC-001","nextAction":"Retain deterministic receipt reuse for identical comparison inputs.","evidence":[{"type":"repo_path","path":"scripts/test_chist_001_pit_diff.sh"}]},
+      {"id":"B-03","title":"Interrupted archive import can be safely retried","priority":"P0","status":"partial","owner":"PFC-001","nextAction":"Add an executable process/interruption-and-retry proof around archive ingestion.","evidence":[{"type":"repo_path","path":"docs/CHATGPT-ARCHIVE-INGESTION.md"}],"limitations":"Operational contract exists; an explicit kill/retry executable proof is still required."},
+      {"id":"B-04","title":"Downstream derivation failure cannot corrupt immutable source evidence","priority":"P0","status":"missing","owner":"PFC-001","nextAction":"Inject a bounded archive-derivation failure after source acceptance and prove source/archive evidence is unchanged and replayable."},
+      {"id":"B-05","title":"Automatic retry authority is bounded and cannot loop indefinitely","priority":"P0","status":"proven","owner":"PFC-001","nextAction":"Retain retry-budget and current-evidence checks as a cross-system invariant.","evidence":[{"type":"repo_path","path":"scripts/lane_health_retry.mjs"},{"type":"repo_path","path":"server/test/lane-health-retry.test.mjs"}]}
+    ]},
+    {"id":"C","title":"Recovery and failure injection","scenarios":[
+      {"id":"C-01","title":"Conversation interruption reconstruction preserves recoverable truth","priority":"P0","status":"proven","owner":"PFC-001","nextAction":"Retain interruption reconstruction as a cross-system recovery invariant.","evidence":[{"type":"repo_path","path":"db/verification/cfr_001_interruption_recovery.sql"}]},
+      {"id":"C-02","title":"Synthetic database recovery path is executable","priority":"P0","status":"proven","owner":"PFC-001","nextAction":"Reuse SDN recovery proof patterns for future PFC failure injection rather than creating a parallel recovery framework.","evidence":[{"type":"repo_path","path":"sdn/scripts/sdn-002-acceptance.sh"}]},
+      {"id":"C-03","title":"Stale lease or lost owner is fenced and reclaimable","priority":"P0","status":"proven","owner":"PFC-001","nextAction":"Retain lease fencing/reclaim verification as the concurrency ownership invariant.","evidence":[{"type":"repo_path","path":"db/migrations/verify_20261009_009_foundry_work_lease_kernel.sql"}]},
+      {"id":"C-04","title":"Provider timeout/failure after durable reservation has a bounded recovery path","priority":"P0","status":"partial","owner":"PFC-001","nextAction":"Map existing provider recovery tests to reservation/settlement invariants and add any missing exact failure fixture.","limitations":"Existing provider recovery substrate is present, but PFC has not yet certified the exact cross-system invariant."},
+      {"id":"C-05","title":"Schema or version mismatch fails closed","priority":"P0","status":"missing","owner":"PFC-001","nextAction":"Add stale/newer-schema fixtures for the archive/history and one additional critical subsystem; require explicit unsupported/fail-closed result."},
+      {"id":"C-06","title":"Evidence artifact write failure does not erase primary truth","priority":"P1","status":"missing","owner":"PFC-001","nextAction":"Inject artifact-output failure after a successful primary operation and prove the source/DB truth remains durable while evidence publication is marked incomplete."}
+    ]},
+    {"id":"D","title":"Scale and performance envelope","scenarios":[
+      {"id":"D-01","title":"Archive ingestion throughput is measured on bounded synthetic tiers","priority":"P0","status":"partial","owner":"PFC-001","nextAction":"Capture elapsed time, records/sec, fixture identity, and environment for at least two bounded corpus tiers.","evidence":[{"type":"repo_path","path":"server/test/chatgpt-archive-load.integration.test.mjs"}],"limitations":"Functional load exists; standardized performance observations are not yet captured."},
+      {"id":"D-02","title":"Conversation History list/search/detail latency is measured","priority":"P1","status":"missing","owner":"PFC-001","nextAction":"Add bounded synthetic latency measurements for list/search/detail at multiple corpus sizes."},
+      {"id":"D-03","title":"PIT comparison throughput is measured","priority":"P1","status":"missing","owner":"PFC-001","nextAction":"Add bounded timing and row-count observations for unchanged and changed synthetic exports."},
+      {"id":"D-04","title":"Database and index growth is measured","priority":"P1","status":"missing","owner":"PFC-001","nextAction":"Record table/index size deltas for bounded synthetic corpus tiers in isolated PostgreSQL."},
+      {"id":"D-05","title":"Concurrent ingestion/retrieval behavior is measured and bounded","priority":"P1","status":"missing","owner":"PFC-001","nextAction":"Add a small deterministic concurrency fixture that establishes safe behavior and explicit unsupported load beyond the measured envelope."}
+    ]},
+    {"id":"E","title":"Migration and schema compatibility","scenarios":[
+      {"id":"E-01","title":"Conversation History reader works across supported staged deployment states","priority":"P0","status":"proven","owner":"PFC-001","nextAction":"Retain pre/post archive-analytics staged reader compatibility in CHIST acceptance.","evidence":[{"type":"repo_path","path":"scripts/test_chist_001_conversation_history.sh"},{"type":"repo_path","path":".github/workflows/chist-001-conversation-history.yml"}]},
+      {"id":"E-02","title":"Critical migrations have exact object/authority verification","priority":"P0","status":"partial","owner":"PFC-001","nextAction":"Inventory migration verifiers and close any P0 migration lacking an exact postcondition check.","evidence":[{"type":"repo_path","path":"db/verification/chist_001_live_test.sql"}],"limitations":"CHIST has strong exact verification; PFC has not yet established repository-wide critical-migration coverage."},
+      {"id":"E-03","title":"Stale schema fails closed before unsafe work","priority":"P0","status":"missing","owner":"PFC-001","nextAction":"Create an executable stale-schema fixture for at least archive/history and one runtime subsystem."},
+      {"id":"E-04","title":"Canonical bootstrap/current schema parity is demonstrated for P0 subsystems","priority":"P1","status":"partial","owner":"PFC-001","nextAction":"Inventory bootstrap-vs-forward-migration parity and add a machine-checkable comparison for P0 subsystems.","limitations":"Existing lane-specific verification exists; repository-wide parity is not yet certified by PFC."}
+    ]},
+    {"id":"F","title":"Authority, privacy, and negative access","scenarios":[
+      {"id":"F-01","title":"Conversation History roles enforce least privilege","priority":"P0","status":"proven","owner":"PFC-001","nextAction":"Keep history reader/certifier/deriver negative privilege checks in the PFC security set.","evidence":[{"type":"repo_path","path":"db/verification/chist_001_live_test.sql"}]},
+      {"id":"F-02","title":"Private history evidence is excluded from ordinary Data API roles","priority":"P0","status":"proven","owner":"PFC-001","nextAction":"Retain anon/authenticated/service_role exclusion checks.","evidence":[{"type":"repo_path","path":"db/verification/chist_001_live_test.sql"}]},
+      {"id":"F-03","title":"Synthetic archive evidence cannot qualify as the real certified baseline","priority":"P0","status":"proven","owner":"PFC-001","nextAction":"Retain explicit certification authority and real-baseline guard semantics.","evidence":[{"type":"repo_path","path":"scripts/test_chist_001_baseline_certification.sh"},{"type":"repo_path","path":"server/src/history/baseline-certification.ts"}]},
+      {"id":"F-04","title":"Purpose-specific credentials do not silently fall back to generic database authority","priority":"P0","status":"partial","owner":"PFC-001","nextAction":"Promote existing purpose-specific credential assertions into a reusable negative test contract.","evidence":[{"type":"repo_path","path":"docs/provenance/2026-10-26-chist-001-conversation-history.md"}],"limitations":"CHIST documents and tests this boundary; PFC has not yet generalized the negative contract."},
+      {"id":"F-05","title":"Private source material cannot leak into logs or generated test artifacts","priority":"P0","status":"missing","owner":"PFC-001","nextAction":"Add synthetic canary secrets/content and assert they do not appear in workflow logs or shareable artifacts outside explicitly authorized evidence."}
+    ]},
+    {"id":"G","title":"Observability and operational continuity","scenarios":[
+      {"id":"G-01","title":"Exact-head workflow stall/failure state is classified","priority":"P0","status":"proven","owner":"PFC-001","nextAction":"Retain exact-head lane health observation and resolved-state behavior.","evidence":[{"type":"repo_path","path":"scripts/lane_health_sentinel.mjs"},{"type":"repo_path","path":"server/test/lane-health-sentinel.test.mjs"},{"type":"repo_path","path":".github/workflows/lane-health-sentinel-observe.yml"}]},
+      {"id":"G-02","title":"Notification authority remains separate from remediation authority","priority":"P0","status":"proven","owner":"PFC-001","nextAction":"Retain separate observer/notification/retry authority and bounded retry proof.","evidence":[{"type":"repo_path","path":"scripts/lane_health_notify.mjs"},{"type":"repo_path","path":"scripts/lane_health_retry.mjs"},{"type":"repo_path","path":"docs/operations/lane-health-sentinel.md"}]},
+      {"id":"G-03","title":"Last-known-good checkpoint remains recoverable after interruption","priority":"P0","status":"partial","owner":"PFC-001","nextAction":"Unify checkpoint evidence expectations across conversational and operational work without introducing a new checkpoint store.","evidence":[{"type":"repo_path","path":"db/verification/cfr_001_interruption_recovery.sql"},{"type":"repo_path","path":"docs/ACP-001-OPERATIONS.md"}],"limitations":"Strong lane-specific checkpoint/recovery evidence exists; cross-system operator contract is not yet frozen."},
+      {"id":"G-04","title":"Original failure evidence survives recovery/retry","priority":"P1","status":"partial","owner":"PFC-001","nextAction":"Select representative archive, Foundry, and lane-health failures and prove recovery appends evidence rather than replacing the original failure.","limitations":"Existing systems are append-oriented, but PFC has not yet certified this across representative subsystems."}
+    ]},
+    {"id":"H","title":"Retrieval mechanics without private semantics","scenarios":[
+      {"id":"H-01","title":"Conversation History retrieval is chronological and branch-aware","priority":"P0","status":"proven","owner":"PFC-001","nextAction":"Retain branch-aware retrieval proof on synthetic history.","evidence":[{"type":"repo_path","path":"scripts/test_chist_001_conversation_history.sh"}]},
+      {"id":"H-02","title":"Source evidence and derived evidence remain explicitly distinct","priority":"P0","status":"proven","owner":"PFC-001","nextAction":"Retain provenance-separated readback and no-fabrication behavior.","evidence":[{"type":"repo_path","path":"scripts/test_chist_001_archive_readback.sh"},{"type":"repo_path","path":"docs/provenance/2026-10-26-chist-001-conversation-history.md"}]},
+      {"id":"H-03","title":"Large-history pagination/cursor behavior is deterministic","priority":"P1","status":"missing","owner":"PFC-001","nextAction":"Add synthetic list/search pagination or cursor tests with deterministic tie-breaking."},
+      {"id":"H-04","title":"Context/result assembly is bounded","priority":"P1","status":"partial","owner":"PFC-001","nextAction":"Convert existing memory-context bounds into a reusable measurable retrieval contract for PFC.","evidence":[{"type":"repo_path","path":"docs/provenance/2026-10-07-memory-retrieval-context.md"}],"limitations":"A bounded context design exists; PFC has not yet measured generic history/retrieval assembly across corpus tiers."}
+    ]},
+    {"id":"I","title":"Evaluation infrastructure","scenarios":[
+      {"id":"I-01","title":"Machine-readable cross-system coverage matrix exists","priority":"P0","status":"proven","owner":"PFC-001","nextAction":"Keep the matrix versioned and update it only with evidence-bearing status transitions.","evidence":[{"type":"repo_path","path":"config/pre-content-foundation.v1.json"},{"type":"repo_path","path":"scripts/pfc_matrix.mjs"},{"type":"repo_path","path":"server/test/pre-content-foundation-contract.test.mjs"}]},
+      {"id":"I-02","title":"Unsupported proven claims fail validation","priority":"P0","status":"proven","owner":"PFC-001","nextAction":"Keep negative contract tests for missing and nonexistent proof references.","evidence":[{"type":"repo_path","path":"scripts/pfc_matrix.mjs"},{"type":"repo_path","path":"server/test/pre-content-foundation-contract.test.mjs"}]},
+      {"id":"I-03","title":"Performance observations use a common evidence shape","priority":"P1","status":"partial","owner":"PFC-001","nextAction":"Define the minimal versioned performance observation schema and use it in bounded scale fixtures."},
+      {"id":"I-04","title":"Semantic-quality evaluation framework","priority":"P2","status":"deferred_content","owner":"PFC-001","nextAction":"Design semantic-quality benchmarks only after certified corpus evidence or separately justified external research provides target meaning.","rationale":"Content-free engineering can validate deterministic mechanics but cannot establish whether inferred topics, salience, personality, or memory importance are semantically correct for the user's real corpus."}
+    ]}
   ]
 }

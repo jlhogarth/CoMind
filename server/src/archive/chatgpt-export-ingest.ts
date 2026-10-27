@@ -454,6 +454,13 @@ async function beginArchiveAttempt(
 ): Promise<{ sourceArchiveId: string; importId: string; existingStatus: string | null; existingReceipt: unknown; existingReceiptSha256: string | null }> {
   await client.query('BEGIN');
   try {
+    // Serialize attempt selection by immutable source identity without granting
+    // UPDATE on the append-only archive source table merely to obtain a row lock.
+    await client.query(
+      `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`,
+      [source.sourceArchiveSha256]
+    );
+
     await client.query(
       `INSERT INTO comind.cm_archive_source
          (source_system, source_archive_name, source_archive_sha256, source_archive_bytes, source_uri, source_metadata)
@@ -464,8 +471,7 @@ async function beginArchiveAttempt(
     const sourceResult = await client.query<{ source_archive_id: string }>(
       `SELECT source_archive_id
          FROM comind.cm_archive_source
-        WHERE source_system='chatgpt' AND source_archive_sha256=$1
-        FOR UPDATE`,
+        WHERE source_system='chatgpt' AND source_archive_sha256=$1`,
       [source.sourceArchiveSha256]
     );
     const sourceArchiveId = sourceResult.rows[0]?.source_archive_id;

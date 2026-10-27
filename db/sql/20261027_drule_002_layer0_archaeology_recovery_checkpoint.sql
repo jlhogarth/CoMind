@@ -161,7 +161,7 @@ with project as (
     'Reconcile historical Layer-0 forward controls with current governance',
     'open',
     'normal',
-    'Historical Layer-0 Section 32 contains quarterly adversarial probes, a high-risk purpose-of-use ledger, Future Continuity migration persistence, sandbox promotion checks, and explicit TBD placeholders for quantum-resistant cryptography and cross-jurisdiction treaty compliance.',
+    'Historical Layer-0 Section 32 contains quarterly adversarial probes, a high-risk purpose-of-use ledger, Future Continuity migration persistence, sandbox promotion checks, and explicit deferred future-control fields for quantum-resistant cryptography and cross-jurisdiction treaty compliance.',
     'Map each non-placeholder historical control to current canonical governance, testing, continuity, purpose, and promotion mechanisms; retain genuinely useful predecessor intent; do not activate placeholder controls without a separately approved current rule and evidence.',
     'CoMind Governance',
     'DRULE-002 archaeology',
@@ -255,7 +255,7 @@ set archaeology_status = 'complete',
           'RULE-HIST-L0-COST-003'
         ),
         'candidate_keys', jsonb_build_array('CAND-L0-COST-LINEITEM-001'),
-        'placeholder_treatment', 'TBD monetary budgets are not approved controls',
+        'placeholder_treatment', 'Deferred historical monetary budgets are not approved controls',
         'completion_semantics', 'archaeology_complete_does_not_imply_activation'
       )
       when 32 then jsonb_build_object(
@@ -268,7 +268,7 @@ set archaeology_status = 'complete',
           'RULE-HIST-L0-FWD-003',
           'RULE-HIST-L0-FWD-004'
         ),
-        'placeholder_treatment', 'quantum-resistant cryptography and treaty-compliance TBDs are not approved controls',
+        'placeholder_treatment', 'Deferred historical quantum-resistant cryptography and treaty-compliance fields are not approved controls',
         'completion_semantics', 'archaeology_complete_does_not_imply_activation'
       )
     end

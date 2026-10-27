@@ -3,11 +3,21 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import {
+  ALLOWED_EVIDENCE_TYPES,
+  isSha,
+  nonEmptyString,
+  validateEvidenceItems,
+  validateExternalEvidenceContract,
+  verifyGitHubRunReferences,
+  verifyImplementationAncestor,
+} from './governed_evidence_verifier.mjs';
+
 const scriptPath = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(scriptPath), '..');
 
 export const ALLOWED_STATUSES = new Set(['proven', 'partial', 'missing', 'not_applicable']);
-export const ALLOWED_EVIDENCE_TYPES = new Set(['repo_path', 'github_run', 'cde_key']);
+export { ALLOWED_EVIDENCE_TYPES };
 
 const REQUIRED_GATE_IDS = new Set(Array.from({ length: 16 }, (_, index) => `C2-${String(index + 1).padStart(2, '0')}`));
 const REQUIRED_TEST_IDS = new Set([
@@ -23,68 +33,7 @@ const GROUP_PREFIX = new Map([
   ['failure', 'F-'],
 ]);
 
-function nonEmptyString(value) {
-  return typeof value === 'string' && value.trim().length > 0;
-}
-
-function isSha(value) {
-  return typeof value === 'string' && /^[a-f0-9]{40}$/.test(value);
-}
-
-function normalizeRepoPath(value) {
-  return value.split('/').join(path.sep);
-}
-
-function isSafeRelativeRepoPath(value) {
-  if (!nonEmptyString(value) || path.isAbsolute(value)) return false;
-  const normalized = path.normalize(value);
-  return normalized !== '..' && !normalized.startsWith(`..${path.sep}`);
-}
-
-function validateEvidence(ownerId, evidence, root, errors) {
-  const items = Array.isArray(evidence) ? evidence : [];
-  let repoEvidenceCount = 0;
-
-  for (const item of items) {
-    if (!item || typeof item !== 'object' || Array.isArray(item)) {
-      errors.push(`${ownerId}: evidence items must be objects`);
-      continue;
-    }
-    if (!ALLOWED_EVIDENCE_TYPES.has(item.type)) {
-      errors.push(`${ownerId}: unsupported evidence type ${JSON.stringify(item.type)}`);
-      continue;
-    }
-    if (item.type === 'repo_path') {
-      repoEvidenceCount += 1;
-      if (!isSafeRelativeRepoPath(item.path)) {
-        errors.push(`${ownerId}: unsafe or invalid repo_path ${JSON.stringify(item.path)}`);
-        continue;
-      }
-      const absolute = path.resolve(root, normalizeRepoPath(item.path));
-      if (!absolute.startsWith(`${root}${path.sep}`) && absolute !== root) {
-        errors.push(`${ownerId}: repo_path escapes repository: ${item.path}`);
-        continue;
-      }
-      if (!fs.existsSync(absolute)) {
-        errors.push(`${ownerId}: evidence path does not exist: ${item.path}`);
-        continue;
-      }
-      if (!fs.statSync(absolute).isFile()) {
-        errors.push(`${ownerId}: evidence path is not a file: ${item.path}`);
-      }
-    }
-    if (item.type === 'github_run' && (!Number.isInteger(item.runId) || item.runId <= 0)) {
-      errors.push(`${ownerId}: github_run requires a positive integer runId`);
-    }
-    if (item.type === 'cde_key' && !nonEmptyString(item.key)) {
-      errors.push(`${ownerId}: cde_key requires a non-empty key`);
-    }
-  }
-
-  return repoEvidenceCount;
-}
-
-function validateRequirement(item, expectedIds, seenIds, root, errors, options = {}) {
+function validateRequirement(item, expectedIds, seenIds, root, errors, implementationCommit, options = {}) {
   const kind = options.kind ?? 'requirement';
   if (!item || typeof item !== 'object' || Array.isArray(item)) {
     errors.push(`${kind}: entries must be objects`);
@@ -108,7 +57,7 @@ function validateRequirement(item, expectedIds, seenIds, root, errors, options =
     else if (!id.startsWith(prefix)) errors.push(`${id}: id does not match group ${item.group}`);
   }
 
-  const repoEvidenceCount = validateEvidence(id, item.evidence, root, errors);
+  const repoEvidenceCount = validateEvidenceItems(id, item.evidence, root, errors, { implementationCommit });
   if (item.status === 'proven' && repoEvidenceCount === 0) errors.push(`${id}: proven entries require at least one repo_path evidence item`);
   if (item.status === 'not_applicable') {
     if (!nonEmptyString(item.rationale)) errors.push(`${id}: not_applicable requires rationale`);
@@ -135,6 +84,7 @@ export function validateThreadKeeperC2Matrix(matrix, options = {}) {
   if (matrix.lane !== 'TK-005') errors.push('lane must equal TK-005');
   if (matrix.issue !== 248) errors.push('issue must equal 248');
   if (!isSha(matrix.baseCommit)) errors.push('baseCommit must be a 40-character lowercase SHA');
+  if (!isSha(matrix.implementationCommit)) errors.push('implementationCommit must be a 40-character lowercase SHA');
   if (!nonEmptyString(matrix.purpose)) errors.push('purpose is required');
 
   const boundary = matrix.promotionBoundary;
@@ -159,12 +109,18 @@ export function validateThreadKeeperC2Matrix(matrix, options = {}) {
   if (!Array.isArray(matrix.testRequirements)) errors.push('testRequirements must be an array');
 
   const gateSeen = new Set();
-  for (const item of matrix.gateRequirements ?? []) validateRequirement(item, REQUIRED_GATE_IDS, gateSeen, root, errors, { kind: 'gate requirement' });
+  for (const item of matrix.gateRequirements ?? []) {
+    validateRequirement(item, REQUIRED_GATE_IDS, gateSeen, root, errors, matrix.implementationCommit, { kind: 'gate requirement' });
+  }
   assertExactIds('gateRequirements', REQUIRED_GATE_IDS, gateSeen, errors);
 
   const testSeen = new Set();
-  for (const item of matrix.testRequirements ?? []) validateRequirement(item, REQUIRED_TEST_IDS, testSeen, root, errors, { kind: 'test requirement', requireGroup: true });
+  for (const item of matrix.testRequirements ?? []) {
+    validateRequirement(item, REQUIRED_TEST_IDS, testSeen, root, errors, matrix.implementationCommit, { kind: 'test requirement', requireGroup: true });
+  }
   assertExactIds('testRequirements', REQUIRED_TEST_IDS, testSeen, errors);
+
+  validateExternalEvidenceContract(matrix, root, errors);
 
   const allItems = [...(matrix.gateRequirements ?? []), ...(matrix.testRequirements ?? [])];
   const unresolved = allItems.filter(item => item?.status === 'partial' || item?.status === 'missing');
@@ -216,8 +172,11 @@ function isCliEntry() {
   return process.argv[1] && path.resolve(process.argv[1]) === scriptPath;
 }
 
-if (isCliEntry()) {
-  const matrixPath = process.argv[2] ?? 'config/threadkeeper-c2-evidence.v1.json';
+async function main() {
+  const args = process.argv.slice(2);
+  const verifyGitHub = args.includes('--verify-github');
+  const verifyGit = args.includes('--verify-git');
+  const matrixPath = args.find((arg) => !arg.startsWith('--')) ?? 'config/threadkeeper-c2-evidence.v1.json';
   let matrix;
   try {
     matrix = loadThreadKeeperC2Matrix(matrixPath);
@@ -225,8 +184,21 @@ if (isCliEntry()) {
     console.error(JSON.stringify({ status: 'FAIL', matrixPath, errors: [`unable to load matrix: ${error.message}`] }, null, 2));
     process.exit(1);
   }
+
   const errors = validateThreadKeeperC2Matrix(matrix);
+  if (verifyGit) errors.push(...verifyImplementationAncestor(matrix.implementationCommit, repoRoot));
+  if (verifyGitHub) errors.push(...await verifyGitHubRunReferences(matrix));
+
   const summary = matrixSummary(matrix);
-  console.log(JSON.stringify({ status: errors.length === 0 ? 'PASS' : 'FAIL', matrixPath, ...summary, errors }, null, 2));
+  console.log(JSON.stringify({
+    status: errors.length === 0 ? 'PASS' : 'FAIL',
+    matrixPath,
+    gitHistoryVerified: verifyGit,
+    githubRunsVerified: verifyGitHub,
+    ...summary,
+    errors,
+  }, null, 2));
   if (errors.length > 0) process.exit(1);
 }
+
+if (isCliEntry()) await main();

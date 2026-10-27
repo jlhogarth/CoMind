@@ -1,0 +1,192 @@
+name: CP-01 Real Provider Substitution Proof
+
+on:
+  pull_request:
+    types: [opened, reopened]
+    paths:
+      - 'server/src/continuity/**'
+      - 'server/src/providers/**'
+      - 'server/test/support/competitive-live-continuity.mjs'
+      - 'server/test/integration/competitive-cp01-provider-substitution.e2e.mjs'
+      - 'scripts/openai_paid_test_preflight.mjs'
+      - '.github/workflows/competitive-cp01-provider-substitution.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cp01-provider-substitution-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  provider-substitution-proof:
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'competitive-execution-proofs-253'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.6-pg17-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_runtime
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_runtime"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      ollama:
+        image: ollama/ollama:0.40.8
+        env:
+          OLLAMA_NO_CLOUD: '1'
+          OLLAMA_NUM_PARALLEL: '1'
+          OLLAMA_MAX_QUEUE: '1'
+        ports:
+          - 11434:11434
+        options: >-
+          --health-cmd "ollama list >/dev/null 2>&1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_runtime
+      SUPABASE_SESSION_DATABASE_URL: ${{ secrets.SUPABASE_SESSION_DATABASE_URL }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      ASSISTANT_PROVIDER: openai
+      ASSISTANT_QUALITY_GATE: disabled
+      OPENAI_MODEL: gpt-6-luna
+      OPENAI_REASONING_EFFORT: low
+      OPENAI_MAX_OUTPUT_TOKENS: 128
+      OPENAI_TIMEOUT_MS: 30000
+      OPENAI_MAX_RETRIES: 0
+      OPENAI_PAID_TEST_MAX_REQUESTS_PER_DISPATCH: 1
+      OLLAMA_BASE_URL: http://127.0.0.1:11434
+      OLLAMA_MODEL: qwen3:0.6b
+      CP01_ARTIFACT: artifacts/cp01-provider-substitution-evidence.json
+      PORT: 3000
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+
+      - name: Require bounded live credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${SUPABASE_SESSION_DATABASE_URL:-}" ]]; then
+            echo "::error title=Missing pooled database secret::SUPABASE_SESSION_DATABASE_URL is not configured."
+            exit 1
+          fi
+          if [[ -z "${OPENAI_API_KEY:-}" ]]; then
+            echo "::error title=Missing OpenAI development key::OPENAI_API_KEY is not configured."
+            exit 1
+          fi
+
+      - name: Install and verify Supabase database CA
+        shell: bash
+        run: |
+          set -euo pipefail
+          ca_path="$RUNNER_TEMP/supabase-prod-ca-2021.crt"
+          curl --fail --silent --show-error --location \
+            --proto '=https' --tlsv1.2 \
+            https://supabase-downloads.s3-ap-southeast-1.amazonaws.com/prod/ssl/prod-ca-2021.crt \
+            --output "$ca_path"
+          expected='807025AD50D4ED219D2C9C7D299C004F824EB00CF7F65AFEF607D07B72E6CAFA'
+          actual="$(openssl x509 -in "$ca_path" -noout -fingerprint -sha256 \
+            | cut -d= -f2 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+          if [ "$actual" != "$expected" ]; then
+            echo "Supabase CA fingerprint mismatch. Refusing database connection." >&2
+            exit 1
+          fi
+          echo "NODE_EXTRA_CA_CERTS=$ca_path" >> "$GITHUB_ENV"
+
+      - name: Pull bounded local comparison model
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:11434/api/version >/dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              echo "Local Ollama server did not become ready." >&2
+              exit 1
+            fi
+            sleep 2
+          done
+          curl --fail --silent --show-error --max-time 900 \
+            -H 'Content-Type: application/json' \
+            -d '{"model":"qwen3:0.6b","stream":false}' \
+            http://127.0.0.1:11434/api/pull
+
+      - name: Install server dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Bootstrap isolated CoMind runtime
+        run: bash ./scripts/bootstrap_dev_runtime.sh
+
+      - name: Build server
+        working-directory: server
+        run: npm run build
+
+      - name: Run spending preflight and exactly one paid OpenAI comparison
+        shell: bash
+        run: |
+          set -euo pipefail
+          server_log="$(mktemp)"
+          (
+            cd server
+            exec node dist/index.js
+          ) >"$server_log" 2>&1 &
+          server_pid=$!
+          cleanup() {
+            code=$?
+            kill "$server_pid" >/dev/null 2>&1 || true
+            wait "$server_pid" >/dev/null 2>&1 || true
+            if [[ "$code" -ne 0 ]]; then
+              echo "CoMind server log from failed CP-01 proof:" >&2
+              cat "$server_log" >&2 || true
+            fi
+            rm -f "$server_log"
+            return "$code"
+          }
+          trap cleanup EXIT
+
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent "http://127.0.0.1:${PORT}/health" >/dev/null 2>&1; then
+              break
+            fi
+            if [[ "$attempt" -eq 30 ]]; then
+              echo "CoMind isolated runtime did not become ready." >&2
+              exit 1
+            fi
+            sleep 1
+          done
+
+          BASE_URL="http://127.0.0.1:${PORT}" node ./scripts/openai_paid_test_preflight.mjs
+          (
+            cd server
+            BASE_URL="http://127.0.0.1:${PORT}" node test/integration/competitive-cp01-provider-substitution.e2e.mjs
+          )
+
+      - name: Preserve CP-01 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cp01-provider-substitution-evidence
+          path: server/artifacts/cp01-provider-substitution-evidence.json
+          if-no-files-found: warn
+          retention-days: 30

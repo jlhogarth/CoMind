@@ -20,17 +20,17 @@ function firstProven(matrix) {
     .find(item => item.status === 'proven');
 }
 
-test('canonical ThreadKeeper C3 matrix validates while promotion remains gated', () => {
+test('canonical ThreadKeeper C3 matrix validates with only governance promotion controls unresolved', () => {
   const matrix = loadThreadKeeperC3Matrix();
   assert.deepEqual(validateThreadKeeperC3Matrix(matrix, { repoRoot }), []);
   const summary = matrixSummary(matrix);
   assert.equal(summary.gateRequirementCount, 17);
   assert.equal(summary.scenarioRequirementCount, 12);
-  assert.equal(summary.byStatus.proven, 1);
-  assert.equal(summary.byStatus.partial, 9);
-  assert.equal(summary.byStatus.missing, 19);
+  assert.equal(summary.byStatus.proven, 26);
+  assert.equal(summary.byStatus.partial ?? 0, 0);
+  assert.equal(summary.byStatus.missing, 3);
   assert.equal(summary.promotionReady, false);
-  assert.equal(summary.unresolvedIds.length, 28);
+  assert.deepEqual(summary.unresolvedIds, ['C3-15', 'C3-16', 'C3-17']);
 });
 
 test('C3 proven claims fail without repository evidence', () => {

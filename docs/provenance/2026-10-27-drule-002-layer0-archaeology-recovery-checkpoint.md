@@ -77,7 +77,7 @@ Current reconciliation remains open under:
 - `RC-L0-COST-001`
 - `RC-L0-COSTLINE-001`
 
-The historical 110 percent automatic limiting language is not activated over current FinOps hard-stop governance. TBD monetary budgets remain placeholders, not approved limits.
+The historical 110 percent automatic limiting language is not activated over current FinOps hard-stop governance. Deferred historical monetary-budget fields remain placeholders, not approved limits.
 
 ### Section 32: Emerging and Forward Controls
 
@@ -90,7 +90,7 @@ Historical controls are preserved as:
 
 Current mapping and activation review is tracked under `RC-L0-FWD-001`.
 
-The historical TBD items for quantum-resistant cryptography and cross-jurisdiction treaty compliance remain placeholders. They are not activated controls.
+The historical deferred fields for quantum-resistant cryptography and cross-jurisdiction treaty compliance remain placeholders. They are not activated controls.
 
 ## Evidence discipline
 

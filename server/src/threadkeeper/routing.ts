@@ -16,6 +16,10 @@ export function recommendRoute(assessment: ContinuityAssessment): RouteRecommend
 
   if (includesAny(assessment.reasonCodes, ['required_evidence_missing', 'required_evidence_unverifiable'])) {
     routeCode = 'REQUEST_EVIDENCE';
+  } else if (includesAny(assessment.reasonCodes, ['dependency_unavailable', 'route_destination_unavailable'])) {
+    routeCode = 'RETAIN_UNRESOLVED';
+  } else if (includesAny(assessment.reasonCodes, ['governed_revision_candidate'])) {
+    routeCode = 'REQUEST_SEAL_REVIEW';
   } else if (includesAny(assessment.reasonCodes, ['scope_identity_ambiguous', 'scope_identity_invalid'])) {
     routeCode = 'REQUEST_HUMAN_REVIEW';
     authorityRequired = true;

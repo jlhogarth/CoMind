@@ -20,20 +20,20 @@ function firstProven(matrix) {
     .find((candidate) => candidate.status === 'proven');
 }
 
-test('canonical ThreadKeeper C2 matrix validates while final promotion controls remain gated', () => {
+test('canonical ThreadKeeper C2 matrix validates as promotion-ready only after full evidence closure', () => {
   const matrix = loadThreadKeeperC2Matrix();
   assert.deepEqual(validateThreadKeeperC2Matrix(matrix, { repoRoot }), []);
 
   const summary = matrixSummary(matrix);
   assert.equal(summary.gateRequirementCount, 16);
   assert.equal(summary.testRequirementCount, 50);
-  assert.equal(summary.byStatus.proven, 62);
-  assert.equal(summary.byStatus.partial, 1);
-  assert.equal(summary.byStatus.missing, 2);
+  assert.equal(summary.byStatus.proven, 65);
+  assert.equal(summary.byStatus.partial, 0);
+  assert.equal(summary.byStatus.missing, 0);
   assert.equal(summary.byStatus.not_applicable, 1);
-  assert.equal(summary.promotionReady, false);
-  assert.equal(summary.unresolvedIds.length, 3);
-  assert.deepEqual(summary.unresolvedIds, ['C2-14', 'C2-15', 'C2-16']);
+  assert.equal(summary.promotionReady, true);
+  assert.deepEqual(summary.unresolvedIds, []);
+  assert.equal(matrix.promotionBoundary.promotionJournalKey, 'JRN-20261027-0004');
 });
 
 test('proven claims fail without repository evidence', () => {
@@ -60,25 +60,22 @@ test('nonexistent repository evidence fails validation', () => {
   );
 });
 
-test('promotion cannot become ready while any C2 evidence remains unresolved', () => {
+test('promotion cannot remain ready if any C2 evidence regresses to unresolved', () => {
   const matrix = clone(loadThreadKeeperC2Matrix());
-  matrix.promotionBoundary.ready = true;
-  matrix.promotionBoundary.promotionJournalKey = 'JRN-test-premature';
+  const regressed = matrix.gateRequirements.find((item) => item.id === 'C2-14');
+  regressed.status = 'partial';
+  regressed.nextAction = 'Reconcile projection regression before promotion.';
 
   const errors = validateThreadKeeperC2Matrix(matrix, { repoRoot });
   assert.ok(
     errors.some((message) => message.includes('required entries remain partial or missing')),
     errors.join('\n'),
   );
-  assert.ok(
-    errors.some((message) => message.includes('requires C2-16 to be proven')),
-    errors.join('\n'),
-  );
 });
 
-test('promotion journal cannot appear before promotion readiness', () => {
+test('promotion journal cannot appear when promotion readiness is false', () => {
   const matrix = clone(loadThreadKeeperC2Matrix());
-  matrix.promotionBoundary.promotionJournalKey = 'JRN-premature';
+  matrix.promotionBoundary.ready = false;
 
   const errors = validateThreadKeeperC2Matrix(matrix, { repoRoot });
   assert.ok(

@@ -59,10 +59,13 @@ for migration in \
   psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f "${root}/db/migrations/${migration}"
  done
 
+node "${root}/scripts/threadkeeper_c3_matrix.mjs"
+
 (
   cd "${root}/server"
   npm ci
   npm run build
+  node --test test/threadkeeper-c3-evidence.test.mjs
   node --test test/threadkeeper-c3-service.test.mjs
   THREADKEEPER_C3_ISOLATED_DB_TEST=1 node --test test/threadkeeper-c3-postgres.integration.test.mjs
 )

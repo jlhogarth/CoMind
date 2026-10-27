@@ -2,28 +2,33 @@
 
 ## Status
 
-**Promotion state:** C2 Implemented, pending final exact-head repository verification and merge acceptance.
+**Historical acceptance state:** TK-005 C2 Implemented accepted and merged on 2026-10-27.
+
+**Current ThreadKeeper state:** C3 Integrated through the later TK-006 governed promotion. This document remains the canonical historical record of the C1 Contracted to C2 Implemented transition and must not be read as the current maturity projection.
 
 - Issue: #248
 - Pull request: #249
 - Governing contract: TK-001
 - Governing design: TK-002
+- C2 promotion journal: `JRN-20261027-0004`
+- C2 closure journal: `JRN-20261027-0006`
+- TK-005 merge commit: `3eecf7c199e520db5574b7c7525598ba6002e7ea`
 - Production activation: **not performed**
-- Public HTTP endpoint: **not required for C2**
-- SDN registration: **deferred to C3 unless separately justified**
 - Automatic maturity promotion: **forbidden**
 
 ## Implementation binding
 
-The bounded ThreadKeeper implementation is frozen at exact code head:
+The bounded C2 ThreadKeeper implementation was frozen at exact code head:
 
 `3eb07decd173734d9c2c899635307b90c6f5f098`
 
-On that implementation head, TK-004 ThreadKeeper Persistence run `40436467686` passed the isolated PostgreSQL 17 proof with all 41 targeted tests passing. The proof covers deterministic core behavior, service/boundary behavior, durable repository behavior, additional C2 PostgreSQL assertions, failure injection, authority boundaries, observability behavior, and false-positive resolution preservation.
+On that implementation head, TK-004 ThreadKeeper Persistence run `40436467686` passed the isolated PostgreSQL 17 proof with all 41 targeted tests passing. The proof covered deterministic core behavior, service and boundary behavior, durable repository behavior, additional C2 PostgreSQL assertions, failure injection, authority boundaries, observability behavior, and false-positive resolution preservation.
+
+EVID-001 now binds this run to its immutable external facts through `config/governed-evidence-bindings.v1.json`: workflow `.github/workflows/threadkeeper-persistence.yml`, exact head `3eb07decd173734d9c2c899635307b90c6f5f098`, pull request event, and successful conclusion.
 
 ## Evidence matrix
 
-The machine-readable matrix contains 66 governed requirements:
+The machine-readable C2 matrix contains 66 governed requirements:
 
 - 16 formal C2 promotion requirements
 - 20 unit requirements
@@ -38,81 +43,112 @@ Final governed census:
 - **0 missing**
 - **1 not applicable**
 
-The single not-applicable item is logical checkpoint expiry. TK-002 explicitly defers expiry unless a scope policy requires it; C2 does not introduce a global expiry policy. Stale-head protection is independently proven.
+The single not-applicable item is logical checkpoint expiry. TK-002 explicitly defers expiry unless a scope policy requires it. C2 did not introduce a global expiry policy. Stale-head protection was independently proven.
 
 ## Freshness reconciliation
 
-During the acceptance audit, `main` advanced from the original TK-005 base `b43ad4cabc3d776fe0fb7e54560ddf7e7c5e0e35` to `a0bb254d058b748420ae2895f7f1246f5b27f947` through merged PR #252, which added competitive continuity handoff proofs and touched the shared ThreadKeeper persistence harness.
+TK-005 encountered two material main-branch advances before merge and reconciled both rather than overwriting concurrent work.
 
-TK-005 did not merge stale or overwrite that lane. A two-parent reconciliation preserved both bodies of work. The reconciled harness runs each ThreadKeeper test file in an isolated `node:test` lifecycle against the same disposable PostgreSQL 17 service and includes the accepted competitive continuity proof.
+### First reconciliation
 
-Freshness reconciliation commit:
+`main` advanced from the original TK-005 base `b43ad4cabc3d776fe0fb7e54560ddf7e7c5e0e35` through PR #252, which added competitive continuity handoff proofs and touched the shared ThreadKeeper persistence harness.
+
+A two-parent reconciliation preserved both bodies of work. Reconciliation commit:
 
 `881923ed354b919d62e9b4802fadb908bbeaaf2a`
 
-## Exact-head pre-promotion verification
+An intermediate exact-head sweep on `88fe50dc4c176e8cb753479ba740d680742d71f0` passed, including MCTRL run `40466464418`. That run is retained as historical intermediate evidence, not as the final freshness proof.
 
-On reconciled head `88fe50dc4c176e8cb753479ba740d680742d71f0`:
+### Second and final reconciliation
 
-- TK-005 ThreadKeeper C2 Evidence Gate `40466464462`: PASS
-- TK-004 ThreadKeeper Persistence `40466464424`: PASS
-- MCTRL-001 Maintenance Control `40466464418`: PASS
-- CI `40466464566`: PASS
-- Lane Health Sentinel Observe `40466464542`: PASS
-- No Placeholder Policy `40466464435`: PASS
-- CoMind Repository Configuration `40466464444`: PASS
-- DRB-002 Query Contract `40466464506`: PASS
-- Foundry Runtime Orchestration `40466464414`: PASS
-- Foundry Work Lease Kernel `40466464417`: PASS
-- Runtime Budget Authority Adapter `40466464585`: PASS
-- Governed Provider Execution `40466464426`: PASS
-- Live Foundry Stage 1 Readiness `40466464487`: PASS
-- Live Foundry LF-2 Readiness `40466464568`: PASS
-- Live Foundry LF-3 Readiness `40466464440`: PASS
-- Competitive Continuity Read-Only Proof: skipped on this branch by its intentional branch/manual trigger condition; its implementation was already accepted on main through PR #252.
+Before merge, `main` advanced again to `3f80a07b58f992df12312c1a284584e5fe98cb22` through PR #254. The incoming competitive execution proof files were additive and non-overlapping with the TK-005 implementation and evidence files. TK-005 used a second two-parent merge and produced final PR head:
 
-## Projection reconciliation
+`f73381f2d6e76fdb5d2f7d52183969d604c88a7b`
 
-The C2 claim changes maturity and planning projections but does not change graph topology.
+Final exact-head acceptance evidence included:
 
-- **CCI-001:** advanced to v0.6; ThreadKeeper is Current at C2 Implemented; production activation remains separate.
-- **MLC-001:** advanced to v0.3; ThreadKeeper remains a Capability, module lifecycle remains not applicable, capability maturity is C2 Implemented.
-- **DPE-001:** advanced to v0.4. The existing scoring model recomputed ThreadKeeper from 86.2 to **80.1 / P0** because evidence gap fell from 3.0 to 1.5 and the next advancement became integration/maintenance rather than initial implementation. No score was hand-edited.
-- **EDG-001:** topology remains v0.2 because TK-005 did not add, retire, or change documentation graph relationships. The unchanged topology is an explicit reconciliation result, not an omitted check.
+- TK-005 ThreadKeeper C2 Evidence Gate `40467605066`: PASS
+- TK-004 ThreadKeeper Persistence `40467604946`: PASS
+- MCTRL-001 Maintenance Control `40467605004`: PASS
+- CI `40467604998`: PASS
+- Lane Health Sentinel Observe `40467604902`: PASS
+- No Placeholder Policy `40467604889`: PASS
+- CoMind Repository Configuration `40467604942`: PASS
+- other applicable returned repository regression gates: PASS
+
+PR #249 then merged as `3eecf7c199e520db5574b7c7525598ba6002e7ea`.
+
+Post-merge MCTRL run `40467885710` executed on that exact merge SHA and completed successfully. Its bounded live Test audit reported **18 PASS, 0 WARNING, 0 FAIL** at the time of TK-005 acceptance.
+
+## EVID-001 evidence-reference hardening
+
+The later acceptance review identified a governance weakness in the original machine-readable evidence pattern. The matrix could require a positive GitHub run ID or non-empty CDE key without independently proving that the external reference existed, succeeded, matched the intended workflow and head SHA, or resolved to a verified canonical journal.
+
+This did not invalidate the C2 implementation or promotion because the final-head and post-merge evidence existed and was independently inspectable. It did mean the matrix was not sufficiently self-verifying.
+
+Issue #261, EVID-001, hardens that pattern without changing ThreadKeeper runtime behavior or historical maturity:
+
+- immutable GitHub run facts are maintained in `config/governed-evidence-bindings.v1.json`;
+- referenced runs are verified live through the GitHub Actions API using read-only CI authority;
+- final acceptance bindings explicitly include TK-005 `40467605066`, final-head MCTRL `40467605004`, and post-merge MCTRL `40467885710`;
+- implementation evidence is bound to exact implementation commit `3eb07decd173734d9c2c899635307b90c6f5f098`;
+- the C2 promotion journal `JRN-20261027-0004` is checked by MCTRL against canonical Development Evidence with required `verification_state=verified`;
+- fabricated positive run IDs and fabricated non-empty CDE keys fail closed.
+
+The older C2-15 matrix reference to `40466464418` remains historical evidence. It is no longer allowed to stand alone as the freshness proof because the governed binding catalog separately identifies and verifies the final acceptance sweep.
+
+## Projection reconciliation at C2 acceptance
+
+The C2 claim changed maturity and planning projections but did not change graph topology.
+
+- **CCI-001:** advanced to v0.6; ThreadKeeper was Current at C2 Implemented; production activation remained separate.
+- **MLC-001:** advanced to v0.3; ThreadKeeper remained a Capability, module lifecycle remained not applicable, capability maturity became C2 Implemented.
+- **DPE-001:** advanced to v0.4 and recomputed ThreadKeeper to 80.1 / P0 under the then-current formula.
+- **EDG-001:** remained v0.2 because TK-005 did not add, retire, or change documentation graph relationships.
+
+These are historical C2 projections. Later governed work, including TK-006 and subsequent DPE reconciliation, superseded their current values without rewriting this acceptance history.
 
 ## Canonical Development Evidence
 
-- `JRN-20261026-0015`: TK-005 evidence inventory created.
-- `JRN-20261027-0003`: technical evidence reconciled; final promotion controls remained gated.
-- `JRN-20261027-0004`: explicit verified transition from C1 Contracted to C2 Implemented.
+TK-005 evidence lineage includes:
 
-Canonical Test state records:
+- `JRN-20261026-0015`: TK-005 evidence inventory created.
+- `JRN-20261027-0003`: technical evidence reconciled while final promotion controls remained gated.
+- `JRN-20261027-0004`: explicit verified transition from C1 Contracted to C2 Implemented.
+- `JRN-20261027-0006`: TK-005 closure record after merge acceptance.
+
+At C2 acceptance, canonical Test state recorded:
 
 - `concept:threadkeeper.capability_maturity = C2 Implemented`
 - `implementation_proven = true`
 - `c2_gate_complete = true`
 - `implementation_key = TK-005`
-- production activation remains false
-- next maturity gate is C3 Integrated
+- production activation remained false
+
+The current canonical state later advanced to C3 Integrated through TK-006. Historical C2 evidence remains immutable and addressable.
 
 ## Boundary proof
 
-C2 does not authorize ThreadKeeper to absorb adjacent systems:
+C2 did not authorize ThreadKeeper to absorb adjacent systems:
 
-- Conversation History retains raw conversation-event ownership.
-- Foundry retains execution, lease, fencing, retry, and outcome authority.
-- Agent Communication retains transport/routing/addressing ownership.
-- Helper Matrix recommendations do not execute helpers.
-- SEAL recommendations do not execute revisions.
-- Memory Graph storage remains outside ThreadKeeper.
-- Digital Twin identity remains outside ThreadKeeper.
-- EIK retains epistemic/truth authority.
-- ACP remains a distinct continuity/recovery substrate.
+- Conversation History retained raw conversation-event ownership.
+- Foundry retained execution, lease, fencing, retry, and outcome authority.
+- Agent Communication retained transport, routing, and addressing ownership.
+- Helper Matrix recommendations did not execute helpers.
+- SEAL recommendations did not execute revisions.
+- Memory Graph storage remained outside ThreadKeeper.
+- Digital Twin identity remained outside ThreadKeeper.
+- EIK retained epistemic and truth authority.
+- ACP remained a distinct continuity and recovery substrate.
 
 ## Security note discovered during acceptance review
 
-A Supabase Test security-advisor read surfaced pre-existing RLS-disabled public-schema findings outside the bounded ThreadKeeper tables. This review did not silently modify those unrelated schemas or policies. ThreadKeeper's own persistence proof continues to verify its intended private RLS/privilege posture. The broader Test-schema findings require a separate governed security lane rather than being normalized inside TK-005.
+A Supabase Test security-advisor read surfaced pre-existing RLS-disabled public-schema findings outside the bounded ThreadKeeper tables. TK-005 did not silently modify those unrelated schemas or policies. ThreadKeeper's own persistence proof verified its intended private RLS and privilege posture. Broader Test-schema findings remained a separate governed security concern.
 
-## Final acceptance rule
+## Final acceptance rule and result
 
-C2 is accepted only if the final exact PR head, after the MCTRL baseline and evidence-matrix promotion changes, returns green for TK-005, TK-004, MCTRL, CI, and the repository-wide required checks. Any final red check reopens acceptance rather than being waived.
+The TK-005 rule required the final exact PR head to be green for TK-005, TK-004, MCTRL, CI, and applicable repository checks before merge. That condition was satisfied at `f73381f2d6e76fdb5d2f7d52183969d604c88a7b`, followed by successful merge and post-merge MCTRL verification.
+
+**Historical C1 to C2 acceptance result: PASS.**
+
+EVID-001 strengthens how that result is machine-verified. It does not retroactively create the evidence, alter ThreadKeeper runtime behavior, or change the current C3 Integrated maturity.

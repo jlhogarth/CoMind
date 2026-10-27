@@ -1,8 +1,27 @@
 # CoMind Lane Health Sentinel
 
-Status: observation and deduplicated PR notification are operationally proven from trusted default-branch code. One-shot transient workflow retry is implemented and exact-head tested in PR #204, but is not called operational until merged to `main` and demonstrated through the controlled retry proof defined in Issue #194.
+Status: operationally proven from trusted default-branch code for observation, unattended Background detection, deduplicated PR notification, and one-shot bounded transient workflow retry.
+
+Lifecycle: Operational
+
+Parent control: Issue #115, `Parallel Development Control: event-driven CI stall detection and lane health sentinel`
+
+Last acceptance reconciliation: 2026-10-27
 
 The sentinel is split into independent authority surfaces. Observation is read-only. Notification may write only the governed PR conversation comment. Retry may request only one bounded GitHub Actions rerun for a narrowly proven transient workflow failure. None of these authorities implies merge, branch mutation, check bypass, deployment, database mutation, secret-management, provider execution, paid-resource authority, or production mutation.
+
+## In this document
+
+- Purpose and exact-head invariant
+- Observation and timing model
+- Machine-readable evidence and suppression signals
+- Pull-request and trusted Background observers
+- Deduplicated PR notification
+- One-shot transient retry and structured signal review
+- Controlled acceptance evidence
+- Authority and human escalation boundaries
+- Active-session behavior and recovery continuity
+- Current implementation files and acceptance state
 
 ## Purpose
 
@@ -39,8 +58,9 @@ The classifier distinguishes:
 - `action_required_zero_jobs`: GitHub reports `action_required` but created no executable jobs.
 - `action_required`: GitHub requires explicit operator action.
 - `cancelled`: the workflow was cancelled.
-- `timed_out`: the workflow exceeded its execution timeout.
+- `timed_out`: the workflow exceeded its execution timeout when GitHub exposes that conclusion.
 - `terminal_startup_failure`: GitHub failed to start the workflow execution.
+- `structured_transient_failure`: trusted review accepted a machine-readable retry-safe transient signal for the exact run/head/attempt.
 - `stale_head_evidence`: evidence belongs to another commit.
 - `unknown`: a state outside the current contract was observed and must not be normalized to healthy.
 
@@ -213,7 +233,7 @@ Controlled PR #197 then proved the complete contract:
 - Notify run 40256366385 updated the same comment ID to resolved
 - notification artifact: https://github.com/jlhogarth/CoMind/actions/runs/40256366385/artifacts/12622781546
 
-PR #197 was closed without merge after acceptance.
+PR #197 was closed without merge after acceptance. Issue #193 is closed complete.
 
 ## One-shot transient retry
 
@@ -227,21 +247,38 @@ Permissions:
 
 It has no PR-comment write, merge, branch-write, deployment, database, secret-management, provider, or paid-resource authority.
 
-The retry executor consumes the exact trusted Background artifact, then re-fetches current GitHub state immediately before any write.
+The retry executor consumes the exact trusted Background artifact, runs trusted structured-transient review, and re-fetches current GitHub state immediately before any write.
 
-An automatic retry is eligible only when all of these are true:
+### Retry-safe evidence paths
 
-1. repository policy explicitly sets `allowTransientRetrigger` for the workflow;
-2. the Background state is `timed_out` or `terminal_startup_failure`;
-3. the observed workflow belongs to the exact PR head;
+A retry candidate must first be explicitly enabled by repository policy with `allowTransientRetrigger` and must be tied to the exact PR head and workflow/run identity. The trusted executor recognizes two bounded evidence paths:
+
+1. GitHub-native transient state, when GitHub exposes an eligible `timed_out` or startup-failure conclusion that survives exact-state revalidation.
+2. Trusted structured transient evidence, when a workflow emits a machine-readable artifact and default-branch reviewer code validates every identity and classification field before enriching the Background state as `structured_transient_failure`.
+
+The first reviewed structured class is deliberately narrow:
+
+- classification: `resource_timeout`
+- exit code: `124`
+- producer: governed transient wrapper contract
+
+Exit code `124` by itself is not authority to retry. The artifact must also match the exact repository workflow run ID, attempt, head SHA, workflow name, event, and governed step. Missing, malformed, duplicated, stale, mismatched, unknown, or unreviewed artifacts fail closed.
+
+The reviewer currently does not accept exit `137` as a generic retry-safe signal because an OOM kill may represent deterministic resource sizing or configuration rather than a transient platform condition.
+
+### One-shot fencing
+
+Immediately before a rerun POST, the trusted executor revalidates:
+
+1. the PR remains open;
+2. the PR head is still the exact observed SHA;
+3. the workflow/run identity still matches;
 4. the workflow event is `pull_request`;
-5. the PR remains open and still has the exact same head;
-6. the original run ID and workflow name still match;
-7. the run remains terminal with conclusion exactly `timed_out` or `startup_failure`;
-8. `run_attempt === 1`;
-9. `policy.defaults.maxAutoRetriggers === 1`.
+5. the run remains terminal and still satisfies its reviewed transient evidence path;
+6. `run_attempt === 1`;
+7. `policy.defaults.maxAutoRetriggers === 1`.
 
-GitHub reruns retain the same workflow run ID and increment `run_attempt`. That GitHub-native attempt counter is the durable one-retry guard. Attempt 2 can never satisfy the automatic retry gate again.
+GitHub reruns retain the same workflow run ID and increment `run_attempt`. That GitHub-native attempt counter is the durable one-retry guard. Attempt 2 cannot satisfy the automatic retry gate again.
 
 The retry workflow also uses a single global concurrency group and permits at most one rerun POST per executor invocation. This prevents one Background completion from fanning out into multiple automatic writes and reduces race risk across concurrent lifecycle events.
 
@@ -253,28 +290,57 @@ The following never qualify automatically:
 - cancellation
 - `action_required`
 - stale-head evidence
-- source or workflow identity mismatch
+- source, workflow, run, head, event, or attempt identity mismatch
+- missing, malformed, duplicated, unknown, or unreviewed structured transient evidence
 - ambiguous failure classification
 - attempt 2 or later
 - a failure whose remediation changes code, data, schema, security, credentials, production state, cost authority, provider execution, or external commitments
 
-### Controlled retry proof workflow
+## Controlled retry proof workflow
 
 `.github/workflows/lane-health-sentinel-retry-proof.yml` is a path-gated acceptance fixture. It runs only when a PR touches `docs/provenance/lane-health-retry-proof/**`.
 
 Supported fixture modes:
 
-- `transient-repeat-timeout`: one-job workflow intentionally exceeds its one-minute timeout on every attempt. Acceptance requires exactly one automatic rerun from attempt 1 to attempt 2 and no attempt 3.
-- `deterministic-failure`: exits with code 1. Acceptance requires zero automatic reruns.
+- `transient-repeat-timeout`: on attempt 1, GNU `timeout` produces exit `124`; the wrapper preserves that exit under GitHub `bash -e`, emits the governed structured transient artifact, and terminates the workflow as failure. On attempt 2, `GITHUB_RUN_ATTEMPT` drives deterministic recovery and the workflow succeeds.
+- `deterministic-failure`: exits with ordinary code `1` and emits no structured transient signal. Acceptance requires zero automatic reruns.
 - `healthy`: succeeds without a retry.
 
 The proof workflow itself has only `contents: read`.
 
-### Retry activation boundary
+## Retry operational acceptance history
 
-The retry implementation and nine deterministic retry tests passed on PR #204 before this documentation update. The pre-documentation exact head `5b317b362e6d3d1ef4b3f95d67f605643c48876c` passed all 12 returned workflow families. Main CI reported 277 tests, 270 passed, 7 skipped, 0 failed, with zero production dependency vulnerabilities.
+Implementation and hardening were delivered through PRs #204, #212, and #218. The first live proof exposed GitHub shell `errexit` behavior that prevented exit `124` from being persisted; PR #218 corrected only the controlled wrapper and added regression coverage without weakening the trusted reviewer, classifier, one-shot fence, or permissions.
 
-Retry authority is not called operationally proven until PR #204 is merged to trusted `main` and both controlled post-merge fixtures are completed with machine-readable retry evidence.
+### Reviewed transient one-retry proof
+
+Disposable PR #216 exact head `27b8a8fc2002bde10da3956a69e1b47628691a42`:
+
+- original proof run: https://github.com/jlhogarth/CoMind/actions/runs/40402975529
+- attempt 1 emitted reviewed `resource_timeout` / exit `124` evidence and failed
+- signal artifact ID: `12688638892`
+- trusted Retry run: https://github.com/jlhogarth/CoMind/actions/runs/40403983467
+- retry evidence: https://github.com/jlhogarth/CoMind/actions/runs/40403983467/artifacts/12689309589
+- decision: `acceptedStructuredTransientSignals: 1`, `candidateCount: 1`, `rerunRequested: true`, `requestStatus: 201`, `retryCount: 1`, `authorityBoundary: rerun_only`
+- GitHub retained run ID `40402975529`, advanced it to `run_attempt: 2`, and recorded `github-actions[bot]` as the triggering actor
+- attempt 2 succeeded through the deterministic recovery path
+- no attempt 3 occurred
+
+### Deterministic zero-retry proof
+
+The same disposable PR #216 was switched to exact head `bd5438767142cc12f7aa4021562fbf857d41ef42` with fixture mode `deterministic-failure`:
+
+- deterministic proof run: https://github.com/jlhogarth/CoMind/actions/runs/40424765174
+- the run completed `failure` and remained `run_attempt: 1`
+- structured transient signal emission and upload were skipped
+- trusted Background run: https://github.com/jlhogarth/CoMind/actions/runs/40425394558
+- Background evidence: https://github.com/jlhogarth/CoMind/actions/runs/40425394558/artifacts/12699715607
+- Background explicitly observed PR #216
+- paired trusted Retry run: https://github.com/jlhogarth/CoMind/actions/runs/40425431097
+- retry evidence: https://github.com/jlhogarth/CoMind/actions/runs/40425431097/artifacts/12699715636
+- decision: `acceptedStructuredTransientSignals: 0`, `candidateCount: 0`, `rerunRequested: false`, `authorityBoundary: rerun_only`
+
+PR #216 was closed without merge after acceptance. Issues #194, #215, and #217 are closed complete.
 
 ## Authority matrix
 
@@ -332,6 +398,7 @@ Runtime modules:
 - `scripts/lane_health_github.mjs`
 - `scripts/lane_health_background.mjs`
 - `scripts/lane_health_notify.mjs`
+- `scripts/lane_health_transient_signal.mjs`
 - `scripts/lane_health_retry.mjs`
 
 Regression tests:
@@ -343,10 +410,11 @@ Regression tests:
 - `server/test/lane-health-github-live-status.test.mjs`
 - `server/test/lane-health-background.test.mjs`
 - `server/test/lane-health-notify.test.mjs`
+- `server/test/lane-health-transient-signal.test.mjs`
 - `server/test/lane-health-retry.test.mjs`
 
 ## Current acceptance checkpoint
 
-Observation, unattended Background detection, and deduplicated notification are operationally proven.
+Observation, trusted unattended Background detection, deduplicated notification, and one-shot bounded transient retry are all operationally proven.
 
-The next acceptance step is the full exact-head verification of this documentation-complete PR #204 candidate, followed by merge to `main`, one controlled repeated-timeout proof, one controlled deterministic-failure proof, and evidence write-through to Issues #194 and #115.
+Parent Issue #115 acceptance criteria 1-18 have implementation and controlled operational evidence. Issue #243 exists only to reconcile this operator contract with the completed retry proof before final parent closure. Once this documentation correction is merged and its exact head passes repository verification, #115 may be closed complete if the final evidence reconciliation identifies no additional gap.

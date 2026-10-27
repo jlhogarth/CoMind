@@ -243,6 +243,8 @@ BEGIN
     RAISE EXCEPTION 'PFC-A01 allowed competing successor for one predecessor';
   EXCEPTION
     WHEN unique_violation THEN NULL;
+    WHEN raise_exception THEN
+      IF SQLERRM <> 'archive retry attempt number must follow predecessor' THEN RAISE; END IF;
   END;
 
   BEGIN

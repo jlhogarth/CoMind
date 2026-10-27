@@ -97,3 +97,8 @@ jobs:
 
       - name: Run governed point-in-time diff proof
         run: bash scripts/test_chist_001_pit_diff.sh
+
+      - name: Verify recovery cannot certify abandoned imports
+        run: |
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f db/migrations/20261027_001_pfc_a01_archive_import_recovery.sql
+          bash scripts/test_pfc_a01_abandoned_certification.sh

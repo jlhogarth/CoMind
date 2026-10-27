@@ -103,7 +103,17 @@ export async function recoverInterruptedArchiveImport(
   assertArchiveDatabaseSessionPrepared();
   const recoveryReason = requireReason(reason);
   const client = await pool.connect();
+  let sourceLock: string | null = null;
   try {
+    const source = (await client.query<{ hash: string }>(
+      `SELECT s.source_archive_sha256::text AS hash FROM comind.cm_archive_import i
+       JOIN comind.cm_archive_source s USING(source_archive_id) WHERE i.import_id=$1`, [importId]
+    )).rows[0];
+    if (!source) throw new Error(`Archive import attempt ${importId} does not exist`);
+    sourceLock = `archive:${source.hash}`;
+    // Serialize recovery with ingestion as well as other recovery requests.
+    await client.query("SET lock_timeout = '5s'");
+    await client.query('SELECT pg_advisory_lock(hashtextextended($1,0))', [sourceLock]);
     await client.query('BEGIN');
     try {
       const attemptResult = await client.query<ImportAttemptRow>(
@@ -243,6 +253,7 @@ export async function recoverInterruptedArchiveImport(
       throw error;
     }
   } finally {
+    if (sourceLock) await client.query('SELECT pg_advisory_unlock(hashtextextended($1,0))', [sourceLock]);
     client.release();
   }
 }

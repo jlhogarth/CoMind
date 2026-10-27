@@ -684,7 +684,13 @@ export async function ingestChatGptExport(inputPath: string): Promise<ArchiveImp
   assertArchiveDatabaseSessionPrepared();
   const prepared = await prepareSource(inputPath);
   const client = await pool.connect();
+  let locked = false;
   try {
+    locked = (await client.query<{ locked: boolean }>(
+      'SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS locked',
+      [`archive:${prepared.sourceArchiveSha256}`]
+    )).rows[0]?.locked === true;
+    if (!locked) throw new Error('Archive source is busy; retry after the active operation terminates');
     const files = await listFiles(prepared.sourceRoot);
     const conversationFiles = files.filter((file) => file.fileRole === 'conversation_json').sort((a, b) => a.sourcePath.localeCompare(b.sourcePath));
     if (conversationFiles.length === 0) throw new Error('No ChatGPT conversation JSON files were detected in the export');
@@ -706,7 +712,9 @@ export async function ingestChatGptExport(inputPath: string): Promise<ArchiveImp
     }
 
     const existingObservation = await client.query<{ count: string }>(
-      `SELECT count(*)::text AS count FROM comind.cm_archive_conversation_observation WHERE import_id=$1`,
+      `SELECT ((SELECT count(*) FROM comind.cm_archive_conversation_observation WHERE import_id=$1)
+       + (SELECT count(*) FROM comind.cm_archive_parser_event WHERE import_id=$1)
+       + (SELECT count(*) FROM comind.cm_archive_quarantine WHERE import_id=$1))::text AS count`,
       [attempt.importId]
     );
     if (Number(existingObservation.rows[0]?.count ?? '0') > 0) {
@@ -790,6 +798,7 @@ export async function ingestChatGptExport(inputPath: string): Promise<ArchiveImp
 
     return await finalizeImport(client, attempt.importId, attempt.sourceArchiveId, sourceCounts, telemetry, conversationFiles);
   } finally {
+    if (locked) await client.query('SELECT pg_advisory_unlock(hashtextextended($1,0))', [`archive:${prepared.sourceArchiveSha256}`]);
     client.release();
     await prepared.cleanup();
   }

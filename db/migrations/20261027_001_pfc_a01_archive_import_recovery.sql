@@ -10,7 +10,13 @@ ALTER TABLE comind.cm_archive_import
 
 ALTER TABLE comind.cm_archive_import
   DROP CONSTRAINT IF EXISTS cm_archive_import_status_check,
-  DROP CONSTRAINT IF EXISTS cm_archive_import_attempt_identity;
+  DROP CONSTRAINT IF EXISTS cm_archive_import_attempt_identity,
+  DROP CONSTRAINT IF EXISTS cm_archive_import_attempt_number_check,
+  DROP CONSTRAINT IF EXISTS cm_archive_import_predecessor_fk,
+  DROP CONSTRAINT IF EXISTS cm_archive_import_root_fk,
+  DROP CONSTRAINT IF EXISTS cm_archive_import_recovery_lineage_shape,
+  DROP CONSTRAINT IF EXISTS cm_archive_import_not_own_predecessor,
+  DROP CONSTRAINT IF EXISTS cm_archive_import_not_own_root;
 
 ALTER TABLE comind.cm_archive_import
   ADD CONSTRAINT cm_archive_import_status_check

@@ -60,5 +60,6 @@ psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f "${verification_010}"
   npm run build
   THREADKEEPER_ISOLATED_DB_TEST=1 node --test --test-concurrency=1 \
     test/threadkeeper-core.test.mjs \
-    test/threadkeeper-repository.integration.test.mjs
+    test/threadkeeper-repository.integration.test.mjs \
+    test/threadkeeper-competitive-proofs.integration.test.mjs
 )

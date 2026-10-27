@@ -58,7 +58,12 @@ psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f "${verification_010}"
   cd "${root}/server"
   npm ci
   npm run build
-  THREADKEEPER_ISOLATED_DB_TEST=1 node --test --test-concurrency=1 \
-    test/threadkeeper-core.test.mjs \
-    test/threadkeeper-repository.integration.test.mjs
+
+  # Keep test-file lifecycle isolated. The repository integration test includes
+  # deliberate failed transactions and concurrency races; running independent
+  # files in one node:test harness can make error-order assertions dependent on
+  # cross-file runner lifecycle rather than ThreadKeeper semantics.
+  THREADKEEPER_ISOLATED_DB_TEST=1 node --test test/threadkeeper-core.test.mjs
+  THREADKEEPER_ISOLATED_DB_TEST=1 node --test test/threadkeeper-repository.integration.test.mjs
+  THREADKEEPER_ISOLATED_DB_TEST=1 node --test test/threadkeeper-competitive-proofs.integration.test.mjs
 )

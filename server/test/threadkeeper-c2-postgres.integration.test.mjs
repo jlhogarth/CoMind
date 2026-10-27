@@ -195,6 +195,7 @@ test('isolated PostgreSQL closes remaining ThreadKeeper C2 persistence evidence 
       classification: 'SUSPECTED_BREAK',
     }]);
 
+    const invalidParentId = '00000000-0000-4000-8000-000000000099';
     await assert.rejects(
       () => query(
         `INSERT INTO comind.cm_threadkeeper_checkpoint (
@@ -203,14 +204,21 @@ test('isolated PostgreSQL closes remaining ThreadKeeper C2 persistence evidence 
            accepted_at, accepted_by_ref, authority_evidence_ref, policy_ref,
            state_digest, digest, proposal
          )
-         SELECT scope_id, '00000000-0000-4000-8000-000000000099'::uuid,
+         SELECT scope_id, $2::uuid,
                 proposal_id || ':invalid-parent', checkpoint_version,
                 scope_semantic_key, proposed_at, proposed_by_ref,
                 accepted_at, accepted_by_ref, authority_evidence_ref, policy_ref,
-                state_digest, digest, proposal
+                state_digest, digest,
+                jsonb_set(
+                  jsonb_set(
+                    jsonb_set(proposal, '{proposalId}', to_jsonb((proposal_id || ':invalid-parent')::text)),
+                    '{parentCheckpointId}', to_jsonb($2::text)
+                  ),
+                  '{currentAcceptedCheckpointId}', to_jsonb($2::text)
+                )
            FROM comind.cm_threadkeeper_checkpoint
           WHERE checkpoint_id=$1::uuid`,
-        [root.checkpointId],
+        [root.checkpointId, invalidParentId],
       ),
       /(parent checkpoint|foreign key|violates foreign key)/i,
     );

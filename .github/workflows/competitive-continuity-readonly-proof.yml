@@ -1,0 +1,64 @@
+name: Competitive Continuity Read-Only Proof
+
+on:
+  pull_request:
+    paths:
+      - 'server/src/continuity/handoff.ts'
+      - 'server/src/threadkeeper/**'
+      - 'server/test/integration/competitive-continuity-live-readonly.e2e.mjs'
+      - '.github/workflows/competitive-continuity-readonly-proof.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: competitive-continuity-readonly-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify-test-continuity:
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'competitive-proofs-251'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SUPABASE_SESSION_DATABASE_URL: ${{ secrets.SUPABASE_SESSION_DATABASE_URL }}
+      COMPETITIVE_CONTINUITY_ARTIFACT: artifacts/competitive-continuity-live-readonly-evidence.json
+    steps:
+      - name: Check out authoritative branch state
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Require exact Test pooled database secret
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${SUPABASE_SESSION_DATABASE_URL:-}" ]]; then
+            echo "::error title=Missing pooled database secret::SUPABASE_SESSION_DATABASE_URL is not configured."
+            exit 1
+          fi
+
+      - name: Build server
+        working-directory: server
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run build
+
+      - name: Exercise canonical CP-03 lineage and CP-01/CP-02 support invariants
+        working-directory: server
+        shell: bash
+        run: node test/integration/competitive-continuity-live-readonly.e2e.mjs
+
+      - name: Upload machine-readable competitive proof evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: competitive-continuity-live-readonly-evidence
+          path: server/artifacts/competitive-continuity-live-readonly-evidence.json
+          if-no-files-found: error
+          retention-days: 30

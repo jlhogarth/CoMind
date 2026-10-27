@@ -58,7 +58,10 @@ async function assumeThreadKeeperRuntimeRole(query: QueryFunction): Promise<Thre
             has_table_privilege(current_user, 'comind.cm_threadkeeper_operation_event', 'INSERT') AS operation_insert,
             has_table_privilege(current_user, 'comind.cm_threadkeeper_operation_event', 'UPDATE') AS operation_update,
             has_table_privilege(current_user, 'comind.cm_threadkeeper_operation_event', 'DELETE') AS operation_delete,
-            has_table_privilege(current_user, 'comind.cm_archive_source', 'SELECT') AS archive_select`
+            CASE
+              WHEN to_regclass('comind.cm_archive_source') IS NULL THEN false
+              ELSE has_table_privilege(current_user, 'comind.cm_archive_source', 'SELECT')
+            END AS archive_select`
   );
   const identity = assumed.rows[0];
   if (!identity || identity.current_user !== THREADKEEPER_RUNTIME_ROLE) {

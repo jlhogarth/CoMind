@@ -9,6 +9,7 @@ on:
       - 'db/migrations/20261027_010_cint_identity_reconciliation_guards.sql'
       - 'db/migrations/20261027_011_foundry_unit_economics_and_api_cost_register.sql'
       - 'db/migrations/20261027_012_foundry_unit_economics_fanout_hardening.sql'
+      - 'db/migrations/20261027_014_cint_finops_fk_index_hardening.sql'
       - 'db/migrations/verify_20261027_008_cint_paid_api_project_registry.sql'
       - 'db/migrations/verify_20261027_010_cint_identity_reconciliation_guards.sql'
       - 'db/migrations/verify_20261027_011_foundry_unit_economics_and_api_cost_register.sql'
@@ -101,3 +102,7 @@ jobs:
             -f ./db/migrations/verify_20261027_011_foundry_unit_economics_and_api_cost_register.sql
           psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 \
             -f ./db/migrations/verify_20261027_012_foundry_unit_economics_behavior.sql
+          for _ in 1 2; do
+            psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 \
+              -f ./db/migrations/20261027_014_cint_finops_fk_index_hardening.sql
+          done

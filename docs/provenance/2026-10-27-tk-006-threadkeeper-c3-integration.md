@@ -113,6 +113,16 @@ C3 acceptance exposed a durability gap: MCTRL validated the accepted C2 evidence
 
 MCTRL run `40569736198` passed on head `f36db53f2edd2f83e9fa19f62b8198d863f59c5a`. Its maintenance-control job explicitly passed both new C3 steps as well as the existing C2 evidence validation/fail-closed tests. This is the evidence bound to C3-16.
 
+## Late pre-promotion regression and fixture hardening
+
+The final pre-promotion regression wave on head `c252c72b76e2661c630f9ee308b60d91ba66e3d3` correctly blocked promotion when TK-004 run `40570074244` failed.
+
+The failure was isolated to `threadkeeper-competitive-proofs.integration.test.mjs`. All ThreadKeeper migration, idempotence, scope-integrity, foreign-key indexing, immutability, concurrency, C2 gap, repository, and service assertions passed before that final competitive-proof test failed with `stale_checkpoint`.
+
+The same TK-004 suite had passed on run `40569736396`, and no ThreadKeeper runtime or persistence code changed between that successful head and the later provenance-only head. Inspection found the competitive fixture used `process.pid` as part of the durable semantic scope and all proof identity keys. Short-lived Node processes may reuse a PID, so the fixture could alias previously created proof state inside the same isolated database and make its locally created checkpoint B legitimately stale.
+
+The repair does not weaken stale-state rejection. Commit `21919df154366872ee76e47bae3110d1803a1c72` replaces `process.pid` fixture identity with a cryptographically random `randomUUID()` per proof invocation and uses that value consistently for the semantic scope, proposals, observation, assessment, case, and transition keys. Promotion remains blocked until the repaired exact head re-proves TK-004, TK-006, aggregate CI, and hardened MCTRL.
+
 ## Current evidence matrix state
 
 `config/threadkeeper-c3-evidence.v1.json` contains 29 governed items:
@@ -156,9 +166,10 @@ The sequence remains fail-closed:
 5. freshness-reconcile concurrent main work without overwriting another lane;
 6. reconcile Canonical Development Evidence and governed projections while keeping C2 canonical;
 7. harden and pass post-change MCTRL with both C2 and C3 evidence contracts enforced;
-8. only if the final pre-promotion head remains current and green, append the explicit C2 Implemented -> C3 Integrated promotion journal;
-9. update the matrix to promotion-ready C3 and rerun exact-head gates;
-10. merge only while the verified head remains current;
-11. require post-merge main MCTRL and bounded live Test audit before acceptance closure.
+8. close any late regression by repairing only the demonstrated defect and re-running the exact-head gates;
+9. only if the final pre-promotion head remains current and green, append the explicit C2 Implemented -> C3 Integrated promotion journal;
+10. update the matrix to promotion-ready C3 and rerun exact-head gates;
+11. merge only while the verified head remains current;
+12. require post-merge main MCTRL and bounded live Test audit before acceptance closure.
 
 No single test, commit, migration, document, or projection is sufficient to establish C3 by itself. Production activation remains false and C4 Operational is a separate future gate.

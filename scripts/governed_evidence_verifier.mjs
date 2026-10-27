@@ -39,9 +39,12 @@ export function loadEvidenceBindings(root) {
   return loadJson(root, 'config/governed-evidence-bindings.v1.json');
 }
 
-function laneBinding(root, lane) {
+function laneBinding(root, lane, implementationCommit = null) {
   const bindings = loadEvidenceBindings(root);
-  return { bindings, laneBinding: bindings.lanes?.[lane] ?? null };
+  const direct = bindings.lanes?.[lane] ?? null;
+  const inferred = direct ?? Object.values(bindings.lanes ?? {})
+    .find((candidate) => implementationCommit && candidate?.implementationCommit === implementationCommit) ?? null;
+  return { bindings, laneBinding: inferred };
 }
 
 function validateRunBinding(ownerId, runId, binding, implementationCommit, errors) {
@@ -78,7 +81,7 @@ export function validateEvidenceItems(ownerId, evidence, root, errors, options =
   let currentLaneBinding = null;
 
   try {
-    currentLaneBinding = laneBinding(root, lane).laneBinding;
+    currentLaneBinding = laneBinding(root, lane, implementationCommit).laneBinding;
   } catch (error) {
     errors.push(`${ownerId}: unable to load governed evidence bindings: ${error.message}`);
   }
@@ -157,7 +160,7 @@ export function validateExternalEvidenceContract(matrix, root, errors) {
   let bindings;
   let currentLaneBinding;
   try {
-    ({ bindings, laneBinding: currentLaneBinding } = laneBinding(root, matrix.lane));
+    ({ bindings, laneBinding: currentLaneBinding } = laneBinding(root, matrix.lane, matrix.implementationCommit));
   } catch (error) {
     errors.push(`unable to load governed external evidence bindings: ${error.message}`);
     return;
@@ -292,7 +295,7 @@ export async function verifyGitHubRunReferences(matrix, options = {}) {
   let bindings;
   let currentLaneBinding;
   try {
-    ({ bindings, laneBinding: currentLaneBinding } = laneBinding(options.repoRoot ?? process.cwd(), matrix.lane));
+    ({ bindings, laneBinding: currentLaneBinding } = laneBinding(options.repoRoot ?? process.cwd(), matrix.lane, matrix.implementationCommit));
   } catch (error) {
     return [`unable to load governed external evidence bindings: ${error.message}`];
   }

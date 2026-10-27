@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+// The C3 service contract exercises only reference/reader/observability behavior.
+// Satisfy server config parsing with an unreachable local sentinel. If this test
+// ever performs database I/O accidentally, the connection must fail closed.
+process.env.DATABASE_URL ??= 'postgres://invalid:invalid@127.0.0.1:1/tk006_unit_no_db';
+
 const {
   CONVERSATION_HISTORY_EVIDENCE_KIND,
   CONVERSATION_HISTORY_EVIDENCE_VERSION,

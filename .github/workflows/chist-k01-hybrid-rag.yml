@@ -4,7 +4,9 @@ on:
   pull_request:
     paths:
       - 'db/migrations/20261026_013_conversation_history_hybrid_rag.sql'
+      - 'db/migrations/20261026_014_conversation_history_hybrid_rag_linked_mutation_hardening.sql'
       - 'scripts/test_chist_k01_hybrid_rag.sh'
+      - 'scripts/test_chist_k01_linked_mutation_hardening.sh'
       - 'docs/architecture/chist-k01-hybrid-rag.md'
       - '.github/workflows/chist-k01-hybrid-rag.yml'
       - 'db/sql/v2/03_schema_graph_rag.sql'
@@ -68,5 +70,5 @@ jobs:
         working-directory: server
         run: npm ci
 
-      - name: Run CHIST-K01 isolated acceptance
-        run: bash scripts/test_chist_k01_hybrid_rag.sh
+      - name: Run CHIST-K01 isolated acceptance and linked-only immutability hardening
+        run: bash scripts/test_chist_k01_linked_mutation_hardening.sh

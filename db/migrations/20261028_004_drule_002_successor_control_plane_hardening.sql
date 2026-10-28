@@ -1,5 +1,10 @@
 BEGIN;
 
+CREATE INDEX IF NOT EXISTS pm_data_assets_residency_idx ON comind_pm.pm_data_asset_governance(residency_profile_id);
+CREATE INDEX IF NOT EXISTS pm_data_assets_retention_idx ON comind_pm.pm_data_asset_governance(retention_profile_id);
+CREATE INDEX IF NOT EXISTS pm_gov_runtime_project_idx ON comind_pm.pm_governance_runtime_decisions(project_id);
+CREATE INDEX IF NOT EXISTS pm_gov_runtime_exception_idx ON comind_pm.pm_governance_runtime_decisions(exception_id);
+
 DO $$
 DECLARE t text;
 BEGIN

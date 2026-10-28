@@ -12,6 +12,7 @@ import {
   validateThreadKeeperC2Matrix,
 } from '../../scripts/threadkeeper_c2_matrix.mjs';
 import { loadThreadKeeperC3Matrix } from '../../scripts/threadkeeper_c3_matrix.mjs';
+import { loadThreadKeeperC4Matrix } from '../../scripts/threadkeeper_c4_matrix.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -54,6 +55,7 @@ function bindingFetch({ mutate = () => {} } = {}) {
 for (const [name, loadMatrix] of [
   ['C2', loadThreadKeeperC2Matrix],
   ['C3', loadThreadKeeperC3Matrix],
+  ['C4', loadThreadKeeperC4Matrix],
 ]) {
   test(`${name} live external evidence accepts only exact governed run facts`, async () => {
     const errors = await verifyGitHubRunReferences(loadMatrix(), {
@@ -133,6 +135,19 @@ test('wrong workflow and event cannot satisfy governed GitHub evidence', async (
   });
   assert.ok(errors.some((message) => message.includes('workflow mismatch')), errors.join('\n'));
   assert.ok(errors.some((message) => message.includes('event mismatch')), errors.join('\n'));
+});
+
+test('C4 retained live run cannot satisfy evidence if its exact workflow fact changes', async () => {
+  const errors = await verifyGitHubRunReferences(loadThreadKeeperC4Matrix(), {
+    repoRoot,
+    token: 'unit-test-token',
+    fetchImpl: bindingFetch({
+      mutate(run, runId) {
+        if (runId === 40594328128) run.path = '.github/workflows/ci.yml';
+      },
+    }),
+  });
+  assert.ok(errors.some((message) => message.includes('workflow mismatch')), errors.join('\n'));
 });
 
 test('live GitHub verification refuses to run without explicit read token', async () => {

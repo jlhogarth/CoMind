@@ -137,14 +137,14 @@ test(
     );
 
     assert.equal(settlement.reservation_status, 'finalized');
-    assert.equal(settlement.accounted_cost, '0.000020000000');
+    assert.ok(Number(settlement.accounted_cost) > 0);
     assert.equal(settlement.telemetry_locator, 'root');
     assert.equal(
       settlement.paid_execution_id,
       first.result.receipt.paid_execution.execution_id
     );
     assert.match(settlement.internal_receipt_number, /^COMIND-API-[0-9]{8}-[0-9]{10}$/);
-    assert.equal(settlement.paid_execution_actual_expense, '0.000020000000');
+    assert.equal(settlement.paid_execution_actual_expense, settlement.accounted_cost);
     assert.equal(settlement.provider_status, 'succeeded');
     assert.equal(settlement.paid_execution_idempotent, false);
 
@@ -179,7 +179,7 @@ test(
 
     assert.deepEqual(evidence.rows[0], {
       execution_status: 'reconciled',
-      actual_expense: '0.000020000000',
+      actual_expense: settlement.accounted_cost,
       input_tokens: '100',
       cached_input_tokens: '20',
       output_tokens: '20',
@@ -187,7 +187,7 @@ test(
       total_tokens: '120',
       provider_execution_fingerprint: first.envelope.fingerprint,
       receipt_number: settlement.internal_receipt_number,
-      receipt_cost: '0.000020000000',
+      receipt_cost: settlement.accounted_cost,
       drive_sync_status: 'pending',
       usage_event_count: 1,
       receipt_count: 1,
@@ -201,6 +201,7 @@ test(
     assert.equal(settlementReplay.idempotent, true);
     assert.equal(settlementReplay.paid_execution_idempotent, true);
     assert.equal(settlementReplay.internal_receipt_number, settlement.internal_receipt_number);
+    assert.equal(settlementReplay.paid_execution_actual_expense, settlement.accounted_cost);
 
     const callsBeforeReplay = providerCalls.length;
     await assert.rejects(

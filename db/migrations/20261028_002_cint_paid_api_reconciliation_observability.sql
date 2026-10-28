@@ -39,7 +39,7 @@ SELECT
     e.execution_id,
     e.proposal_id,
     p.project_id,
-    e.budget_authority_binding_id,
+    e.binding_id,
     e.reservation_id,
     e.routing_decision_id,
     e.foundry_execution_context_id,

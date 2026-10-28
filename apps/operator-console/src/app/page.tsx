@@ -24,14 +24,14 @@ export default function Home() {
       <aside className="sidebar">
         <div className="brand">CoMind</div>
         <div className="product">Operator Console</div>
-        <div className="status">OC-001 foundation</div>
+        <div className="status">Governed Test operations</div>
       </aside>
       <section className="content">
         <p className="eyebrow">Governed relational operations</p>
-        <h1>Inspect the structure before changing the system.</h1>
+        <h1>Inspect the structure and control state before changing the system.</h1>
         <p className="lede">
-          OC-001 establishes the schema-driven foundation. Live schema mutation, destructive operations,
-          and privileged browser access remain outside this milestone.
+          The Operator Console exposes bounded Test views for operational activity and RuleBook control health.
+          Privileged browser access, raw governance evidence, sensitive runtime context, and destructive operations remain outside these views.
         </p>
         <div className="cards">
           {foundations.map(({ title, detail, icon: Icon }) => (
@@ -42,7 +42,10 @@ export default function Home() {
             </article>
           ))}
         </div>
-        <a className="activity-launch" href="/activity">Open Activity HUD</a>
+        <div className="hud-heading-actions">
+          <a className="activity-launch" href="/activity">Open Activity HUD</a>
+          <a className="activity-launch" href="/rulebook">Open RuleBook HUD</a>
+        </div>
       </section>
     </main>
   );

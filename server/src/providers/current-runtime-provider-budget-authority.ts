@@ -22,6 +22,12 @@ export interface CurrentRuntimeMessageSettlementResult {
   readonly accounted_cost: string | null;
   readonly idempotent: boolean;
   readonly telemetry_locator: string;
+  readonly paid_execution_id?: string;
+  readonly internal_receipt_id?: string;
+  readonly internal_receipt_number?: string;
+  readonly paid_execution_actual_expense?: string;
+  readonly provider_status?: string;
+  readonly paid_execution_idempotent?: boolean;
 }
 
 interface RuntimeSettlementRow {
@@ -29,6 +35,16 @@ interface RuntimeSettlementRow {
   usage_event_id: string | null;
   reservation_status: string;
   accounted_cost: string | null;
+  idempotent: boolean;
+}
+
+interface RuntimePaidReconciliationRow {
+  execution_id: string;
+  usage_event_id: string | null;
+  receipt_id: string;
+  receipt_number: string;
+  actual_expense: string;
+  provider_status: string;
   idempotent: boolean;
 }
 
@@ -171,13 +187,67 @@ export class CurrentRuntimeProviderBudgetAuthority implements GovernedProviderBu
       throw new Error('Current runtime provider settlement returned malformed authority data');
     }
 
-    return Object.freeze({
+    const baseResult = {
       reservation_id: row.reservation_id,
       usage_event_id: row.usage_event_id,
       reservation_status: row.reservation_status,
       accounted_cost: row.accounted_cost,
       idempotent: row.idempotent,
       telemetry_locator: telemetryLocator,
+    } as const;
+
+    if (!receipt.paid_execution) {
+      return Object.freeze(baseResult);
+    }
+
+    requiredText(receipt.paid_execution.execution_id, 'paid execution id');
+    const paidResult = await this.queryFn<RuntimePaidReconciliationRow>(
+      `SELECT
+         execution_id::text AS execution_id,
+         usage_event_id::text AS usage_event_id,
+         receipt_id::text AS receipt_id,
+         receipt_number,
+         actual_expense::text AS actual_expense,
+         provider_status,
+         idempotent
+       FROM comind.cm_reconcile_paid_api_execution_from_message(
+         $1::uuid,
+         $2::uuid,
+         $3::text
+       )`,
+      [receipt.paid_execution.execution_id, messageId, telemetryLocator]
+    );
+
+    if (paidResult.rows.length !== 1) {
+      throw new Error('Paid API reconciliation returned an ambiguous row count');
+    }
+    const paidRow = paidResult.rows[0];
+    if (paidRow.execution_id !== receipt.paid_execution.execution_id) {
+      throw new Error('Paid API reconciliation returned a conflicting execution identity');
+    }
+    if (
+      row.usage_event_id !== null &&
+      paidRow.usage_event_id !== null &&
+      paidRow.usage_event_id !== row.usage_event_id
+    ) {
+      throw new Error('Paid API reconciliation returned a conflicting FinOps usage identity');
+    }
+    requiredText(paidRow.receipt_id, 'internal API receipt id');
+    requiredText(paidRow.receipt_number, 'internal API receipt number');
+    requiredText(paidRow.actual_expense, 'paid execution actual expense');
+    requiredText(paidRow.provider_status, 'paid execution provider status');
+    if (typeof paidRow.idempotent !== 'boolean') {
+      throw new Error('Paid API reconciliation returned malformed idempotency data');
+    }
+
+    return Object.freeze({
+      ...baseResult,
+      paid_execution_id: paidRow.execution_id,
+      internal_receipt_id: paidRow.receipt_id,
+      internal_receipt_number: paidRow.receipt_number,
+      paid_execution_actual_expense: paidRow.actual_expense,
+      provider_status: paidRow.provider_status,
+      paid_execution_idempotent: paidRow.idempotent,
     });
   }
 }

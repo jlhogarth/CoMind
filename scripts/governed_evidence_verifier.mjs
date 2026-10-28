@@ -195,11 +195,12 @@ export function validateExternalEvidenceContract(matrix, root, errors) {
   } else {
     let laneGateFound = false;
     let maintenanceFound = false;
+    const laneWorkflowToken = matrix.lane.toLowerCase();
     for (const runId of finalAcceptanceRunIds) {
       const binding = currentLaneBinding.githubRuns?.[String(runId)];
       validateRunBinding('final acceptance', runId, binding, matrix.implementationCommit, errors);
       if (binding?.historical === true) errors.push(`${matrix.lane}: final acceptance run ${runId} cannot be marked historical`);
-      if (binding?.workflowPath?.includes(matrix.lane === 'TK-005' ? 'tk-005' : 'tk-006')) laneGateFound = true;
+      if (binding?.workflowPath?.includes(laneWorkflowToken)) laneGateFound = true;
       if (binding?.workflowPath === '.github/workflows/mctrl-001-maintenance-control.yml') maintenanceFound = true;
     }
     if (!laneGateFound) errors.push(`${matrix.lane}: final acceptance bindings must include the lane evidence workflow`);

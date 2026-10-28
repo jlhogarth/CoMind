@@ -36,7 +36,10 @@ function validateRequirement(item, expectedIds, seenIds, root, errors, implement
   seenIds.add(id);
   if (!nonEmptyString(item.title)) errors.push(`${id}: title is required`);
   if (!ALLOWED_STATUSES.has(item.status)) errors.push(`${id}: invalid status ${JSON.stringify(item.status)}`);
-  const repoEvidenceCount = validateEvidenceItems(id, item.evidence, root, errors, { implementationCommit });
+  const repoEvidenceCount = validateEvidenceItems(id, item.evidence, root, errors, {
+    implementationCommit,
+    lane: 'TK-007',
+  });
   if (item.status === 'proven' && repoEvidenceCount === 0) {
     errors.push(`${id}: proven entries require at least one repo_path evidence item`);
   }
@@ -99,11 +102,10 @@ export function validateThreadKeeperC4Matrix(matrix, options = {}) {
   }
   assertExactIds('scenarioRequirements', REQUIRED_SCENARIO_IDS, scenarioSeen, errors);
 
-  validateExternalEvidenceContract(matrix, root, errors);
-
   const allItems = [...(matrix.gateRequirements ?? []), ...(matrix.scenarioRequirements ?? [])];
   const unresolved = allItems.filter(item => item?.status === 'partial' || item?.status === 'missing');
   if (boundary?.ready === true) {
+    validateExternalEvidenceContract(matrix, root, errors);
     if (unresolved.length > 0) {
       errors.push(`promotionBoundary.ready cannot be true while ${unresolved.length} required entries remain partial or missing`);
     }

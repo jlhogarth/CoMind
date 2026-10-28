@@ -1,5 +1,6 @@
 import { AssistantResponseRequest, ConversationMessage } from '../assistant.js';
 import {
+  GovernedPaidExecutionLedger,
   GovernedProviderBudgetAuthority,
   GovernedProviderExecutionResult,
   executeGovernedProviderExecution,
@@ -168,7 +169,8 @@ export function executeGovernedOpenAIProviderExecutionEnvelope<TResponse>(
   responses: OpenAIResponseCreateClient<TResponse>,
   envelope: OpenAIProviderExecutionEnvelope,
   inputTokenCounter: ProviderInputTokenCounter<OpenAIResponseCreateRequest>,
-  budgetAuthority: GovernedProviderBudgetAuthority
+  budgetAuthority: GovernedProviderBudgetAuthority,
+  paidExecutionLedger: GovernedPaidExecutionLedger
 ): Promise<GovernedProviderExecutionResult<TResponse, OpenAIProviderExposureQuote>> {
   return executeGovernedProviderExecution({
     envelope,
@@ -177,6 +179,8 @@ export function executeGovernedOpenAIProviderExecutionEnvelope<TResponse>(
       quoteExposure: quoteOpenAIExecutionEnvelopeExposure,
     },
     budgetAuthority,
+    paidExecutionLedger,
+    requestedToolCalls: 0,
     operationName: 'responses.create',
     execute: (executionEnvelope) =>
       executeOpenAIProviderExecutionEnvelope(responses, executionEnvelope),
@@ -187,7 +191,8 @@ export function executeGovernedOpenAIProviderStreamingEnvelope<TStream>(
   responses: OpenAIResponseStreamingClient<TStream>,
   envelope: OpenAIProviderExecutionEnvelope,
   inputTokenCounter: ProviderInputTokenCounter<OpenAIResponseCreateRequest>,
-  budgetAuthority: GovernedProviderBudgetAuthority
+  budgetAuthority: GovernedProviderBudgetAuthority,
+  paidExecutionLedger: GovernedPaidExecutionLedger
 ): Promise<GovernedProviderExecutionResult<TStream, OpenAIProviderExposureQuote>> {
   return executeGovernedProviderExecution({
     envelope,
@@ -196,6 +201,8 @@ export function executeGovernedOpenAIProviderStreamingEnvelope<TStream>(
       quoteExposure: quoteOpenAIExecutionEnvelopeExposure,
     },
     budgetAuthority,
+    paidExecutionLedger,
+    requestedToolCalls: 0,
     operationName: 'responses.create',
     execute: (executionEnvelope) =>
       executeOpenAIProviderStreamingEnvelope(responses, executionEnvelope),

@@ -64,6 +64,14 @@ done
 psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
   -f "${repository_root}/db/migrations/verify_20261028_001_cint_paid_api_runtime_bridge.sql"
 
+printf 'Applying CINT-FINOPS-003 reconciliation observability twice to prove replay safety...\n'
+for _ in 1 2; do
+  psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
+    -f "${repository_root}/db/migrations/20261028_002_cint_paid_api_reconciliation_observability.sql"
+done
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
+  -f "${repository_root}/db/migrations/verify_20261028_002_cint_paid_api_reconciliation_observability.sql"
+
 printf 'Building server TypeScript...\n'
 (
   cd "${repository_root}/server"
@@ -221,12 +229,15 @@ final_counts="$(psql "${DATABASE_URL}" -X -Atq -F '|' -v ON_ERROR_STOP=1 -c "
     (SELECT count(*)
        FROM comind.cm_unattributed_paid_usage_v u
        JOIN public.comind_cost_reservations cr ON cr.id=u.reservation_id
-      WHERE cr.envelope_id=${envelope_id});
+      WHERE cr.envelope_id=${envelope_id}),
+    (SELECT count(*)
+       FROM comind.cm_paid_api_reconciliation_pending_v p
+      WHERE p.proposal_id='${proposal_id}'::uuid);
 ")"
 
-if [[ "${final_counts}" != "1|1|0" ]]; then
+if [[ "${final_counts}" != "1|1|0|0" ]]; then
   echo "CINT-FINOPS-003 final evidence mismatch: ${final_counts}" >&2
   exit 1
 fi
 
-printf 'CINT-FINOPS-003 isolated provider runtime bridge verification passed: executions|receipts|unattributed=%s\n' "${final_counts}"
+printf 'CINT-FINOPS-003 isolated provider runtime bridge verification passed: executions|receipts|unattributed|pending=%s\n' "${final_counts}"

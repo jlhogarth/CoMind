@@ -108,6 +108,21 @@
           "mctrlControlId": "MCTRL-JOURNAL-TK-C3-PROMOTION"
         }
       }
+    },
+    "TK-007": {
+      "issue": 272,
+      "implementationCommit": "a48baa290baef792d614c788961ab99966b3efac",
+      "githubRuns": {
+        "40594328128": {
+          "workflowPath": ".github/workflows/tk-007-threadkeeper-c4.yml",
+          "expectedHeadSha": "a48baa290baef792d614c788961ab99966b3efac",
+          "event": "push",
+          "conclusion": "success",
+          "bindsImplementation": true
+        }
+      },
+      "finalAcceptanceRunIds": [],
+      "cdeKeys": {}
     }
   }
 }

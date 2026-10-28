@@ -13,12 +13,16 @@ if p.scheme not in ('postgres','postgresql') or p.hostname not in ('localhost','
     raise SystemExit(2)
 PY
 
+node "${root}/scripts/threadkeeper_c4_matrix.mjs"
+
 # The C3 compatibility regression now bootstraps and verifies the current
 # ThreadKeeper runtime schema before exercising current repository code.
 bash "${root}/scripts/test_threadkeeper_c3.sh"
 
 (
   cd "${root}/server"
+  node --test test/threadkeeper-c4-evidence.test.mjs
+
   THREADKEEPER_C4_DB_TEST=1 \
   node --test test/threadkeeper-c4-runtime-role.test.mjs
 
@@ -29,4 +33,4 @@ bash "${root}/scripts/test_threadkeeper_c3.sh"
   node --test test/threadkeeper-c4-operational.integration.test.mjs
 )
 
-echo 'TK-007 isolated operational, least-privilege, authority, failure, recovery, and observability proof: PASS'
+echo 'TK-007 isolated evidence-gate, operational, least-privilege, authority, failure, recovery, and observability proof: PASS'

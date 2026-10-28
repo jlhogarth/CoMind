@@ -1,6 +1,13 @@
 name: CINT-GOV-001 Paid API and Project Registry
 
 on:
+  # Branch-scoped push is retained for exact-head verification while this feature
+  # branch is active. Connector-originated PR branch updates have not reliably
+  # produced pull_request runs, so this prevents an evidence gap without adding
+  # post-merge main-branch CI load.
+  push:
+    branches:
+      - 'cint-gov-001-paid-api-project-registry'
   pull_request:
     paths:
       - '.github/workflows/cint-gov-001-paid-api-project-registry.yml'

@@ -87,7 +87,17 @@ test('isolated PostgreSQL ThreadKeeper persistence preserves governed lineage, e
           AND c.relname LIKE 'cm_threadkeeper_%'
         ORDER BY c.relname`
     );
-    assert.equal(rls.rows.length, 5);
+    assert.deepEqual(
+      rls.rows.map(row => row.relname),
+      [
+        'cm_threadkeeper_assessment',
+        'cm_threadkeeper_case',
+        'cm_threadkeeper_case_transition',
+        'cm_threadkeeper_checkpoint',
+        'cm_threadkeeper_operation_event',
+        'cm_threadkeeper_scope',
+      ]
+    );
     assert.ok(rls.rows.every(row => row.relrowsecurity === true));
 
     const privileges = await query(

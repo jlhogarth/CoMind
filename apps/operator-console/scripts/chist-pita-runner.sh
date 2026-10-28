@@ -9,6 +9,7 @@ WORK="/tmp/comind-chist-pita"
 CHUNKS="$WORK/chunks"
 ZIP="$WORK/openai-export.zip"
 ENC="$WORK/openai-export.enc"
+EXPECTED_DB_USER="comind_archive_ingest_login.sbgfuanxiqepcoboxzcl"
 
 CANONICAL_BYTES="535654634"
 CANONICAL_SHA256="125f79141e7aa8c046e6c8f3c6a12c0dd5507ec4f58d261af697fa62fdf87b2e"
@@ -45,6 +46,28 @@ done
 
 rm -rf "$WORK"
 mkdir -p "$CHUNKS"
+
+cd "$SERVER_ROOT"
+echo "CHIST PIT-A: installing governed archive server dependencies"
+npm ci --include=dev --no-audit --no-fund
+echo "CHIST PIT-A: compiling governed archive server"
+npm run build
+
+# Vercel keeps the URI write-only. Normalize only its username in-process so the
+# protected password is never read back, logged, committed, or copied elsewhere.
+export CHATGPT_ARCHIVE_DATABASE_URL="$(node -e '
+const raw = process.env.CHATGPT_ARCHIVE_DATABASE_URL;
+const expected = process.argv[1];
+const u = new URL(raw);
+if (!u.hostname.endsWith(".pooler.supabase.com")) throw new Error("archive URL is not a Supabase pooler endpoint");
+if (u.port !== "5432") throw new Error("archive URL must use Session pooler port 5432");
+u.username = expected;
+process.stdout.write(u.toString());
+' "$EXPECTED_DB_USER")"
+
+echo "CHIST PIT-A: running governed database preflight"
+node dist/archive/chatgpt-export-cli.js --preflight > "$WORK/preflight.json"
+node -e "const r=require(process.argv[1]); console.log(JSON.stringify({status:r.status,databaseName:r.databaseName,sessionUser:r.sessionUser,currentUser:r.currentUser}))" "$WORK/preflight.json"
 
 echo "CHIST PIT-A: acquiring encrypted source chunks concurrently"
 pids=()
@@ -92,16 +115,6 @@ fi
 unzip -tqq "$ZIP"
 echo "CHIST PIT-A: canonical source PASS bytes=$bytes sha256=$sha"
 
-cd "$SERVER_ROOT"
-echo "CHIST PIT-A: installing governed archive server dependencies"
-npm ci --include=dev --no-audit --no-fund
-echo "CHIST PIT-A: compiling governed archive server"
-npm run build
-
-echo "CHIST PIT-A: running governed database preflight"
-node dist/archive/chatgpt-export-cli.js --preflight > "$WORK/preflight.json"
-node -e "const r=require(process.argv[1]); console.log(JSON.stringify({status:r.status,databaseName:r.databaseName,sessionUser:r.sessionUser,currentUser:r.currentUser}))" "$WORK/preflight.json"
-
 echo "CHIST PIT-A: beginning first real governed baseline ingestion"
 started="$(date +%s)"
 node dist/archive/chatgpt-export-cli.js "$ZIP" > "$WORK/import.json"
@@ -109,11 +122,8 @@ elapsed="$(( $(date +%s) - started ))"
 node -e "const r=require(process.argv[1]); console.log(JSON.stringify({status:r.status,importId:r.importId,sourceArchiveId:r.sourceArchiveId,receiptSha256:r.receiptSha256,reused:r.reused}))" "$WORK/import.json"
 echo "CHIST PIT-A: first ingest process elapsed_seconds=$elapsed"
 
-# Private source and result files are not deployment artifacts.
 rm -f "$ZIP" "$WORK/import.json" "$WORK/preflight.json"
-
 echo "CHIST PIT-A: ingestion stage complete; independent reconciliation is still required before certification"
 
 cd "$APP_ROOT"
-# Produce the ordinary Preview deployment output so Vercel can close the one-shot build cleanly.
 npx next build

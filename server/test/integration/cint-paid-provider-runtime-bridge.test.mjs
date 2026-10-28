@@ -176,7 +176,10 @@ test(
            WHERE r.execution_id = e.execution_id) AS receipt_count,
          (SELECT COUNT(*)::int
             FROM comind.cm_unattributed_paid_usage_v x
-           WHERE x.reservation_id = e.reservation_id) AS unattributed_count
+           WHERE x.reservation_id = e.reservation_id) AS unattributed_count,
+         (SELECT COUNT(*)::int
+            FROM comind.cm_paid_api_reconciliation_pending_v x
+           WHERE x.execution_id = e.execution_id) AS reconciliation_pending_count
        FROM comind.cm_paid_api_execution e
        JOIN public.comind_cost_reservations cr ON cr.id = e.reservation_id
        WHERE e.execution_id = $1::uuid`,
@@ -189,7 +192,8 @@ test(
     assert.equal(interruptedEvidence.rows[0].execution_status, 'running');
     assert.equal(interruptedEvidence.rows[0].usage_event_count, 1);
     assert.equal(interruptedEvidence.rows[0].receipt_count, 0);
-    assert.equal(interruptedEvidence.rows[0].unattributed_count, 1);
+    assert.equal(interruptedEvidence.rows[0].unattributed_count, 0);
+    assert.equal(interruptedEvidence.rows[0].reconciliation_pending_count, 1);
 
     const callsBeforeRecovery = providerCalls.length;
     const settlement = await first.budgetAuthority.settlePersistedMessageExecution(
@@ -237,7 +241,10 @@ test(
            WHERE rr.execution_id = e.execution_id) AS receipt_count,
          (SELECT COUNT(*)::int
             FROM comind.cm_unattributed_paid_usage_v x
-           WHERE x.reservation_id = e.reservation_id) AS unattributed_count
+           WHERE x.reservation_id = e.reservation_id) AS unattributed_count,
+         (SELECT COUNT(*)::int
+            FROM comind.cm_paid_api_reconciliation_pending_v x
+           WHERE x.execution_id = e.execution_id) AS reconciliation_pending_count
        FROM comind.cm_paid_api_execution e
        JOIN comind.cm_api_cost_receipt r ON r.execution_id = e.execution_id
        WHERE e.execution_id = $1::uuid`,
@@ -269,6 +276,7 @@ test(
       usage_event_count: 1,
       receipt_count: 1,
       unattributed_count: 0,
+      reconciliation_pending_count: 0,
     });
 
     const settlementReplay = await first.budgetAuthority.settlePersistedMessageExecution(
@@ -303,13 +311,17 @@ test(
             FROM public.comind_usage_events u
             JOIN comind.cm_paid_api_execution e ON e.reservation_id = u.reservation_id
            WHERE e.proposal_id = $1::uuid
-             AND u.meter_code = 'provider_execution') AS usage_event_count`,
+             AND u.meter_code = 'provider_execution') AS usage_event_count,
+         (SELECT COUNT(*)::int
+            FROM comind.cm_paid_api_reconciliation_pending_v x
+           WHERE x.proposal_id = $1::uuid) AS reconciliation_pending_count`,
       [proposalId]
     );
     assert.deepEqual(finalCounts.rows[0], {
       execution_count: 1,
       receipt_count: 1,
       usage_event_count: 1,
+      reconciliation_pending_count: 0,
     });
   }
 );

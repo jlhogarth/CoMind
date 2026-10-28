@@ -296,7 +296,7 @@ test(
     const callsBeforeReplay = providerCalls.length;
     await assert.rejects(
       executeSynthetic(providerCalls),
-      /recovery must resolve the existing attempt|request limit .* exhausted/
+      /Existing reservation is no longer spendable|recovery must resolve the existing attempt|request limit .* exhausted/
     );
     assert.equal(providerCalls.length, callsBeforeReplay);
 

@@ -1,9 +1,7 @@
 name: CINT-GOV-001 Paid API and Project Registry
 
 on:
-  # Branch-scoped push is retained for exact-head verification while this feature
-  # branch is active. Connector-originated PR branch updates have not reliably
-  # produced pull_request runs, so this prevents an evidence gap without adding
+  # Keep exact-head verification on the feature branch without adding
   # post-merge main-branch CI load.
   push:
     branches:
@@ -40,6 +38,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: cint-gov-001-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   cint-governance:

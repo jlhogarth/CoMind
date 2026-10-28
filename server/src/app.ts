@@ -18,6 +18,7 @@ import { registerChecklistRoutes } from './routes/checklist.js';
 import { registerAssistantRoutes } from './routes/assistant.js';
 import { registerMemoryRoutes } from './routes/memory.js';
 import { registerChatRoutes } from './routes/chat.js';
+import { registerGovernanceRoutes } from './routes/governance.js';
 import {
   closePool,
   ConversationLockRunner,
@@ -127,6 +128,7 @@ export async function buildApp(overrides: Partial<AppDependencies> = {}) {
   registerMemoryRoutes(app, dependencies.query, dependencies.conversationLock);
   registerAdminRoutes(app);
   registerChatRoutes(app);
+  registerGovernanceRoutes(app, dependencies.query);
 
   app.get('/', async () => ({ ok: true }));
   app.get('/health', async () => ({ ok: true, service: 'comind-api' }));

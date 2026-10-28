@@ -51,6 +51,14 @@ function options() {
   };
 }
 
+function assertSameMoney(actual, expected, label) {
+  const actualNumber = Number(actual);
+  const expectedNumber = Number(expected);
+  assert.ok(Number.isFinite(actualNumber), `${label} actual value must be numeric`);
+  assert.ok(Number.isFinite(expectedNumber), `${label} expected value must be numeric`);
+  assert.equal(actualNumber, expectedNumber, label);
+}
+
 async function executeSynthetic(providerCalls) {
   const envelope = buildOpenAIProviderExecutionEnvelope(assistantRequest(), options());
   const budgetAuthority = new CurrentRuntimeProviderBudgetAuthority(query, bindingId);
@@ -94,7 +102,7 @@ async function executeSynthetic(providerCalls) {
 }
 
 test(
-  'CINT paid runtime bridge admits before synthetic provider execution and reconciles one immutable receipt after persisted settlement',
+  'CINT paid runtime bridge preserves FinOps settlement across reconciliation failure and recovers without a second provider call or cost event',
   { skip: !fixtureAvailable },
   async () => {
     const providerCalls = [];
@@ -131,20 +139,79 @@ test(
     );
     const messageId = message.rows[0].msg_id;
 
+    let reconciliationAttempts = 0;
+    const postSettlementFailureQuery = async (text, params) => {
+      if (text.includes('cm_reconcile_paid_api_execution_from_message')) {
+        reconciliationAttempts += 1;
+        throw new Error('synthetic post-settlement CINT reconciliation outage');
+      }
+      return query(text, params);
+    };
+    const interruptedBudgetAuthority = new CurrentRuntimeProviderBudgetAuthority(
+      postSettlementFailureQuery,
+      bindingId
+    );
+
+    await assert.rejects(
+      interruptedBudgetAuthority.settlePersistedMessageExecution(
+        first.result.receipt,
+        messageId
+      ),
+      /synthetic post-settlement CINT reconciliation outage/
+    );
+    assert.equal(reconciliationAttempts, 1);
+    assert.equal(providerCalls.length, 1);
+
+    const interruptedEvidence = await query(
+      `SELECT
+         cr.status AS reservation_status,
+         cr.finalized_cost::text AS finalized_cost,
+         e.execution_status,
+         (SELECT COUNT(*)::int
+            FROM public.comind_usage_events u
+           WHERE u.reservation_id = e.reservation_id
+             AND u.meter_code = 'provider_execution') AS usage_event_count,
+         (SELECT COUNT(*)::int
+            FROM comind.cm_api_cost_receipt r
+           WHERE r.execution_id = e.execution_id) AS receipt_count,
+         (SELECT COUNT(*)::int
+            FROM comind.cm_unattributed_paid_usage_v x
+           WHERE x.reservation_id = e.reservation_id) AS unattributed_count
+       FROM comind.cm_paid_api_execution e
+       JOIN public.comind_cost_reservations cr ON cr.id = e.reservation_id
+       WHERE e.execution_id = $1::uuid`,
+      [first.result.receipt.paid_execution.execution_id]
+    );
+
+    assert.equal(interruptedEvidence.rows.length, 1);
+    assert.equal(interruptedEvidence.rows[0].reservation_status, 'finalized');
+    assert.ok(Number(interruptedEvidence.rows[0].finalized_cost) > 0);
+    assert.equal(interruptedEvidence.rows[0].execution_status, 'running');
+    assert.equal(interruptedEvidence.rows[0].usage_event_count, 1);
+    assert.equal(interruptedEvidence.rows[0].receipt_count, 0);
+    assert.equal(interruptedEvidence.rows[0].unattributed_count, 1);
+
+    const callsBeforeRecovery = providerCalls.length;
     const settlement = await first.budgetAuthority.settlePersistedMessageExecution(
       first.result.receipt,
       messageId
     );
 
+    assert.equal(providerCalls.length, callsBeforeRecovery);
     assert.equal(settlement.reservation_status, 'finalized');
     assert.ok(Number(settlement.accounted_cost) > 0);
     assert.equal(settlement.telemetry_locator, 'root');
+    assert.equal(settlement.idempotent, true);
     assert.equal(
       settlement.paid_execution_id,
       first.result.receipt.paid_execution.execution_id
     );
     assert.match(settlement.internal_receipt_number, /^COMIND-API-[0-9]{8}-[0-9]{10}$/);
-    assert.equal(settlement.paid_execution_actual_expense, settlement.accounted_cost);
+    assertSameMoney(
+      settlement.paid_execution_actual_expense,
+      settlement.accounted_cost,
+      'recovered paid execution cost must equal authoritative FinOps cost'
+    );
     assert.equal(settlement.provider_status, 'succeeded');
     assert.equal(settlement.paid_execution_idempotent, false);
 
@@ -177,9 +244,20 @@ test(
       [first.result.receipt.paid_execution.execution_id]
     );
 
-    assert.deepEqual(evidence.rows[0], {
+    const { actual_expense: actualExpense, receipt_cost: receiptCost, ...stableEvidence } =
+      evidence.rows[0];
+    assertSameMoney(
+      actualExpense,
+      settlement.accounted_cost,
+      'persisted execution cost must equal authoritative FinOps cost'
+    );
+    assertSameMoney(
+      receiptCost,
+      settlement.accounted_cost,
+      'internal receipt cost must equal authoritative FinOps cost'
+    );
+    assert.deepEqual(stableEvidence, {
       execution_status: 'reconciled',
-      actual_expense: settlement.accounted_cost,
       input_tokens: '100',
       cached_input_tokens: '20',
       output_tokens: '20',
@@ -187,7 +265,6 @@ test(
       total_tokens: '120',
       provider_execution_fingerprint: first.envelope.fingerprint,
       receipt_number: settlement.internal_receipt_number,
-      receipt_cost: settlement.accounted_cost,
       drive_sync_status: 'pending',
       usage_event_count: 1,
       receipt_count: 1,
@@ -201,7 +278,12 @@ test(
     assert.equal(settlementReplay.idempotent, true);
     assert.equal(settlementReplay.paid_execution_idempotent, true);
     assert.equal(settlementReplay.internal_receipt_number, settlement.internal_receipt_number);
-    assert.equal(settlementReplay.paid_execution_actual_expense, settlement.accounted_cost);
+    assertSameMoney(
+      settlementReplay.paid_execution_actual_expense,
+      settlement.accounted_cost,
+      'replayed reconciliation cost must remain stable'
+    );
+    assert.equal(providerCalls.length, callsBeforeRecovery);
 
     const callsBeforeReplay = providerCalls.length;
     await assert.rejects(
@@ -216,9 +298,18 @@ test(
          (SELECT COUNT(*)::int
             FROM comind.cm_api_cost_receipt r
             JOIN comind.cm_paid_api_execution e ON e.execution_id = r.execution_id
-           WHERE e.proposal_id = $1::uuid) AS receipt_count`,
+           WHERE e.proposal_id = $1::uuid) AS receipt_count,
+         (SELECT COUNT(*)::int
+            FROM public.comind_usage_events u
+            JOIN comind.cm_paid_api_execution e ON e.reservation_id = u.reservation_id
+           WHERE e.proposal_id = $1::uuid
+             AND u.meter_code = 'provider_execution') AS usage_event_count`,
       [proposalId]
     );
-    assert.deepEqual(finalCounts.rows[0], { execution_count: 1, receipt_count: 1 });
+    assert.deepEqual(finalCounts.rows[0], {
+      execution_count: 1,
+      receipt_count: 1,
+      usage_event_count: 1,
+    });
   }
 );

@@ -11,6 +11,7 @@ psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${repository_root}/db/migration
 for pass in 1 2; do
   printf 'DRULE-002 successor control-plane migration pass %s\n' "${pass}"
   psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${repository_root}/db/migrations/20261028_003_drule_002_successor_control_plane.sql"
+  psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${repository_root}/db/migrations/20261028_004_drule_002_successor_control_plane_hardening.sql"
   psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${repository_root}/db/sql/20261028_drule_002_successor_control_seed.sql"
 done
 

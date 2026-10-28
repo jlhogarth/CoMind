@@ -1,0 +1,79 @@
+name: CINT-FINOPS-003 Provider Runtime Bridge
+
+on:
+  push:
+    branches:
+      - 'cint-finops-003-provider-runtime-bridge'
+  pull_request:
+    paths:
+      - '.github/workflows/cint-finops-003-provider-runtime-bridge.yml'
+      - 'db/migrations/20261028_001_cint_paid_api_runtime_bridge.sql'
+      - 'db/migrations/verify_20261028_001_cint_paid_api_runtime_bridge.sql'
+      - 'db/migrations/20261027_008_cint_paid_api_project_registry.sql'
+      - 'db/migrations/20261027_009_cint_paid_api_project_registry_hardening.sql'
+      - 'db/migrations/20261027_010_cint_identity_reconciliation_guards.sql'
+      - 'db/migrations/20261027_011_foundry_unit_economics_and_api_cost_register.sql'
+      - 'db/migrations/20261027_012_foundry_unit_economics_fanout_hardening.sql'
+      - 'db/migrations/20261027_014_cint_finops_fk_index_hardening.sql'
+      - 'server/src/providers/governed-provider-execution.ts'
+      - 'server/src/providers/current-runtime-provider-budget-authority.ts'
+      - 'server/src/providers/current-runtime-paid-api-ledger.ts'
+      - 'server/src/providers/openai-execution.ts'
+      - 'server/test/governed-provider-paid-ledger.test.mjs'
+      - 'server/test/current-runtime-paid-api-ledger.test.mjs'
+      - 'server/test/current-runtime-paid-api-settlement.test.mjs'
+      - 'server/test/integration/cint-paid-provider-runtime-bridge.test.mjs'
+      - 'scripts/test_cint_finops_003_provider_runtime_bridge.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cint-finops-runtime-bridge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.6-pg17-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+    steps:
+      - name: Checkout exact workflow head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client python3
+      - name: Install server dependencies
+        working-directory: server
+        run: npm ci
+      - name: Verify CINT-FINOPS-003 bridge and application integration
+        run: bash ./scripts/test_cint_finops_003_provider_runtime_bridge.sh

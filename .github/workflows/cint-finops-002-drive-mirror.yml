@@ -1,0 +1,70 @@
+name: CINT-FINOPS-002 Drive Mirror
+
+on:
+  push:
+    branches:
+      - 'cint-finops-002-drive-mirror'
+  pull_request:
+    paths:
+      - '.github/workflows/cint-finops-002-drive-mirror.yml'
+      - 'db/migrations/20261028_003_cint_finops_drive_sync_leasing.sql'
+      - 'db/migrations/verify_20261028_003_cint_finops_drive_sync_leasing.sql'
+      - 'scripts/test_cint_finops_002_drive_mirror.sh'
+      - 'scripts/test_cint_finops_003_provider_runtime_bridge.sh'
+      - 'db/migrations/20261028_001_cint_paid_api_runtime_bridge.sql'
+      - 'db/migrations/20261028_002_cint_paid_api_reconciliation_observability.sql'
+      - 'db/migrations/20261027_011_foundry_unit_economics_and_api_cost_register.sql'
+      - 'db/migrations/20261027_012_foundry_unit_economics_fanout_hardening.sql'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cint-finops-drive-mirror:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.6-pg17-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+    steps:
+      - name: Checkout exact workflow head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client python3
+      - name: Install server dependencies
+        working-directory: server
+        run: npm ci
+      - name: Verify CINT-FINOPS-002 Drive mirror state machine
+        run: bash ./scripts/test_cint_finops_002_drive_mirror.sh

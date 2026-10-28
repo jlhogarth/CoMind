@@ -119,9 +119,37 @@
           "event": "push",
           "conclusion": "success",
           "bindsImplementation": true
+        },
+        "40790077208": {
+          "workflowPath": ".github/workflows/ci.yml",
+          "expectedHeadSha": "ef110bf49e5ed6909c5daddeef5f6476d0474eab",
+          "event": "pull_request",
+          "conclusion": "success",
+          "bindsImplementation": false
+        },
+        "40790281313": {
+          "workflowPath": ".github/workflows/threadkeeper-persistence.yml",
+          "expectedHeadSha": "f9cae4cbe8fd499e91a505fb47c6764647fb76b9",
+          "event": "push",
+          "conclusion": "success",
+          "bindsImplementation": false
+        },
+        "40790281352": {
+          "workflowPath": ".github/workflows/mctrl-001-maintenance-control.yml",
+          "expectedHeadSha": "f9cae4cbe8fd499e91a505fb47c6764647fb76b9",
+          "event": "push",
+          "conclusion": "success",
+          "bindsImplementation": false
+        },
+        "40790281404": {
+          "workflowPath": ".github/workflows/tk-007-threadkeeper-c4.yml",
+          "expectedHeadSha": "f9cae4cbe8fd499e91a505fb47c6764647fb76b9",
+          "event": "push",
+          "conclusion": "success",
+          "bindsImplementation": false
         }
       },
-      "finalAcceptanceRunIds": [],
+      "finalAcceptanceRunIds": [40790281404, 40790281352],
       "cdeKeys": {}
     }
   }

@@ -46,11 +46,20 @@ done
 rm -rf "$WORK"
 mkdir -p "$CHUNKS"
 
-echo "CHIST PIT-A: acquiring encrypted source chunks"
+echo "CHIST PIT-A: acquiring encrypted source chunks concurrently"
+pids=()
 for i in $(seq -w 0 10); do
   var="CHIST_PITA_URL_${i}"
   out="$CHUNKS/part-${i}"
-  curl --fail --location --silent --show-error --retry 2 --retry-all-errors "${!var}" -o "$out"
+  curl --fail --location --silent --show-error --retry 2 --retry-all-errors "${!var}" -o "$out" &
+  pids+=("$!")
+done
+for pid in "${pids[@]}"; do
+  wait "$pid"
+done
+
+for i in $(seq -w 0 10); do
+  out="$CHUNKS/part-${i}"
   index=$((10#$i))
   got="$(sha256sum "$out" | awk '{print $1}')"
   if [[ "$got" != "${PART_HASHES[$index]}" ]]; then
@@ -85,8 +94,9 @@ echo "CHIST PIT-A: canonical source PASS bytes=$bytes sha256=$sha"
 
 cd "$SERVER_ROOT"
 echo "CHIST PIT-A: installing governed archive server dependencies"
-npm ci --no-audit --no-fund >/dev/null
-npm run build >/dev/null
+npm ci --include=dev --no-audit --no-fund
+echo "CHIST PIT-A: compiling governed archive server"
+npm run build
 
 echo "CHIST PIT-A: running governed database preflight"
 node dist/archive/chatgpt-export-cli.js --preflight > "$WORK/preflight.json"

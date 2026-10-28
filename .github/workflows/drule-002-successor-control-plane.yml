@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/drule-002-successor-control-plane.yml'
       - 'db/migrations/20261028_003_drule_002_successor_control_plane.sql'
+      - 'db/migrations/20261028_004_drule_002_successor_control_plane_hardening.sql'
       - 'db/sql/20261028_drule_002_successor_control_seed.sql'
       - 'db/sql/20261028_drule_002_successor_control_test_runtime.sql'
       - 'db/verification/20261028_drule_002_successor_control_plane_verification.sql'

@@ -90,6 +90,7 @@ export type ContinuityPreconditionStatus =
   | 'valid'
   | 'invalid'
   | 'integrity_mismatch'
+  | 'handoff_integrity_mismatch'
   | 'expired'
   | 'scope_mismatch'
   | 'stale_checkpoint'
@@ -157,18 +158,22 @@ function normalizeTimestamp(value: string, field: string): string {
   return new Date(parsed).toISOString();
 }
 
-function normalizeReferences(values: readonly string[], field: string): string[] {
+function validateOrderedReferences(values: readonly string[], field: string): string[] {
   if (!Array.isArray(values) || values.length > MAX_REFERENCE_COUNT) {
     throw new Error(`Invalid ${field}`);
   }
-  const normalized = values.map((value, index) => {
+  const validated = values.map((value, index) => {
     boundedString(value, `${field}[${index}]`);
     return value;
   });
-  if (new Set(normalized).size !== normalized.length) {
+  if (new Set(validated).size !== validated.length) {
     throw new Error(`Duplicate ${field}`);
   }
-  return [...normalized].sort();
+  return [...validated];
+}
+
+function normalizeReferences(values: readonly string[], field: string): string[] {
+  return validateOrderedReferences(values, field).sort();
 }
 
 function assertSha256(value: string, field: string): void {
@@ -226,27 +231,79 @@ function sameOrderedValues(left: readonly string[], right: readonly string[]): b
   return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
+function canonicalHandoffContinuity(handoff: ContinuityHandoffEnvelope) {
+  return {
+    version: handoff.version,
+    scopeSemanticKey: handoff.scopeSemanticKey,
+    currentCheckpoint: handoff.currentCheckpoint,
+    lineage: handoff.lineage,
+    unresolvedCases: handoff.unresolvedCases,
+  };
+}
+
+export function verifyContinuityHandoffDigest(handoff: ContinuityHandoffEnvelope): boolean {
+  try {
+    if (!handoff || handoff.version !== 'continuity-handoff-v1') return false;
+    boundedString(handoff.scopeSemanticKey, 'continuity handoff scope semantic key', 256);
+    boundedString(handoff.currentCheckpoint.checkpointId, 'continuity handoff checkpoint id', 128);
+    if (handoff.currentCheckpoint.parentCheckpointId !== null) {
+      boundedString(handoff.currentCheckpoint.parentCheckpointId, 'continuity handoff parent checkpoint id', 128);
+    }
+    boundedString(handoff.currentCheckpoint.persistenceSeq, 'continuity handoff persistence sequence', 128);
+    normalizeTimestamp(handoff.currentCheckpoint.acceptedAt, 'continuity handoff accepted timestamp');
+    boundedString(handoff.currentCheckpoint.acceptedByRef, 'continuity handoff accepted-by reference');
+    boundedString(handoff.currentCheckpoint.authorityEvidenceRef, 'continuity handoff authority evidence reference');
+    if (handoff.currentCheckpoint.policyRef !== null) {
+      boundedString(handoff.currentCheckpoint.policyRef, 'continuity handoff policy reference');
+    }
+    assertSha256(handoff.currentCheckpoint.stateDigest, 'continuity handoff state digest');
+    assertSha256(handoff.currentCheckpoint.proposalDigest, 'continuity handoff proposal digest');
+    assertSha256(handoff.continuityDigest, 'continuity handoff continuity digest');
+
+    const lineage = validateOrderedReferences(handoff.lineage.checkpointIds, 'continuity handoff lineage');
+    if (!Number.isSafeInteger(handoff.lineage.depth)
+        || handoff.lineage.depth <= 0
+        || handoff.lineage.depth !== lineage.length
+        || lineage.at(-1) !== handoff.currentCheckpoint.checkpointId) {
+      return false;
+    }
+
+    if (!Array.isArray(handoff.unresolvedCases) || handoff.unresolvedCases.length > MAX_REFERENCE_COUNT) return false;
+    for (const item of handoff.unresolvedCases) {
+      boundedString(item.caseId, 'continuity handoff case id', 128);
+      boundedString(item.caseKey, 'continuity handoff case key', 512);
+      boundedString(item.state, 'continuity handoff case state', 128);
+      boundedString(item.latestTransitionId, 'continuity handoff latest transition id', 128);
+      normalizeTimestamp(item.lastTransitionAt, 'continuity handoff last transition timestamp');
+    }
+
+    if (handoff.consumer.authorityMode !== 'requires_independent_validation') return false;
+    boundedString(handoff.consumer.consumerRef, 'continuity handoff consumer reference', 512);
+    if (handoff.consumer.providerRef !== null) {
+      boundedString(handoff.consumer.providerRef, 'continuity handoff provider reference', 512);
+    }
+    if (handoff.consumer.actorRef !== null) {
+      boundedString(handoff.consumer.actorRef, 'continuity handoff actor reference', 512);
+    }
+    normalizeTimestamp(handoff.consumer.resolvedAt, 'continuity handoff resolved timestamp');
+
+    const canonical = canonicalHandoffContinuity(handoff);
+    assertNoCredentialMaterial(canonical);
+    return fingerprintCanonicalValue(canonical) === handoff.continuityDigest;
+  } catch {
+    return false;
+  }
+}
+
 export function createContinuityCapsule(input: CreateContinuityCapsuleInput): ContinuityCapsule {
   const { handoff } = input;
-  boundedString(handoff.scopeSemanticKey, 'continuity capsule scope semantic key', 256);
-  boundedString(handoff.currentCheckpoint.checkpointId, 'continuity capsule checkpoint id', 128);
-  assertSha256(handoff.currentCheckpoint.stateDigest, 'continuity capsule state digest');
-  assertSha256(handoff.currentCheckpoint.proposalDigest, 'continuity capsule proposal digest');
-  assertSha256(handoff.continuityDigest, 'continuity capsule continuity digest');
-  if (handoff.consumer.authorityMode !== 'requires_independent_validation') {
-    throw new Error('Continuity capsule requires independent downstream authority validation');
+  if (!verifyContinuityHandoffDigest(handoff)) {
+    throw new Error('Continuity handoff digest mismatch or malformed handoff');
   }
 
-  if (!Number.isSafeInteger(handoff.lineage.depth)
-      || handoff.lineage.depth <= 0
-      || handoff.lineage.depth !== handoff.lineage.checkpointIds.length
-      || handoff.lineage.checkpointIds.at(-1) !== handoff.currentCheckpoint.checkpointId) {
-    throw new Error('Invalid continuity handoff lineage');
-  }
-
-  const checkpointIds = normalizeReferences(handoff.lineage.checkpointIds, 'continuity capsule lineage');
-  if (checkpointIds.length !== handoff.lineage.checkpointIds.length
-      || !containsAll(checkpointIds, handoff.lineage.checkpointIds)) {
+  const lineage = validateOrderedReferences(handoff.lineage.checkpointIds, 'continuity capsule lineage');
+  if (lineage.length !== handoff.lineage.depth
+      || lineage.at(-1) !== handoff.currentCheckpoint.checkpointId) {
     throw new Error('Invalid continuity handoff lineage');
   }
 
@@ -278,18 +335,27 @@ export function createContinuityCapsule(input: CreateContinuityCapsuleInput): Co
   const expiresAt = normalizeTimestamp(input.expiresAt, 'continuity capsule expiry timestamp');
   assertLifetime(issuedAt, expiresAt);
 
+  const acceptedAt = normalizeTimestamp(
+    handoff.currentCheckpoint.acceptedAt,
+    'continuity capsule checkpoint acceptance timestamp'
+  );
+  const resolvedAt = normalizeTimestamp(handoff.consumer.resolvedAt, 'continuity handoff resolution timestamp');
+  if (Date.parse(issuedAt) < Date.parse(acceptedAt) || Date.parse(issuedAt) < Date.parse(resolvedAt)) {
+    throw new Error('Continuity capsule cannot be issued before accepted or resolved handoff state');
+  }
+
   const payload: Omit<ContinuityCapsule, 'capsuleDigest'> = {
     version: CONTINUITY_CAPSULE_VERSION,
     scopeSemanticKey: handoff.scopeSemanticKey,
     currentCheckpoint: {
       checkpointId: handoff.currentCheckpoint.checkpointId,
       parentCheckpointId: handoff.currentCheckpoint.parentCheckpointId,
-      acceptedAt: normalizeTimestamp(handoff.currentCheckpoint.acceptedAt, 'continuity capsule checkpoint acceptance timestamp'),
+      acceptedAt,
       stateDigest: handoff.currentCheckpoint.stateDigest,
       proposalDigest: handoff.currentCheckpoint.proposalDigest,
     },
     lineage: {
-      checkpointIds: [...handoff.lineage.checkpointIds],
+      checkpointIds: lineage,
       depth: handoff.lineage.depth,
     },
     unresolvedCaseRefs: normalizeReferences(
@@ -337,7 +403,11 @@ export function verifyContinuityCapsule(capsule: ContinuityCapsule, now?: string
     boundedString(capsule.scopeSemanticKey, 'continuity capsule scope semantic key', 256);
     boundedString(capsule.retentionClass, 'continuity capsule retention class', 128);
     assertLifetime(capsule.issuedAt, capsule.expiresAt);
-    normalizeReferences(capsule.lineage.checkpointIds, 'continuity capsule lineage');
+    const acceptedAt = normalizeTimestamp(capsule.currentCheckpoint.acceptedAt, 'continuity capsule accepted timestamp');
+    const issuedAt = normalizeTimestamp(capsule.issuedAt, 'continuity capsule issued timestamp');
+    if (Date.parse(issuedAt) < Date.parse(acceptedAt)) return false;
+
+    const lineage = validateOrderedReferences(capsule.lineage.checkpointIds, 'continuity capsule lineage');
     normalizeReferences(capsule.unresolvedCaseRefs, 'unresolved case references');
     normalizeReferences(capsule.references.objectiveRefs, 'objective references');
     normalizeReferences(capsule.references.decisionRefs, 'decision references');
@@ -348,9 +418,9 @@ export function verifyContinuityCapsule(capsule: ContinuityCapsule, now?: string
     normalizeReferences(capsule.references.evidenceRefs, 'evidence references');
     normalizeReferences(capsule.authority.authorityEvidenceRefs, 'authority evidence references');
     normalizeReferences(capsule.authority.policyRefs, 'policy references');
-    if (capsule.lineage.depth !== capsule.lineage.checkpointIds.length
+    if (capsule.lineage.depth !== lineage.length
         || capsule.lineage.depth <= 0
-        || capsule.lineage.checkpointIds.at(-1) !== capsule.currentCheckpoint.checkpointId) {
+        || lineage.at(-1) !== capsule.currentCheckpoint.checkpointId) {
       return false;
     }
     assertNoCredentialMaterial(capsule);
@@ -359,7 +429,11 @@ export function verifyContinuityCapsule(capsule: ContinuityCapsule, now?: string
     }
     if (now !== undefined) {
       const nowMs = Date.parse(now);
-      if (!Number.isFinite(nowMs) || nowMs >= Date.parse(capsule.expiresAt)) return false;
+      if (!Number.isFinite(nowMs)
+          || nowMs < Date.parse(capsule.issuedAt)
+          || nowMs >= Date.parse(capsule.expiresAt)) {
+        return false;
+      }
     }
     return true;
   } catch {
@@ -402,8 +476,14 @@ export function validateContinuityPrecondition(
       return { valid: false, status: 'integrity_mismatch' };
     }
     const nowMs = Date.parse(now);
-    if (!Number.isFinite(nowMs) || nowMs >= Date.parse(precondition.expiresAt)) {
+    const issuedMs = Date.parse(precondition.issuedAt);
+    const expiresMs = Date.parse(precondition.expiresAt);
+    if (!Number.isFinite(nowMs) || !Number.isFinite(issuedMs) || !Number.isFinite(expiresMs)
+        || nowMs < issuedMs || nowMs >= expiresMs) {
       return { valid: false, status: 'expired' };
+    }
+    if (!verifyContinuityHandoffDigest(current)) {
+      return { valid: false, status: 'handoff_integrity_mismatch' };
     }
     if (precondition.authorityMode !== 'requires_independent_validation'
         || precondition.authorityInheritance !== 'forbidden'

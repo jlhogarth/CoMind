@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "cd ../../server && npm ci --include=dev && npm run build && NODE_EXTRA_CA_CERTS=certs/prod-ca-2021.crt node dist/archive/chatgpt-export-cli.js --establish-baseline openai-chatgpt-primary f118f46b-2d5c-4f39-8c9d-063e972bab73 && echo CHIST_BASELINE_CHECKPOINT_COMPLETE && node -e \"process.exit(42)\"",
+    "build": "cd ../../server && npm ci --include=dev && npm run build && NODE_EXTRA_CA_CERTS=certs/prod-ca-2021.crt COMIND_DATABASE_PURPOSE=chatgpt_history node dist/history/conversation-history-cli.js --preflight && NODE_EXTRA_CA_CERTS=certs/prod-ca-2021.crt COMIND_DATABASE_PURPOSE=chatgpt_history node dist/history/conversation-history-cli.js status && echo CHIST_HISTORY_RETRIEVAL_PROOF_COMPLETE && node -e \"process.exit(42)\"",
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test test/**/*.test.ts",

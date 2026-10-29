@@ -6,6 +6,7 @@ on:
       - '.github/workflows/drule-003-mandatory-assistant-governance.yml'
       - 'server/src/assistant-provider.ts'
       - 'server/src/env.ts'
+      - 'server/.env.example'
       - 'server/test/configured-assistant-rulebook.test.mjs'
       - 'server/test/env.test.mjs'
       - 'docs/provenance/2026-10-29-drule-003-mandatory-assistant-governance.md'

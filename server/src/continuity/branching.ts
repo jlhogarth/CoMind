@@ -13,6 +13,7 @@ export const CONTINUITY_MERGE_REVIEW_VERSION = 'continuity-merge-review-v1' as c
 
 const MAX_ITEMS = 256;
 const MAX_REF_LENGTH = 1024;
+const SHA256_HEX = /^[a-f0-9]{64}$/;
 
 export interface ExperimentalContinuityBranch {
   version: typeof CONTINUITY_BRANCH_VERSION;
@@ -95,9 +96,16 @@ export interface CreateContinuityBranchOutcomeInput {
   evaluatedAt: string;
 }
 
+export interface ContinuityBranchComparisonCandidate {
+  branch: ExperimentalContinuityBranch;
+  checkpoints: readonly ContinuityBranchCheckpoint[];
+  outcome: ContinuityBranchOutcome;
+}
+
 export interface ContinuityBranchComparisonEntry {
   branchId: string;
   headCheckpointId: string;
+  headCheckpointDigest: string;
   status: ContinuityBranchOutcomeStatus;
   outcomeRefs: string[];
   evidenceRefs: string[];
@@ -174,6 +182,10 @@ function requiredText(value: unknown, field: string): asserts value is string {
   }
 }
 
+function digest(value: unknown, field: string): asserts value is string {
+  if (typeof value !== 'string' || !SHA256_HEX.test(value)) throw new Error(`Invalid ${field}`);
+}
+
 function timestamp(value: string, field: string): string {
   const parsed = Date.parse(value);
   if (!Number.isFinite(parsed)) throw new Error(`Invalid ${field}`);
@@ -190,6 +202,11 @@ function refs(values: readonly string[], field: string, required = false): strin
   });
   if (new Set(result).size !== result.length) throw new Error(`Duplicate ${field}`);
   return [...result].sort();
+}
+
+function uniqueRefs(values: readonly string[], field: string, required = false): string[] {
+  if (!Array.isArray(values) || values.length > MAX_ITEMS * MAX_ITEMS) throw new Error(`Invalid ${field}`);
+  return refs([...new Set(values)], field, required);
 }
 
 function branchPayload(branch: ExperimentalContinuityBranch): Omit<ExperimentalContinuityBranch, 'branchDigest'> {
@@ -233,8 +250,9 @@ export function verifyExperimentalContinuityBranch(branch: ExperimentalContinuit
     requiredText(branch.branchId, 'continuity branch id');
     requiredText(branch.scopeSemanticKey, 'continuity branch scope');
     requiredText(branch.baseCheckpointId, 'continuity branch base checkpoint');
-    requiredText(branch.baseContinuityDigest, 'continuity branch base digest');
-    requiredText(branch.baseCapsuleDigest, 'continuity branch base capsule digest');
+    digest(branch.baseContinuityDigest, 'continuity branch base digest');
+    digest(branch.baseCapsuleDigest, 'continuity branch base capsule digest');
+    digest(branch.branchDigest, 'continuity branch digest');
     refs(branch.purposeRefs, 'branch purpose references', true);
     refs(branch.evidenceRefs, 'branch evidence references', true);
     refs(branch.authorityEvidenceRefs, 'branch authority evidence references', true);
@@ -264,6 +282,8 @@ export function verifyContinuityBranchCheckpoint(checkpoint: ContinuityBranchChe
     requiredText(checkpoint.baseCheckpointId, 'branch checkpoint base checkpoint');
     requiredText(checkpoint.checkpointId, 'branch checkpoint id');
     requiredText(checkpoint.parentCheckpointId, 'branch checkpoint parent');
+    digest(checkpoint.branchDigest, 'branch checkpoint branch digest');
+    digest(checkpoint.checkpointDigest, 'branch checkpoint digest');
     refs(checkpoint.candidateStateRefs, 'branch candidate state references', true);
     refs(checkpoint.observationRefs, 'branch observation references');
     refs(checkpoint.evidenceRefs, 'branch checkpoint evidence references', true);
@@ -352,6 +372,9 @@ export function verifyContinuityBranchOutcome(outcome: ContinuityBranchOutcome):
     requiredText(outcome.scopeSemanticKey, 'branch outcome scope');
     requiredText(outcome.baseCheckpointId, 'branch outcome base checkpoint');
     requiredText(outcome.headCheckpointId, 'branch outcome head checkpoint');
+    digest(outcome.branchDigest, 'branch outcome branch digest');
+    digest(outcome.headCheckpointDigest, 'branch outcome head checkpoint digest');
+    digest(outcome.outcomeDigest, 'branch outcome digest');
     refs(outcome.outcomeRefs, 'branch outcome references', true);
     refs(outcome.evidenceRefs, 'branch outcome evidence references', true);
     refs(outcome.unresolvedConflictRefs, 'branch unresolved conflict references');
@@ -398,17 +421,38 @@ function comparisonPayload(
   return payload;
 }
 
+function verifyComparisonEntry(entry: ContinuityBranchComparisonEntry): boolean {
+  try {
+    requiredText(entry.branchId, 'comparison branch id');
+    requiredText(entry.headCheckpointId, 'comparison head checkpoint id');
+    digest(entry.headCheckpointDigest, 'comparison head checkpoint digest');
+    digest(entry.branchDigest, 'comparison branch digest');
+    digest(entry.outcomeDigest, 'comparison outcome digest');
+    if (!['COMPLETED', 'INCONCLUSIVE', 'BLOCKED'].includes(entry.status)) return false;
+    refs(entry.outcomeRefs, 'comparison outcome references', true);
+    refs(entry.evidenceRefs, 'comparison evidence references', true);
+    refs(entry.unresolvedConflictRefs, 'comparison unresolved conflict references');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function verifyContinuityBranchComparison(comparison: ContinuityBranchComparison): boolean {
   try {
     if (!comparison || comparison.version !== CONTINUITY_BRANCH_COMPARISON_VERSION
+        || !Array.isArray(comparison.branchEntries)
         || comparison.branchEntries.length < 2 || comparison.branchEntries.length > MAX_ITEMS) return false;
     requiredText(comparison.scopeSemanticKey, 'branch comparison scope');
     requiredText(comparison.baseCheckpointId, 'branch comparison base checkpoint');
-    requiredText(comparison.baseContinuityDigest, 'branch comparison base continuity digest');
+    digest(comparison.baseContinuityDigest, 'branch comparison base continuity digest');
+    digest(comparison.comparisonDigest, 'branch comparison digest');
     refs(comparison.unresolvedConflictRefs, 'comparison unresolved conflict references');
     timestamp(comparison.comparedAt, 'branch comparison timestamp');
+    if (comparison.branchEntries.some(entry => !verifyComparisonEntry(entry))) return false;
     const branchIds = comparison.branchEntries.map(entry => entry.branchId);
     if (new Set(branchIds).size !== branchIds.length) return false;
+    if (![...branchIds].sort().every((id, index) => id === branchIds[index])) return false;
     return fingerprintCanonicalValue(comparisonPayload(comparison)) === comparison.comparisonDigest;
   } catch {
     return false;
@@ -416,20 +460,22 @@ export function verifyContinuityBranchComparison(comparison: ContinuityBranchCom
 }
 
 export function compareContinuityBranches(
-  branches: readonly ExperimentalContinuityBranch[],
-  outcomes: readonly ContinuityBranchOutcome[],
+  candidates: readonly ContinuityBranchComparisonCandidate[],
   comparedAt: string
 ): ContinuityBranchComparison {
-  if (!Array.isArray(branches) || branches.length < 2 || branches.length > MAX_ITEMS
-      || !Array.isArray(outcomes) || outcomes.length !== branches.length) {
-    throw new Error('Branch comparison requires at least two branches with one outcome each');
+  if (!Array.isArray(candidates) || candidates.length < 2 || candidates.length > MAX_ITEMS) {
+    throw new Error('Branch comparison requires at least two branch candidates');
   }
   const branchIds = new Set<string>();
   const entries: ContinuityBranchComparisonEntry[] = [];
-  const first = branches[0];
-  if (!verifyExperimentalContinuityBranch(first)) throw new Error('Invalid experimental branch');
-  for (const branch of branches) {
-    if (!verifyExperimentalContinuityBranch(branch) || branchIds.has(branch.branchId)) throw new Error('Invalid or duplicate experimental branch');
+  const first = candidates[0]?.branch;
+  if (!first || !verifyExperimentalContinuityBranch(first)) throw new Error('Invalid experimental branch');
+
+  for (const candidate of candidates) {
+    const { branch, checkpoints, outcome } = candidate;
+    if (!verifyExperimentalContinuityBranch(branch) || branchIds.has(branch.branchId)) {
+      throw new Error('Invalid or duplicate experimental branch');
+    }
     branchIds.add(branch.branchId);
     if (branch.scopeSemanticKey !== first.scopeSemanticKey
         || branch.baseCheckpointId !== first.baseCheckpointId
@@ -437,16 +483,25 @@ export function compareContinuityBranches(
         || branch.baseCapsuleDigest !== first.baseCapsuleDigest) {
       throw new Error('Compared branches must share the same governed continuity base');
     }
-    const outcome = outcomes.find(item => item.branchId === branch.branchId);
-    if (!outcome || !verifyContinuityBranchOutcome(outcome)
+    if (!verifyContinuityBranchChain(branch, checkpoints) || checkpoints.length === 0) {
+      throw new Error('Branch comparison requires a valid non-empty branch checkpoint lineage');
+    }
+    const head = checkpoints.at(-1)!;
+    if (!verifyContinuityBranchOutcome(outcome)
         || outcome.scopeSemanticKey !== branch.scopeSemanticKey
         || outcome.baseCheckpointId !== branch.baseCheckpointId
-        || outcome.branchDigest !== branch.branchDigest) {
-      throw new Error('Branch outcome does not bind to its experimental branch');
+        || outcome.branchDigest !== branch.branchDigest
+        || outcome.headCheckpointId !== head.checkpointId
+        || outcome.headCheckpointDigest !== head.checkpointDigest) {
+      throw new Error('Branch outcome does not bind to the verified branch-local head');
+    }
+    if (Date.parse(outcome.evaluatedAt) < Date.parse(head.createdAt)) {
+      throw new Error('Branch outcome predates its verified branch-local head');
     }
     entries.push({
       branchId: branch.branchId,
-      headCheckpointId: outcome.headCheckpointId,
+      headCheckpointId: head.checkpointId,
+      headCheckpointDigest: head.checkpointDigest,
       status: outcome.status,
       outcomeRefs: [...outcome.outcomeRefs],
       evidenceRefs: [...outcome.evidenceRefs],
@@ -455,10 +510,13 @@ export function compareContinuityBranches(
       outcomeDigest: outcome.outcomeDigest,
     });
   }
+
   entries.sort((a, b) => a.branchId.localeCompare(b.branchId));
   const normalizedComparedAt = timestamp(comparedAt, 'branch comparison timestamp');
-  if (entries.some(entry => Date.parse(outcomes.find(item => item.branchId === entry.branchId)!.evaluatedAt) > Date.parse(normalizedComparedAt))) {
-    throw new Error('Branch comparison predates a branch outcome');
+  for (const candidate of candidates) {
+    if (Date.parse(candidate.outcome.evaluatedAt) > Date.parse(normalizedComparedAt)) {
+      throw new Error('Branch comparison predates a branch outcome');
+    }
   }
   const payload: Omit<ContinuityBranchComparison, 'comparisonDigest'> = {
     version: CONTINUITY_BRANCH_COMPARISON_VERSION,
@@ -466,7 +524,10 @@ export function compareContinuityBranches(
     baseCheckpointId: first.baseCheckpointId,
     baseContinuityDigest: first.baseContinuityDigest,
     branchEntries: entries,
-    unresolvedConflictRefs: refs(entries.flatMap(entry => entry.unresolvedConflictRefs), 'comparison unresolved conflict references'),
+    unresolvedConflictRefs: uniqueRefs(
+      entries.flatMap(entry => entry.unresolvedConflictRefs),
+      'comparison unresolved conflict references'
+    ),
     comparedAt: normalizedComparedAt,
   };
   return Object.freeze({ ...payload, comparisonDigest: fingerprintCanonicalValue(payload) });
@@ -484,11 +545,26 @@ export function verifyContinuityMergeProposal(proposal: ContinuityMergeProposal)
     if (!proposal || proposal.version !== CONTINUITY_MERGE_PROPOSAL_VERSION
         || proposal.authorityMode !== 'requires_independent_authorization'
         || proposal.automaticCanonicalAcceptance !== false
-        || proposal.canonicalHeadMutation !== false) return false;
+        || proposal.canonicalHeadMutation !== false
+        || (proposal.reviewStatus !== 'READY_FOR_INDEPENDENT_REVIEW'
+          && proposal.reviewStatus !== 'BLOCKED_UNRESOLVED_CONFLICT')) return false;
     requiredText(proposal.scopeSemanticKey, 'merge proposal scope');
     requiredText(proposal.baseCheckpointId, 'merge proposal base checkpoint');
-    refs(proposal.selectedBranchIds, 'selected branch ids', true);
-    refs(proposal.selectedOutcomeDigests, 'selected outcome digests', true);
+    digest(proposal.baseContinuityDigest, 'merge proposal base continuity digest');
+    digest(proposal.comparisonDigest, 'merge proposal comparison digest');
+    digest(proposal.proposalDigest, 'merge proposal digest');
+    const selected = refs(proposal.selectedBranchIds, 'selected branch ids', true);
+    const selectedDigests = refs(proposal.selectedOutcomeDigests, 'selected outcome digests', true);
+    if (selected.length !== selectedDigests.length) return false;
+    if (!Array.isArray(proposal.rejectedBranches) || proposal.rejectedBranches.length > MAX_ITEMS) return false;
+    const rejectedIds = new Set<string>();
+    for (const rejected of proposal.rejectedBranches) {
+      requiredText(rejected.branchId, 'rejected branch id');
+      digest(rejected.outcomeDigest, 'rejected branch outcome digest');
+      refs(rejected.rejectionReasonRefs, 'rejected branch reason references', true);
+      if (rejectedIds.has(rejected.branchId) || selected.includes(rejected.branchId)) return false;
+      rejectedIds.add(rejected.branchId);
+    }
     refs(proposal.candidateSuccessorStateRefs, 'candidate successor state references', true);
     refs(proposal.mergeEvidenceRefs, 'merge evidence references', true);
     refs(proposal.unresolvedConflictRefs, 'merge unresolved conflict references');
@@ -514,7 +590,9 @@ export function createContinuityMergeProposal(
     if (!entry) throw new Error('Merge selects an unknown branch');
     if (entry.status !== 'COMPLETED') throw new Error('Only completed branch outcomes may be selected for merge');
   }
-  if (!Array.isArray(input.rejectedBranches) || input.rejectedBranches.length > MAX_ITEMS) throw new Error('Invalid rejected branch set');
+  if (!Array.isArray(input.rejectedBranches) || input.rejectedBranches.length > MAX_ITEMS) {
+    throw new Error('Invalid rejected branch set');
+  }
   const rejected: RejectedContinuityBranch[] = input.rejectedBranches.map(item => {
     requiredText(item.branchId, 'rejected branch id');
     if (selectedSet.has(item.branchId)) throw new Error('A branch cannot be both selected and rejected');
@@ -532,14 +610,16 @@ export function createContinuityMergeProposal(
       || comparison.branchEntries.some(entry => !accounted.has(entry.branchId))) {
     throw new Error('Every compared branch must be explicitly selected or rejected');
   }
-  const unresolvedConflictRefs = refs(
+  const unresolvedConflictRefs = uniqueRefs(
     comparison.branchEntries
       .filter(entry => selectedSet.has(entry.branchId))
       .flatMap(entry => entry.unresolvedConflictRefs),
     'merge unresolved conflict references'
   );
   const proposedAt = timestamp(input.proposedAt, 'merge proposal timestamp');
-  if (Date.parse(proposedAt) < Date.parse(comparison.comparedAt)) throw new Error('Merge proposal predates branch comparison');
+  if (Date.parse(proposedAt) < Date.parse(comparison.comparedAt)) {
+    throw new Error('Merge proposal predates branch comparison');
+  }
   const selectedOutcomeDigests = refs(
     selectedBranchIds.map(branchId => known.get(branchId)!.outcomeDigest),
     'selected outcome digests',
@@ -566,6 +646,35 @@ export function createContinuityMergeProposal(
   return Object.freeze({ ...payload, proposalDigest: fingerprintCanonicalValue(payload) });
 }
 
+function reviewPayload(
+  review: ContinuityMergeReviewRequest
+): Omit<ContinuityMergeReviewRequest, 'reviewRequestDigest'> {
+  const { reviewRequestDigest: _digest, ...payload } = review;
+  return payload;
+}
+
+export function verifyContinuityMergeReviewRequest(review: ContinuityMergeReviewRequest): boolean {
+  try {
+    if (!review || review.version !== CONTINUITY_MERGE_REVIEW_VERSION
+        || review.recommendedRoute !== 'REQUEST_INDEPENDENT_MERGE_REVIEW'
+        || review.authorityMode !== 'requires_independent_authorization'
+        || review.automaticCanonicalAcceptance !== false
+        || review.canonicalHeadMutation !== false) return false;
+    requiredText(review.scopeSemanticKey, 'merge review scope');
+    requiredText(review.baseCheckpointId, 'merge review base checkpoint');
+    refs(review.selectedBranchIds, 'merge review selected branch ids', true);
+    refs(review.rejectedBranchIds, 'merge review rejected branch ids');
+    digest(review.comparisonDigest, 'merge review comparison digest');
+    digest(review.proposalDigest, 'merge review proposal digest');
+    digest(review.reviewRequestDigest, 'merge review request digest');
+    refs(review.evidenceRefs, 'merge review evidence references', true);
+    timestamp(review.requestedAt, 'merge review request timestamp');
+    return fingerprintCanonicalValue(reviewPayload(review)) === review.reviewRequestDigest;
+  } catch {
+    return false;
+  }
+}
+
 export function createContinuityMergeReviewRequest(
   comparison: ContinuityBranchComparison,
   proposal: ContinuityMergeProposal,
@@ -583,7 +692,9 @@ export function createContinuityMergeReviewRequest(
     throw new Error('Unresolved branch conflicts block independent merge review');
   }
   const normalizedRequestedAt = timestamp(requestedAt, 'merge review request timestamp');
-  if (Date.parse(normalizedRequestedAt) < Date.parse(proposal.proposedAt)) throw new Error('Merge review request predates proposal');
+  if (Date.parse(normalizedRequestedAt) < Date.parse(proposal.proposedAt)) {
+    throw new Error('Merge review request predates proposal');
+  }
   const rejectedBranchIds = proposal.rejectedBranches.map(item => item.branchId).sort();
   const payload: Omit<ContinuityMergeReviewRequest, 'reviewRequestDigest'> = {
     version: CONTINUITY_MERGE_REVIEW_VERSION,
@@ -593,7 +704,7 @@ export function createContinuityMergeReviewRequest(
     rejectedBranchIds,
     comparisonDigest: comparison.comparisonDigest,
     proposalDigest: proposal.proposalDigest,
-    evidenceRefs: refs([
+    evidenceRefs: uniqueRefs([
       ...proposal.mergeEvidenceRefs,
       ...comparison.branchEntries.flatMap(entry => entry.evidenceRefs),
     ], 'merge review evidence references', true),

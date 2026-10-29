@@ -41,8 +41,15 @@ try {
   await page.goto(baseUrl, { waitUntil: "networkidle" });
 
   await page.getByRole("heading", { name: "CoMind Control Plane" }).waitFor();
-  assert.equal(await page.getByRole("link", { name: "Open Activity HUD" }).count(), 1);
-  assert.equal(await page.getByRole("link", { name: "Review Approvals" }).count(), 1);
+
+  const activityLinks = page.getByRole("link", { name: "Open Activity HUD" });
+  assert.ok((await activityLinks.count()) >= 1, "Expected at least one Activity HUD link");
+  assert.equal(await activityLinks.first().getAttribute("href"), "/activity");
+
+  const approvalLinks = page.getByRole("link", { name: "Review Approvals" });
+  assert.ok((await approvalLinks.count()) >= 1, "Expected at least one approvals link");
+  assert.equal(await approvalLinks.first().getAttribute("href"), "https://approvals.comindinc.com");
+
   assert.equal(await page.getByText("Two governed domains", { exact: true }).count(), 1);
   assert.equal(await page.getByText("No paid call triggered by this page", { exact: true }).count(), 1);
   assert.equal(await page.getByText("Production deployment", { exact: true }).count(), 1);

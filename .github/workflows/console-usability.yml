@@ -4,7 +4,10 @@ on:
   pull_request:
     paths:
       - "apps/operator-console/**"
+      - "server/src/providers/console-usability-foundry-adapter.ts"
+      - "server/test/console-usability-foundry-adapter.test.mjs"
       - "config/console-usability-auditor.v1.json"
+      - "docs/provenance/**cux-001**"
       - ".github/workflows/console-usability.yml"
   workflow_dispatch:
 
@@ -12,6 +15,28 @@ permissions:
   contents: read
 
 jobs:
+  foundry-adapter-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Build server
+        run: npm run build
+      - name: Run server tests
+        run: npm test
+
   chromium-baseline:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest

@@ -1,0 +1,32 @@
+name: Implementation Integrity
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  iic-shadow:
+    name: IIC-001 shadow integrity scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run integrity engine tests
+        run: python scripts/test_check_implementation_integrity.py
+
+      - name: Run NDT-001 in shadow mode
+        run: python scripts/check_implementation_integrity.py . --mode shadow --format json --output integrity-findings.json
+
+      - name: Render findings in job log
+        run: cat integrity-findings.json

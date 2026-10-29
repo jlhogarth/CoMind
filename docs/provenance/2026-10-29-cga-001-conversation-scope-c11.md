@@ -47,6 +47,35 @@ User and tool messages are treated as untrusted input. Secret-disclosure and aut
 
 The observer is deliberately conservative infrastructure, not a semantic security classifier. It is one input to the existing RuleBook C11 policy and does not replace provider safeguards, authorization, evidence validation, or human review.
 
+## Live Supabase Test proof
+
+After the isolated PostgreSQL and server contracts passed on exact candidate `712682d2213ee38423d527ef5803409c61a462a6`, the live Test target was re-read immediately before mutation:
+
+- target count: 10;
+- both scope fields null: 10;
+- partial scope: 0;
+- already scoped: 0;
+- canonical organization: `997bfcdf-e42f-4757-8d1c-d0da44d26482`;
+- canonical project: `8ac9fab3-35df-48fb-b1df-95285fee9dc0`.
+
+The bounded reconciliation then completed successfully. Post-write readback proved:
+
+- total conversations: 10;
+- fully scoped: 10;
+- fully unscoped: 0;
+- partial scope: 0;
+- target records at canonical scope: 10 of 10.
+
+A durable PM ledger verification event was recorded as `f87b77b2-3eab-449a-ab22-d1c2735b40ed` with outcome `pass` and links to issue #299 and PR #300.
+
+No Production mutation and no paid provider call occurred.
+
+## Advisor review
+
+Post-write Supabase security advisor counts match the pre-CGA baseline: 48 informational `rls_enabled_no_policy` findings elsewhere, 8 pre-existing mutable-search-path functions, and the same two legacy anonymous/authenticated security-definer approval RPC findings. CGA-001 introduced no schema object and no new security finding.
+
+Performance advisor likewise found no CGA-001-specific new object. Existing project-wide findings remain, including the pre-existing `cm_conversation.org_id` foreign-key index advisory and two multiple-permissive-policy findings. No advisor finding was caused by the bounded data reconciliation or C11 observer.
+
 ## Cross-lane boundaries
 
 - CHIST-K01 #244/#247 retains ownership of Conversation History retrieval, chunking, embeddings, and vector schema. CGA-001 does not modify those objects.
@@ -71,4 +100,4 @@ Repository acceptance requires:
 11. benign secret terminology without a disclosure request does not trigger `asks_for_secrets`;
 12. exact-head CI and broad regressions remain green.
 
-Live Test reconciliation is performed only after isolated acceptance. Production remains unchanged and no paid provider call is authorized or required.
+The live Test reconciliation portion is complete. Final merge remains gated on exact-head CI for the documentation-complete candidate. Production remains unchanged.

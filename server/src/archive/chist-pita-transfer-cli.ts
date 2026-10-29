@@ -12,6 +12,7 @@ const WORK_ROOT = '/tmp/comind-chist-pita';
 const CHUNK_ROOT = `${WORK_ROOT}/chunks`;
 const CIPHERTEXT_PATH = `${WORK_ROOT}/openai-export.enc`;
 const ZIP_PATH = `${WORK_ROOT}/openai-export.zip`;
+const POLL_INTERVAL_MS = 750;
 
 type TransferRow = {
   transfer_id: string;
@@ -20,9 +21,16 @@ type TransferRow = {
   expected_source_bytes: string | number;
   cipher_sha256: string;
   chunk_hashes: unknown;
-  signed_urls: unknown;
   key_hex: string | null;
   iv_hex: string | null;
+  expires_at: string | Date;
+};
+
+type ChunkRow = {
+  transfer_id: string;
+  chunk_index: number;
+  expected_sha256: string;
+  signed_url: string;
   expires_at: string | Date;
 };
 
@@ -58,6 +66,10 @@ function validateTransferUrl(raw: string): URL {
     throw new Error('Transfer URL path is outside the approved private file-delivery path');
   }
   return parsed;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function fetchWithBoundedRedirects(raw: string): Promise<Response> {
@@ -120,7 +132,31 @@ async function verifyFileIdentity(path: string, expectedBytes: number, expectedH
   }
 }
 
+async function consumeChunk(transferId: string, chunkIndex: number): Promise<void> {
+  const result = await query<{ chunk_index: number }>(
+    `UPDATE comind.cm_archive_transfer_chunk
+        SET signed_url = NULL,
+            consumed_at = now()
+      WHERE transfer_id = $1::uuid
+        AND chunk_index = $2
+        AND consumed_at IS NULL
+      RETURNING chunk_index`,
+    [transferId, chunkIndex],
+  );
+  if (result.rows.length !== 1) {
+    throw new Error(`Transfer chunk ${chunkIndex} could not be atomically consumed and scrubbed`);
+  }
+}
+
 async function consumeTransfer(transferId: string): Promise<void> {
+  await query(
+    `UPDATE comind.cm_archive_transfer_chunk
+        SET signed_url = NULL,
+            consumed_at = now()
+      WHERE transfer_id = $1::uuid
+        AND consumed_at IS NULL`,
+    [transferId],
+  );
   const result = await query<{ transfer_id: string }>(
     `UPDATE comind.cm_archive_transfer_stage
         SET signed_urls = NULL,
@@ -134,8 +170,44 @@ async function consumeTransfer(transferId: string): Promise<void> {
     [transferId],
   );
   if (result.rows.length !== 1) {
-    throw new Error('Transfer row could not be atomically consumed and scrubbed');
+    throw new Error('Transfer header could not be atomically consumed and scrubbed');
   }
+}
+
+async function waitForChunk(
+  transferId: string,
+  chunkIndex: number,
+  expectedHash: string,
+  deadlineMs: number,
+): Promise<ChunkRow> {
+  while (Date.now() < deadlineMs) {
+    const result = await query<ChunkRow>(
+      `SELECT transfer_id::text,
+              chunk_index,
+              expected_sha256,
+              signed_url,
+              expires_at
+         FROM comind.cm_archive_transfer_chunk
+        WHERE transfer_id = $1::uuid
+          AND chunk_index = $2
+          AND consumed_at IS NULL
+          AND expires_at > now()`,
+      [transferId, chunkIndex],
+    );
+    if (result.rows.length === 1) {
+      const row = result.rows[0];
+      if (row.expected_sha256 !== expectedHash) {
+        throw new Error(`Transfer chunk ${chunkIndex} does not match the governed chunk hash`);
+      }
+      if (new Date(row.expires_at).getTime() <= Date.now()) {
+        throw new Error(`Transfer chunk ${chunkIndex} is expired`);
+      }
+      validateTransferUrl(row.signed_url);
+      return row;
+    }
+    await sleep(POLL_INTERVAL_MS);
+  }
+  throw new Error(`Timed out waiting for transfer chunk ${chunkIndex}`);
 }
 
 async function main(): Promise<void> {
@@ -156,7 +228,6 @@ async function main(): Promise<void> {
             expected_source_bytes,
             cipher_sha256,
             chunk_hashes,
-            signed_urls,
             key_hex,
             iv_hex,
             expires_at
@@ -168,7 +239,7 @@ async function main(): Promise<void> {
     [transferId],
   );
   if (transferResult.rows.length !== 1) {
-    throw new Error('No active governed CHIST transfer row is available');
+    throw new Error('No active governed CHIST transfer header is available');
   }
 
   const transfer = transferResult.rows[0];
@@ -176,23 +247,29 @@ async function main(): Promise<void> {
   try {
     const expectedBytes = Number(transfer.expected_source_bytes);
     if (transfer.expected_source_sha256 !== CANONICAL_SHA256 || expectedBytes !== CANONICAL_BYTES) {
-      throw new Error('Transfer manifest does not identify the independently verified canonical source');
+      throw new Error('Transfer header does not identify the independently verified canonical source');
     }
-    const expiresAt = new Date(transfer.expires_at).getTime();
-    if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
-      throw new Error('Transfer manifest is expired');
+    const deadlineMs = new Date(transfer.expires_at).getTime();
+    if (!Number.isFinite(deadlineMs) || deadlineMs <= Date.now()) {
+      throw new Error('Transfer header is expired');
     }
 
     const cipherHash = requireHex(transfer.cipher_sha256, 64, 'cipher_sha256');
     const chunkHashes = requireStringArray(transfer.chunk_hashes, EXPECTED_CHUNKS, 'chunk_hashes')
       .map((value, index) => requireHex(value, 64, `chunk_hashes[${index}]`));
-    const signedUrls = requireStringArray(transfer.signed_urls, EXPECTED_CHUNKS, 'signed_urls');
     const keyHex = requireHex(transfer.key_hex, 64, 'key_hex');
     const ivHex = requireHex(transfer.iv_hex, 32, 'iv_hex');
 
-    await Promise.all(signedUrls.map((url, index) =>
-      downloadVerified(url, `${CHUNK_ROOT}/part-${String(index).padStart(2, '0')}`, chunkHashes[index])
-    ));
+    for (let index = 0; index < EXPECTED_CHUNKS; index += 1) {
+      const row = await waitForChunk(transferId, index, chunkHashes[index], deadlineMs);
+      const outputPath = `${CHUNK_ROOT}/part-${String(index).padStart(2, '0')}`;
+      try {
+        await downloadVerified(row.signed_url, outputPath, chunkHashes[index]);
+      } finally {
+        await consumeChunk(transferId, index);
+      }
+      console.log(JSON.stringify({ status: 'CHUNK_PASS', chunkIndex: index }));
+    }
 
     for (let index = 0; index < EXPECTED_CHUNKS; index += 1) {
       const chunk = await readFile(`${CHUNK_ROOT}/part-${String(index).padStart(2, '0')}`);

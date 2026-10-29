@@ -28,6 +28,31 @@ The following are permitted when used deliberately:
 
 An agent may report success only when it can cite the executed validation, schema comparison, test result, or deployment record that establishes success. Unsupported confidence is not evidence.
 
+## Continuous Excellence and recovery interrupts
+
+The canonical operating contract is `docs/governance/continuous-excellence-contract.md` and the architecture is `docs/architecture/continuous-excellence.md`.
+
+Treat `Reasoning Failed`, `Stopped thinking`, `Lost context`, `Lost conversation content`, `Recover`, `Resume from checkpoint`, and semantically equivalent statements as recovery interrupts when context indicates interrupted work.
+
+On a recovery interrupt:
+
+- do not invent missing state;
+- identify the active objective and authoritative systems;
+- retrieve the most recent durable RunBook and Continuity Capsule state that is available;
+- reconcile that state against current authoritative external systems when applicable;
+- distinguish verified, mixed, and uncertain facts;
+- identify the smallest safe continuation point;
+- resume automatically when existing authority permits;
+- preserve the recovery event and material continuity changes as evidence;
+- determine whether the failure warrants a systemic improvement, regression test, eval, control, or documentation change.
+
+The user must not be required to manually reconstruct information that is recoverable from authoritative systems.
+
+Before consequential work, perform a proportionate Missingness Scan for material dependencies, assumptions, adjacent effects, rollback, recovery, security, data integrity, usability, observability, testing, cost, authority, documentation, reversibility, reusable capabilities, costly-to-reverse decisions, and inexpensive opportunities worth preserving. Surface only findings that can materially change the decision or outcome.
+
+Do not treat cessation of activity as completion. Substantial work requires explicit completion criteria, an appropriate verification method, and inspectable evidence.
+
+Repeated corrections, recovery requests, unnecessary manual steps, recurring failures, and preventable interruptions are operational evidence. When material, route them through the Continuous Excellence signal and improvement model rather than relying on conversational recollection alone.
 
 ## GOV-001 provisional tiered governance policy (effective for new development)
 

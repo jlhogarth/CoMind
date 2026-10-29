@@ -31,23 +31,61 @@ No paid API proposal, paid execution, budget reservation, provider token-count r
 
 The existing assistant provider outside the synthetic canary remains unchanged in this slice. This avoids silently changing operational traffic while proving the governed composition needed for later rollout.
 
-## Acceptance matrix
+## Isolated broker acceptance
 
-The isolated contract must prove:
+The dedicated exact-head canary workflow passed on candidate `dac2c3b293212a9395105878dcdac7732dee415f`.
 
-1. secret-disclosure request is denied by DRULE-C11 before token counting, budget reservation, or provider execution;
-2. authority-escalation request is denied by DRULE-C11 before token counting, budget reservation, or provider execution;
-3. unapproved untrusted side effect returns `review` before token counting or provider execution;
-4. approved benign request passes C11, C17, and C13, reaches a deliberately denying Test budget authority, and still performs zero provider calls;
+It proved:
+
+1. a secret-disclosure request is denied by DRULE-C11 before token counting, budget reservation, or provider execution;
+2. an authority-escalation request is denied by DRULE-C11 before token counting, budget reservation, or provider execution;
+3. an unapproved untrusted side effect returns `review` before token counting or provider execution;
+4. an approved benign request passes C11, C17, and C13, reaches a deliberately denying Test budget authority, and still performs zero provider calls;
 5. a fully approved all-fake path reaches the fake provider only after all broker gates and returns governed execution receipt metadata;
 6. governance telemetry contains structured attributes only and never copies raw prompt content;
-7. `maxRetries` must be zero for governed assistant execution.
+7. governed assistant execution requires `maxRetries=0`.
 
-## Live Test canary
+The CP-01 Real Provider Substitution Proof was independently checked on the same candidate and concluded `skipped`. No real provider substitution ran.
 
-A single dedicated synthetic conversation will be created under canonical CoMind Test scope and bound to the RuleBook as `INTERNAL`, residency `COMIND-TEST-US`, retention `OPERATIONAL`, purpose `assistant-response`, destination `OPENAI-API`.
+## Live Supabase Test canary
 
-A time-bounded human egress review will be recorded under the Founder instruction to perform these next steps while retaining the separate paid-provider approval rule. The live proof will call the governance resolver and structured RuleBook preflight only. It will not invoke OpenAI.
+A dedicated persistent synthetic conversation was created:
+
+- conversation ID: `c9a20000-0000-4000-8000-000000000002`;
+- source: `cga_test`;
+- environment: Test;
+- canonical CoMind organization/project scope;
+- metadata explicitly states `paid_provider_authority=false`.
+
+It was bound to RuleBook governance as:
+
+- classification: `INTERNAL`, rank 10;
+- residency: `COMIND-TEST-US`;
+- retention: `OPERATIONAL`;
+- purpose: `assistant-response`;
+- destination: `OPENAI-API`.
+
+A time-bounded egress approval was recorded as review event `d5ebc7d7-ac36-4f7a-a4b1-39d29e34ad1e`. The approval expires at `2026-10-30T06:32:23.164775+00:00`. Its authority basis explicitly preserves the separate paid-provider approval requirement.
+
+The authoritative resolver returned the exact expected conversation asset, canonical tenant/project scope, `INTERNAL` classification, `assistant-response` purpose, `OPENAI-API` destination, `approved` review state, and bounded expiry.
+
+Structured live RuleBook decisions were then recorded without prompt text:
+
+- DRULE-C11 benign approved input: `allow`, reason `TRUST_BOUNDARY_ACCEPTABLE`;
+- DRULE-C17 same tenant/project: `allow`, reason `SAME_SCOPE`;
+- DRULE-C13 approved registered Test egress: `allow`, reason `EGRESS_AUTHORIZED`;
+- DRULE-C11 secret-disclosure signal: `deny`, reason `UNTRUSTED_SECRET_REQUEST`;
+- DRULE-C11 authority-escalation signal: `deny`, reason `UNTRUSTED_AUTHORITY_ESCALATION`.
+
+Paid-provider state was counted before and after the live proof. Both reads returned:
+
+- paid API executions: 0;
+- API cost receipts: 0;
+- budget authority reservations: 0.
+
+Therefore CGA-002 performed no paid execution, no budget reservation, no provider token-count call, and no model request.
+
+Durable PM verification event: `09131c94-32e0-44c0-9d27-904403674735`, outcome `pass`.
 
 ## Cross-lane boundaries
 
@@ -55,3 +93,8 @@ A time-bounded human egress review will be recorded under the Founder instructio
 - VE lifecycle PR #301 changes only the VE lifecycle coordinator and does not overlap this provider adapter.
 - Operator Console production deployment issues #294-#297 remain untouched.
 - Foundry runtime remains unchanged until its separate later slice.
+- Production assistant behavior remains unchanged.
+
+## Final merge gate
+
+The live Test canary is complete. Merge remains gated on a fresh exact-head CI and cross-lane regression matrix for this documentation-complete candidate, followed by a current `main` conflict check.

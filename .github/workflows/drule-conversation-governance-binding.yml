@@ -10,6 +10,7 @@ on:
       - 'db/migrations/20261029_004_drule_conversation_governance_function_hardening.sql'
       - 'db/test/bootstrap_drule_conversation_governance.sql'
       - 'db/verification/20261029_drule_conversation_governance_binding_verification.sql'
+      - 'db/verification/20261029_drule_conversation_governance_function_hardening_verification.sql'
       - 'scripts/test_drule_conversation_governance_binding.sh'
       - 'server/src/providers/conversation-governance-binding.ts'
       - 'server/test/conversation-governance-binding.test.mjs'

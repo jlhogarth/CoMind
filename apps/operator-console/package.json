@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "cd ../../server && npm ci --include=dev && npm run build && COMIND_DATABASE_PURPOSE=chatgpt_history_certification node dist/history/baseline-certify-cli.js --preflight && echo CHIST_CERTIFIER_PREFLIGHT_COMPLETE && node -e \"process.exit(42)\"",
+    "build": "cd ../../server && npm ci --include=dev && npm run build && NODE_EXTRA_CA_CERTS=certs/prod-ca-2021.crt COMIND_DATABASE_PURPOSE=chatgpt_history_certification node dist/history/baseline-certify-cli.js --preflight && echo CHIST_CERTIFIER_PREFLIGHT_COMPLETE && node -e \"process.exit(42)\"",
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test test/**/*.test.ts",

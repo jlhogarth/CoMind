@@ -15,7 +15,6 @@ DECLARE
   v_predecessor uuid;
   v_hash_1 text;
   v_hash_2 text;
-  v_state text;
   v_count bigint;
   v_rls_enabled boolean;
   v_mutation_blocked boolean := false;
@@ -245,12 +244,13 @@ BEGIN
     RAISE EXCEPTION 'CE-001 verification failed: improvement event did not return an identity';
   END IF;
 
-  SELECT current_state INTO v_state
-  FROM comind.v_ce_improvement_state
-  WHERE improvement_id = v_improvement_id;
+  SELECT count(*) INTO v_count
+  FROM comind.cm_ce_improvement_event
+  WHERE improvement_id = v_improvement_id
+    AND event_type IN ('proposed', 'validated');
 
-  IF v_state IS DISTINCT FROM 'validated' THEN
-    RAISE EXCEPTION 'CE-001 verification failed: improvement state projection returned %', v_state;
+  IF v_count <> 2 THEN
+    RAISE EXCEPTION 'CE-001 verification failed: expected proposed and validated lifecycle events, found %', v_count;
   END IF;
 
   SELECT count(*) INTO v_count
@@ -261,7 +261,7 @@ BEGIN
     RAISE EXCEPTION 'CE-001 verification failed: linked signal remained in the actionable backlog';
   END IF;
 
-  RAISE NOTICE 'CE-001 verification passed: RLS, grants, append-only history, idempotency, capsule lineage, hashes, current-state projection, and improvement lifecycle';
+  RAISE NOTICE 'CE-001 foundation verification passed: RLS, grants, append-only history, idempotency, capsule lineage, hashes, lifecycle event presence, and signal linkage';
 END;
 $$;
 

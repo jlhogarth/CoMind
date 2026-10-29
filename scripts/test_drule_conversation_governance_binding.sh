@@ -18,6 +18,7 @@ for pass in 1 2; do
   psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${repository_root}/db/migrations/20261029_001_drule_conversation_governance_binding.sql"
   psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${repository_root}/db/migrations/20261029_002_drule_conversation_governance_binding_hardening.sql"
   psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${repository_root}/db/migrations/20261029_003_drule_conversation_governance_binding_constraints.sql"
+  psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${repository_root}/db/migrations/20261029_004_drule_conversation_governance_function_hardening.sql"
 done
 
 psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${repository_root}/db/verification/20261029_drule_conversation_governance_binding_verification.sql"

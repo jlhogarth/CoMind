@@ -2,13 +2,21 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 const {
-  executeGovernedProviderExecution,
+  executeGovernedProviderExecution: executeGovernedProviderExecutionRaw,
   providerExecutionReservationIdempotencyKey,
 } = await import('../dist/providers/governed-provider-execution.js');
 const {
   DeterministicProviderInputTokenCounter,
   createProviderExecutionEnvelope,
 } = await import('../dist/providers/provider-execution-envelope.js');
+const { rulebookProviderInput } = await import('./support/rulebook-execution-preflight.mjs');
+
+function executeGovernedProviderExecution(input) {
+  return executeGovernedProviderExecutionRaw({
+    ...input,
+    rulebook: input.rulebook ?? rulebookProviderInput(),
+  });
+}
 
 function envelope(overrides = {}) {
   return createProviderExecutionEnvelope({
@@ -116,6 +124,53 @@ test('governed execution binds count quote reservation and exact provider execut
   assert.equal(Object.isFrozen(result), true);
   assert.equal(Object.isFrozen(result.receipt), true);
   assert.equal(Object.isFrozen(result.receipt.reservation), true);
+});
+
+test('RuleBook deny blocks before token counting, reservation, or provider execution', async () => {
+  const events = [];
+  let counted = false;
+  let reserved = false;
+  let executed = false;
+  const rulebook = rulebookProviderInput();
+
+  await assert.rejects(
+    executeGovernedProviderExecution({
+      envelope: envelope(),
+      rulebook: {
+        ...rulebook,
+        evaluator: {
+          async evaluate(controlKey) {
+            events.push(controlKey);
+            return {
+              control_key: controlKey,
+              decision: controlKey === 'DRULE-C17' ? 'deny' : 'allow',
+              reason_code: controlKey === 'DRULE-C17' ? 'TEST_TENANCY_DENY' : 'TEST_ALLOW',
+              reason: 'Deterministic preflight ordering proof.',
+            };
+          },
+        },
+      },
+      inputTokenCounter: new DeterministicProviderInputTokenCounter(() => {
+        counted = true;
+        return 1;
+      }),
+      exposureQuoter: { quoteExposure: () => quote() },
+      budgetAuthority: authority(async () => {
+        reserved = true;
+        throw new Error('must not reserve');
+      }),
+      operationName: 'responses.create',
+      async execute() {
+        executed = true;
+      },
+    }),
+    /DRULE-C17 returned deny: TEST_TENANCY_DENY/
+  );
+
+  assert.deepEqual(events, ['DRULE-C11', 'DRULE-C17']);
+  assert.equal(counted, false);
+  assert.equal(reserved, false);
+  assert.equal(executed, false);
 });
 
 test('governed execution rejects automatic provider retries before token counting or reservation', async () => {

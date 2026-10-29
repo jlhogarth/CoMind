@@ -6,6 +6,10 @@ import {
   assertProviderInputTokenPreflight,
   preflightProviderInputTokens,
 } from './provider-execution-envelope.js';
+import {
+  RequiredRulebookExecutionPreflight,
+  runRequiredRulebookExecutionPreflight,
+} from './rulebook-execution-preflight.js';
 
 export interface ProviderExposureQuote {
   readonly provider: string;
@@ -129,6 +133,7 @@ export interface GovernedProviderExecutionInput<
   TQuote extends ProviderExposureQuote = ProviderExposureQuote,
 > {
   readonly envelope: ProviderExecutionEnvelope<TRequest>;
+  readonly rulebook: RequiredRulebookExecutionPreflight;
   readonly inputTokenCounter: ProviderInputTokenCounter<TRequest>;
   readonly exposureQuoter: ProviderExposureQuoter<TRequest, TQuote>;
   readonly budgetAuthority: GovernedProviderBudgetAuthority;
@@ -299,6 +304,9 @@ export async function executeGovernedProviderExecution<
   if (!validRequestedToolCalls(requestedToolCalls)) {
     throw new Error('requestedToolCalls must be a non-negative safe integer');
   }
+
+  await runRequiredRulebookExecutionPreflight(input.rulebook);
+  assertProviderExecutionEnvelopeIntegrity(envelope);
 
   const preflight = await preflightProviderInputTokens(envelope, input.inputTokenCounter);
   assertProviderInputTokenPreflight(envelope, preflight);

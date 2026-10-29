@@ -1,7 +1,7 @@
 # CoMind RuleBook Control Plane
 
-Date: 2026-10-28
-Status: Test implementation and verification boundary
+Date: 2026-10-29
+Status: Test implementation, verification, and bounded product-path adoption
 Owner: CoMind Governance
 Scope: successor-control remediation for historical Layer-0 Sections 3, 4, 6, 7, 10, 11, 13, 15, 17, 19, 24, and 27
 
@@ -164,6 +164,32 @@ The job makes no external HTTP call and performs no paid provider action.
 
 The HUD refreshes every 30 seconds, supports health and original-disposition filters, and exports only the visible status projection.
 
+## Governed provider adoption
+
+The first product-path adoption of the common preflight is the governed provider-execution broker. Before that broker may count input tokens, quote cost exposure, reserve budget, admit a paid execution, or call a provider, it must receive `allow` decisions from:
+
+1. `DRULE-C11` for the structured trust boundary;
+2. `DRULE-C17` for tenant and project isolation;
+3. `DRULE-C13` for the governed asset and outbound destination.
+
+`deny`, `review`, malformed output, evaluator failure, missing structured context, inconsistent tenant identity, or undeclared context keys stop the broker before provider work begins.
+
+The OpenAI governed wrapper binds its destination server-side rather than accepting destination identity from request content. The current Test binding uses `OPENAI-API`, host policy `api.openai.com`, region token `provider-managed`, and explicit operation actions. The bounded Test destination accepts no classification above `INTERNAL`, requires purpose, requires human review, and carries `production_authority=false`. It does not replace CoMind's separate paid-access approval and budget controls.
+
+The shared execution-preflight helper accepts structured governance attributes only. It does not receive the raw prompt, message history, provider credential, authorization header, secret material, or API key.
+
+### Current adoption boundary
+
+The ordinary assistant provider path is not yet routed through this governed broker. That is intentional, not an implicit exemption.
+
+A normal `AssistantResponseRequest` currently identifies a conversation and its messages but does not provide an authoritative RuleBook governed-asset classification for the outbound conversation content. CoMind will not silently classify every existing conversation as `INTERNAL`, because that can underclassify sensitive content. CoMind will also not classify every unknown conversation as `RESTRICTED` merely to make the integration compile, because that would intentionally block current provider operation without first establishing a migration path.
+
+The prerequisite for normal assistant adoption is a durable server-side binding from the conversation or outbound provider payload to authoritative governance state. That binding must supply classification, tenant, project scope, purpose, and human approval from controlled state rather than caller assertions. Missing classification must fail closed once the governed path is activated.
+
+Foundry adapter dispatch is also a separate adoption slice. The same shared helper is intended for Foundry, but Foundry's existing leasing, authorization, adapter, and live Test evidence will be changed and reviewed independently.
+
+Evidence for the first provider-broker adoption is recorded in `docs/provenance/2026-10-29-drule-provider-egress-preflight-adoption.md`.
+
 ## Integration contract
 
 A product lane resolves its use of one of these control families by registering governed assets/destinations/keys/obligations as needed and calling the common preflight before the consequential action. It should not clone the decision logic into a second policy implementation.
@@ -183,10 +209,12 @@ The repository verifies:
 - missing tenancy context denial;
 - recursive rejection of raw-sensitive context fields;
 - Fastify route validation and fail-closed behavior;
+- governed provider preflight ordering and deny/review stops before token counting, reservation, or provider execution;
+- CINT paid-provider and budget/replay compatibility behind the governed broker gate;
 - Operator Console model behavior and TypeScript correctness.
 
-Live Supabase Test additionally verifies safe HUD grants, Cron registration, current advisor findings, and Test readback.
+Live Supabase Test additionally verifies safe HUD grants, Cron registration, current advisor findings, Test readback, and the bounded provider-egress allow/review/deny matrix.
 
 ## Production boundary
 
-This document and implementation establish reusable governance capability and Test evidence. They do not authorize production deployment, production RLS changes, cross-tenant production operation, certification claims, or product-specific high-consequence use. Those transitions require the appropriate lane owner, environment evidence, and authority decision.
+This document and implementation establish reusable governance capability, bounded governed-provider adoption, and Test evidence. They do not authorize production deployment, production RLS changes, cross-tenant production operation, certification claims, product-specific high-consequence use, or an OpenAI paid request. Those transitions require the appropriate lane owner, environment evidence, and authority decision.

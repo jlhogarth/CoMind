@@ -118,13 +118,24 @@ jobs:
 
       - name: Run zero-cost ten-role Ollama planning pilot
         working-directory: server
-        run: node --test --test-concurrency=1 test/integration/mdo-ollama-pilot.e2e.mjs
+        shell: bash
+        run: |
+          set -uo pipefail
+          mkdir -p artifacts
+          set +e
+          node --test --test-concurrency=1 test/integration/mdo-ollama-pilot.e2e.mjs \
+            2>&1 | tee artifacts/mdo-002-ollama-pilot.log
+          status=${PIPESTATUS[0]}
+          set -e
+          exit "$status"
 
-      - name: Preserve pilot evidence
+      - name: Preserve pilot evidence and diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: mdo-002-ollama-pilot-evidence
-          path: server/artifacts/mdo-002-ollama-pilot-evidence.json
+          path: |
+            server/artifacts/mdo-002-ollama-pilot-evidence.json
+            server/artifacts/mdo-002-ollama-pilot.log
           if-no-files-found: error
           retention-days: 14

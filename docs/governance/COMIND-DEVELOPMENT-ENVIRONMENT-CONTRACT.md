@@ -115,23 +115,14 @@ Then proceed according to the authorized sequence unless a new approval or decis
 
 ## Per-Lane Invocation Template
 
-### Current Development Sequence
+Each lane invocation supplies these fields as actual instructions, not repository placeholders:
 
-[Insert Next Step]
+- **Next step:** the first authorized task or issue to execute.
+- **Follow-on step:** the next task after the first reaches its acceptance boundary.
+- **Additional steps or priorities:** any further ordered work.
+- **Outcome / product priority:** the actual result the lane should begin producing once sufficient infrastructure exists.
 
-Then:
-
-[Insert Follow-on Step]
-
-Then:
-
-[Insert Additional Steps or Priorities]
-
-### Current Outcome / Product Priority
-
-[Insert the actual result this Development Lane should begin producing once sufficient infrastructure exists.]
-
-**Proceed.**
+The lane owner may omit any field that is not needed. After the supplied sequence and priority are understood, **Proceed.**
 
 ## Cross-Conversation Invocation
 

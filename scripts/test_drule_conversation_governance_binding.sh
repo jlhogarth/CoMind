@@ -22,3 +22,4 @@ for pass in 1 2; do
 done
 
 psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${repository_root}/db/verification/20261029_drule_conversation_governance_binding_verification.sql"
+psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${repository_root}/db/verification/20261029_drule_conversation_governance_function_hardening_verification.sql"

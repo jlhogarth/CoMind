@@ -1,6 +1,11 @@
 name: CUX-001 Console Usability Auditor Test one-shot
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/cux-001-test-agent-one-shot.yml"
   workflow_dispatch:
 
 permissions:

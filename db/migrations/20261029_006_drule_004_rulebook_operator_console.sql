@@ -33,18 +33,18 @@ BEGIN
   END IF;
   v_effective_limit := p_limit;
 
-  SELECT id INTO v_project_id
-  FROM comind_pm.pm_projects
-  WHERE project_key = 'COMIND';
+  SELECT p.id INTO v_project_id
+  FROM comind_pm.pm_projects AS p
+  WHERE p.project_key = 'COMIND';
   IF v_project_id IS NULL THEN
     RAISE EXCEPTION 'RULEBOOK_OPERATOR_PROJECT_UNAVAILABLE';
   END IF;
 
-  SELECT id INTO v_destination_id
-  FROM comind_pm.pm_egress_destinations
-  WHERE project_id = v_project_id
-    AND destination_key = 'OPENAI-API'
-    AND active;
+  SELECT d.id INTO v_destination_id
+  FROM comind_pm.pm_egress_destinations AS d
+  WHERE d.project_id = v_project_id
+    AND d.destination_key = 'OPENAI-API'
+    AND d.active;
   IF v_destination_id IS NULL THEN
     RAISE EXCEPTION 'RULEBOOK_OPERATOR_DESTINATION_UNAVAILABLE';
   END IF;

@@ -67,7 +67,7 @@ function capsule(overrides = {}) {
       openQuestionRefs: ['question:which-experiment-best-supported'],
       evidenceRefs: ['evidence:canonical-baseline'],
     },
-    authorityEvidenceRefs: ['authority:founder:tk012'],
+    authorityEvidenceRefs: ['authority:tk012:consumer-independent-validation'],
     policyRefs: ['policy:threadkeeper:branching'],
     sensitivity: 'internal',
     retentionClass: 'durable',

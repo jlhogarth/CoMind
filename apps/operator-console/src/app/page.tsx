@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import {
   Activity,
   ArrowRight,
@@ -17,9 +18,7 @@ import {
   LayoutDashboard,
   LockKeyhole,
   Network,
-  Search,
   ServerCog,
-  Settings2,
   ShieldCheck,
   Sparkles,
   Workflow,
@@ -72,7 +71,7 @@ function ExternalAwareLink({
   href: string;
   external?: boolean;
   className: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }>) {
   return (
     <a className={className} href={href} {...(external ? { target: "_blank", rel: "noreferrer" } : {})}>
@@ -127,12 +126,12 @@ export default function Home() {
 
       <section className={styles.main}>
         <header className={styles.topbar}>
-          <div className={styles.search} aria-label="Control plane search preview">
-            <Search size={15} aria-hidden="true" />
-            <span>Projects, resources, domains, documentation</span>
-            <kbd>⌘ K</kbd>
+          <div className={styles.search} aria-label="Current control plane scope">
+            <Network size={15} aria-hidden="true" />
+            <span>Operator Console / HUD-001 / read-only landing surface</span>
+            <kbd>T1</kbd>
           </div>
-          <div className={styles.topStatus}><span className={styles.stateDot} aria-hidden="true" /> Read-only landing surface</div>
+          <div className={styles.topStatus}><span className={styles.stateDot} aria-hidden="true" /> Production activation excluded</div>
         </header>
 
         <div className={styles.content}>

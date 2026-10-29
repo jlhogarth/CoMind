@@ -13,7 +13,9 @@ for pass in 1 2; do
   psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${repository_root}/db/migrations/20261028_003_drule_002_successor_control_plane.sql"
   psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${repository_root}/db/migrations/20261028_004_drule_002_successor_control_plane_hardening.sql"
   psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${repository_root}/db/sql/20261028_drule_002_successor_control_seed.sql"
+  psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${repository_root}/db/sql/20261029_drule_provider_egress_integration_seed.sql"
 done
 
 psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${repository_root}/db/verification/20261028_drule_002_successor_control_plane_hardening_verification.sql"
 psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${repository_root}/db/verification/20261028_drule_002_successor_control_plane_verification.sql"
+psql -X "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${repository_root}/db/verification/20261029_drule_provider_egress_integration_verification.sql"

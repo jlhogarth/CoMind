@@ -377,8 +377,19 @@ BEGIN
     COALESCE(p_observed_at, now())
   )
   ON CONFLICT (project_id, idempotency_key) WHERE idempotency_key IS NOT NULL
-  DO UPDATE SET idempotency_key = EXCLUDED.idempotency_key
+  DO NOTHING
   RETURNING signal_id INTO v_signal_id;
+
+  IF v_signal_id IS NULL AND p_idempotency_key IS NOT NULL THEN
+    SELECT signal_id INTO v_signal_id
+    FROM comind.cm_ce_signal
+    WHERE project_id = p_project_id
+      AND idempotency_key = p_idempotency_key;
+  END IF;
+
+  IF v_signal_id IS NULL THEN
+    RAISE EXCEPTION 'CE signal could not be recorded or reconciled';
+  END IF;
 
   RETURN v_signal_id;
 END;

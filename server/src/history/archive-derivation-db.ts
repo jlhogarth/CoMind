@@ -82,11 +82,66 @@ export async function prepareArchiveDerivationSession() {
 
     await client.query('SELECT import_id FROM comind.cm_conversation_history_baseline LIMIT 1');
     await client.query('SELECT source_conversation_id FROM comind.cm_archive_conversation_observation LIMIT 1');
+    await client.query('RESET ROLE');
     prepared = true;
     releaseError = undefined;
     return { databaseName: identity.database_name, sessionUser: identity.session_user, currentUser: assumed.current_user };
   } finally {
     client.release(releaseError);
+  }
+}
+
+export async function listCertifiedArchiveConversationIds(
+  importId: string,
+  limit?: number,
+): Promise<string[]> {
+  assertArchiveDerivationSessionPrepared();
+  if (limit !== undefined && (!Number.isInteger(limit) || limit < 1 || limit > 100_000)) {
+    throw new Error('Archive bulk derivation limit must be an integer from 1 through 100000');
+  }
+
+  const client = await archiveDerivationPool.connect();
+  try {
+    await client.query('BEGIN READ ONLY');
+    await client.query(`SET LOCAL ROLE ${DERIVER_ROLE}`);
+    const result = await client.query<{ source_conversation_id: string }>(
+      `SELECT o.source_conversation_id
+         FROM comind.cm_archive_conversation_observation o
+         JOIN comind.cm_conversation_history_baseline b ON b.import_id=o.import_id
+        WHERE o.import_id=$1::uuid
+        ORDER BY o.source_conversation_id
+        LIMIT $2::integer`,
+      [importId, limit ?? 100_000],
+    );
+    await client.query('COMMIT');
+    return result.rows.map((row) => row.source_conversation_id);
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function computeArchiveConversationMetrics(
+  archiveDerivationRunId: string,
+): Promise<number> {
+  assertArchiveDerivationSessionPrepared();
+  const client = await archiveDerivationPool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(`SET LOCAL ROLE ${DERIVER_ROLE}`);
+    const result = await client.query<{ inserted_count: number }>(
+      `SELECT comind.cm_compute_archive_conversation_metrics($1::uuid)::integer AS inserted_count`,
+      [archiveDerivationRunId],
+    );
+    await client.query('COMMIT');
+    return Number(result.rows[0]?.inserted_count ?? 0);
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
   }
 }
 

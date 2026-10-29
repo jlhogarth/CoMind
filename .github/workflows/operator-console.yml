@@ -36,6 +36,8 @@ jobs:
         run: test -z "$(git status --porcelain -- package-lock.json)"
       - name: Install locked dependencies
         run: npm ci
+      - name: Audit dependencies for high or critical vulnerabilities
+        run: npm audit --audit-level=high
       - name: Test
         run: npm test
       - name: Typecheck

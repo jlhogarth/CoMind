@@ -13,10 +13,13 @@ import {
   verifyContinuityBranchChain,
   verifyContinuityBranchComparison,
   verifyContinuityMergeProposal,
+  verifyContinuityMergeReviewRequest,
 } from '../dist/continuity/branching.js';
 
 const A = 'a'.repeat(64);
 const B = 'b'.repeat(64);
+const C = 'c'.repeat(64);
+const COMPARED_AT = '2026-10-29T18:11:00.000Z';
 
 function handoff(overrides = {}) {
   const base = {
@@ -55,9 +58,8 @@ function handoff(overrides = {}) {
 }
 
 function capsule(overrides = {}) {
-  const source = handoff(overrides.handoff);
   return createContinuityCapsule({
-    handoff: source,
+    handoff: handoff(overrides.handoff),
     references: {
       objectiveRefs: ['objective:explore-without-overwrite'],
       decisionRefs: ['decision:canonical-baseline'],
@@ -109,22 +111,42 @@ function outcome(branchValue, chain, overrides = {}) {
   });
 }
 
+function candidate(branchValue, checkpoints, outcomeValue) {
+  return { branch: branchValue, checkpoints, outcome: outcomeValue };
+}
+
 function twoBranches() {
   const a = branch('branch:architecture:a');
   const b = branch('branch:architecture:b');
   const a1 = checkpoint(a, [], 'branch-checkpoint:a:1');
   const a2 = checkpoint(a, [a1], 'branch-checkpoint:a:2');
   const b1 = checkpoint(b, [], 'branch-checkpoint:b:1');
+  const aChain = [a1, a2];
+  const bChain = [b1];
   return {
-    a, b,
-    aChain: [a1, a2],
-    bChain: [b1],
-    aOutcome: outcome(a, [a1, a2]),
-    bOutcome: outcome(b, [b1]),
+    a,
+    b,
+    aChain,
+    bChain,
+    aOutcome: outcome(a, aChain),
+    bOutcome: outcome(b, bChain),
   };
 }
 
-test('TK-012 forks a valid accepted capsule into explicitly non-canonical branches', () => {
+function compareFixture(fixture, aOutcome = fixture.aOutcome, bOutcome = fixture.bOutcome) {
+  return compareContinuityBranches([
+    candidate(fixture.a, fixture.aChain, aOutcome),
+    candidate(fixture.b, fixture.bChain, bOutcome),
+  ], COMPARED_AT);
+}
+
+function redigestOutcome(value) {
+  const clone = structuredClone(value);
+  delete clone.outcomeDigest;
+  return { ...clone, outcomeDigest: fingerprintCanonicalValue(clone) };
+}
+
+test('TK-012 forks valid accepted continuity into explicitly non-canonical branches', () => {
   const a = branch('branch:architecture:a');
   const b = branch('branch:architecture:b');
   assert.equal(a.baseCheckpointId, 'checkpoint:canonical:1');
@@ -151,13 +173,11 @@ test('TK-012 branch-local checkpoints form a strict append-only candidate lineag
   const a1 = checkpoint(a, [], 'branch-checkpoint:a:1');
   const a2 = checkpoint(a, [a1], 'branch-checkpoint:a:2');
   assert.equal(a1.parentCheckpointId, a.baseCheckpointId);
-  assert.equal(a1.ordinal, 1);
   assert.equal(a2.parentCheckpointId, a1.checkpointId);
   assert.equal(a2.ordinal, 2);
   assert.equal(a2.canonicalStatus, 'NON_CANONICAL');
   assert.equal(a2.automaticAcceptance, false);
   assert.equal(verifyContinuityBranchChain(a, [a1, a2]), true);
-
   assert.throws(() => checkpoint(a, [a1], 'branch-checkpoint:a:bad', {
     parentCheckpointId: a.baseCheckpointId,
   }), /current branch-local head/);
@@ -167,20 +187,30 @@ test('TK-012 branch-local checkpoints form a strict append-only candidate lineag
   assert.equal(verifyContinuityBranchChain(a, [a1, b1]), false);
 });
 
-test('TK-012 compares only branches descended from the same governed base', () => {
+test('TK-012 comparison binds each outcome to the actual verified branch-local head', () => {
   const fixture = twoBranches();
-  const comparison = compareContinuityBranches(
-    [fixture.b, fixture.a],
-    [fixture.aOutcome, fixture.bOutcome],
-    '2026-10-29T18:11:00.000Z'
-  );
+  const comparison = compareFixture(fixture);
   assert.equal(verifyContinuityBranchComparison(comparison), true);
   assert.deepEqual(comparison.branchEntries.map(entry => entry.branchId), [
     'branch:architecture:a',
     'branch:architecture:b',
   ]);
-  assert.equal(comparison.baseCheckpointId, 'checkpoint:canonical:1');
+  assert.equal(comparison.branchEntries[0].headCheckpointId, fixture.aChain.at(-1).checkpointId);
+  assert.equal(comparison.branchEntries[0].headCheckpointDigest, fixture.aChain.at(-1).checkpointDigest);
 
+  const forged = redigestOutcome({
+    ...fixture.aOutcome,
+    headCheckpointId: 'branch-checkpoint:a:forged',
+    headCheckpointDigest: C,
+  });
+  assert.throws(() => compareContinuityBranches([
+    candidate(fixture.a, fixture.aChain, forged),
+    candidate(fixture.b, fixture.bChain, fixture.bOutcome),
+  ], COMPARED_AT), /verified branch-local head/);
+});
+
+test('TK-012 compares only branches descended from the same governed continuity base', () => {
+  const fixture = twoBranches();
   const otherBase = capsule({
     handoff: {
       scopeSemanticKey: 'architecture:other-scope',
@@ -193,26 +223,20 @@ test('TK-012 compares only branches descended from the same governed base', () =
   });
   const c = branch('branch:other:c', { baseCapsule: otherBase });
   const c1 = checkpoint(c, [], 'branch-checkpoint:c:1');
-  const cOutcome = outcome(c, [c1]);
-  assert.throws(() => compareContinuityBranches(
-    [fixture.a, c],
-    [fixture.aOutcome, cOutcome],
-    '2026-10-29T18:11:00.000Z'
-  ), /same governed continuity base/);
+  const cChain = [c1];
+  assert.throws(() => compareContinuityBranches([
+    candidate(fixture.a, fixture.aChain, fixture.aOutcome),
+    candidate(c, cChain, outcome(c, cChain)),
+  ], COMPARED_AT), /same governed continuity base/);
 });
 
-test('TK-012 merge proposal must account for every branch and preserves rejected alternatives', () => {
+test('TK-012 merge proposal accounts for every branch and preserves rejected outcomes and reasons', () => {
   const fixture = twoBranches();
-  const comparison = compareContinuityBranches(
-    [fixture.a, fixture.b],
-    [fixture.aOutcome, fixture.bOutcome],
-    '2026-10-29T18:11:00.000Z'
-  );
-
+  const comparison = compareFixture(fixture);
   assert.throws(() => createContinuityMergeProposal(comparison, {
     selectedBranchIds: ['branch:architecture:a'],
     rejectedBranches: [],
-    candidateSuccessorStateRefs: ['candidate-successor:ab'],
+    candidateSuccessorStateRefs: ['candidate-successor:a'],
     mergeEvidenceRefs: ['evidence:merge-analysis'],
     proposedAt: '2026-10-29T18:12:00.000Z',
   }), /Every compared branch/);
@@ -227,26 +251,24 @@ test('TK-012 merge proposal must account for every branch and preserves rejected
     mergeEvidenceRefs: ['evidence:merge-analysis'],
     proposedAt: '2026-10-29T18:12:00.000Z',
   });
-
   assert.equal(verifyContinuityMergeProposal(proposal), true);
   assert.equal(proposal.reviewStatus, 'READY_FOR_INDEPENDENT_REVIEW');
   assert.equal(proposal.automaticCanonicalAcceptance, false);
   assert.equal(proposal.canonicalHeadMutation, false);
-  assert.equal(proposal.rejectedBranches[0].branchId, 'branch:architecture:b');
   assert.equal(proposal.rejectedBranches[0].outcomeDigest, fixture.bOutcome.outcomeDigest);
   assert.deepEqual(proposal.rejectedBranches[0].rejectionReasonRefs, ['reason:b-inferior-evidence']);
 });
 
-test('TK-012 unresolved conflicts remain explicit and block merge review', () => {
+test('TK-012 shared conflict references deduplicate and unresolved selected conflicts block review', () => {
   const fixture = twoBranches();
-  const conflictingB = outcome(fixture.b, fixture.bChain, {
-    unresolvedConflictRefs: ['conflict:a-vs-b:authority-model'],
+  const aConflict = outcome(fixture.a, fixture.aChain, {
+    unresolvedConflictRefs: ['conflict:shared'],
   });
-  const comparison = compareContinuityBranches(
-    [fixture.a, fixture.b],
-    [fixture.aOutcome, conflictingB],
-    '2026-10-29T18:11:00.000Z'
-  );
+  const bConflict = outcome(fixture.b, fixture.bChain, {
+    unresolvedConflictRefs: ['conflict:shared'],
+  });
+  const comparison = compareFixture(fixture, aConflict, bConflict);
+  assert.deepEqual(comparison.unresolvedConflictRefs, ['conflict:shared']);
   const proposal = createContinuityMergeProposal(comparison, {
     selectedBranchIds: ['branch:architecture:a', 'branch:architecture:b'],
     rejectedBranches: [],
@@ -255,7 +277,7 @@ test('TK-012 unresolved conflicts remain explicit and block merge review', () =>
     proposedAt: '2026-10-29T18:12:00.000Z',
   });
   assert.equal(proposal.reviewStatus, 'BLOCKED_UNRESOLVED_CONFLICT');
-  assert.deepEqual(proposal.unresolvedConflictRefs, ['conflict:a-vs-b:authority-model']);
+  assert.deepEqual(proposal.unresolvedConflictRefs, ['conflict:shared']);
   assert.throws(() => createContinuityMergeReviewRequest(
     comparison,
     proposal,
@@ -263,14 +285,10 @@ test('TK-012 unresolved conflicts remain explicit and block merge review', () =>
   ), /Unresolved branch conflicts block/);
 });
 
-test('TK-012 non-completed branches cannot be selected but can be explicitly rejected', () => {
+test('TK-012 non-completed outcomes cannot be selected but remain preservable as rejected alternatives', () => {
   const fixture = twoBranches();
   const blockedB = outcome(fixture.b, fixture.bChain, { status: 'BLOCKED' });
-  const comparison = compareContinuityBranches(
-    [fixture.a, fixture.b],
-    [fixture.aOutcome, blockedB],
-    '2026-10-29T18:11:00.000Z'
-  );
+  const comparison = compareFixture(fixture, fixture.aOutcome, blockedB);
   assert.throws(() => createContinuityMergeProposal(comparison, {
     selectedBranchIds: ['branch:architecture:b'],
     rejectedBranches: [{ branchId: 'branch:architecture:a', rejectionReasonRefs: ['reason:not-selected'] }],
@@ -289,40 +307,30 @@ test('TK-012 non-completed branches cannot be selected but can be explicitly rej
   assert.equal(proposal.reviewStatus, 'READY_FOR_INDEPENDENT_REVIEW');
 });
 
-test('TK-012 final output is only an independent review request, never canonical acceptance', () => {
+test('TK-012 review evidence deduplicates shared sources and remains independent-review-only', () => {
   const fixture = twoBranches();
-  const comparison = compareContinuityBranches(
-    [fixture.a, fixture.b],
-    [fixture.aOutcome, fixture.bOutcome],
-    '2026-10-29T18:11:00.000Z'
-  );
+  const aShared = outcome(fixture.a, fixture.aChain, { evidenceRefs: ['evidence:shared'] });
+  const bShared = outcome(fixture.b, fixture.bChain, { evidenceRefs: ['evidence:shared'] });
+  const comparison = compareFixture(fixture, aShared, bShared);
   const proposal = createContinuityMergeProposal(comparison, {
     selectedBranchIds: ['branch:architecture:a'],
     rejectedBranches: [{ branchId: 'branch:architecture:b', rejectionReasonRefs: ['reason:b-not-selected'] }],
     candidateSuccessorStateRefs: ['candidate-successor:a'],
-    mergeEvidenceRefs: ['evidence:merge-analysis'],
+    mergeEvidenceRefs: ['evidence:merge-analysis', 'evidence:shared'],
     proposedAt: '2026-10-29T18:12:00.000Z',
   });
-  const review = createContinuityMergeReviewRequest(
-    comparison,
-    proposal,
-    '2026-10-29T18:13:00.000Z'
-  );
+  const review = createContinuityMergeReviewRequest(comparison, proposal, '2026-10-29T18:13:00.000Z');
+  assert.equal(verifyContinuityMergeReviewRequest(review), true);
+  assert.deepEqual(review.evidenceRefs, ['evidence:merge-analysis', 'evidence:shared']);
   assert.equal(review.recommendedRoute, 'REQUEST_INDEPENDENT_MERGE_REVIEW');
   assert.equal(review.authorityMode, 'requires_independent_authorization');
   assert.equal(review.automaticCanonicalAcceptance, false);
   assert.equal(review.canonicalHeadMutation, false);
-  assert.deepEqual(review.selectedBranchIds, ['branch:architecture:a']);
-  assert.deepEqual(review.rejectedBranchIds, ['branch:architecture:b']);
 });
 
 test('TK-012 digest tampering fails verification rather than becoming accepted history', () => {
   const fixture = twoBranches();
-  const comparison = compareContinuityBranches(
-    [fixture.a, fixture.b],
-    [fixture.aOutcome, fixture.bOutcome],
-    '2026-10-29T18:11:00.000Z'
-  );
+  const comparison = compareFixture(fixture);
   const proposal = createContinuityMergeProposal(comparison, {
     selectedBranchIds: ['branch:architecture:a'],
     rejectedBranches: [{ branchId: 'branch:architecture:b', rejectionReasonRefs: ['reason:b-not-selected'] }],

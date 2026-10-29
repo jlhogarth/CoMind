@@ -73,11 +73,12 @@ BEGIN
     RAISE EXCEPTION 'CONVERSATION_GOVERNANCE_PURPOSE_NOT_ALLOWED:%', p_conversation_id;
   END IF;
 
-  SELECT classification_key, rank
+  SELECT classification_key, classification_rank
     INTO v_classification_key, v_classification_rank
   FROM comind_pm.pm_data_classification_levels
   WHERE id = v_asset.classification_id
-    AND project_id = v_project_id;
+    AND project_id = v_project_id
+    AND active;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'CONVERSATION_CLASSIFICATION_UNAVAILABLE:%', p_conversation_id;
   END IF;
@@ -102,7 +103,8 @@ BEGIN
 
   IF FOUND THEN
     IF v_review_decision = 'approved'
-       AND (v_review_expires_at IS NULL OR v_review_expires_at > now()) THEN
+       AND v_review_expires_at IS NOT NULL
+       AND v_review_expires_at > now() THEN
       v_human_approved := true;
       v_review_state := 'approved';
     ELSIF v_review_decision = 'approved' THEN

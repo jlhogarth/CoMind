@@ -2,6 +2,7 @@
 
 Date: 2026-10-29
 Issue: #332
+Pull request: #333
 Branch: `ce-001-continuous-excellence-foundation`
 Base: `main` at `4104ce9743f51dc61f2725a8c9126e8011579e58`
 Environment: repository plus Supabase Test
@@ -148,6 +149,41 @@ Remediation:
 - browser roles retain no privileges;
 - verification confirms both views remain non-updatable and non-insertable.
 
+## Verification discovery 4: Console environment typing
+
+The first exact-head PR run passed all 57 Console runtime tests and the production dependency audit, then failed TypeScript validation because the CE server configuration helper accepted the full project `NodeJS.ProcessEnv` type while its focused test fixtures supplied only the keys the helper actually consumes.
+
+Root cause:
+
+- the helper depended on a broader type contract than its behavior required;
+- the project `ProcessEnv` declaration requires `NODE_ENV`;
+- the CE tests correctly did not need or provide unrelated process state.
+
+Remediation:
+
+- introduced a minimal readonly string environment-map contract;
+- kept `process.env` as the runtime default;
+- removed unnecessary `NodeJS.ProcessEnv` casts from CE tests.
+
+The repaired exact-head Console job subsequently passed all 57 tests, TypeScript validation, zero-vulnerability production dependency audit, and the Next.js production build.
+
+## Verification discovery 5: migration-scoped verification boundaries
+
+The first exact-head PostgreSQL 17 run applied migration 007 twice successfully, then failed `verify_007` because that verifier asserted deterministic latest improvement-event ordering before migration 008 introduced the monotonic event ordinal that provides that guarantee.
+
+Root cause:
+
+- the foundation verifier tested a successor migration invariant;
+- applying migration 008 before running the 007 verifier would have hidden the boundary error rather than correcting it.
+
+Remediation:
+
+- `verify_007` now proves lifecycle event presence and signal-to-improvement linkage without asserting deterministic latest-event ordering;
+- `verify_008` exclusively owns the deterministic ordering guarantee;
+- the CI sequence remains strict so every migration is independently verifiable at the boundary where its invariant is introduced.
+
+The repaired exact-head PostgreSQL 17 job subsequently passed all three migration families, each applied twice, plus all three verification suites.
+
 ## Destructive Test verification result
 
 The final Supabase Test verification passed and was rolled back after exercising synthetic verification records.
@@ -163,7 +199,7 @@ Verified controls include:
 - Continuity Capsule predecessor lineage;
 - distinct 64-character SHA-256 capsule hashes;
 - deterministic current-capsule projection;
-- deterministic improvement lifecycle ordering;
+- deterministic improvement lifecycle ordering after migration 008;
 - signal-to-improvement backlog reconciliation;
 - explicit read-only Operator Console projection ACLs.
 
@@ -195,7 +231,7 @@ The CE page does not take ownership of CUX-002 readability and accessibility rem
 
 ## Continuous Excellence self-observation
 
-CE-001 used its own substrate during implementation.
+CE-001 used its own substrate during implementation rather than treating the Continuous Excellence loop as documentation only.
 
 Canonical task:
 
@@ -209,28 +245,36 @@ Initial RunBook implementation snapshot:
 
 - `13ff9ebe-213a-4171-9115-ccccfd6715a0`
 
-Current self-observation state before PR verification:
+State after the first repaired exact-head green run:
 
-- four CE signals;
-- three systemic improvements;
+- seven CE signals;
+- five systemic improvements;
 - zero unowned actionable CE-001 signals;
-- Continuity Capsule version 1.
+- Continuity Capsule version 1 pending final review-state successor.
 
-The recorded signals cover approval/opportunity, the lifecycle-ordering failure, the failed corrective view migration, and the operator-view default-ACL gap.
+The seven signals include the approval opportunity, three Test-time integrity discoveries, two exact-head CI failures, and one non-actionable forward-looking GitHub Actions runtime-deprecation observation.
+
+The non-actionable observation records that GitHub currently warns `actions/checkout@v4` and `actions/setup-node@v4` target deprecated Node.js 20 action internals and are being forced onto Node.js 24. CE-001 passed under the forced Node.js 24 runtime. Repository-wide action-generation maintenance is intentionally outside this issue.
 
 ## Canonical evidence
 
-Evidence identities created in `comind.cm_evidence`:
+Evidence identities created in `comind.cm_evidence` include:
 
 - issue #332: `872ea3ec-5612-465c-b9c5-86d9979b2df9`
 - foundation Test migration: `961c7a86-fd8a-464a-b470-a42466b36476`
 - event-ordering Test migration: `701e38ec-85e8-4b34-b31a-b0b8c3e8b2db`
-- final destructive verification: `7bd1e35e-5e65-43ef-b49b-49fefb836284`
+- final destructive Test verification: `7bd1e35e-5e65-43ef-b49b-49fefb836284`
 - lifecycle-ordering verification failure: `f3507c5c-264a-44ec-814b-f90f893b7c62`
 - first corrective migration failure: `28b4ac58-b53b-4b98-9b60-85ae3389a88b`
 - advisor and foreign-key review: `d2705be3-ad2a-402b-b4f6-15fdcca3efc5`
 - default Operator Console view ACL finding: `562eb68b-2a9d-44f8-a183-68502591d9d9`
 - least-privilege Operator Console verification: `6e44a5e8-9813-49d2-b506-15da455627b0`
+- PR #333: `e8ebe999-e27b-47fc-89ec-4615ba339f97`
+- first exact-head Console typecheck failure: `e6eb6de4-fc80-47c4-8c21-358d97b508f9`
+- first exact-head database verification-boundary failure: `fb430a97-bf21-480f-8bd3-1bb3d29d328a`
+- repaired-head database contract pass: `718b6d90-743a-4de1-9f93-e9f181db0b41`
+- repaired-head Console contract pass: `5517f330-d9e7-4d95-b9c2-5f5e2eb1bdf0`
+- GitHub Actions Node.js runtime-deprecation observation: `faf52d29-e134-4404-adfb-022eb620ae56`
 
 ## Foundry reviewer decision
 
@@ -254,7 +298,7 @@ Database contract:
 - foundation migration applied twice before successor migrations;
 - event-ordering migration applied twice;
 - ACL migration applied twice;
-- all three verification suites.
+- all three migration-scoped verification suites.
 
 Operator Console contract:
 
@@ -264,17 +308,24 @@ Operator Console contract:
 - TypeScript check;
 - Next.js production build with CE and RuleBook protected modes disabled.
 
+The repaired implementation head `f4699cb0edb70accee1987ed2de824e9d70c085c` passed both CE-specific jobs in GitHub Actions run `40960992893`:
+
+- database job `123753393472`: passed PostgreSQL 17.11 and every CE database contract;
+- Console job `123753393901`: passed 57 of 57 tests, TypeScript, zero-vulnerability production audit, and production build.
+
+Because this provenance reconciliation is itself a repository commit, CE requires the CI workflow to rerun on the resulting exact head before final branch acceptance. Final exact-head acceptance evidence belongs in the RunBook, canonical evidence store, and successor Continuity Capsule so the repository documentation does not need another self-invalidating evidence-only commit.
+
 ## Recovery
 
 Repository recovery is branch and PR based. No merge or deployment is performed by CE-001 itself.
 
 Supabase changes are Test-only and additive. Failed migrations were preserved as evidence and rolled back atomically. Corrective changes were implemented as forward migrations rather than rewriting accepted Test history.
 
-The current Continuity Capsule records the next safe action and recovery point. Exact-head PR verification remains required before branch acceptance.
+The current Continuity Capsule records the verified baseline, constraints, next safe action, and rollback point. A successor capsule will advance the durable recovery point after final exact-head CI on the provenance-reconciled head.
 
-## Acceptance state at provenance creation
+## Acceptance state at provenance reconciliation
 
-Implemented and Test-verified:
+Implemented and verified before this documentation-only reconciliation commit:
 
 - canonical CE contract and architecture;
 - agent recovery semantics;
@@ -283,14 +334,13 @@ Implemented and Test-verified:
 - RunBook presence;
 - read-only Console application surface;
 - database verification and security hardening;
-- dedicated CI workflow.
+- dedicated CI workflow;
+- successful exact-head PostgreSQL 17 and Console contracts on the repaired implementation head.
 
-Still required before CE-001 branch acceptance:
+Still required before CE-001 is ready for human review:
 
-- open the CE-001 pull request;
-- execute exact-head GitHub CI;
-- reconcile any CI failure through the CE loop;
-- record final PR and CI evidence;
-- advance the RunBook and Continuity Capsule to the verified review state.
+1. rerun exact-head CE CI on this provenance-reconciled commit;
+2. record the final CI evidence;
+3. advance the RunBook and Continuity Capsule to the verified review state.
 
 Merge and Production activation remain outside autonomous CE-001 authority.

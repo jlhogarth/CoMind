@@ -23,23 +23,38 @@ No pre-existing repository path is modified by IIC-001 foundation.
 
 The existing No Placeholder Policy remains the NPH-001 hard gate. IIC-001 does not duplicate or replace it. The new implementation follows the same repository-level enforcement pattern and introduces a reusable engine for successor integrity controls.
 
-## Initial implementation failure retained
+## Failure evidence retained
 
-The first NDT-001 parser did not recognize GitHub Actions list-form `- run:` and `- uses:` entries. Synthetic tests exposed the defect. The matcher was corrected and the full nine-test suite passed afterward.
+### YAML list-form parser defect
 
-This failure is retained as development evidence because it changed the implementation and prevented a false-clean detector.
+The first NDT-001 parser did not recognize GitHub Actions list-form `- run:` and `- uses:` entries. Synthetic tests exposed the defect. The matcher was corrected and the initial nine-test suite passed afterward.
 
-## Local verification before PR
+### Generated-output false positives
 
-- Python compilation passed for the engine and test file.
-- Nine synthetic integrity tests passed.
-- NDT-001 scanned the staged implementation mini-tree with zero findings.
-- The existing No Placeholder prohibited-pattern set was applied to the new files with zero findings.
+The first exact-head repository shadow scan completed successfully but reported two unbaselined findings from `server/package.json`:
 
-## Exact-head acceptance still required
+- `start:dist/index.js`
+- `maintenance:audit:dist/maintenance-control/cli.js`
 
-Repository-wide NDT-001 shadow findings and exact-head GitHub Actions results must be reviewed before any baseline or blocking enforcement is adopted. A successful shadow workflow proves detector execution, not that every future integrity control is implemented.
+These were investigated rather than baselined. `server/tsconfig.json` declares `rootDir: src` and `outDir: dist`; `server/src/index.ts` and `server/src/maintenance-control/cli.ts` both exist. The findings therefore represented generated TypeScript outputs backed by checked-in source, not dead paths.
+
+The detector was refined to accept a generated JavaScript target only when a local `tsconfig.json` contains literal `rootDir` and `outDir` values and the corresponding checked-in source exists. A generated target without matching source remains a finding. Two synthetic tests were added for these cases.
+
+## Verification to date
+
+- Python compilation passed for the engine and test file before the first PR run.
+- Initial nine-test synthetic suite passed.
+- First exact-head Implementation Integrity workflow completed successfully.
+- Its preserved machine-readable artifact contained exactly two findings, both classified as generated-output detector false positives after source/build inspection.
+- Refined local suite contains eleven tests and passes.
+- Existing No Placeholder prohibited-pattern set returned zero findings across the initial new files.
+
+Fresh exact-head GitHub evidence is required after the generated-output refinement before acceptance or any enforcement promotion.
+
+## Evidence discipline
+
+The two initial repository findings are not placed in a baseline because doing so would convert detector error into accepted debt. Baseline creation remains deferred until any remaining exact-head findings have been classified and the detector is considered sufficiently precise for promotion.
 
 ## Recovery and cost
 
-Recovery is revert or branch abandonment. There is no live-state rollback. No paid provider, external Python package, or runtime service is introduced. Cost is limited to GitHub Actions runner time.
+Recovery is revert or branch abandonment. There is no live-state rollback. No paid provider, external Python package, or runtime service is introduced. Cost is limited to GitHub Actions runner time and short-retention GitHub Actions evidence storage.

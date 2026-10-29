@@ -5,6 +5,8 @@ export interface ContinuousExcellenceRuntimeConfig {
   secretKey: string;
 }
 
+export type ContinuousExcellenceEnvironment = Readonly<Record<string, string | undefined>>;
+
 export class ContinuousExcellenceUnavailableError extends Error {
   constructor(message: string) {
     super(message);
@@ -20,7 +22,7 @@ function required(name: string, value: string | undefined): string {
 }
 
 export function getContinuousExcellenceRuntimeConfig(
-  environment: NodeJS.ProcessEnv = process.env,
+  environment: ContinuousExcellenceEnvironment = process.env,
 ): ContinuousExcellenceRuntimeConfig {
   if (environment.OPERATOR_CONSOLE_CE_ACCESS_MODE !== "trusted-perimeter") {
     throw new ContinuousExcellenceUnavailableError(

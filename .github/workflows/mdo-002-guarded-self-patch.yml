@@ -1,0 +1,49 @@
+name: MDO-002 Guarded Diagnostic Integrity Patch
+
+on:
+  push:
+    branches:
+      - mdo-002-pilot-planning-workforce
+    paths:
+      - 'scripts/apply_mdo_002_diagnostic_patch.py'
+      - '.github/workflows/mdo-002-guarded-self-patch.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-clean:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: mdo-002-pilot-planning-workforce
+          fetch-depth: 0
+
+      - name: Apply exact guarded patch
+        run: python scripts/apply_mdo_002_diagnostic_patch.py
+
+      - name: Verify patch integrity
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          grep -q 'execution_release_failed' server/src/mdo-planning-runtime.ts
+          grep -q 'worker_instance_id = $2::text AS worker_matches' server/src/mdo-planning-runtime.ts
+          grep -q 'planning worker preserves original failure identity' server/test/mdo-planning-runtime.test.mjs
+          grep -q 'mdo-pilot-role-start' server/test/integration/mdo-ollama-pilot.e2e.mjs
+
+      - name: Commit patch and remove temporary machinery
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'CoMind guarded patch'
+          git config user.email '83435038+jlhogarth@users.noreply.github.com'
+          git add server/src/mdo-planning-runtime.ts \
+                  server/test/mdo-planning-runtime.test.mjs \
+                  server/test/integration/mdo-ollama-pilot.e2e.mjs
+          git rm scripts/apply_mdo_002_diagnostic_patch.py \
+                 .github/workflows/mdo-002-guarded-self-patch.yml
+          git commit -m 'MDO-002: preserve execution failure diagnostics across lease release'
+          git push origin HEAD:mdo-002-pilot-planning-workforce

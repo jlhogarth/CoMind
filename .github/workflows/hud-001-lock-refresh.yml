@@ -1,0 +1,38 @@
+name: HUD-001 Lock Refresh
+
+on:
+  push:
+    branches:
+      - hud-001-control-plane-dashboard
+    paths:
+      - ".github/workflows/hud-001-lock-refresh.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  refresh-lock:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact HUD branch
+        uses: actions/checkout@v4
+        with:
+          ref: hud-001-control-plane-dashboard
+          fetch-depth: 0
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Regenerate operator-console lockfile
+        working-directory: apps/operator-console
+        run: npm install --package-lock-only
+      - name: Remove temporary refresh workflow
+        run: rm .github/workflows/hud-001-lock-refresh.yml
+      - name: Commit generated lock evidence and self-remove
+        run: |
+          test -n "$(git status --porcelain -- apps/operator-console/package-lock.json .github/workflows/hud-001-lock-refresh.yml)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/operator-console/package-lock.json .github/workflows/hud-001-lock-refresh.yml
+          git commit -m "HUD-001: regenerate audited operator-console lockfile"
+          git push origin HEAD:hud-001-control-plane-dashboard

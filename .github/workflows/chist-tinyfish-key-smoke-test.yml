@@ -1,0 +1,57 @@
+name: CHIST TinyFish API Key Smoke Test
+
+on:
+  push:
+    branches:
+      - chist-tinyfish-key-smoke-test
+    paths:
+      - '.github/workflows/chist-tinyfish-key-smoke-test.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tinyfish-key-smoke-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TINYFISH_API_KEY: ${{ secrets.TinyFish_API_Key }}
+      TINYFISH_NO_TELEMETRY: '1'
+    steps:
+      - name: Checkout exact workflow head
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install pinned TinyFish CLI
+        run: npm install -g @tiny-fish/cli@0.52.4
+
+      - name: Confirm secret is injected without revealing it
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${TINYFISH_API_KEY:-}" ]]; then
+            echo '::error::GitHub secret TinyFish_API_Key was not injected.'
+            exit 1
+          fi
+          echo 'TinyFish_API_Key is present in the runner environment.'
+
+      - name: Validate API key with authenticated read-only wallet call
+        shell: bash
+        run: |
+          set -euo pipefail
+          tinyfish wallet status --pretty
+
+      - name: Run requested TinyFish Search smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          TINYFISH_RUNTIME_ATTEMPT_ID=a70dc2f0-c7b0-415d-9ef0-5dd6a98d961e \
+            tinyfish search query "latest FIFA World Cup news today" \
+              --location "US" \
+              --language "en" \
+              --pretty

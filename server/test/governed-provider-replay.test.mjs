@@ -1,13 +1,21 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-const { executeGovernedProviderExecution } = await import(
+const { executeGovernedProviderExecution: executeGovernedProviderExecutionRaw } = await import(
   '../dist/providers/governed-provider-execution.js'
 );
 const {
   DeterministicProviderInputTokenCounter,
   createProviderExecutionEnvelope,
 } = await import('../dist/providers/provider-execution-envelope.js');
+const { rulebookProviderInput } = await import('./support/rulebook-execution-preflight.mjs');
+
+function executeGovernedProviderExecution(input) {
+  return executeGovernedProviderExecutionRaw({
+    ...input,
+    rulebook: input.rulebook ?? rulebookProviderInput(),
+  });
+}
 
 function makeEnvelope(attemptNumber = 1) {
   return createProviderExecutionEnvelope({

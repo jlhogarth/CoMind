@@ -412,20 +412,26 @@ async function finishLease(
   workerInstanceId: string,
   complete: boolean
 ): Promise<string> {
-  const result = await queryFn<{ ok: boolean; lease_state: string }>(
-    `WITH finished AS MATERIALIZED (
-       SELECT comind.cm_foundry_finish_work(
-         $1::uuid, $2::text, $3::uuid, $4::bigint, $5::boolean
-       ) AS ok
-     )
-     SELECT COALESCE((SELECT ok FROM finished), false) AS ok,
-            (SELECT state FROM comind.cm_foundry_work_lease WHERE task_id = $1::uuid) AS lease_state`,
+  const finished = await queryFn<{ ok: boolean }>(
+    `SELECT comind.cm_foundry_finish_work(
+       $1::uuid, $2::text, $3::uuid, $4::bigint, $5::boolean
+     ) AS ok`,
     [claim.taskId, workerInstanceId, claim.leaseToken, claim.fencingEpoch, complete]
   );
-  if (result.rows.length !== 1 || result.rows[0].ok !== true) {
+  if (finished.rows.length !== 1 || finished.rows[0].ok !== true) {
     throw new MdoPlanningRuntimeError('fence_rejected', 'MDO lease completion was rejected by the fencing contract');
   }
-  return result.rows[0].lease_state;
+
+  const readback = await queryFn<{ lease_state: string }>(
+    `SELECT state AS lease_state
+     FROM comind.cm_foundry_work_lease
+     WHERE task_id = $1::uuid`,
+    [claim.taskId]
+  );
+  if (readback.rows.length !== 1 || typeof readback.rows[0].lease_state !== 'string') {
+    throw new MdoPlanningRuntimeError('lease_readback_failed', 'MDO lease state could not be read after fenced completion');
+  }
+  return readback.rows[0].lease_state;
 }
 
 export class MdoPlanningWorker {

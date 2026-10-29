@@ -11,20 +11,17 @@ on:
       - 'scripts/test_threadkeeper_c4.sh'
       - 'scripts/threadkeeper_c4_matrix.mjs'
       - 'config/threadkeeper-c4-evidence.v1.json'
+      - 'config/governed-evidence-bindings.v1.json'
       - 'docs/provenance/*tk-007*'
       - '.github/workflows/tk-007-threadkeeper-c4.yml'
   push:
     branches: [main]
     paths:
       - 'server/src/threadkeeper/**'
-      - 'server/test/threadkeeper-c4-*.test.mjs'
-      - 'server/test/threadkeeper-c4-*.integration.test.mjs'
+      - 'server/test/threadkeeper-c4-runtime-role.test.mjs'
+      - 'server/test/threadkeeper-c4-operational.integration.test.mjs'
       - 'db/migrations/20261027_007_threadkeeper_c4_operational_events.sql'
       - 'db/migrations/verify_20261027_007_threadkeeper_c4_operational_events.sql'
-      - 'scripts/test_threadkeeper_c4.sh'
-      - 'scripts/threadkeeper_c4_matrix.mjs'
-      - 'config/threadkeeper-c4-evidence.v1.json'
-      - 'docs/provenance/*tk-007*'
       - '.github/workflows/tk-007-threadkeeper-c4.yml'
   workflow_dispatch:
 

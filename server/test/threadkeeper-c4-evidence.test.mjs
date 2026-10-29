@@ -26,13 +26,13 @@ test('canonical ThreadKeeper C4 matrix validates while promotion remains explici
   const summary = matrixSummary(matrix);
   assert.equal(summary.gateRequirementCount, 16);
   assert.equal(summary.scenarioRequirementCount, 12);
-  assert.equal(summary.byStatus.proven, 24);
-  assert.equal(summary.byStatus.partial, 2);
+  assert.equal(summary.byStatus.proven, 25);
+  assert.equal(summary.byStatus.partial, 1);
   assert.equal(summary.byStatus.missing, 2);
   assert.equal(summary.currentMaturity, 'C3 Integrated');
   assert.equal(summary.targetMaturity, 'C4 Operational');
   assert.equal(summary.promotionReady, false);
-  assert.deepEqual(summary.unresolvedIds, ['C4-11', 'C4-13', 'C4-14', 'C4-16']);
+  assert.deepEqual(summary.unresolvedIds, ['C4-13', 'C4-14', 'C4-16']);
   assert.equal(matrix.promotionBoundary.promotionJournalKey, null);
 });
 

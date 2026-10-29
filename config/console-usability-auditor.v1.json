@@ -1,0 +1,86 @@
+{
+  "schema_version": "comind.console-usability-auditor.v1",
+  "issue": 322,
+  "agent": {
+    "role_code": "console_usability_auditor",
+    "display_name": "Console Usability Auditor",
+    "authority_floor": "C0",
+    "authority_ceiling": "C1",
+    "instruction_version": "cux-001.v1",
+    "status": "defined",
+    "production_mutation_authorized": false,
+    "paid_provider_authorized": false
+  },
+  "capabilities": [
+    {
+      "capability_code": "console.usability.inspect",
+      "action": "inspect",
+      "target_kind": "operator_console",
+      "max_authority": "C1",
+      "risk_class": "low",
+      "cost_bearing": false,
+      "adapter": "console_usability"
+    },
+    {
+      "capability_code": "console.usability.browser_test",
+      "action": "browser_test",
+      "target_kind": "operator_console",
+      "max_authority": "C1",
+      "risk_class": "low",
+      "cost_bearing": false,
+      "adapter": "console_usability"
+    },
+    {
+      "capability_code": "console.usability.review",
+      "action": "review",
+      "target_kind": "operator_console",
+      "max_authority": "C1",
+      "risk_class": "low",
+      "cost_bearing": false,
+      "adapter": "console_usability"
+    }
+  ],
+  "scope": {
+    "application": "apps/operator-console",
+    "initial_routes": ["/", "/activity", "/rulebook"],
+    "safe_external_link_policy": "classify_only",
+    "remote_control_exercise": false,
+    "local_control_exercise": true,
+    "security_policy_mutation": false,
+    "deployment_mutation": false,
+    "database_mutation": false
+  },
+  "review_domains": [
+    "navigation_integrity",
+    "interactive_control_integrity",
+    "content_clarity",
+    "readability",
+    "keyboard_navigation",
+    "responsive_layout",
+    "touch_target_sizing",
+    "mobile_information_preservation",
+    "browser_engine_compatibility",
+    "reduced_motion_behavior"
+  ],
+  "viewports": [
+    { "id": "desktop_1440", "width": 1440, "height": 1000, "mobile": false },
+    { "id": "laptop_1280", "width": 1280, "height": 800, "mobile": false },
+    { "id": "phone_narrow_375", "width": 375, "height": 812, "mobile": true },
+    { "id": "iphone_class_390", "width": 390, "height": 844, "mobile": true },
+    { "id": "phone_wide_430", "width": 430, "height": 932, "mobile": true },
+    { "id": "phone_landscape", "width": 844, "height": 390, "mobile": true }
+  ],
+  "browser_engines": ["chromium", "firefox", "webkit"],
+  "evidence": {
+    "machine_report": "JSON",
+    "human_summary": true,
+    "screenshots": "optional_non_secret",
+    "severity_levels": ["blocker", "major", "moderate", "minor"],
+    "human_acceptance_required": true
+  },
+  "cross_lane_boundaries": {
+    "DEP-C01": "Deployment health, authentication, rollback, and production acceptance remain owned by issue 297.",
+    "DRULE-004": "RuleBook governance semantics remain owned by issue 321.",
+    "BRAND-001": "Shared brand runtime remains owned by issue 138."
+  }
+}

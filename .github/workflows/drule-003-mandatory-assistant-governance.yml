@@ -1,0 +1,54 @@
+name: DRULE-003 Mandatory Assistant Governance
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/drule-003-mandatory-assistant-governance.yml'
+      - 'server/src/assistant-provider.ts'
+      - 'server/src/env.ts'
+      - 'server/test/configured-assistant-rulebook.test.mjs'
+      - 'server/test/env.test.mjs'
+      - 'docs/provenance/2026-10-29-drule-003-mandatory-assistant-governance.md'
+      - 'README.md'
+      - 'scripts/verify_openai_live.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  normal-route-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+      - name: Use Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Build and prove mandatory RuleBook route
+        working-directory: server
+        run: |
+          npm ci
+          npm run build
+          node --test test/env.test.mjs test/configured-assistant-rulebook.test.mjs test/governed-openai-assistant.test.mjs
+      - name: Reject direct configured OpenAI provider construction
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -Eq 'createOpenAIAssistantProvider|new[[:space:]]+OpenAIAssistantProvider' server/src/assistant-provider.ts; then
+            echo 'Normal assistant configuration contains a direct OpenAI provider bypass' >&2
+            exit 1
+          fi

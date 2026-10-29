@@ -30,3 +30,11 @@ jobs:
 
       - name: Render findings in job log
         run: cat integrity-findings.json
+
+      - name: Preserve exact-head integrity evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: iic-001-findings-${{ github.sha }}
+          path: integrity-findings.json
+          if-no-files-found: error
+          retention-days: 14

@@ -103,20 +103,9 @@ async function downloadVerified(rawUrl: string, outputPath: string, expectedHash
 
 async function sha256File(path: string): Promise<string> {
   const hash = createHash('sha256');
-  await pipeline(
-    createReadStream(path),
-    new Transform({
-      transform(chunk, _encoding, callback) {
-        hash.update(chunk);
-        callback(null, chunk);
-      },
-    }),
-    new Transform({
-      transform(chunk, _encoding, callback) {
-        callback(null, chunk);
-      },
-    }),
-  );
+  for await (const chunk of createReadStream(path)) {
+    hash.update(chunk);
+  }
   return hash.digest('hex');
 }
 
@@ -150,7 +139,6 @@ async function consumeTransfer(transferId: string): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  process.env.COMIND_DATABASE_PURPOSE = 'chatgpt_archive';
   const transferId = requireUuid(process.env.CHIST_PITA_TRANSFER_ID);
   await mkdir(CHUNK_ROOT, { recursive: true, mode: 0o700 });
   await rm(CIPHERTEXT_PATH, { force: true });
@@ -184,24 +172,24 @@ async function main(): Promise<void> {
   }
 
   const transfer = transferResult.rows[0];
-  const expectedBytes = Number(transfer.expected_source_bytes);
-  if (transfer.expected_source_sha256 !== CANONICAL_SHA256 || expectedBytes !== CANONICAL_BYTES) {
-    throw new Error('Transfer manifest does not identify the independently verified canonical source');
-  }
-  const expiresAt = new Date(transfer.expires_at).getTime();
-  if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
-    throw new Error('Transfer manifest is expired');
-  }
-
-  const cipherHash = requireHex(transfer.cipher_sha256, 64, 'cipher_sha256');
-  const chunkHashes = requireStringArray(transfer.chunk_hashes, EXPECTED_CHUNKS, 'chunk_hashes')
-    .map((value, index) => requireHex(value, 64, `chunk_hashes[${index}]`));
-  const signedUrls = requireStringArray(transfer.signed_urls, EXPECTED_CHUNKS, 'signed_urls');
-  const keyHex = requireHex(transfer.key_hex, 64, 'key_hex');
-  const ivHex = requireHex(transfer.iv_hex, 32, 'iv_hex');
-
   let transferConsumed = false;
   try {
+    const expectedBytes = Number(transfer.expected_source_bytes);
+    if (transfer.expected_source_sha256 !== CANONICAL_SHA256 || expectedBytes !== CANONICAL_BYTES) {
+      throw new Error('Transfer manifest does not identify the independently verified canonical source');
+    }
+    const expiresAt = new Date(transfer.expires_at).getTime();
+    if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+      throw new Error('Transfer manifest is expired');
+    }
+
+    const cipherHash = requireHex(transfer.cipher_sha256, 64, 'cipher_sha256');
+    const chunkHashes = requireStringArray(transfer.chunk_hashes, EXPECTED_CHUNKS, 'chunk_hashes')
+      .map((value, index) => requireHex(value, 64, `chunk_hashes[${index}]`));
+    const signedUrls = requireStringArray(transfer.signed_urls, EXPECTED_CHUNKS, 'signed_urls');
+    const keyHex = requireHex(transfer.key_hex, 64, 'key_hex');
+    const ivHex = requireHex(transfer.iv_hex, 32, 'iv_hex');
+
     await Promise.all(signedUrls.map((url, index) =>
       downloadVerified(url, `${CHUNK_ROOT}/part-${String(index).padStart(2, '0')}`, chunkHashes[index])
     ));
@@ -227,10 +215,13 @@ async function main(): Promise<void> {
     );
     await verifyFileIdentity(ZIP_PATH, CANONICAL_BYTES, CANONICAL_SHA256);
   } finally {
-    await consumeTransfer(transferId);
-    transferConsumed = true;
-    await rm(CHUNK_ROOT, { recursive: true, force: true });
-    await rm(CIPHERTEXT_PATH, { force: true });
+    try {
+      await consumeTransfer(transferId);
+      transferConsumed = true;
+    } finally {
+      await rm(CHUNK_ROOT, { recursive: true, force: true });
+      await rm(CIPHERTEXT_PATH, { force: true });
+    }
   }
 
   console.log(JSON.stringify({

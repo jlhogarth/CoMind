@@ -64,15 +64,24 @@ export function registerConversationRoutes(
 
     const { title, project_id } = parsed.data;
     const { rows } = await queryFn<any>(
-      `INSERT INTO comind.cm_conversation (project_id, source, title)
-       VALUES (
-         COALESCE($1::uuid, (SELECT project_id FROM comind.cm_project WHERE slug='comind' LIMIT 1)),
-         'live',
-         $2
+      `WITH selected_project AS (
+         SELECT project_id, org_id
+         FROM comind.cm_project
+         WHERE project_id = COALESCE(
+           $1::uuid,
+           (SELECT project_id FROM comind.cm_project WHERE slug='comind' LIMIT 1)
+         )
+           AND org_id IS NOT NULL
        )
-       RETURNING conv_id, project_id, source, title, created_at`,
+       INSERT INTO comind.cm_conversation (org_id, project_id, source, title)
+       SELECT org_id, project_id, 'live', $2
+       FROM selected_project
+       RETURNING conv_id, org_id, project_id, source, title, created_at`,
       [project_id ?? null, title]
     );
+    if (!rows[0]) {
+      return reply.code(409).send({ error: 'Conversation project scope could not be resolved' });
+    }
     return reply.code(201).send(rows[0]);
   });
 

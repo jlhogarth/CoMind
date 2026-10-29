@@ -30,8 +30,11 @@ const assistantProvider = {
 
 before(async () => {
   const project = await databaseQuery(
-    `INSERT INTO comind.cm_project (title, slug, priority)
-     VALUES ($1, $2, 5)
+    `INSERT INTO comind.cm_project (org_id, title, slug, priority)
+     SELECT org_id, $1, $2, 5
+     FROM comind.cm_org
+     WHERE slug='comind'
+     LIMIT 1
      RETURNING project_id`,
     [`Promotion ${marker}`, `memory-promotion-${process.pid}`]
   );

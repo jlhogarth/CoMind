@@ -1,7 +1,7 @@
 # DRULE conversation governance binding
 
 Date: 2026-10-29
-Status: candidate for Test verification
+Status: verified in Supabase Test, pending repository merge
 Scope: authoritative static governance binding for assistant conversations
 Production authority: false
 
@@ -29,6 +29,8 @@ The binding and review tables are private, RLS-enabled, and covered by restricti
 Binding and review mutation functions are administrative only. They are not executable by `anon`, `authenticated`, or `service_role`.
 
 The server role receives only `EXECUTE` on `comind_pm.resolve_conversation_execution_governance(text,uuid,text)`. The resolver is `SECURITY DEFINER` in the private `comind_pm` schema with an explicit search path and returns only structured governance attributes.
+
+The `conversation_asset_key(uuid)` helper also pins its `search_path` and is not executable by application roles. This hardening was added after the first live Test advisor pass identified the helper as a new mutable-search-path warning. The follow-up advisor pass returned the mutable-search-path count to the pre-change baseline.
 
 Raw prompts, passwords, tokens, API keys, authorization headers, credentials, key material, and other forbidden governance-context keys are rejected from binding/review metadata by the existing RuleBook sensitive-key guard.
 
@@ -81,9 +83,9 @@ The server adapter calls the private database resolver and validates:
 
 It converts the result only into static RuleBook execution context. It intentionally does not manufacture C11 observations such as `untrusted_input`, `asks_for_secrets`, or `authority_escalation`.
 
-## Acceptance proof
+## Repository acceptance proof
 
-The isolated PostgreSQL 17 proof must establish:
+The exact-head PostgreSQL 17 and Node 24 proof establishes:
 
 1. migrations are idempotent across two passes;
 2. both private tables have RLS and restrictive deny-all policies;
@@ -101,13 +103,45 @@ The isolated PostgreSQL 17 proof must establish:
 14. review evidence is append-only;
 15. conversation scope drift after binding causes resolver failure;
 16. unscoped conversations cannot be silently bound;
-17. the TypeScript server adapter rejects malformed, contradictory, or expanded resolver output.
+17. the TypeScript server adapter rejects malformed, contradictory, or expanded resolver output;
+18. the conversation asset-key helper has a pinned search path and no application-role execute grant.
 
-The live Supabase Test proof uses a transaction and rolls back synthetic conversation, asset, binding, and review records after verification.
+Broad repository CI and the provider, FinOps/governance, budget-authority, DRB, and Foundry regression workflows also passed on the pre-advisor-hardening candidate. Final exact-head verification is required again after the search-path hardening commit.
+
+## Live Supabase Test proof
+
+The four migration stages were applied to Supabase Test. A rollback-only synthetic proof then used a real CoMind Test organization/project scope and verified the same authoritative lifecycle against the deployed functions:
+
+- unbound resolution fails closed;
+- first bind creates the governed asset and binding;
+- repeat bind is idempotent;
+- pending review resolves `human_approved=false`;
+- denial resolves `human_approved=false`;
+- bounded approval resolves `human_approved=true` with expiry;
+- the resolved tenant/project context passes DRULE-C17;
+- the resolved asset/destination/purpose/approval context passes DRULE-C13;
+- unbounded approval is rejected;
+- raw-sensitive metadata is rejected;
+- review evidence cannot be updated;
+- changed conversation project scope is detected as drift and rejected;
+- a conversation without org/project scope cannot be bound.
+
+The proof transaction was rolled back. Post-proof readback showed zero synthetic conversations, zero synthetic bindings, zero synthetic governed assets, and zero synthetic review events.
+
+Persistent Test readback after rollback:
+
+- both new private tables have RLS enabled;
+- two restrictive deny-all policies are present;
+- `service_role` can execute only the resolver, not bind or review mutation functions;
+- `anon` and `authenticated` cannot execute the resolver;
+- conversation FK and approval-expiry constraint are present;
+- zero persistent conversation bindings and zero persistent review events exist because no legacy conversation has yet been assigned authoritative scope.
+
+Security advisor comparison after hardening matches the pre-change counts for the relevant findings. No new conversation-governance security finding remains. Performance advisor output contains no unindexed foreign key for either new table. Newly created covering indexes are reported as unused because the authoritative tables are intentionally empty after rollback.
 
 ## Existing-data finding
 
-At inspection time on 2026-10-29, Supabase Test contained 10 `comind.cm_conversation` rows and none had both `org_id` and `project_id` populated. This milestone does not invent scope for those records. They remain unbound until a separate evidence-backed scope/backfill decision is made.
+At inspection and post-deployment readback on 2026-10-29, Supabase Test contained 10 `comind.cm_conversation` rows and none had both `org_id` and `project_id` populated. This milestone does not invent scope for those records. They remain unbound until a separate evidence-backed scope/backfill decision is made.
 
 ## Activation boundary
 

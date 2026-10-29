@@ -406,6 +406,28 @@ export function createMdoFoundryAdapter(options: MdoFoundryAdapterOptions): Foun
   };
 }
 
+interface LeaseDiagnosticRow {
+  state: string;
+  worker_matches: boolean;
+  token_matches: boolean;
+  fencing_epoch: number | string;
+  epoch_matches: boolean;
+  lease_expires_at: string | null;
+  expired: boolean | null;
+  attempt_count: number | string;
+  max_attempts: number | string;
+}
+
+function errorIdentity(error: unknown): string {
+  if (error instanceof MdoPlanningRuntimeError) return error.code;
+  if (error && typeof error === 'object' && 'code' in error) {
+    const code = (error as { code?: unknown }).code;
+    if (typeof code === 'string' && SAFE_CODE.test(code)) return code;
+  }
+  if (error instanceof Error && SAFE_CODE.test(error.name)) return error.name;
+  return 'unknown_error';
+}
+
 async function finishLease(
   queryFn: QueryFunction,
   claim: MdoClaimedWork,
@@ -419,7 +441,29 @@ async function finishLease(
     [claim.taskId, workerInstanceId, claim.leaseToken, claim.fencingEpoch, complete]
   );
   if (finished.rows.length !== 1 || finished.rows[0].ok !== true) {
-    throw new MdoPlanningRuntimeError('fence_rejected', 'MDO lease completion was rejected by the fencing contract');
+    const diagnostic = await queryFn<LeaseDiagnosticRow>(
+      `SELECT state,
+              worker_instance_id = $2::text AS worker_matches,
+              lease_token = $3::uuid AS token_matches,
+              fencing_epoch,
+              fencing_epoch = $4::bigint AS epoch_matches,
+              lease_expires_at::text,
+              CASE WHEN lease_expires_at IS NULL THEN NULL
+                   ELSE lease_expires_at <= clock_timestamp() END AS expired,
+              attempt_count,
+              max_attempts
+       FROM comind.cm_foundry_work_lease
+       WHERE task_id = $1::uuid`,
+      [claim.taskId, workerInstanceId, claim.leaseToken, claim.fencingEpoch]
+    );
+    const row = diagnostic.rows.length === 1 ? diagnostic.rows[0] : null;
+    const detail = row
+      ? `state=${row.state};worker_match=${row.worker_matches};token_match=${row.token_matches};epoch=${row.fencing_epoch};epoch_match=${row.epoch_matches};expired=${row.expired};attempt=${row.attempt_count}/${row.max_attempts}`
+      : 'lease_row=missing_or_ambiguous';
+    throw new MdoPlanningRuntimeError(
+      'fence_rejected',
+      `MDO lease completion was rejected by the fencing contract (${detail})`
+    );
   }
 
   const readback = await queryFn<{ lease_state: string }>(
@@ -432,6 +476,25 @@ async function finishLease(
     throw new MdoPlanningRuntimeError('lease_readback_failed', 'MDO lease state could not be read after fenced completion');
   }
   return readback.rows[0].lease_state;
+}
+
+async function releaseAfterExecutionFailure(
+  queryFn: QueryFunction,
+  claim: MdoClaimedWork,
+  workerInstanceId: string,
+  originalError: unknown
+): Promise<string> {
+  try {
+    return await finishLease(queryFn, claim, workerInstanceId, false);
+  } catch (releaseError) {
+    const releaseDetail = releaseError instanceof MdoPlanningRuntimeError
+      ? `${releaseError.code}:${releaseError.message}`
+      : errorIdentity(releaseError);
+    throw new MdoPlanningRuntimeError(
+      'execution_release_failed',
+      `MDO execution failed as ${errorIdentity(originalError)} and retry release failed as ${releaseDetail}`
+    );
+  }
 }
 
 export class MdoPlanningWorker {
@@ -466,7 +529,12 @@ export class MdoPlanningWorker {
         input: Object.freeze({}),
       });
     } catch (error) {
-      await finishLease(this.options.queryFn, input.claim, input.workerInstanceId, false);
+      await releaseAfterExecutionFailure(
+        this.options.queryFn,
+        input.claim,
+        input.workerInstanceId,
+        error
+      );
       throw error;
     }
 

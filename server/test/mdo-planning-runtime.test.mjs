@@ -299,3 +299,68 @@ test('planning worker releases a failed execution for bounded retry, verifies re
   assert.equal(submitted, false);
   assert.equal(leaseState, 'ready');
 });
+
+
+test('planning worker preserves original failure identity when retry release fencing is rejected', async () => {
+  let diagnosticRead = false;
+  const queryFn = async (sql, params = []) => {
+    if (sql.includes('cm_foundry_finish_work')) {
+      assert.equal(params[4], false);
+      return { rows: [{ ok: false }] };
+    }
+    if (sql.includes('worker_instance_id = $2::text AS worker_matches')) {
+      diagnosticRead = true;
+      return { rows: [{
+        state: 'ready',
+        worker_matches: false,
+        token_matches: false,
+        fencing_epoch: 2,
+        epoch_matches: false,
+        lease_expires_at: null,
+        expired: null,
+        attempt_count: 1,
+        max_attempts: 3,
+      }] };
+    }
+    throw new Error(`Unexpected SQL: ${sql}`);
+  };
+  const providerError = Object.assign(new Error('provider payload must not leak'), {
+    code: 'ollama_inference_failed',
+  });
+  const worker = new MdoPlanningWorker({
+    queryFn,
+    foundryRuntime: { execute: async () => { throw providerError; } },
+    mdo: {
+      loadTaskContext: async () => context(),
+      submitContribution: async () => 'never',
+    },
+  });
+  await assert.rejects(
+    () => worker.executeClaim({
+      profileId: ids.profile,
+      workerInstanceId: 'mdo-unit-worker',
+      authorizationDecisionId: ids.decision,
+      idempotencyKey: 'mdo-unit-execution-release-failure',
+      claim: {
+        taskId: ids.task,
+        leaseToken: ids.lease,
+        fencingEpoch: 1,
+        leaseExpiresAt: '2099-01-01T00:00:00Z',
+        planId: ids.plan,
+        capabilityCode: 'mdo.plan.analyze',
+      },
+    }),
+    (error) => {
+      assert.equal(error instanceof MdoPlanningRuntimeError, true);
+      assert.equal(error.code, 'execution_release_failed');
+      assert.match(error.message, /ollama_inference_failed/);
+      assert.match(error.message, /state=ready/);
+      assert.match(error.message, /worker_match=false/);
+      assert.match(error.message, /epoch_match=false/);
+      assert.equal(error.message.includes(ids.lease), false);
+      assert.equal(error.message.includes('provider payload must not leak'), false);
+      return true;
+    }
+  );
+  assert.equal(diagnosticRead, true);
+});

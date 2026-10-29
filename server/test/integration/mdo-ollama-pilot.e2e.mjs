@@ -308,6 +308,7 @@ test('MDO-002 executes the complete ten-role phase chain through local Ollama wi
       const [profileKey, expectedRole] = schedule[index];
       const profile = profiles[profileKey];
       const workerId = `mdo002-${profileKey}-${index + 1}`;
+      console.log(`mdo-pilot-role-start|index=${index + 1}|role=${expectedRole}|capability=${profile.capabilityCode}`);
       const claim = await mdo.claimWork({
         profileId: profile.profileId,
         workerInstanceId: workerId,
@@ -334,6 +335,7 @@ test('MDO-002 executes the complete ten-role phase chain through local Ollama wi
       assert.equal(result.provider, 'ollama_local');
       assert.equal(result.model, model);
       assert.equal(result.execution.terminalStatus, 'succeeded');
+      console.log(`mdo-pilot-role-complete|index=${index + 1}|role=${expectedRole}`);
       results.push({
         role: expectedRole,
         task_id: result.taskId,

@@ -43,9 +43,10 @@
         "40790281404": {"workflowPath":".github/workflows/tk-007-threadkeeper-c4.yml","expectedHeadSha":"f9cae4cbe8fd499e91a505fb47c6764647fb76b9","event":"push","conclusion":"success","bindsImplementation":false},
         "40791220310": {"workflowPath":".github/workflows/mctrl-001-maintenance-control.yml","expectedHeadSha":"e9eb2367f584d3f922a30d50e38b00d7df41943f","event":"push","conclusion":"success","bindsImplementation":false},
         "40791220486": {"workflowPath":".github/workflows/tk-007-threadkeeper-c4.yml","expectedHeadSha":"e9eb2367f584d3f922a30d50e38b00d7df41943f","event":"push","conclusion":"success","bindsImplementation":false},
-        "40791220532": {"workflowPath":".github/workflows/ci.yml","expectedHeadSha":"e9eb2367f584d3f922a30d50e38b00d7df41943f","event":"push","conclusion":"success","bindsImplementation":false}
+        "40791220532": {"workflowPath":".github/workflows/ci.yml","expectedHeadSha":"e9eb2367f584d3f922a30d50e38b00d7df41943f","event":"push","conclusion":"success","bindsImplementation":false},
+        "40803375534": {"workflowPath":".github/workflows/mctrl-001-maintenance-control.yml","expectedHeadSha":"97f88346ba6b6393671dc6725080b35e6711be5a","event":"push","conclusion":"success","bindsImplementation":false}
       },
-      "finalAcceptanceRunIds": [40791220486,40791220310],
+      "finalAcceptanceRunIds": [40791220486,40803375534],
       "cdeKeys": {"JRN-20261028-0001":{"verificationState":"verified","mctrlControlId":"MCTRL-JOURNAL-TK-C4-PROMOTION"}}
     }
   }

@@ -6,13 +6,13 @@
   "implementationCommit": "a48baa290baef792d614c788961ab99966b3efac",
   "purpose": "Fail-closed evidence gate for ThreadKeeper C4 Operational maturity.",
   "promotionBoundary": {
-    "currentMaturity": "C3 Integrated",
+    "currentMaturity": "C4 Operational",
     "targetMaturity": "C4 Operational",
     "automaticPromotionAllowed": false,
     "productionActivationRequired": false,
     "operationalSlaRequired": false,
-    "ready": false,
-    "promotionJournalKey": null
+    "ready": true,
+    "promotionJournalKey": "JRN-20261028-0001"
   },
   "statuses": ["proven", "partial", "missing", "not_applicable"],
   "evidenceTypes": ["repo_path", "github_run", "cde_key"],
@@ -29,10 +29,10 @@
     {"id":"C4-10","title":"Bounded sustained operation covers normal change failure recovery authority and continuation","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-c4-operational.integration.test.mjs"},{"type":"github_run","runId":40594328128}]},
     {"id":"C4-11","title":"Acceptance-closure exact-head CI C4 and MCTRL are green","status":"proven","evidence":[{"type":"repo_path","path":"docs/provenance/2026-10-28-tk-007-c4-acceptance-closure.md"},{"type":"repo_path","path":".github/workflows/tk-007-threadkeeper-c4.yml"},{"type":"repo_path","path":"config/maintenance-control.v1.json"},{"type":"github_run","runId":40790077208},{"type":"github_run","runId":40790281313},{"type":"github_run","runId":40790281352},{"type":"github_run","runId":40790281404}],"note":"The exact PR tree passed broad CI before merge. The identical merged tree passed TK-004 persistence, the complete main-branch C4 isolated plus live Test proof, and MCTRL including its read-only live Test audit."},
     {"id":"C4-12","title":"Retained live artifact reconciles with Supabase Test operational rows","status":"proven","evidence":[{"type":"repo_path","path":"docs/provenance/2026-10-28-tk-007-c4-acceptance-closure.md"},{"type":"github_run","runId":40594328128},{"type":"github_run","runId":40790281404}],"note":"Both accepted live runs reconcile at their own correlation IDs to six operations: four succeeded, one controlled failure, one blocked stale operation, zero in-flight operations, and zero unrecovered failures. Runtime role readback preserves SELECT/INSERT only and denies UPDATE/DELETE plus archive access."},
-    {"id":"C4-13","title":"Independent or Founder acceptance is explicitly recorded","status":"partial","evidence":[{"type":"repo_path","path":"config/threadkeeper-c4-evidence.v1.json"}],"nextAction":"Record an independent reviewer disposition or explicit Founder acceptance now that all technical acceptance gates are green."},
-    {"id":"C4-14","title":"Canonical Development Evidence records the C3 to C4 promotion atomically","status":"missing","evidence":[{"type":"repo_path","path":"docs/provenance/2026-10-28-tk-007-c4-acceptance-closure.md"}],"nextAction":"After explicit acceptance, write a stale-state-guarded CDE promotion transaction and preserve its new journal key without activating production."},
-    {"id":"C4-15","title":"Production activation remains a separate false boundary","status":"proven","evidence":[{"type":"repo_path","path":"docs/provenance/2026-10-28-tk-007-c4-acceptance-closure.md"},{"type":"repo_path","path":".github/workflows/tk-007-threadkeeper-c4.yml"}]},
-    {"id":"C4-16","title":"Post-promotion Maintenance Control confirms canonical and repository agreement","status":"missing","evidence":[{"type":"repo_path","path":"config/maintenance-control.v1.json"}],"nextAction":"Run MCTRL on the promoted exact head and record the successful post-promotion result before closing TK-007."}
+    {"id":"C4-13","title":"Independent or Founder acceptance is explicitly recorded","status":"proven","evidence":[{"type":"repo_path","path":"docs/provenance/2026-10-28-tk-007-c4-promotion.md"}],"note":"The Founder explicitly accepted TK-007 promotion from C3 Integrated to C4 Operational. The preserved acceptance authorizes maturity promotion only and does not authorize production activation."},
+    {"id":"C4-14","title":"Canonical Development Evidence records the C3 to C4 promotion atomically","status":"proven","evidence":[{"type":"repo_path","path":"docs/provenance/2026-10-28-tk-007-c4-promotion.md"},{"type":"cde_key","key":"JRN-20261028-0001"}],"note":"A stale-state-guarded Supabase transaction atomically promoted concept:threadkeeper and reconciled CCI, MLC, DPE, DPE-002, and EDG projections while preserving production_activation=false."},
+    {"id":"C4-15","title":"Production activation remains a separate false boundary","status":"proven","evidence":[{"type":"repo_path","path":"docs/provenance/2026-10-28-tk-007-c4-acceptance-closure.md"},{"type":"repo_path","path":"docs/provenance/2026-10-28-tk-007-c4-promotion.md"},{"type":"repo_path","path":".github/workflows/tk-007-threadkeeper-c4.yml"}]},
+    {"id":"C4-16","title":"Post-promotion Maintenance Control confirms canonical and repository agreement","status":"proven","evidence":[{"type":"repo_path","path":"config/maintenance-control.v1.json"},{"type":"repo_path","path":"docs/provenance/2026-10-28-tk-007-c4-promotion.md"},{"type":"github_run","runId":40803375534}],"note":"Main-branch MCTRL run 40803375534 passed the promoted C4 repository baseline and its bounded read-only Supabase Test audit on commit 97f88346ba6b6393671dc6725080b35e6711be5a."}
   ],
   "scenarioRequirements": [
     {"id":"O-01","title":"Root continuity cycle establishes an externally authorized accepted checkpoint","status":"proven","evidence":[{"type":"repo_path","path":"server/test/threadkeeper-c4-operational.integration.test.mjs"},{"type":"github_run","runId":40594328128}]},

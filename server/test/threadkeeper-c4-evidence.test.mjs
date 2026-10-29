@@ -20,20 +20,22 @@ function firstProven(matrix) {
     .find(item => item.status === 'proven');
 }
 
-test('canonical ThreadKeeper C4 matrix validates while promotion remains explicitly gated', () => {
+test('canonical ThreadKeeper C4 matrix validates after governed promotion closure', () => {
   const matrix = loadThreadKeeperC4Matrix();
   assert.deepEqual(validateThreadKeeperC4Matrix(matrix, { repoRoot }), []);
   const summary = matrixSummary(matrix);
   assert.equal(summary.gateRequirementCount, 16);
   assert.equal(summary.scenarioRequirementCount, 12);
-  assert.equal(summary.byStatus.proven, 25);
-  assert.equal(summary.byStatus.partial, 1);
-  assert.equal(summary.byStatus.missing, 2);
-  assert.equal(summary.currentMaturity, 'C3 Integrated');
+  assert.equal(summary.byStatus.proven, 28);
+  assert.equal(summary.byStatus.partial ?? 0, 0);
+  assert.equal(summary.byStatus.missing ?? 0, 0);
+  assert.equal(summary.currentMaturity, 'C4 Operational');
   assert.equal(summary.targetMaturity, 'C4 Operational');
-  assert.equal(summary.promotionReady, false);
-  assert.deepEqual(summary.unresolvedIds, ['C4-13', 'C4-14', 'C4-16']);
-  assert.equal(matrix.promotionBoundary.promotionJournalKey, null);
+  assert.equal(summary.promotionReady, true);
+  assert.deepEqual(summary.unresolvedIds, []);
+  assert.equal(matrix.promotionBoundary.promotionJournalKey, 'JRN-20261028-0001');
+  assert.equal(matrix.promotionBoundary.automaticPromotionAllowed, false);
+  assert.equal(matrix.promotionBoundary.productionActivationRequired, false);
 });
 
 test('C4 proven claims fail without repository evidence', () => {
@@ -52,21 +54,27 @@ test('C4 nonexistent evidence path fails validation', () => {
   assert.ok(errors.some(message => message.includes('evidence path does not exist')), errors.join('\n'));
 });
 
-test('C4 cannot become promotion-ready while any required evidence is unresolved', () => {
+test('C4 cannot remain promotion-ready if a required acceptance gate regresses', () => {
   const matrix = clone(loadThreadKeeperC4Matrix());
-  matrix.promotionBoundary.ready = true;
-  matrix.promotionBoundary.currentMaturity = 'C4 Operational';
-  matrix.promotionBoundary.promotionJournalKey = 'JRN-20990101-0001';
+  const acceptance = matrix.gateRequirements.find(item => item.id === 'C4-13');
+  acceptance.status = 'partial';
+  acceptance.nextAction = 'Restore explicit governed acceptance evidence.';
   const errors = validateThreadKeeperC4Matrix(matrix, { repoRoot });
   assert.ok(errors.some(message => message.includes('required entries remain partial or missing')), errors.join('\n'));
   assert.ok(errors.some(message => message.includes('requires C4-13 to be proven')), errors.join('\n'));
-  assert.ok(errors.some(message => message.includes('requires C4-14 to be proven')), errors.join('\n'));
-  assert.ok(errors.some(message => message.includes('requires C4-16 to be proven')), errors.join('\n'));
 });
 
-test('C4 promotion journal cannot appear before promotion readiness', () => {
+test('C4 final state requires the governed promotion journal', () => {
   const matrix = clone(loadThreadKeeperC4Matrix());
-  matrix.promotionBoundary.promotionJournalKey = 'JRN-20990101-0001';
+  matrix.promotionBoundary.promotionJournalKey = null;
+  const errors = validateThreadKeeperC4Matrix(matrix, { repoRoot });
+  assert.ok(errors.some(message => message.includes('promotionBoundary.ready requires promotionJournalKey')), errors.join('\n'));
+});
+
+test('C4 promotion journal cannot appear in a pre-promotion state', () => {
+  const matrix = clone(loadThreadKeeperC4Matrix());
+  matrix.promotionBoundary.ready = false;
+  matrix.promotionBoundary.currentMaturity = 'C3 Integrated';
   const errors = validateThreadKeeperC4Matrix(matrix, { repoRoot });
   assert.ok(errors.some(message => message.includes('promotionJournalKey must remain null')), errors.join('\n'));
 });
@@ -83,7 +91,8 @@ test('C4 required ids cannot be silently dropped or duplicated', () => {
 
 test('C4 cannot claim current C4 maturity before promotion readiness', () => {
   const matrix = clone(loadThreadKeeperC4Matrix());
-  matrix.promotionBoundary.currentMaturity = 'C4 Operational';
+  matrix.promotionBoundary.ready = false;
+  matrix.promotionBoundary.promotionJournalKey = null;
   const errors = validateThreadKeeperC4Matrix(matrix, { repoRoot });
   assert.ok(errors.some(message => message.includes('pre-promotion matrix must remain C3 Integrated')), errors.join('\n'));
 });

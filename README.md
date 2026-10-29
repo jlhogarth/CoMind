@@ -75,7 +75,7 @@ The metered answer quality gate is disabled by default. When `ASSISTANT_QUALITY_
 
 Assistant generation and conversation message writes are serialized per conversation with a PostgreSQL session advisory lock. If another assistant generation already owns that conversation lock, generation and competing message writes return HTTP `409` without invoking the provider or writing a message. A repeated generation request after the latest user turn already has a persisted assistant response returns that existing assistant row with HTTP `200` and does not call the provider again. A newly generated response returns HTTP `201`.
 
-The historical `scripts/verify_openai_live.sh` path is deliberately disabled by DRULE-003 because it predates authoritative conversation governance. A future real-provider smoke test must be a separately reviewed governed-live proof with an explicitly bound synthetic conversation, current egress approval, approved paid-access proposal and binding, and zero automatic retries. Ordinary CI never invokes a paid provider.
+The historical `scripts/verify_openai_live.sh` path is deliberately disabled by DRULE-003 because it predates authoritative conversation governance. A future real-provider smoke test must be a separately reviewed governed-live proof with an explicitly bound synthetic conversation, current egress approval, approved paid-access proposal and binding, and zero automatic retries. This paid live verification is not part of ordinary CI; ordinary CI never invokes a paid provider.
 
 ## Application endpoints
 

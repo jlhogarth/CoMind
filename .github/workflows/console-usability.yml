@@ -1,0 +1,95 @@
+name: Console usability
+
+on:
+  pull_request:
+    paths:
+      - "apps/operator-console/**"
+      - "config/console-usability-auditor.v1.json"
+      - ".github/workflows/console-usability.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  chromium-baseline:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/operator-console
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/operator-console/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm test
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run CUX Chromium desktop and mobile review
+        run: npm run usability-test
+        env:
+          CUX_BROWSERS: chromium
+          CUX_REQUIRED_BROWSERS: chromium
+          CUX_FAIL_ON: blocker
+          CUX_REPORT_PATH: test-results/cux-001/console-usability-report.json
+          CUX_SCREENSHOT_DIR: test-results/cux-001/screenshots
+      - name: Upload CUX evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cux-001-chromium-${{ github.sha }}
+          path: apps/operator-console/test-results/cux-001
+          if-no-files-found: error
+          retention-days: 14
+
+  full-browser-matrix:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: apps/operator-console
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/operator-console/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm test
+      - name: Install Chromium, Firefox, and WebKit
+        run: npx playwright install --with-deps chromium firefox webkit
+      - name: Run full CUX browser and mobile review
+        run: npm run usability-test
+        env:
+          CUX_BROWSERS: chromium,firefox,webkit
+          CUX_REQUIRED_BROWSERS: chromium,firefox,webkit
+          CUX_FAIL_ON: blocker
+          CUX_REPORT_PATH: test-results/cux-001/console-usability-report.json
+          CUX_SCREENSHOT_DIR: test-results/cux-001/screenshots
+      - name: Upload CUX evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cux-001-full-browser-${{ github.sha }}
+          path: apps/operator-console/test-results/cux-001
+          if-no-files-found: error
+          retention-days: 14

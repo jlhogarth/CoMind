@@ -54,7 +54,7 @@ test("Continuous Excellence state parser preserves bounded aggregate state", () 
 
 test("Continuous Excellence protected runtime fails closed unless trusted perimeter is explicit", () => {
   assert.throws(
-    () => getContinuousExcellenceRuntimeConfig({} as NodeJS.ProcessEnv),
+    () => getContinuousExcellenceRuntimeConfig({}),
     ContinuousExcellenceUnavailableError,
   );
 
@@ -62,7 +62,7 @@ test("Continuous Excellence protected runtime fails closed unless trusted perime
     OPERATOR_CONSOLE_CE_ACCESS_MODE: "trusted-perimeter",
     NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
     SUPABASE_SECRET_KEY: "test-secret",
-  } as NodeJS.ProcessEnv);
+  });
 
   assert.deepEqual(config, {
     url: "https://example.supabase.co",

@@ -87,11 +87,12 @@ test("review decision windows fail closed", () => {
 
 test("protected runtime is disabled unless the trusted perimeter is explicit", () => {
   assert.throws(
-    () => getRuleBookOperatorRuntimeConfig({}),
+    () => getRuleBookOperatorRuntimeConfig({ NODE_ENV: "test" }),
     RuleBookOperatorUnavailableError,
   );
   assert.throws(
     () => getRuleBookOperatorRuntimeConfig({
+      NODE_ENV: "test",
       OPERATOR_CONSOLE_RULEBOOK_ACCESS_MODE: "trusted-perimeter",
       NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
       SUPABASE_SECRET_KEY: "server-secret",
@@ -101,6 +102,7 @@ test("protected runtime is disabled unless the trusted perimeter is explicit", (
 
   assert.deepEqual(
     getRuleBookOperatorRuntimeConfig({
+      NODE_ENV: "test",
       OPERATOR_CONSOLE_RULEBOOK_ACCESS_MODE: "trusted-perimeter",
       NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
       SUPABASE_SECRET_KEY: "server-secret",

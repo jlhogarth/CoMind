@@ -10,6 +10,12 @@ The browser client uses only `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABAS
 
 The metadata adapter required to discover PostgreSQL catalog structure is intentionally not wired to live Supabase in this first commit because doing so may require a protected database connection or database function. That authority boundary will be resolved without exposing privileged credentials or mutating live Supabase implicitly.
 
+## HUD-001 Control Plane landing surface
+
+HUD-001 adds the first CoMind Control Plane home page while preserving the existing Activity HUD and RuleBook HUD routes. The landing surface is deliberately read-only and links only to implemented or external governed destinations. It does not invent provider telemetry, expose privileged credentials, trigger paid API usage, or authorize production deployment.
+
+The CoMind brain-and-computer-chip mark is implemented as a reusable SVG React component rather than a screenshot dependency. The landing page and its responsive styling live in `src/app/page.tsx` and `src/app/control-plane.module.css`.
+
 ## Development
 
 Requires Node.js 24.
@@ -23,7 +29,9 @@ npm run typecheck
 npm run dev
 ```
 
-The Activity HUD browser acceptance uses Playwright 1.55.0 and Chromium. Install the browser with `npx playwright install chromium`, then run `npm run browser-test`. The test starts the local app and intercepts its Supabase REST request with 23 synthetic rows; it verifies page navigation, filter narrowing, filter reset to page one, and bounded page counts. It does not use Supabase credentials or make a live data request.
+Browser acceptance uses Playwright 1.56.0 and Chromium. Install the browser with `npx playwright install chromium`. `test/control-plane.browser.mjs` verifies the Control Plane landing surface and governed navigation. `npm run browser-test` verifies the Activity HUD pagination and filters with intercepted synthetic test rows. Neither browser acceptance path uses Supabase credentials or makes a live data request.
+
+CI also runs `npm audit --audit-level=high` before tests and build so high or critical dependency findings fail the Operator Console verification lane rather than being silently ignored.
 
 Populate `.env.local` with the CoMind Supabase project URL and a publishable key. Do not commit `.env.local`.
 

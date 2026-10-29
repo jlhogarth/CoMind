@@ -4,8 +4,11 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "CoMind Operator Console",
-  description: "Governed relational operations console for CoMind",
+  title: {
+    default: "CoMind Control Plane",
+    template: "%s | CoMind",
+  },
+  description: "Governed CoMind infrastructure, monitoring, operations, and evidence console",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {

@@ -1,0 +1,102 @@
+name: DRULE-004 RuleBook Operator Console
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/drule-004-rulebook-operator-console.yml'
+      - 'db/migrations/20261029_006_drule_004_rulebook_operator_console.sql'
+      - 'db/verification/20261029_drule_004_rulebook_operator_console_verification.sql'
+      - 'scripts/test_drule_004_rulebook_operator_console.sh'
+      - 'apps/operator-console/src/app/api/rulebook/conversations/route.ts'
+      - 'apps/operator-console/src/app/rulebook/page.tsx'
+      - 'apps/operator-console/src/components/rulebook-conversation-governance.tsx'
+      - 'apps/operator-console/src/lib/rulebook-operator/service.ts'
+      - 'apps/operator-console/src/lib/supabase/server.ts'
+      - 'apps/operator-console/test/rulebook-operator.test.ts'
+      - 'apps/operator-console/.env.example'
+      - 'docs/provenance/2026-10-29-drule-004-rulebook-operator-console.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  database-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+      - name: Prove service-only RuleBook operator contract
+        run: bash ./scripts/test_drule_004_rulebook_operator_console.sh
+
+  console-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/operator-console
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify exact checked-out head
+        working-directory: .
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+      - name: Use Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install exact dependencies
+        run: npm ci
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - name: Test protected operator boundary
+        run: npm test
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://sbgfuanxiqepcoboxzcl.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_test_only_placeholder
+          OPERATOR_CONSOLE_RULEBOOK_ACCESS_MODE: disabled
+        run: npm run build

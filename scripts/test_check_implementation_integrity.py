@@ -99,6 +99,61 @@ class IntegrityEngineTests(unittest.TestCase):
         self.assertEqual(1, len(findings))
         self.assertEqual("package-script-path", findings[0].detector)
 
+    def test_typescript_generated_package_target_is_accepted(self) -> None:
+        temp, root = self.make_root()
+        self.addCleanup(temp.cleanup)
+        package = root / "server"
+        source = package / "src" / "maintenance-control"
+        source.mkdir(parents=True)
+        (source / "cli.ts").write_text("export {};\n", encoding="utf-8")
+        (package / "tsconfig.json").write_text(
+            json.dumps(
+                {
+                    "compilerOptions": {
+                        "outDir": "dist",
+                        "rootDir": "src",
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+        (package / "package.json").write_text(
+            json.dumps(
+                {
+                    "scripts": {
+                        "build": "tsc -p tsconfig.json",
+                        "audit": "node dist/maintenance-control/cli.js",
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+        self.assertEqual([], MODULE.scan(root))
+
+    def test_generated_target_without_source_is_reported(self) -> None:
+        temp, root = self.make_root()
+        self.addCleanup(temp.cleanup)
+        package = root / "server"
+        package.mkdir(parents=True)
+        (package / "tsconfig.json").write_text(
+            json.dumps(
+                {
+                    "compilerOptions": {
+                        "outDir": "dist",
+                        "rootDir": "src",
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+        (package / "package.json").write_text(
+            json.dumps({"scripts": {"start": "node dist/missing.js"}}),
+            encoding="utf-8",
+        )
+        findings = MODULE.scan(root)
+        self.assertEqual(1, len(findings))
+        self.assertEqual("package-script-path", findings[0].detector)
+
     def test_dynamic_command_path_is_not_guessed(self) -> None:
         temp, root = self.make_root()
         self.addCleanup(temp.cleanup)

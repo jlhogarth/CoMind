@@ -11,6 +11,11 @@ EXPECTED_DB_USER="comind_archive_ingest_login.sbgfuanxiqepcoboxzcl"
 CANONICAL_BYTES="535654634"
 CANONICAL_SHA256="125f79141e7aa8c046e6c8f3c6a12c0dd5507ec4f58d261af697fa62fdf87b2e"
 
+cleanup() {
+  rm -f "$ZIP" "$WORK/import.json" "$WORK/preflight.json" "$WORK/transfer.ndjson" "$WORK/transfer-final.json"
+}
+trap cleanup EXIT
+
 if [[ -z "${CHATGPT_ARCHIVE_DATABASE_URL:-}" ]]; then
   echo "CHIST PIT-A missing CHATGPT_ARCHIVE_DATABASE_URL" >&2
   exit 20
@@ -45,8 +50,9 @@ node dist/archive/chatgpt-export-cli.js --preflight > "$WORK/preflight.json"
 node -e "const r=require(process.argv[1]); console.log(JSON.stringify({status:r.status,databaseName:r.databaseName,sessionUser:r.sessionUser,currentUser:r.currentUser}))" "$WORK/preflight.json"
 
 echo "CHIST PIT-A: acquiring one-use encrypted source through governed transfer bridge"
-node dist/archive/chist-pita-transfer-cli.js > "$WORK/transfer.json"
-node -e "const r=require(process.argv[1]); console.log(JSON.stringify({status:r.status,transferConsumed:r.transferConsumed,sessionUser:r.sessionUser,currentUser:r.currentUser,sourceBytes:r.sourceBytes,sourceSha256:r.sourceSha256}))" "$WORK/transfer.json"
+node dist/archive/chist-pita-transfer-cli.js | tee "$WORK/transfer.ndjson"
+tail -n 1 "$WORK/transfer.ndjson" > "$WORK/transfer-final.json"
+node -e "const r=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')); if(r.status!=='PASS'||r.transferConsumed!==true) throw new Error('governed transfer did not finish PASS/consumed'); console.log(JSON.stringify({status:r.status,transferConsumed:r.transferConsumed,sessionUser:r.sessionUser,currentUser:r.currentUser,sourceBytes:r.sourceBytes,sourceSha256:r.sourceSha256}))" "$WORK/transfer-final.json"
 
 bytes="$(wc -c < "$ZIP" | tr -d ' ')"
 sha="$(sha256sum "$ZIP" | awk '{print $1}')"
@@ -65,7 +71,7 @@ node -e "const r=require(process.argv[1]); console.log(JSON.stringify({status:r.
 echo "CHIST PIT-A: candidate ingestion process elapsed_seconds=$elapsed"
 
 echo "CHIST PIT-A: deleting plaintext working source before application build"
-rm -f "$ZIP" "$WORK/import.json" "$WORK/preflight.json" "$WORK/transfer.json"
+rm -f "$ZIP" "$WORK/import.json" "$WORK/preflight.json" "$WORK/transfer.ndjson" "$WORK/transfer-final.json"
 
 echo "CHIST PIT-A: candidate ingestion complete; independent reconciliation and certification are still required"
 cd "$APP_ROOT"

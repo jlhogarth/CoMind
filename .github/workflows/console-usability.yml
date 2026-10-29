@@ -6,9 +6,12 @@ on:
       - "apps/operator-console/**"
       - "server/src/providers/console-usability-foundry-adapter.ts"
       - "server/test/console-usability-foundry-adapter.test.mjs"
+      - "server/scripts/run-cux-001-test-agent.mjs"
+      - "scripts/provision_cux_001_test_agent.sql"
       - "config/console-usability-auditor.v1.json"
       - "docs/provenance/**cux-001**"
       - ".github/workflows/console-usability.yml"
+      - ".github/workflows/cux-001-test-agent-one-shot.yml"
   workflow_dispatch:
 
 permissions:
@@ -34,6 +37,8 @@ jobs:
         run: npm ci
       - name: Build server
         run: npm run build
+      - name: Check governed CUX dispatch script syntax
+        run: node --check scripts/run-cux-001-test-agent.mjs
       - name: Run server tests
         run: npm test
 

@@ -29,6 +29,7 @@ export interface VeResourceLifecycleAdapter {
 export interface VeLifecycleCoordinatorInput {
   readonly profileId: string;
   readonly requestedByActorId: string;
+  readonly authorizationDecisionId: string;
   readonly reason: string;
   readonly idempotencyKey: string;
 }
@@ -63,8 +64,20 @@ interface ResourceRow {
   lifecycle_status: string;
 }
 
-interface CountRow {
-  count: number | string;
+interface CountRow { count: number | string; }
+
+interface LifecycleAuthorizationRow {
+  authorization_request_id: string;
+  requesting_actor_id: string;
+  capability_code: string;
+  authority_level: string;
+  environment: string;
+  target_kind: string;
+  target_ref: string | null;
+  request_status: string;
+  request_expires_at: string | null;
+  decision: string;
+  effective_until: string | null;
 }
 
 const TRANSITIONS: Readonly<Record<VeLifecycleAction, Readonly<Record<VeLifecycleState, VeLifecycleState | null>>>> = Object.freeze({
@@ -78,6 +91,10 @@ function requiredText(value: string, field: string): string {
     throw new VeLifecycleError('invalid_request', `${field} must be a non-empty string`);
   }
   return value;
+}
+
+function isExpired(value: string | null, nowMs: number): boolean {
+  return value !== null && Date.parse(value) <= nowMs;
 }
 
 function externalResource(row: ResourceRow): VeExternalResource {
@@ -100,12 +117,12 @@ export class VeLifecycleCoordinator {
   async transition(action: VeLifecycleAction, input: VeLifecycleCoordinatorInput): Promise<VeLifecycleCoordinatorResult> {
     requiredText(input.profileId, 'profileId');
     requiredText(input.requestedByActorId, 'requestedByActorId');
+    requiredText(input.authorizationDecisionId, 'authorizationDecisionId');
     requiredText(input.reason, 'reason');
     requiredText(input.idempotencyKey, 'idempotencyKey');
 
     const duplicate = await this.queryFn<CountRow>(
-      `SELECT count(*)::int AS count
-       FROM comind.cm_audit_log
+      `SELECT count(*)::int AS count FROM comind.cm_audit_log
        WHERE action IN ('ve.lifecycle.completed', 've.lifecycle.partial')
          AND details->>'idempotency_key' = $1::text`,
       [input.idempotencyKey]
@@ -116,8 +133,7 @@ export class VeLifecycleCoordinator {
 
     const profileResult = await this.queryFn<ProfileRow>(
       `SELECT profile_id::text, actor_id::text, status
-       FROM comind.cm_foundry_agent_profile
-       WHERE profile_id = $1::uuid`,
+       FROM comind.cm_foundry_agent_profile WHERE profile_id = $1::uuid`,
       [input.profileId]
     );
     if (profileResult.rows.length !== 1) {
@@ -129,10 +145,13 @@ export class VeLifecycleCoordinator {
       throw new VeLifecycleError('transition_not_allowed', `Cannot ${action} VE from ${profile.status}`);
     }
 
+    await this.assertLifecycleAuthorization(action, input);
+
     const operationId = randomUUID();
     await this.audit(profile.actor_id, 've.lifecycle.started', input.profileId, {
       operation_id: operationId,
       idempotency_key: input.idempotencyKey,
+      authorization_decision_id: input.authorizationDecisionId,
       action,
       from_state: profile.status,
       to_state: toState,
@@ -142,8 +161,6 @@ export class VeLifecycleCoordinator {
     });
 
     const steps: VeLifecycleStepResult[] = [];
-
-    // Fail closed first. A suspended or retired profile cannot begin new Foundry execution.
     if (action === 'suspend' || action === 'retire') {
       await this.setProfileState(input.profileId, profile.status, action === 'suspend' ? 'suspended' : 'retired');
       steps.push({ step: 'foundry_profile', status: 'succeeded', targetRef: input.profileId, errorCode: null });
@@ -151,9 +168,7 @@ export class VeLifecycleCoordinator {
       const revoked = await this.queryFn<{ grant_id: string }>(
         `UPDATE comind.cm_foundry_capability_grant
          SET revoked_at = COALESCE(revoked_at, clock_timestamp())
-         WHERE profile_id = $1::uuid
-           AND revoked_at IS NULL
-         RETURNING grant_id::text`,
+         WHERE profile_id = $1::uuid AND revoked_at IS NULL RETURNING grant_id::text`,
         [input.profileId]
       );
       steps.push({ step: 'capability_grants', status: 'succeeded', targetRef: String(revoked.rows.length), errorCode: null });
@@ -161,8 +176,7 @@ export class VeLifecycleCoordinator {
       const cancelled = await this.queryFn<{ authorization_request_id: string }>(
         `UPDATE comind.cm_foundry_authorization_request
          SET status = 'cancelled'
-         WHERE requesting_profile_id = $1::uuid
-           AND status = 'pending'
+         WHERE requesting_profile_id = $1::uuid AND status = 'pending'
          RETURNING authorization_request_id::text`,
         [input.profileId]
       );
@@ -171,8 +185,7 @@ export class VeLifecycleCoordinator {
 
     const resourcesResult = await this.queryFn<ResourceRow>(
       `SELECT external_resource_id::text, provider, resource_type, external_subject, lifecycle_status
-       FROM comind.cm_actor_external_resource
-       WHERE actor_id = $1::uuid
+       FROM comind.cm_actor_external_resource WHERE actor_id = $1::uuid
        ORDER BY created_at, external_resource_id`,
       [profile.actor_id]
     );
@@ -194,20 +207,14 @@ export class VeLifecycleCoordinator {
           steps.push({ step: 'external_resource_resume', status: 'failed', targetRef: resource.externalResourceId, errorCode: 'provider_failure' });
         }
       }
-
-      // Activation is fail closed if a previously suspended external resource cannot be reconciled.
       if (steps.some((step) => step.status !== 'succeeded')) {
         await this.audit(profile.actor_id, 've.lifecycle.partial', input.profileId, {
-          operation_id: operationId,
-          idempotency_key: input.idempotencyKey,
-          action,
-          from_state: profile.status,
-          intended_state: toState,
-          steps,
+          operation_id: operationId, idempotency_key: input.idempotencyKey,
+          authorization_decision_id: input.authorizationDecisionId,
+          action, from_state: profile.status, intended_state: toState, steps,
         });
         return Object.freeze({ operationId, profileId: input.profileId, fromState: profile.status, toState, status: 'partial', steps: Object.freeze(steps) });
       }
-
       await this.setProfileState(input.profileId, profile.status, 'active');
       steps.push({ step: 'foundry_profile', status: 'succeeded', targetRef: input.profileId, errorCode: null });
     } else {
@@ -235,21 +242,40 @@ export class VeLifecycleCoordinator {
     await this.audit(profile.actor_id, partial ? 've.lifecycle.partial' : 've.lifecycle.completed', input.profileId, {
       operation_id: operationId,
       idempotency_key: input.idempotencyKey,
-      action,
-      from_state: profile.status,
-      to_state: toState,
-      steps,
+      authorization_decision_id: input.authorizationDecisionId,
+      action, from_state: profile.status, to_state: toState, steps,
       completed_at: this.now().toISOString(),
     });
+    return Object.freeze({ operationId, profileId: input.profileId, fromState: profile.status, toState, status: partial ? 'partial' : 'succeeded', steps: Object.freeze(steps) });
+  }
 
-    return Object.freeze({
-      operationId,
-      profileId: input.profileId,
-      fromState: profile.status,
-      toState,
-      status: partial ? 'partial' : 'succeeded',
-      steps: Object.freeze(steps),
-    });
+  private async assertLifecycleAuthorization(action: VeLifecycleAction, input: VeLifecycleCoordinatorInput): Promise<void> {
+    const result = await this.queryFn<LifecycleAuthorizationRow>(
+      `SELECT ar.authorization_request_id::text, ar.requesting_actor_id::text,
+              c.capability_code, ar.authority_level, ar.environment, ar.target_kind,
+              ar.target_ref, ar.status AS request_status, ar.expires_at::text AS request_expires_at,
+              ad.decision, ad.effective_until::text
+       FROM comind.cm_foundry_authorization_decision AS ad
+       JOIN comind.cm_foundry_authorization_request AS ar
+         ON ar.authorization_request_id = ad.authorization_request_id
+       JOIN comind.cm_foundry_capability AS c ON c.capability_id = ar.capability_id
+       WHERE ad.authorization_decision_id = $1::uuid`,
+      [input.authorizationDecisionId]
+    );
+    if (result.rows.length !== 1) throw new VeLifecycleError('authorization_missing', 'Lifecycle authorization decision could not be resolved uniquely');
+    const authorization = result.rows[0];
+    const nowMs = this.now().getTime();
+    if (authorization.decision !== 'approved') throw new VeLifecycleError('authorization_denied', 'Lifecycle authorization was not approved');
+    if (!['pending', 'approved'].includes(authorization.request_status)) throw new VeLifecycleError('authorization_inactive', 'Lifecycle authorization request is not active');
+    if (isExpired(authorization.request_expires_at, nowMs) || isExpired(authorization.effective_until, nowMs)) throw new VeLifecycleError('authorization_expired', 'Lifecycle authorization has expired');
+    if (authorization.capability_code !== `ve.lifecycle.${action}`
+      || authorization.requesting_actor_id !== input.requestedByActorId
+      || authorization.authority_level !== 'C2'
+      || authorization.environment !== 'isolated'
+      || authorization.target_kind !== 'foundry_agent_profile'
+      || authorization.target_ref !== input.profileId) {
+      throw new VeLifecycleError('authorization_scope_mismatch', 'Lifecycle authorization does not match the exact requested transition envelope');
+    }
   }
 
   private async setProfileState(profileId: string, expectedState: VeLifecycleState, state: VeLifecycleState): Promise<void> {
@@ -258,14 +284,10 @@ export class VeLifecycleCoordinator {
        SET status = $3::text,
            activated_at = CASE WHEN $3::text = 'active' THEN COALESCE(activated_at, clock_timestamp()) ELSE activated_at END,
            retired_at = CASE WHEN $3::text = 'retired' THEN COALESCE(retired_at, clock_timestamp()) ELSE retired_at END
-       WHERE profile_id = $1::uuid
-         AND status = $2::text
-       RETURNING profile_id::text`,
+       WHERE profile_id = $1::uuid AND status = $2::text RETURNING profile_id::text`,
       [profileId, expectedState, state]
     );
-    if (result.rows.length !== 1) {
-      throw new VeLifecycleError('concurrent_transition', 'VE profile state changed during lifecycle transition');
-    }
+    if (result.rows.length !== 1) throw new VeLifecycleError('concurrent_transition', 'VE profile state changed during lifecycle transition');
   }
 
   private async updateResourceState(externalResourceId: string, lifecycleStatus: 'active' | 'suspended' | 'retired'): Promise<void> {
@@ -276,13 +298,10 @@ export class VeLifecycleCoordinator {
            suspended_at = CASE WHEN $2::text = 'suspended' THEN clock_timestamp() ELSE suspended_at END,
            retired_at = CASE WHEN $2::text = 'retired' THEN COALESCE(retired_at, clock_timestamp()) ELSE retired_at END,
            updated_at = clock_timestamp()
-       WHERE external_resource_id = $1::uuid
-       RETURNING external_resource_id::text`,
+       WHERE external_resource_id = $1::uuid RETURNING external_resource_id::text`,
       [externalResourceId, lifecycleStatus]
     );
-    if (result.rows.length !== 1) {
-      throw new VeLifecycleError('external_resource_missing', 'External resource disappeared during lifecycle reconciliation');
-    }
+    if (result.rows.length !== 1) throw new VeLifecycleError('external_resource_missing', 'External resource disappeared during lifecycle reconciliation');
   }
 
   private async audit(actorId: string, action: string, profileId: string, details: Record<string, unknown>): Promise<void> {

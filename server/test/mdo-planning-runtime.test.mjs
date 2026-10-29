@@ -163,10 +163,11 @@ test('MDO adapter rejects runtime provider overrides and recursive routing', asy
   );
 });
 
-test('planning worker submits evidence-backed contribution before completing the fenced lease', async () => {
+test('planning worker submits evidence-backed contribution before completing and reading back the fenced lease', async () => {
   const sequence = [];
   const outputText = 'Architecture: reuse Foundry lease and evidence substrate.';
   const checksum = createHash('sha256').update(outputText).digest('hex');
+  let leaseState = 'leased';
   const queryFn = async (sql, params = []) => {
     if (sql.includes('FROM comind.cm_evidence')) {
       sequence.push('evidence-read');
@@ -190,7 +191,12 @@ test('planning worker submits evidence-backed contribution before completing the
     }
     if (sql.includes('cm_foundry_finish_work')) {
       sequence.push(`finish:${params[4]}`);
-      return { rows: [{ ok: true, lease_state: params[4] ? 'completed' : 'ready' }] };
+      leaseState = params[4] ? 'completed' : 'ready';
+      return { rows: [{ ok: true }] };
+    }
+    if (sql.includes('SELECT state AS lease_state')) {
+      sequence.push('lease-readback');
+      return { rows: [{ lease_state: leaseState }] };
     }
     if (sql.includes("UPDATE comind.cm_task SET status = 'done'")) {
       sequence.push('task-done');
@@ -241,15 +247,27 @@ test('planning worker submits evidence-backed contribution before completing the
     },
   });
   assert.equal(result.evidenceId, ids.evidence);
-  assert.deepEqual(sequence, ['execute', 'evidence-read', 'contribution', 'finish:true', 'task-done']);
+  assert.deepEqual(sequence, [
+    'execute',
+    'evidence-read',
+    'contribution',
+    'finish:true',
+    'lease-readback',
+    'task-done',
+  ]);
 });
 
-test('planning worker releases a failed execution for bounded retry and does not submit a contribution', async () => {
+test('planning worker releases a failed execution for bounded retry, verifies readback, and submits no contribution', async () => {
   let submitted = false;
+  let leaseState = 'leased';
   const queryFn = async (sql, params = []) => {
     if (sql.includes('cm_foundry_finish_work')) {
       assert.equal(params[4], false);
-      return { rows: [{ ok: true, lease_state: 'ready' }] };
+      leaseState = 'ready';
+      return { rows: [{ ok: true }] };
+    }
+    if (sql.includes('SELECT state AS lease_state')) {
+      return { rows: [{ lease_state: leaseState }] };
     }
     throw new Error(`Unexpected SQL: ${sql}`);
   };
@@ -279,4 +297,5 @@ test('planning worker releases a failed execution for bounded retry and does not
     /synthetic provider failure/
   );
   assert.equal(submitted, false);
+  assert.equal(leaseState, 'ready');
 });

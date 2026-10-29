@@ -1,0 +1,79 @@
+name: TK-012 Governed Branch and Merge
+
+on:
+  push:
+    branches:
+      - 'tk-012-governed-branch-merge'
+    paths:
+      - 'server/src/continuity/branching.ts'
+      - 'server/test/threadkeeper-governed-branch-merge.test.mjs'
+      - 'docs/architecture/threadkeeper-governed-branch-merge.md'
+      - '.github/workflows/tk-012-governed-branch-merge.yml'
+  pull_request:
+    paths:
+      - 'server/src/continuity/branching.ts'
+      - 'server/test/threadkeeper-governed-branch-merge.test.mjs'
+      - 'docs/architecture/threadkeeper-governed-branch-merge.md'
+      - '.github/workflows/tk-012-governed-branch-merge.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tk-012:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact workflow head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install server dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Build server
+        working-directory: server
+        run: npm run build
+
+      - name: Run TK-012 branch and merge tests
+        working-directory: server
+        run: node --test test/threadkeeper-governed-branch-merge.test.mjs
+
+      - name: Run TK-011 regression tests
+        working-directory: server
+        run: node --test test/threadkeeper-decision-reconsideration.test.mjs
+
+      - name: Run TK-010 regression tests
+        working-directory: server
+        run: node --test test/threadkeeper-continuity-compatibility.test.mjs
+
+      - name: Run TK-009 regression tests
+        working-directory: server
+        run: node --test test/threadkeeper-continuity-impact.test.mjs
+
+      - name: Run TK-008 regression tests
+        working-directory: server
+        run: node --test test/threadkeeper-continuity-capsule.test.mjs
+
+      - name: Run non-database server regression suite
+        working-directory: server
+        run: npm test

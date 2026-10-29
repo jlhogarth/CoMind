@@ -13,12 +13,11 @@ import { fingerprintCanonicalValue } from '../dist/continuity/checkpoint.js';
 
 const HEX_A = 'a'.repeat(64);
 const HEX_B = 'b'.repeat(64);
-const HEX_C = 'c'.repeat(64);
 const CHECKPOINT_A = 'checkpoint:tk008:a';
 const CHECKPOINT_B = 'checkpoint:tk008:b';
 
 function handoff(overrides = {}) {
-  return {
+  const baseCanonical = {
     version: 'continuity-handoff-v1',
     scopeSemanticKey: 'plan:comind.threadkeeper.tk008',
     currentCheckpoint: {
@@ -45,15 +44,39 @@ function handoff(overrides = {}) {
         lastTransitionAt: '2026-10-29T12:01:00.000Z',
       },
     ],
-    continuityDigest: HEX_C,
-    consumer: {
-      consumerRef: 'consumer:tk008:test',
-      providerRef: 'provider:test',
-      actorRef: 'actor:test',
-      authorityMode: 'requires_independent_validation',
-      resolvedAt: '2026-10-29T12:02:00.000Z',
+  };
+  const baseConsumer = {
+    consumerRef: 'consumer:tk008:test',
+    providerRef: 'provider:test',
+    actorRef: 'actor:test',
+    authorityMode: 'requires_independent_validation',
+    resolvedAt: '2026-10-29T12:02:00.000Z',
+  };
+  const {
+    currentCheckpoint: checkpointOverride,
+    lineage: lineageOverride,
+    unresolvedCases: unresolvedCasesOverride,
+    consumer: consumerOverride,
+    continuityDigest: continuityDigestOverride,
+    ...topLevelOverrides
+  } = overrides;
+  const canonical = {
+    ...baseCanonical,
+    ...topLevelOverrides,
+    currentCheckpoint: {
+      ...baseCanonical.currentCheckpoint,
+      ...(checkpointOverride ?? {}),
     },
-    ...overrides,
+    lineage: lineageOverride ?? baseCanonical.lineage,
+    unresolvedCases: unresolvedCasesOverride ?? baseCanonical.unresolvedCases,
+  };
+  return {
+    ...canonical,
+    continuityDigest: continuityDigestOverride ?? fingerprintCanonicalValue(canonical),
+    consumer: {
+      ...baseConsumer,
+      ...(consumerOverride ?? {}),
+    },
   };
 }
 
@@ -80,10 +103,16 @@ function capsule(overrides = {}) {
   });
 }
 
-function redigest(value) {
+function redigestCapsule(value) {
   const clone = structuredClone(value);
   delete clone.capsuleDigest;
   return { ...clone, capsuleDigest: fingerprintCanonicalValue(clone) };
+}
+
+function redigestPrecondition(value) {
+  const clone = structuredClone(value);
+  delete clone.preconditionDigest;
+  return { ...clone, preconditionDigest: fingerprintCanonicalValue(clone) };
 }
 
 test('TK-008 capsule is deterministic, reference-oriented, integrity protected, and authority neutral', () => {
@@ -99,7 +128,7 @@ test('TK-008 capsule is deterministic, reference-oriented, integrity protected, 
 
   assert.equal(first.version, 'continuity-capsule-v1');
   assert.equal(first.currentCheckpoint.checkpointId, CHECKPOINT_A);
-  assert.equal(first.continuityDigest, HEX_C);
+  assert.equal(first.continuityDigest, handoff().continuityDigest);
   assert.equal(first.authority.mode, 'requires_independent_validation');
   assert.equal(first.authority.inheritance, 'forbidden');
   assert.deepEqual(first.unresolvedCaseRefs, ['threadkeeper-case:case-tk008-1']);
@@ -111,7 +140,11 @@ test('TK-008 capsule is deterministic, reference-oriented, integrity protected, 
   assert.equal(verifyContinuityCapsule(tampered), false);
 });
 
-test('TK-008 capsule rejects credential material, duplicate references, oversized references, and invalid authority handoff', () => {
+test('TK-008 capsule rejects forged handoff digests, credential material, duplicate/oversized refs, invalid authority, and impossible issuance time', () => {
+  assert.throws(() => capsule({
+    handoff: { continuityDigest: HEX_A },
+  }), /handoff integrity mismatch/i);
+
   assert.throws(() => capsule({
     references: {
       ...references,
@@ -135,12 +168,13 @@ test('TK-008 capsule rejects credential material, duplicate references, oversize
 
   assert.throws(() => capsule({
     handoff: {
-      consumer: {
-        ...handoff().consumer,
-        authorityMode: 'inherited',
-      },
+      consumer: { authorityMode: 'inherited' },
     },
   }), /independent downstream authority validation/);
+
+  assert.throws(() => capsule({
+    issuedAt: '2026-10-29T11:59:59.000Z',
+  }), /cannot predate/i);
 });
 
 test('TK-008 precondition validates current continuity and fails closed on stale, expired, substituted, and weakened state', () => {
@@ -154,7 +188,6 @@ test('TK-008 precondition validates current continuity and fails closed on stale
 
   const staleHandoff = handoff({
     currentCheckpoint: {
-      ...handoff().currentCheckpoint,
       checkpointId: CHECKPOINT_B,
       parentCheckpointId: CHECKPOINT_A,
     },
@@ -165,12 +198,17 @@ test('TK-008 precondition validates current continuity and fails closed on stale
     { valid: false, status: 'stale_checkpoint' }
   );
 
+  const changedContinuity = handoff({
+    unresolvedCases: [
+      {
+        ...handoff().unresolvedCases[0],
+        latestTransitionId: 'transition:tk008:2',
+        lastTransitionAt: '2026-10-29T12:30:00.000Z',
+      },
+    ],
+  });
   assert.deepEqual(
-    validateContinuityPrecondition(
-      precondition,
-      handoff({ continuityDigest: HEX_A }),
-      '2026-10-29T13:00:00.000Z'
-    ),
+    validateContinuityPrecondition(precondition, changedContinuity, '2026-10-29T13:00:00.000Z'),
     { valid: false, status: 'continuity_digest_mismatch' }
   );
 
@@ -191,21 +229,34 @@ test('TK-008 precondition validates current continuity and fails closed on stale
   assert.deepEqual(
     validateContinuityPrecondition(
       precondition,
-      handoff({
-        consumer: {
-          ...handoff().consumer,
-          authorityMode: 'inherited',
-        },
-      }),
+      handoff({ consumer: { authorityMode: 'inherited' } }),
       '2026-10-29T13:00:00.000Z'
     ),
     { valid: false, status: 'authority_contract_mismatch' }
+  );
+
+  assert.deepEqual(
+    validateContinuityPrecondition(
+      precondition,
+      handoff({ continuityDigest: HEX_A }),
+      '2026-10-29T13:00:00.000Z'
+    ),
+    { valid: false, status: 'current_handoff_invalid' }
   );
 
   const tamperedPrecondition = { ...precondition, expectedCheckpointId: CHECKPOINT_B };
   assert.deepEqual(
     validateContinuityPrecondition(tamperedPrecondition, handoff(), '2026-10-29T13:00:00.000Z'),
     { valid: false, status: 'integrity_mismatch' }
+  );
+
+  const illegallyExtended = redigestPrecondition({
+    ...precondition,
+    expiresAt: '2027-01-15T12:03:00.000Z',
+  });
+  assert.deepEqual(
+    validateContinuityPrecondition(illegallyExtended, handoff(), '2026-10-29T13:00:00.000Z'),
+    { valid: false, status: 'invalid' }
   );
 });
 
@@ -255,12 +306,10 @@ test('TK-008 fidelity detects scope/checkpoint substitution, lineage drift, sens
   const replacementHandoff = handoff({
     scopeSemanticKey: 'plan:substituted-scope',
     currentCheckpoint: {
-      ...handoff().currentCheckpoint,
       checkpointId: CHECKPOINT_B,
       parentCheckpointId: CHECKPOINT_A,
     },
     lineage: { checkpointIds: [CHECKPOINT_A, CHECKPOINT_B], depth: 2 },
-    continuityDigest: HEX_A,
   });
   const replacement = createContinuityCapsule({
     handoff: replacementHandoff,
@@ -289,7 +338,7 @@ test('TK-008 fidelity rejects authority weakening even if an attacker recomputes
   const weakened = structuredClone(source);
   weakened.authority.mode = 'inherited';
   weakened.authority.inheritance = 'allowed';
-  const attackerRedigested = redigest(weakened);
+  const attackerRedigested = redigestCapsule(weakened);
 
   const report = validateContinuityCapsuleFidelity(source, attackerRedigested);
   assert.equal(report.status, 'FAIL');

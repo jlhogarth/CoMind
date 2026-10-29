@@ -13,12 +13,14 @@ on:
       - 'db/migrations/verify_20261029_007_mdo_002_foundry_terminal_alignment.sql'
       - 'scripts/test_mdo_001.sh'
       - 'scripts/test_mdo_002.sh'
+      - 'scripts/apply_mdo_002_diagnostic_patch.py'
+      - '.github/workflows/mdo-002-guarded-self-patch.yml'
       - '.github/workflows/mdo-002.yml'
       - 'docs/provenance/2026-10-29-mdo-002-pilot-planning-workforce.md'
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: mdo-002-provider-neutral-planning-pilot-${{ github.ref }}
@@ -75,6 +77,27 @@ jobs:
           actual="$(git rev-parse HEAD)"
           printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
           test "$actual" = "$expected"
+
+      - name: Apply and commit the guarded diagnostic-integrity patch
+        if: ${{ hashFiles('scripts/apply_mdo_002_diagnostic_patch.py') != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/apply_mdo_002_diagnostic_patch.py
+          git diff --check
+          grep -q 'execution_release_failed' server/src/mdo-planning-runtime.ts
+          grep -q 'worker_instance_id = $2::text AS worker_matches' server/src/mdo-planning-runtime.ts
+          grep -q 'planning worker preserves original failure identity' server/test/mdo-planning-runtime.test.mjs
+          grep -q 'mdo-pilot-role-start' server/test/integration/mdo-ollama-pilot.e2e.mjs
+          git config user.name 'CoMind guarded patch'
+          git config user.email '83435038+jlhogarth@users.noreply.github.com'
+          git add server/src/mdo-planning-runtime.ts \
+                  server/test/mdo-planning-runtime.test.mjs \
+                  server/test/integration/mdo-ollama-pilot.e2e.mjs
+          git rm scripts/apply_mdo_002_diagnostic_patch.py \
+                 .github/workflows/mdo-002-guarded-self-patch.yml
+          git commit -m 'MDO-002: preserve execution failure diagnostics across lease release'
+          git push origin HEAD:mdo-002-pilot-planning-workforce
 
       - uses: actions/setup-node@v4
         with:

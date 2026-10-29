@@ -7,6 +7,7 @@ on:
       - 'db/migrations/20261029_001_drule_conversation_governance_binding.sql'
       - 'db/migrations/20261029_002_drule_conversation_governance_binding_hardening.sql'
       - 'db/migrations/20261029_003_drule_conversation_governance_binding_constraints.sql'
+      - 'db/migrations/20261029_004_drule_conversation_governance_function_hardening.sql'
       - 'db/test/bootstrap_drule_conversation_governance.sql'
       - 'db/verification/20261029_drule_conversation_governance_binding_verification.sql'
       - 'scripts/test_drule_conversation_governance_binding.sh'

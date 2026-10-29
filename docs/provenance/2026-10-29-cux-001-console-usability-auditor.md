@@ -16,7 +16,7 @@ CUX-001 establishes a governed Console Usability Auditor for the CoMind Operator
 - Foundry authority ceiling: C1.
 - Environment: isolated/Test only.
 - Paid provider use: not authorized and not required.
-- Production UI mutation, deployment, security-policy change, merge authority, and destructive action: not authorized by CUX-001.
+- Production UI mutation, deployment, security-policy change, and destructive action: not authorized by CUX-001.
 
 ## Composition decision
 
@@ -56,7 +56,9 @@ The default adapter child process receives a scrubbed environment and executes o
 
 ## Governed dispatch path
 
-`.github/workflows/cux-001-test-agent-one-shot.yml` provides a manual Test-only one-shot after the workflow exists on the accepted default branch. The dispatch:
+`.github/workflows/cux-001-test-agent-one-shot.yml` provides the governed Test-only Foundry dispatch. It is configured to run automatically once when the workflow is first adopted on `main`, because that merge changes the workflow file itself. Later executions remain available through `workflow_dispatch` without creating a recurring main-branch schedule.
+
+The dispatch:
 
 - verifies the exact CoMind Test Supabase pooler target and pinned Supabase CA fingerprint;
 - resolves the active CUA profile and `console.usability.browser_test` grant by semantic identity;
@@ -200,4 +202,4 @@ Repository changes are reversible by PR revert. The Test profile can be suspende
 
 ## Acceptance state
 
-The Test profile, capabilities, corrected grants, bounded adapter, browser harness, CI matrix, and manual governed dispatch path are implemented. Chromium, Firefox, and WebKit have all passed the blocker gate on the implemented UI/harness code. PR #323 still requires exact-head CI completion after the final evidence/dispatch updates before merge. The first governed one-shot Foundry dispatch should run from the accepted default branch after merge, because GitHub `workflow_dispatch` is only reliable once the workflow exists on the default branch.
+The Test profile, capabilities, corrected grants, bounded adapter, browser harness, CI matrix, and governed dispatch path are implemented. Chromium, Firefox, and WebKit have all passed the blocker gate on the implemented UI/harness code. PR #323 still requires exact-head CI completion after the final evidence/dispatch updates before merge. Once merged, the workflow-file adoption push is intended to produce the first persisted governed CUA execution automatically; subsequent runs remain explicitly triggered rather than scheduled.

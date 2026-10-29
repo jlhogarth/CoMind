@@ -21,11 +21,11 @@ SELECT
   i.rationale,
   i.created_at,
   latest.event_id AS latest_event_id,
-  latest.event_ordinal AS latest_event_ordinal,
   latest.event_type AS current_state,
   latest.outcome AS current_outcome,
   latest.summary AS latest_summary,
-  latest.created_at AS latest_event_at
+  latest.created_at AS latest_event_at,
+  latest.event_ordinal AS latest_event_ordinal
 FROM comind.cm_ce_improvement i
 LEFT JOIN LATERAL (
   SELECT e.event_id, e.event_ordinal, e.event_type, e.outcome, e.summary, e.created_at

@@ -10,12 +10,30 @@ const { CurrentRuntimePaidApiLedger } = await import(
 );
 const {
   buildOpenAIProviderExecutionEnvelope,
-  executeGovernedOpenAIProviderExecutionEnvelope,
+  executeGovernedOpenAIProviderExecutionEnvelope: executeGovernedOpenAIProviderExecutionEnvelopeRaw,
 } = await import('../../dist/providers/openai-execution.js');
 const { openAIProviderSuccessMetadata } = await import('../../dist/providers/openai.js');
 const {
   DeterministicProviderInputTokenCounter,
 } = await import('../../dist/providers/provider-execution-envelope.js');
+const { openAIRulebookInput } = await import('../support/rulebook-execution-preflight.mjs');
+
+function executeGovernedOpenAIProviderExecutionEnvelope(
+  responses,
+  envelope,
+  counter,
+  budgetAuthority,
+  paidExecutionLedger
+) {
+  return executeGovernedOpenAIProviderExecutionEnvelopeRaw(
+    responses,
+    envelope,
+    counter,
+    budgetAuthority,
+    paidExecutionLedger,
+    openAIRulebookInput()
+  );
+}
 
 const bindingId = process.env.COMIND_CINT_FINOPS_BINDING_ID;
 const conversationId = process.env.COMIND_CINT_FINOPS_CONVERSATION_ID;

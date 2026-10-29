@@ -68,7 +68,7 @@ function capsule(overrides = {}) {
       evidenceRefs: ['evidence:canonical-baseline'],
     },
     authorityEvidenceRefs: ['authority:tk012:consumer-independent-validation'],
-    policyRefs: ['policy:threadkeeper:branching'],
+    policyRefs: ['policy:tk012:experimental-branching'],
     sensitivity: 'internal',
     retentionClass: 'durable',
     issuedAt: '2026-10-29T18:02:00.000Z',

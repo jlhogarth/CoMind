@@ -166,14 +166,26 @@ DECLARE
   v_review_count integer;
   v_first_review uuid;
 BEGIN
-  SELECT count(*), min(e.id)
-    INTO v_review_count, v_first_review
+  SELECT count(*)
+    INTO v_review_count
   FROM comind_pm.pm_conversation_egress_review_events e
   JOIN comind_pm.pm_conversation_governance_bindings b ON b.id=e.binding_id
   WHERE b.conversation_id=v_conv_id
     AND e.reviewed_by='DRULE-004-TEST';
   IF v_review_count <> 2 THEN
     RAISE EXCEPTION 'Operator review decisions did not preserve append-only history: %', v_review_count;
+  END IF;
+
+  SELECT e.id
+    INTO v_first_review
+  FROM comind_pm.pm_conversation_egress_review_events e
+  JOIN comind_pm.pm_conversation_governance_bindings b ON b.id=e.binding_id
+  WHERE b.conversation_id=v_conv_id
+    AND e.reviewed_by='DRULE-004-TEST'
+  ORDER BY e.reviewed_at, e.created_at, e.id
+  LIMIT 1;
+  IF v_first_review IS NULL THEN
+    RAISE EXCEPTION 'Operator append-only proof could not resolve a review event';
   END IF;
 
   BEGIN

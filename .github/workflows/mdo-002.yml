@@ -1,0 +1,130 @@
+name: MDO-002 Provider-Neutral Planning Pilot
+
+on:
+  pull_request:
+    paths:
+      - 'server/src/mdo-planning-runtime.ts'
+      - 'server/src/mdo-orchestrator.ts'
+      - 'server/src/foundry-runtime.ts'
+      - 'server/src/providers/ollama-foundry-adapter.ts'
+      - 'server/test/mdo-planning-runtime.test.mjs'
+      - 'server/test/integration/mdo-ollama-pilot.e2e.mjs'
+      - 'scripts/test_mdo_001.sh'
+      - '.github/workflows/mdo-002.yml'
+      - 'docs/provenance/2026-10-29-mdo-002-pilot-planning-workforce.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mdo-002-provider-neutral-planning-pilot-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  provider-neutral-planning-pilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.6-pg17-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      ollama:
+        image: ollama/ollama:0.40.8
+        env:
+          OLLAMA_NO_CLOUD: '1'
+          OLLAMA_NUM_PARALLEL: '1'
+          OLLAMA_MAX_QUEUE: '1'
+        ports:
+          - 11434:11434
+        options: >-
+          --health-cmd "ollama list >/dev/null 2>&1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+      OLLAMA_BASE_URL: http://127.0.0.1:11434
+      OLLAMA_MODEL: qwen3:0.6b
+      MDO_PILOT_ARTIFACT: artifacts/mdo-002-ollama-pilot-evidence.json
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+
+      - name: Pull the bounded local model
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:11434/api/version >/dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              echo "Local Ollama server did not become ready." >&2
+              exit 1
+            fi
+            sleep 2
+          done
+          curl --fail --silent --show-error --max-time 900 \
+            -H 'Content-Type: application/json' \
+            -d '{"model":"qwen3:0.6b","stream":false}' \
+            http://127.0.0.1:11434/api/pull
+
+      - name: Install and verify the isolated MDO substrate
+        run: bash ./scripts/test_mdo_001.sh
+
+      - name: Install server dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Build server runtime
+        working-directory: server
+        run: npm run build
+
+      - name: Run deterministic MDO-002 adapter and worker tests
+        working-directory: server
+        run: node --test test/mdo-planning-runtime.test.mjs
+
+      - name: Run zero-cost ten-role Ollama planning pilot
+        working-directory: server
+        run: node --test --test-concurrency=1 test/integration/mdo-ollama-pilot.e2e.mjs
+
+      - name: Preserve pilot evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mdo-002-ollama-pilot-evidence
+          path: server/artifacts/mdo-002-ollama-pilot-evidence.json
+          if-no-files-found: error
+          retention-days: 14

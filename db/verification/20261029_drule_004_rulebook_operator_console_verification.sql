@@ -6,13 +6,37 @@ DECLARE
   v_org_id uuid := '88888888-8888-4888-8888-888888888882'::uuid;
   v_project_id uuid := '88888888-8888-4888-8888-888888888883'::uuid;
   v_result_signature text;
+  v_public_status_execute boolean;
+  v_public_review_execute boolean;
 BEGIN
-  IF has_function_privilege('PUBLIC','public.comind_rulebook_operator_conversation_status(integer)','EXECUTE')
+  SELECT EXISTS (
+    SELECT 1
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    CROSS JOIN LATERAL aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) acl
+    WHERE n.nspname = 'public'
+      AND p.oid = 'public.comind_rulebook_operator_conversation_status(integer)'::regprocedure
+      AND acl.grantee = 0
+      AND acl.privilege_type = 'EXECUTE'
+  ) INTO v_public_status_execute;
+
+  SELECT EXISTS (
+    SELECT 1
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    CROSS JOIN LATERAL aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) acl
+    WHERE n.nspname = 'public'
+      AND p.oid = 'public.comind_rulebook_operator_review_conversation(uuid,text,text,text,integer,text,uuid)'::regprocedure
+      AND acl.grantee = 0
+      AND acl.privilege_type = 'EXECUTE'
+  ) INTO v_public_review_execute;
+
+  IF v_public_status_execute
      OR has_function_privilege('anon','public.comind_rulebook_operator_conversation_status(integer)','EXECUTE')
      OR has_function_privilege('authenticated','public.comind_rulebook_operator_conversation_status(integer)','EXECUTE') THEN
     RAISE EXCEPTION 'RuleBook operator status RPC leaked to ordinary roles';
   END IF;
-  IF has_function_privilege('PUBLIC','public.comind_rulebook_operator_review_conversation(uuid,text,text,text,integer,text,uuid)','EXECUTE')
+  IF v_public_review_execute
      OR has_function_privilege('anon','public.comind_rulebook_operator_review_conversation(uuid,text,text,text,integer,text,uuid)','EXECUTE')
      OR has_function_privilege('authenticated','public.comind_rulebook_operator_review_conversation(uuid,text,text,text,integer,text,uuid)','EXECUTE') THEN
     RAISE EXCEPTION 'RuleBook operator review RPC leaked to ordinary roles';

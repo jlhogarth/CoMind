@@ -79,9 +79,11 @@ A comparison is allowed only among branches that share the exact same:
 - base continuity digest;
 - base capsule digest.
 
+Each comparison candidate must also supply its full branch-local checkpoint chain. ThreadKeeper verifies that chain and requires the outcome's head ID and head digest to match the actual verified branch-local head. A caller cannot manufacture a plausible outcome digest around a checkpoint that never existed in that branch lineage.
+
 Comparison is deterministic and structured. It does not rank branches by model plausibility or prose similarity.
 
-Unresolved conflicts are retained explicitly.
+Shared evidence and unresolved-conflict references may legitimately appear in more than one branch. Cross-branch aggregation therefore deduplicates identical references deterministically rather than treating shared provenance as an error. Unresolved conflicts remain explicit.
 
 ## Merge proposal
 
@@ -138,15 +140,17 @@ TK-012 repository acceptance requires:
 2. expired/tampered capsules fail closed;
 3. branch candidate lineage cannot cross, skip, or rewrite parents;
 4. compared branches must share one governed base;
-5. branch outcomes preserve explicit evidence and conflict state;
-6. every compared branch is selected or explicitly rejected in a merge proposal;
-7. non-completed outcomes cannot be selected;
-8. unresolved conflicts block merge review;
-9. rejected branches and reasons remain historically addressable;
-10. final output is independent review only, never canonical acceptance;
-11. digest tampering fails verification;
-12. TK-008 through TK-011 and broad non-database regressions remain green;
-13. no schema, RLS, grant, paid-provider, or Production change occurs.
+5. every compared outcome must bind to the actual verified branch-local head;
+6. branch outcomes preserve explicit evidence and conflict state;
+7. shared cross-branch evidence/conflict references deduplicate without losing provenance;
+8. every compared branch is selected or explicitly rejected in a merge proposal;
+9. non-completed outcomes cannot be selected;
+10. unresolved conflicts block merge review;
+11. rejected branches and reasons remain historically addressable;
+12. final output is independent review only, never canonical acceptance;
+13. digest tampering fails verification;
+14. TK-008 through TK-011 and broad non-database regressions remain green;
+15. no schema, RLS, grant, paid-provider, or Production change occurs.
 
 ## Future integration
 

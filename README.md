@@ -49,11 +49,15 @@ Assistant generation is disabled by default. In that state, `/chat` continues to
 
 The first production provider adapter is OpenAI through the Responses API. CoMind remains the authoritative conversation store: the adapter sends the chronological history loaded from PostgreSQL on each request and explicitly disables provider-side response storage with `store: false`.
 
+When `ASSISTANT_PROVIDER=openai`, the normal configured assistant path is RuleBook-governed. It resolves the authoritative conversation governance binding, evaluates DRULE-C11 trust-boundary observations, DRULE-C17 tenant/project isolation, and DRULE-C13 egress authorization before provider token counting, budget reservation, paid-execution admission, or provider dispatch. The normal configured provider does not construct the direct `OpenAIAssistantProvider` path. Metered quality-gate draft, verifier, and repair passes use the same governed construction path and preserve the original conversation identity.
+
 To enable OpenAI in a development environment, set these values in `server/.env` or through the runtime environment:
 
 ```text
 ASSISTANT_PROVIDER=openai
 OPENAI_API_KEY=<secret supplied through the runtime environment>
+OPENAI_PAID_API_BINDING_ID=<approved governed paid-access binding UUID>
+OPENAI_PAID_API_PROPOSAL_ID=<approved paid-access proposal UUID>
 OPENAI_MODEL=gpt-6-luna
 OPENAI_REASONING_EFFORT=low
 OPENAI_MAX_OUTPUT_TOKENS=1024
@@ -62,22 +66,22 @@ ASSISTANT_QUALITY_GATE=disabled
 ASSISTANT_QUALITY_VERIFIER_FAILURE_FALLBACK=block
 ASSISTANT_QUALITY_VERIFIER_MAX_OUTPUT_TOKENS=256
 OPENAI_TIMEOUT_MS=30000
-OPENAI_MAX_RETRIES=2
+OPENAI_MAX_RETRIES=0
 ```
 
-Do not commit an OpenAI API key. `OPENAI_API_KEY` is required only when `ASSISTANT_PROVIDER=openai`. The model, reasoning effort, output-token bound, retained-history message count, request timeout, retry count, and quality-gate controls are validated configuration rather than conversation-schema decisions.
+Do not commit an OpenAI API key or paid-authority UUID as a substitute for runtime configuration. `OPENAI_API_KEY`, `OPENAI_PAID_API_BINDING_ID`, and `OPENAI_PAID_API_PROPOSAL_ID` are required when `ASSISTANT_PROVIDER=openai`. The binding and proposal identities must already exist under the governed paid-access process; configuration does not create or approve them. Automatic retries are forbidden for the normal governed assistant path: `OPENAI_MAX_RETRIES` must be `0`, and any later retry requires fresh authority.
 
-The metered answer quality gate is disabled by default. When `ASSISTANT_QUALITY_GATE=metered`, CoMind first generates a draft, classifies request risk using deterministic signals, and skips the verifier for low-risk requests. Elevated-risk requests receive a separate provider-backed verifier pass. Approved drafts return normally, `revise` verdicts receive a repair pass, and reject, abstain, or fail-closed verifier outcomes persist a controlled blocked assistant response with compact quality telemetry. The verifier uses its own smaller output-token budget, default 256, while repairs use the normal assistant output budget. Every provider-backed quality pass preserves its own usage and estimated-cost metadata.
+The metered answer quality gate is disabled by default. When `ASSISTANT_QUALITY_GATE=metered`, CoMind first generates a governed draft, classifies request risk using deterministic signals, and skips the verifier for low-risk requests. Elevated-risk requests receive a separate governed provider-backed verifier pass. Approved drafts return normally, `revise` verdicts receive a governed repair pass, and reject, abstain, or fail-closed verifier outcomes persist a controlled blocked assistant response with compact quality telemetry. The verifier uses its own smaller output-token budget, default 256, while repairs use the normal assistant output budget. Every provider-backed quality pass preserves its own usage and estimated-cost metadata and remains subject to RuleBook plus paid-execution authority.
 
 Assistant generation and conversation message writes are serialized per conversation with a PostgreSQL session advisory lock. If another assistant generation already owns that conversation lock, generation and competing message writes return HTTP `409` without invoking the provider or writing a message. A repeated generation request after the latest user turn already has a persisted assistant response returns that existing assistant row with HTTP `200` and does not call the provider again. A newly generated response returns HTTP `201`.
 
-A guarded live-provider smoke verification is available for explicit development use after the isolated database is running and `OPENAI_API_KEY` is present in the environment:
+A guarded live-provider smoke verification is available for explicit development use after the isolated database is running and the required OpenAI and paid-authority environment values are present:
 
 ```bash
 bash scripts/verify_openai_live.sh
 ```
 
-That script refuses remote database hosts and refuses database names other than `comind_runtime`. It performs a paid live provider request, so it is not part of ordinary CI and must be invoked explicitly. The quality gate remains disabled unless `ASSISTANT_QUALITY_GATE=metered` is explicitly configured.
+That script refuses remote database hosts and refuses database names other than `comind_runtime`. It performs a paid live provider request, so it is not part of ordinary CI and must be invoked explicitly only after the separate paid-access proposal/approval requirements are satisfied. The quality gate remains disabled unless `ASSISTANT_QUALITY_GATE=metered` is explicitly configured.
 
 ## Application endpoints
 

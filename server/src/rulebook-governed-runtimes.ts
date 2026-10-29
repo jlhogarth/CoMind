@@ -12,13 +12,13 @@ import {
   VeResourceLifecycleAdapter,
 } from './ve-lifecycle-coordinator.js';
 import {
-  MdoClaimInput,
-  MdoClaimResult,
-  MdoContributionInput,
-  MdoContributionResult,
+  MdoClaimWorkInput,
+  MdoClaimedWork,
   MdoEnqueuePlanInput,
   MdoEnqueuePlanResult,
   MdoOrchestrator,
+  MdoSubmitContributionInput,
+  MdoTaskContext,
 } from './mdo-orchestrator.js';
 import { QueryFunction } from './db.js';
 import {
@@ -55,8 +55,9 @@ interface VeDelegate {
 
 interface MdoDelegate {
   enqueuePlan(input: MdoEnqueuePlanInput): Promise<MdoEnqueuePlanResult>;
-  claimWork(input: MdoClaimInput): Promise<MdoClaimResult | null>;
-  submitContribution(input: MdoContributionInput): Promise<MdoContributionResult>;
+  claimWork(input: MdoClaimWorkInput): Promise<MdoClaimedWork | null>;
+  loadTaskContext(taskId: string): Promise<MdoTaskContext>;
+  submitContribution(input: MdoSubmitContributionInput): Promise<string>;
 }
 
 function wrapPreflightError(error: unknown, codePrefix: string): never {
@@ -291,11 +292,15 @@ export class GovernedMdoOrchestrator implements MdoDelegate {
     return this.delegate.enqueuePlan(input);
   }
 
-  claimWork(input: MdoClaimInput): Promise<MdoClaimResult | null> {
+  claimWork(input: MdoClaimWorkInput): Promise<MdoClaimedWork | null> {
     return this.delegate.claimWork(input);
   }
 
-  submitContribution(input: MdoContributionInput): Promise<MdoContributionResult> {
+  loadTaskContext(taskId: string): Promise<MdoTaskContext> {
+    return this.delegate.loadTaskContext(taskId);
+  }
+
+  submitContribution(input: MdoSubmitContributionInput): Promise<string> {
     return this.delegate.submitContribution(input);
   }
 }

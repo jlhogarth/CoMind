@@ -38,7 +38,6 @@ jobs:
         run: npm test
 
   chromium-baseline:
-    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
@@ -78,8 +77,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  full-browser-matrix:
-    if: github.event_name == 'workflow_dispatch'
+  firefox-webkit-matrix:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     defaults:
@@ -100,13 +98,13 @@ jobs:
         run: npm run typecheck
       - name: Unit tests
         run: npm test
-      - name: Install Chromium, Firefox, and WebKit
-        run: npx playwright install --with-deps chromium firefox webkit
-      - name: Run full CUX browser and mobile review
+      - name: Install Firefox and WebKit
+        run: npx playwright install --with-deps firefox webkit
+      - name: Run CUX Firefox and WebKit desktop and mobile review
         run: npm run usability-test
         env:
-          CUX_BROWSERS: chromium,firefox,webkit
-          CUX_REQUIRED_BROWSERS: chromium,firefox,webkit
+          CUX_BROWSERS: firefox,webkit
+          CUX_REQUIRED_BROWSERS: firefox,webkit
           CUX_FAIL_ON: blocker
           CUX_REPORT_PATH: test-results/cux-001/console-usability-report.json
           CUX_SCREENSHOT_DIR: test-results/cux-001/screenshots
@@ -114,7 +112,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: cux-001-full-browser-${{ github.sha }}
+          name: cux-001-firefox-webkit-${{ github.sha }}
           path: apps/operator-console/test-results/cux-001
           if-no-files-found: error
           retention-days: 14

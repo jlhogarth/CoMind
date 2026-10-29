@@ -8,14 +8,16 @@ The implementation is T1 reversible repository development. It is additive and d
 
 ## Collision and freshness check
 
-The branch was created directly from the verified current `main` head. A pre-PR compare showed the branch ahead by four commits, behind by zero, with only four new files:
+The branch was created directly from the verified current `main` head. The initial compare showed the branch ahead by four commits, behind by zero, with four new implementation files and no modified existing path. This provenance record was then added as the fifth branch file.
+
+Initial implementation files:
 
 - `.github/workflows/implementation-integrity.yml`
 - `docs/integrity/IIC-001.md`
 - `scripts/check_implementation_integrity.py`
 - `scripts/test_check_implementation_integrity.py`
 
-No existing repository path was modified by that initial implementation set.
+No pre-existing repository path is modified by IIC-001 foundation.
 
 ## Reuse decision
 
@@ -31,7 +33,7 @@ This failure is retained as development evidence because it changed the implemen
 
 - Python compilation passed for the engine and test file.
 - Nine synthetic integrity tests passed.
-- NDT-001 scanned the staged four-file mini-tree with zero findings.
+- NDT-001 scanned the staged implementation mini-tree with zero findings.
 - The existing No Placeholder prohibited-pattern set was applied to the new files with zero findings.
 
 ## Exact-head acceptance still required

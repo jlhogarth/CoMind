@@ -190,10 +190,10 @@ test('MDO-002 executes the complete ten-role phase chain through local Ollama wi
       [org.org_id, `mdo002-founder-${suffix}`]
     );
     const project = await one(
-      `INSERT INTO comind.cm_project(org_id, title, slug, status, created_by, project_code, acronym)
-       VALUES ($1::uuid, $2::text, $3::text, 'active', $4::uuid, $5::text, 'MDO2')
+      `INSERT INTO comind.cm_project(org_id, title, slug, status, created_by)
+       VALUES ($1::uuid, $2::text, $3::text, 'active', $4::uuid)
        RETURNING project_id::text`,
-      [org.org_id, `MDO-002 isolated pilot ${suffix}`, `mdo002-project-${suffix}`, founder.actor_id, `MDO2-${suffix}`]
+      [org.org_id, `MDO-002 isolated pilot ${suffix}`, `mdo002-project-${suffix}`, founder.actor_id]
     );
     const module = await one(
       `INSERT INTO comind.cm_module_registry(

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ArrowDownToLine, RefreshCw, ShieldCheck } from "lucide-react";
+import { RuleBookConversationGovernancePanel } from "@/components/rulebook-conversation-governance";
 import { assertActivityHudTestProject } from "@/lib/activity-hud/source";
 import { getPublicSupabaseConfig } from "@/lib/supabase/config";
 import { getBrowserSupabaseClient } from "@/lib/supabase/browser";
@@ -112,8 +113,8 @@ export default function RulebookHudPage() {
           <a className="active" href="/rulebook" aria-current="page">RuleBook HUD</a>
         </nav>
         <div className="hud-side-note">
-          <b>Policy data stays private</b>
-          This page shows control health and verification counts only. Runtime context, exception reasons, tenant IDs, evidence payloads, and secret references remain outside the browser projection.
+          <b>Public status stays synthetic</b>
+          The health HUD uses only the synthetic Test projection. Protected conversation governance is separately server-mediated and is available only when the trusted operator perimeter is configured.
         </div>
       </aside>
 
@@ -129,7 +130,7 @@ export default function RulebookHudPage() {
           <div>
             <p className="hud-eyebrow">Governance control plane</p>
             <h1>RuleBook Control HUD</h1>
-            <p>Track the twelve historical successor deficiencies as explicit modern controls, including runtime gates, verification coverage, exceptions, and scheduled health checks.</p>
+            <p>Track successor control health and, when a trusted operator perimeter is configured, review bounded conversation egress authority through a separate protected server path.</p>
           </div>
           <div className="hud-heading-actions">
             <button className="hud-refresh" onClick={() => setRefreshNonce((value) => value + 1)} disabled={isLoading}>
@@ -146,6 +147,8 @@ export default function RulebookHudPage() {
           <span>Connected to <code>public.v_rulebook_control_hud_test</code>, a read-only Test projection. Health refresh is automated every 15 minutes in Supabase Test. Last browser refresh: {lastRefreshed ? new Date(lastRefreshed).toLocaleString() : "not yet"}.</span>
         </div>
         {sourceError && <div className="hud-read-error" role="alert">RuleBook HUD read failed: {sourceError}</div>}
+
+        <RuleBookConversationGovernancePanel />
 
         <div className="cards">
           <article className="card"><h2>{healthy}</h2><p>Healthy controls</p></article>

@@ -1,5 +1,6 @@
 import {
   assertNoCredentialMaterial,
+  canonicalizeForIntegrity,
   fingerprintCanonicalValue,
 } from './checkpoint.js';
 import type { ContinuityHandoffEnvelope } from './handoff.js';
@@ -94,7 +95,8 @@ export type ContinuityPreconditionStatus =
   | 'scope_mismatch'
   | 'stale_checkpoint'
   | 'continuity_digest_mismatch'
-  | 'authority_contract_mismatch';
+  | 'authority_contract_mismatch'
+  | 'current_handoff_invalid';
 
 export interface ContinuityPreconditionResult {
   valid: boolean;
@@ -197,8 +199,24 @@ function withoutPreconditionDigest(
   return payload;
 }
 
+function handoffCanonicalPayload(
+  handoff: ContinuityHandoffEnvelope
+): Omit<ContinuityHandoffEnvelope, 'continuityDigest' | 'consumer'> {
+  const { continuityDigest: _continuityDigest, consumer: _consumer, ...payload } = handoff;
+  return payload;
+}
+
+function verifyContinuityHandoffIntegrity(handoff: ContinuityHandoffEnvelope): boolean {
+  try {
+    assertSha256(handoff.continuityDigest, 'continuity handoff digest');
+    return fingerprintCanonicalValue(handoffCanonicalPayload(handoff)) === handoff.continuityDigest;
+  } catch {
+    return false;
+  }
+}
+
 function canonicalCapsuleBytes(capsule: ContinuityCapsule): number {
-  return Buffer.byteLength(JSON.stringify(capsule), 'utf8');
+  return Buffer.byteLength(canonicalizeForIntegrity(capsule), 'utf8');
 }
 
 function isSensitivity(value: unknown): value is ContinuitySensitivity {
@@ -233,6 +251,9 @@ export function createContinuityCapsule(input: CreateContinuityCapsuleInput): Co
   assertSha256(handoff.currentCheckpoint.stateDigest, 'continuity capsule state digest');
   assertSha256(handoff.currentCheckpoint.proposalDigest, 'continuity capsule proposal digest');
   assertSha256(handoff.continuityDigest, 'continuity capsule continuity digest');
+  if (!verifyContinuityHandoffIntegrity(handoff)) {
+    throw new Error('Continuity handoff integrity mismatch');
+  }
   if (handoff.consumer.authorityMode !== 'requires_independent_validation') {
     throw new Error('Continuity capsule requires independent downstream authority validation');
   }
@@ -276,7 +297,18 @@ export function createContinuityCapsule(input: CreateContinuityCapsuleInput): Co
   boundedString(input.retentionClass, 'continuity capsule retention class', 128);
   const issuedAt = normalizeTimestamp(input.issuedAt, 'continuity capsule issued timestamp');
   const expiresAt = normalizeTimestamp(input.expiresAt, 'continuity capsule expiry timestamp');
+  const acceptedAt = normalizeTimestamp(
+    handoff.currentCheckpoint.acceptedAt,
+    'continuity capsule checkpoint acceptance timestamp'
+  );
+  const resolvedAt = normalizeTimestamp(
+    handoff.consumer.resolvedAt,
+    'continuity handoff resolution timestamp'
+  );
   assertLifetime(issuedAt, expiresAt);
+  if (Date.parse(issuedAt) < Date.parse(acceptedAt) || Date.parse(issuedAt) < Date.parse(resolvedAt)) {
+    throw new Error('Continuity capsule cannot predate its accepted checkpoint or source handoff');
+  }
 
   const payload: Omit<ContinuityCapsule, 'capsuleDigest'> = {
     version: CONTINUITY_CAPSULE_VERSION,
@@ -284,7 +316,7 @@ export function createContinuityCapsule(input: CreateContinuityCapsuleInput): Co
     currentCheckpoint: {
       checkpointId: handoff.currentCheckpoint.checkpointId,
       parentCheckpointId: handoff.currentCheckpoint.parentCheckpointId,
-      acceptedAt: normalizeTimestamp(handoff.currentCheckpoint.acceptedAt, 'continuity capsule checkpoint acceptance timestamp'),
+      acceptedAt,
       stateDigest: handoff.currentCheckpoint.stateDigest,
       proposalDigest: handoff.currentCheckpoint.proposalDigest,
     },
@@ -335,8 +367,14 @@ export function verifyContinuityCapsule(capsule: ContinuityCapsule, now?: string
       return false;
     }
     boundedString(capsule.scopeSemanticKey, 'continuity capsule scope semantic key', 256);
+    boundedString(capsule.currentCheckpoint.checkpointId, 'continuity capsule checkpoint id', 128);
     boundedString(capsule.retentionClass, 'continuity capsule retention class', 128);
+    const acceptedAt = normalizeTimestamp(
+      capsule.currentCheckpoint.acceptedAt,
+      'continuity capsule checkpoint acceptance timestamp'
+    );
     assertLifetime(capsule.issuedAt, capsule.expiresAt);
+    if (Date.parse(capsule.issuedAt) < Date.parse(acceptedAt)) return false;
     normalizeReferences(capsule.lineage.checkpointIds, 'continuity capsule lineage');
     normalizeReferences(capsule.unresolvedCaseRefs, 'unresolved case references');
     normalizeReferences(capsule.references.objectiveRefs, 'objective references');
@@ -359,7 +397,8 @@ export function verifyContinuityCapsule(capsule: ContinuityCapsule, now?: string
     }
     if (now !== undefined) {
       const nowMs = Date.parse(now);
-      if (!Number.isFinite(nowMs) || nowMs >= Date.parse(capsule.expiresAt)) return false;
+      const issuedMs = Date.parse(capsule.issuedAt);
+      if (!Number.isFinite(nowMs) || nowMs < issuedMs || nowMs >= Date.parse(capsule.expiresAt)) return false;
     }
     return true;
   } catch {
@@ -398,12 +437,20 @@ export function validateContinuityPrecondition(
         || !SHA256_HEX.test(precondition.sourceCapsuleDigest)) {
       return { valid: false, status: 'invalid' };
     }
+    assertLifetime(precondition.issuedAt, precondition.expiresAt);
     if (fingerprintCanonicalValue(withoutPreconditionDigest(precondition)) !== precondition.preconditionDigest) {
       return { valid: false, status: 'integrity_mismatch' };
     }
     const nowMs = Date.parse(now);
-    if (!Number.isFinite(nowMs) || nowMs >= Date.parse(precondition.expiresAt)) {
+    const issuedMs = Date.parse(precondition.issuedAt);
+    if (!Number.isFinite(nowMs) || nowMs < issuedMs) {
+      return { valid: false, status: 'invalid' };
+    }
+    if (nowMs >= Date.parse(precondition.expiresAt)) {
       return { valid: false, status: 'expired' };
+    }
+    if (!verifyContinuityHandoffIntegrity(current)) {
+      return { valid: false, status: 'current_handoff_invalid' };
     }
     if (precondition.authorityMode !== 'requires_independent_validation'
         || precondition.authorityInheritance !== 'forbidden'

@@ -106,12 +106,12 @@ test('preflight rejects non-success guardrail HTTP responses', async () => {
   );
 });
 
-test('smoke script runs preflight before the assistant provider trigger', async () => {
+test('legacy live smoke script is retired fail-closed and cannot trigger the assistant provider', async () => {
   const scriptUrl = new URL('../../scripts/verify_openai_live.sh', import.meta.url);
   const script = await readFile(scriptUrl, 'utf8');
-  const preflightIndex = script.indexOf('openai_paid_test_preflight.mjs');
-  const providerTriggerIndex = script.indexOf('/assistant-response');
-  assert.notEqual(preflightIndex, -1, 'preflight invocation must exist');
-  assert.notEqual(providerTriggerIndex, -1, 'assistant provider trigger must exist');
-  assert.ok(preflightIndex < providerTriggerIndex, 'preflight must run before the assistant provider trigger');
+  assert.match(script, /legacy OpenAI live smoke script is disabled by DRULE-003/i);
+  assert.match(script, /separately reviewed governed-live proof/i);
+  assert.match(script, /exit 2/);
+  assert.equal(script.includes('/assistant-response'), false, 'retired script must not contain an assistant provider trigger');
+  assert.equal(script.includes('openai_paid_test_preflight.mjs'), false, 'retired script must not masquerade as an executable paid preflight path');
 });

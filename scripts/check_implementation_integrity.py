@@ -228,6 +228,42 @@ def iter_package_json(root: Path) -> Iterable[Path]:
     )
 
 
+def generated_package_target_exists(package_dir: Path, target: str) -> bool:
+    """Recognize simple TypeScript build outputs backed by checked-in source."""
+    tsconfig = package_dir / "tsconfig.json"
+    if not tsconfig.is_file():
+        return False
+    try:
+        payload = json.loads(tsconfig.read_text(encoding="utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return False
+    compiler_options = payload.get("compilerOptions")
+    if not isinstance(compiler_options, dict):
+        return False
+    out_dir = compiler_options.get("outDir")
+    root_dir = compiler_options.get("rootDir")
+    if not isinstance(out_dir, str) or not isinstance(root_dir, str):
+        return False
+    if any(marker in out_dir + root_dir for marker in DYNAMIC_MARKERS):
+        return False
+
+    target_path = Path(target)
+    try:
+        source_relative = target_path.relative_to(Path(out_dir))
+    except ValueError:
+        return False
+
+    source_base = package_dir / root_dir / source_relative
+    if target_path.suffix.lower() in {".js", ".mjs", ".cjs"}:
+        candidates = [
+            source_base.with_suffix(suffix)
+            for suffix in (".ts", ".tsx", ".mts", ".cts", ".js", ".mjs", ".cjs")
+        ]
+    else:
+        candidates = [source_base]
+    return any(candidate.is_file() for candidate in candidates)
+
+
 def scan_package_scripts(root: Path) -> list[Finding]:
     findings: list[Finding] = []
     for package_file in iter_package_json(root):
@@ -250,7 +286,9 @@ def scan_package_scripts(root: Path) -> list[Finding]:
                     exists = False
                 else:
                     exists = candidate.is_file()
-                if not exists:
+                if not exists and not generated_package_target_exists(
+                    package_file.parent, target
+                ):
                     findings.append(
                         finding(
                             detector="package-script-path",

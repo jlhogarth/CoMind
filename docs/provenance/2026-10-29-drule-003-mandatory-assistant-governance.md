@@ -49,6 +49,8 @@ The historical `scripts/verify_openai_live.sh` path predated authoritative conve
 
 A future real-provider proof must be separately reviewed and must use an explicitly governed synthetic conversation, current egress approval, a separately approved paid-access proposal/binding, and zero automatic retries before any token-count or model request.
 
+The paid-test preflight library remains tested as a reusable bounded component. Its former smoke-script integration assertion was deliberately replaced with an assertion that the legacy script is retired, exits nonzero, contains no `/assistant-response` trigger, and does not masquerade as an executable paid-preflight path.
+
 ## Normal HTTP route proof
 
 `server/test/configured-assistant-rulebook.test.mjs` exercises the actual normal HTTP endpoint:
@@ -103,6 +105,21 @@ After live RuleBook evaluation:
 - `comind.cm_budget_authority_reservation`: 0 rows.
 
 Therefore DRULE-003 live acceptance created no paid-provider state.
+
+## Cross-lane regression found and repaired
+
+The first documentation-complete candidate caused the existing `Foundry Runtime Orchestration` workflow to fail during its broad `server` test suite. Foundry schema/runtime verification had already passed. The single failing test was `server/test/openai-paid-test-preflight.test.mjs`, which still asserted that the retired `scripts/verify_openai_live.sh` contained both the paid preflight invocation and `/assistant-response` provider trigger.
+
+This was a stale test contract, not a Foundry runtime failure. Restoring the provider trigger would have reintroduced the exact obsolete bypass DRULE-003 is intended to remove.
+
+The repair therefore:
+
+- keeps the legacy live smoke script disabled fail-closed;
+- updates the stale test to require the disabled state and absence of any assistant provider trigger;
+- preserves the reusable paid-preflight library unit tests;
+- adds `server/test/openai-paid-test-preflight.test.mjs` to the dedicated DRULE-003 workflow path triggers and exact-head test command.
+
+Fresh exact-head CI after this repair is required before merge, including a successful Foundry Runtime Orchestration run.
 
 ## Advisor readback
 

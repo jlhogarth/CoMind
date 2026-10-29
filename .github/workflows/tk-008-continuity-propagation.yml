@@ -1,0 +1,64 @@
+name: TK-008 Continuity Propagation
+
+on:
+  push:
+    branches:
+      - 'tk-008-continuity-propagation'
+    paths:
+      - 'server/src/continuity/capsule.ts'
+      - 'server/test/threadkeeper-continuity-capsule.test.mjs'
+      - 'docs/architecture/threadkeeper-continuity-propagation.md'
+      - '.github/workflows/tk-008-continuity-propagation.yml'
+  pull_request:
+    paths:
+      - 'server/src/continuity/capsule.ts'
+      - 'server/test/threadkeeper-continuity-capsule.test.mjs'
+      - 'docs/architecture/threadkeeper-continuity-propagation.md'
+      - '.github/workflows/tk-008-continuity-propagation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tk-008:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact workflow head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install server dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Build server
+        working-directory: server
+        run: npm run build
+
+      - name: Run TK-008 deterministic propagation tests
+        working-directory: server
+        run: node --test test/threadkeeper-continuity-capsule.test.mjs
+
+      - name: Run non-database server regression suite
+        working-directory: server
+        run: npm test

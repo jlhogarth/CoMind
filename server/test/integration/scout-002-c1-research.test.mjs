@@ -81,7 +81,7 @@ try {
   );
   const project = await one(
     `SELECT project_id::text FROM comind.cm_project
-      WHERE org_id=$1::uuid AND project_code::text='COMIND' AND status='active'`,
+      WHERE org_id=$1::uuid AND slug::text='comind' AND status='active'`,
     [org.org_id]
   );
   const task = await one(

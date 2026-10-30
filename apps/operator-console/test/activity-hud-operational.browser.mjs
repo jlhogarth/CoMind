@@ -206,8 +206,10 @@ try {
 
   await page.getByLabel("Choose Activity HUD data scope").selectOption("all");
   await page.getByText("Recovery and Reorientation Protocol automation", { exact: true }).waitFor();
-  assert.equal(await page.getByText("Synthetic activity 1", { exact: true }).count(), 1);
+  assert.equal(await page.getByText("Synthetic activity 1", { exact: true }).count(), 0);
   assert.match(await page.getByText(/operational · 5 synthetic/).first().innerText(), /13 operational · 5 synthetic/);
+  await page.getByRole("button", { name: "Next page" }).click();
+  assert.equal(await page.getByText("Synthetic activity 1", { exact: true }).count(), 1);
 
   if (process.env.ACTIVITY_HUD_BROWSER_SCREENSHOT) {
     await page.getByLabel("Choose Activity HUD data scope").selectOption("operational");

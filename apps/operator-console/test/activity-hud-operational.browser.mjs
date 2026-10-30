@@ -182,9 +182,11 @@ try {
     "https://github.com/jlhogarth/CoMind/issues/250",
   );
 
+  await page.getByLabel("Filter source").selectOption("drive");
   const driveCard = page.locator(".activity-card").filter({ hasText: "Research Source RunBook projection synchronized" });
   await driveCard.locator("summary").click();
   assert.equal(await driveCard.locator(".source-reference a").count(), 0, "opaque Drive refs must remain text");
+  await page.getByLabel("Filter source").selectOption("all");
 
   const cards = page.locator(".activity-card");
   assert.equal(await cards.count(), 10);

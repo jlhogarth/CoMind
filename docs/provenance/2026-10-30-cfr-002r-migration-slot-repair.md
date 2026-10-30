@@ -38,3 +38,11 @@ No SQL semantics are changed. The migration content SHA-256 before and after the
 - no change to CFR-002 database semantics
 
 After merge, MDO-005T must repeat its freshness and migration-ledger checks before resuming shared Test activation.
+
+## Exact-head CI repair
+
+After synchronization with current `main`, PR #419 exact-head `052a3a532b38dca7752eeaaf9ef2892483c9e2b2` reran the CFR-002 database proof. Migration replay succeeded twice using the renamed `_030` file, confirming the filename repair did not alter migration semantics. The verification job then failed at `db/verification/cfr_002_dual_acquisition.sql:162` with PostgreSQL error `VALUES lists must all be the same length`.
+
+The failure exposed a pre-existing fixture defect: the schema-drift observation tuple omitted the `source_event_ref` value while the INSERT declares that column. CFR-002R repairs only that fixture by adding deterministic synthetic reference `browser_event_drift_1`. The production migration remains byte-identical with SHA-256 `4c2f6ddd04fc15d6dcbc3e5d606a19e19d210d5a586f8d7161b51139c4ac345b`.
+
+Failed check evidence: GitHub Actions run `41092694264`, check run `124190399143`.

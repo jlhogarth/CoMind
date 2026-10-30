@@ -35,6 +35,7 @@ const navItems = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard, active: true },
   { label: "Monitoring", href: "/activity", icon: Activity },
   { label: "RuleBook HUD", href: "/rulebook", icon: ShieldCheck },
+  { label: "Integration Gateway", href: "/integrations", icon: Network },
   { label: "Approvals", href: "https://approvals.comindinc.com", icon: CheckCircle2, external: true },
   { label: "Cloudflare", href: "https://dash.cloudflare.com", icon: Cloud, external: true },
   { label: "ThreadKeeper", href: "#threadkeeper", icon: GitBranch },
@@ -46,6 +47,7 @@ const navItems = [
 
 const quickActions = [
   { label: "Open Activity HUD", href: "/activity", icon: Gauge },
+  { label: "Open Integration Gateway", href: "/integrations", icon: Network },
   { label: "Review Approvals", href: "https://approvals.comindinc.com", icon: CheckCircle2, external: true },
   { label: "View Infrastructure", href: "https://dash.cloudflare.com", icon: ServerCog, external: true },
   { label: "Open Documentation", href: "https://github.com/jlhogarth/CoMind/tree/main/docs", icon: BookOpen, external: true },
@@ -56,6 +58,7 @@ const serviceCards = [
   { title: "Supabase", detail: "Governed relational state and evidence", state: "Test project bound", icon: Database, source: "RLS remains authoritative" },
   { title: "Google Workspace", detail: "Identity, mail, Drive and planning", state: "DNS integrated", icon: Workflow, source: "CoMindInc.com" },
   { title: "GitHub", detail: "Source, issues, PRs and CI evidence", state: "Repository connected", icon: Github, source: "jlhogarth/CoMind" },
+  { title: "Composio", detail: "Governed integration and managed OAuth substrate", state: "CIG-001 verified", icon: Network, source: "GitHub + Supabase proof" },
   { title: "Domain Security", detail: "CoMindInc.com and CoMindForge.com", state: "Two governed domains", icon: Globe2, source: "Cloudflare Registrar" },
   { title: "Evidence", detail: "Acceptance requires executed verification", state: "Evidence-first", icon: FileCheck2, source: "AGENTS.md policy" },
 ];
@@ -64,6 +67,7 @@ const infrastructureRows = [
   ["Operator Console", "Live at console.comindinc.com"],
   ["Activity HUD", "Bounded read-only route"],
   ["RuleBook HUD", "Governed control-health route"],
+  ["Integration Gateway", "CIG-001 governed process route"],
   ["Approval Portal", "External governed approval service"],
   ["Deployment perimeter", "Cloudflare Access + origin proxy + Vercel protection"],
 ];
@@ -96,7 +100,7 @@ export default function Home() {
         </a>
 
         <nav className={styles.nav}>
-          {navItems.slice(0, 7).map(({ label, href, icon: Icon, active, external }) => (
+          {navItems.slice(0, 8).map(({ label, href, icon: Icon, active, external }) => (
             <ExternalAwareLink
               key={label}
               href={href}
@@ -109,7 +113,7 @@ export default function Home() {
             </ExternalAwareLink>
           ))}
           <div className={styles.navDivider} aria-hidden="true" />
-          {navItems.slice(7).map(({ label, href, icon: Icon, external }) => (
+          {navItems.slice(8).map(({ label, href, icon: Icon, external }) => (
             <ExternalAwareLink key={label} href={href} external={external} className={styles.navExternal}>
               <Icon size={17} aria-hidden="true" />
               <span>{label}</span>
@@ -189,7 +193,7 @@ export default function Home() {
             <article className={styles.card}>
               <div className={styles.cardHeader}><span className={styles.cardIcon}><Gauge size={17} color="#55e3bb" /> <strong>System Surface</strong></span></div>
               <div className={styles.metricValue}>2 HUDs</div>
-              <div className={styles.metricLabel}>Activity and RuleBook routes are already implemented.</div>
+              <div className={styles.metricLabel}>Activity, RuleBook, and Integration Gateway routes are already implemented.</div>
               <div className={styles.metricMeta}>Bounded read-only visibility</div>
             </article>
 

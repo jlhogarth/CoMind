@@ -1,10 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {
+
+process.env.DATABASE_URL ??= 'postgresql://ce002_test:ce002_test@127.0.0.1:65432/ce002_unit';
+
+const {
   persistRecoveryOutcome,
   resolveRecovery,
-} from '../dist/continuous-excellence/recovery.js';
-import { ContinuityHandoffError } from '../dist/continuity/handoff.js';
+} = await import('../dist/continuous-excellence/recovery.js');
+const { ContinuityHandoffError } = await import('../dist/continuity/handoff.js');
 
 const PROJECT_ID = '11111111-1111-4111-8111-111111111111';
 const TASK_ID = '22222222-2222-4222-8222-222222222222';

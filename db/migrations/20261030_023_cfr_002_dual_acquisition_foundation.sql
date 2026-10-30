@@ -21,9 +21,11 @@ BEGIN
 END
 $$;
 
+CREATE SEQUENCE IF NOT EXISTS comind.cm_conv_acq_seq;
+
 CREATE TABLE IF NOT EXISTS comind.cm_conversation_acquisition_observation (
   acquisition_observation_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  acquisition_sequence bigint GENERATED ALWAYS AS IDENTITY UNIQUE,
+  acquisition_sequence bigint NOT NULL DEFAULT nextval('comind.cm_conv_acq_seq'::regclass) UNIQUE,
   conv_id uuid NOT NULL REFERENCES comind.cm_conversation(conv_id) ON DELETE RESTRICT,
   generation_id uuid REFERENCES comind.cm_assistant_generation(generation_id) ON DELETE RESTRICT,
   source_family text NOT NULL CHECK (
@@ -42,6 +44,9 @@ CREATE TABLE IF NOT EXISTS comind.cm_conversation_acquisition_observation (
     CHECK (jsonb_typeof(acquisition_metadata) = 'object'),
   captured_at timestamptz NOT NULL DEFAULT now()
 );
+
+ALTER SEQUENCE comind.cm_conv_acq_seq
+  OWNED BY comind.cm_conversation_acquisition_observation.acquisition_sequence;
 
 CREATE INDEX IF NOT EXISTS idx_cm_conversation_acquisition_conv
   ON comind.cm_conversation_acquisition_observation (conv_id, acquisition_sequence);
@@ -258,8 +263,7 @@ GRANT SELECT, INSERT ON TABLE
   comind.cm_conversation_acquisition_normalization,
   comind.cm_conversation_acquisition_reconciliation
 TO comind_conversation_acquisition_writer;
-GRANT USAGE, SELECT ON SEQUENCE
-  comind.cm_conversation_acquisition_observation_acquisition_sequence_seq
+GRANT USAGE, SELECT ON SEQUENCE comind.cm_conv_acq_seq
 TO comind_conversation_acquisition_writer;
 
 COMMENT ON TABLE comind.cm_conversation_acquisition_observation IS

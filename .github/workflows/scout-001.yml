@@ -1,0 +1,90 @@
+name: SCOUT-001 Developmental VE
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/scout-001.yml'
+      - 'db/migrations/20261030_026_scout_001_developmental_identity.sql'
+      - 'db/migrations/verify_20261030_026_scout_001_developmental_identity.sql'
+      - 'scripts/provision_scout_001_test_agent.sql'
+      - 'docs/architecture/scout-001-developmental-ve.md'
+      - 'docs/provenance/2026-10-30-scout-001-developmental-ve.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  developmental-ve-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/comind_ci
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Reconstruct accepted Foundry substrate
+        run: bash scripts/test_foundry_agent_substrate.sh
+
+      - name: Seed isolated canonical organization and founder
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO comind.cm_org(name,slug)
+          VALUES ('CoMind Inc.','comind')
+          ON CONFLICT (slug) DO NOTHING;
+
+          INSERT INTO comind.cm_actor(org_id,kind,handle,display_name,meta)
+          SELECT org_id,'person','joseph.hogarth','Joseph Hogarth',jsonb_build_object('fixture','SCOUT-001 isolated CI')
+          FROM comind.cm_org WHERE slug::text='comind'
+          ON CONFLICT (handle) DO NOTHING;
+
+          CREATE TABLE IF NOT EXISTS comind.cm_actor_external_resource (
+            external_resource_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            actor_id uuid NOT NULL REFERENCES comind.cm_actor(actor_id) ON DELETE RESTRICT
+          );
+          SQL
+
+      - name: Apply and reapply SCOUT-001 developmental migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f db/migrations/20261030_026_scout_001_developmental_identity.sql
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f db/migrations/20261030_026_scout_001_developmental_identity.sql
+
+      - name: Provision Scout draft fixture
+        run: psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f scripts/provision_scout_001_test_agent.sql
+
+      - name: Verify developmental identity and negative controls
+        run: psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f db/migrations/verify_20261030_026_scout_001_developmental_identity.sql

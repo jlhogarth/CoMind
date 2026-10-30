@@ -7,14 +7,14 @@ on:
     paths:
       - '.github/workflows/rlib-003.yml'
       - 'db/sql/v2/**'
-      - 'db/migrations/20261030_025_rlib_003_ve_standards_learning_path.sql'
-      - 'db/migrations/verify_20261030_025_rlib_003_ve_standards_learning_path.sql'
+      - 'db/migrations/20261030_026_rlib_003_ve_standards_learning_path.sql'
+      - 'db/migrations/verify_20261030_026_rlib_003_ve_standards_learning_path.sql'
   pull_request:
     paths:
       - '.github/workflows/rlib-003.yml'
       - 'db/sql/v2/**'
-      - 'db/migrations/20261030_025_rlib_003_ve_standards_learning_path.sql'
-      - 'db/migrations/verify_20261030_025_rlib_003_ve_standards_learning_path.sql'
+      - 'db/migrations/20261030_026_rlib_003_ve_standards_learning_path.sql'
+      - 'db/migrations/verify_20261030_026_rlib_003_ve_standards_learning_path.sql'
   workflow_dispatch:
 
 permissions:
@@ -47,10 +47,13 @@ jobs:
         run: |
           set -euo pipefail
           [[ -f db/migrations/20261030_024_mdo_003_plan_scoped_claim_hardening.sql ]]
+          [[ -f db/migrations/20261030_025_ce_004_friction_failure_register.sql ]]
           [[ ! -e db/migrations/20261030_024_rlib_003_ve_standards_learning_path.sql ]]
           [[ ! -e db/migrations/verify_20261030_024_rlib_003_ve_standards_learning_path.sql ]]
-          [[ -f db/migrations/20261030_025_rlib_003_ve_standards_learning_path.sql ]]
-          [[ -f db/migrations/verify_20261030_025_rlib_003_ve_standards_learning_path.sql ]]
+          [[ ! -e db/migrations/20261030_025_rlib_003_ve_standards_learning_path.sql ]]
+          [[ ! -e db/migrations/verify_20261030_025_rlib_003_ve_standards_learning_path.sql ]]
+          [[ -f db/migrations/20261030_026_rlib_003_ve_standards_learning_path.sql ]]
+          [[ -f db/migrations/verify_20261030_026_rlib_003_ve_standards_learning_path.sql ]]
 
       - name: Install PostgreSQL client
         run: |
@@ -92,16 +95,16 @@ jobs:
         run: |
           set -euo pipefail
           psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
-            -f db/migrations/20261030_025_rlib_003_ve_standards_learning_path.sql
+            -f db/migrations/20261030_026_rlib_003_ve_standards_learning_path.sql
           psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
-            -f db/migrations/20261030_025_rlib_003_ve_standards_learning_path.sql
+            -f db/migrations/20261030_026_rlib_003_ve_standards_learning_path.sql
 
       - name: Verify governed curriculum and canonical metadata
         shell: bash
         run: |
           set -euo pipefail
           psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
-            -f db/migrations/verify_20261030_025_rlib_003_ve_standards_learning_path.sql
+            -f db/migrations/verify_20261030_026_rlib_003_ve_standards_learning_path.sql
 
           state="$(psql "${DATABASE_URL}" -X -At -F '|' -c "
             SELECT

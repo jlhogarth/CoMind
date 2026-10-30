@@ -4,9 +4,9 @@ on:
   pull_request:
     paths:
       - '.github/workflows/mdo-004.yml'
-      - 'db/migrations/20261030_025_mdo_004_governed_plan_disposition.sql'
-      - 'db/migrations/verify_20261030_025_mdo_004_governed_plan_disposition.sql'
-      - 'db/migrations/verify_20261030_025_mdo_004_behavior.sql'
+      - 'db/migrations/20261030_026_mdo_004_governed_plan_disposition.sql'
+      - 'db/migrations/verify_20261030_026_mdo_004_governed_plan_disposition.sql'
+      - 'db/migrations/verify_20261030_026_mdo_004_behavior.sql'
       - 'scripts/test_mdo_004.sh'
       - 'server/src/mdo-plan-disposition.ts'
       - 'server/test/mdo-plan-disposition.test.mjs'

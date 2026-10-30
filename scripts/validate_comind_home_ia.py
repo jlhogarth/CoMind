@@ -153,10 +153,18 @@ def validate_contract(contract: dict[str, Any]) -> None:
     if len(pm_project_sources) != 1 or pm_project_sources[0].get("join") != "canonical_project_id":
         _fail("Projects must treat pm_projects as an operational projection linked by canonical_project_id")
 
-    if domain_by_id["decisions"] is domain_by_id["approvals"]:
-        _fail("Decisions and Approvals must remain separate domains")
-    if "comind.cm_foundry_authorization_request" not in _source_refs(domain_by_id["approvals"]):
-        _fail("Approvals must use the canonical Foundry authorization request substrate")
+    decision_refs = _source_refs(domain_by_id["decisions"])
+    approval_refs = _source_refs(domain_by_id["approvals"])
+    authorization_refs = {
+        "comind.cm_foundry_authorization_request",
+        "comind.cm_foundry_authorization_decision",
+    }
+    if "comind_pm.pm_decision_records" not in decision_refs:
+        _fail("Decisions must preserve the canonical operational decision record substrate")
+    if decision_refs & authorization_refs:
+        _fail("Decisions must not use Foundry authorization records as decision truth")
+    if not authorization_refs.issubset(approval_refs):
+        _fail("Approvals must include Foundry authorization request and decision truth")
 
     if "comind.cm_evidence" not in _source_refs(domain_by_id["evidence"]):
         _fail("Evidence must preserve comind.cm_evidence as canonical evidence identity")

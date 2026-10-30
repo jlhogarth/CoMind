@@ -155,6 +155,7 @@ DECLARE
     v_plan record;
     v_auth record;
     v_successor record;
+    v_actor_kind text;
     v_to_status text;
     v_event_id uuid;
     v_task_count integer;
@@ -225,6 +226,13 @@ BEGIN
             v_existing.from_status,
             v_existing.to_status;
         RETURN;
+    END IF;
+
+    SELECT kind INTO v_actor_kind
+    FROM comind.cm_actor
+    WHERE actor_id = p_actor_id;
+    IF NOT FOUND OR v_actor_kind <> 'person' THEN
+        RAISE EXCEPTION 'MDO plan disposition requires an attributable human person actor';
     END IF;
 
     SELECT mp.plan_id, mp.module_id, mp.project_id, mp.version, mp.status,

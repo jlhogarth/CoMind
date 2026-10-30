@@ -32,7 +32,9 @@ CFR-002 extends rather than replaces:
 - CFR-001G derived analytics and promotion-candidate boundaries
 - CHIST lossless archive ingestion and certified history baseline
 
-The active HCH-001 lane was found to be changing `server/src/conversation-db.ts` and migration numbers through `20261030_022`. CFR-002 therefore remains additive, does not modify `server/src/conversation-db.ts`, and begins at migration `20261030_023`.
+The active HCH-001 lane was initially found to be changing `server/src/conversation-db.ts` and migration numbers through `20261030_022`. CFR-002 therefore remained additive and did not modify `server/src/conversation-db.ts`.
+
+A later freshness check found that current `main` had advanced and now owned migration numbers `20261030_023`, `20261030_024`, and `20261030_025`. CFR-002 was therefore renumbered to `20261030_026` before reconciliation with current `main`. The earlier `_023` CFR path was removed from the branch and was never merged to `main`.
 
 ## External contract verification
 
@@ -60,7 +62,7 @@ The API reference also lists `response.reasoning_text.delta` and `.done`. CFR-00
 
 Migration:
 
-`db/migrations/20261030_023_cfr_002_dual_acquisition_foundation.sql`
+`db/migrations/20261030_026_cfr_002_dual_acquisition_foundation.sql`
 
 ### `cm_conversation_acquisition_observation`
 
@@ -179,6 +181,8 @@ The original table used `acquisition_sequence bigint GENERATED ALWAYS AS IDENTIT
 This was a migration portability defect, not a reason to weaken the least-privilege requirement. The repair replaces the implicit identity sequence with the explicit short sequence `comind.cm_conv_acq_seq`, uses it as the column default, binds it to the acquisition column with `OWNED BY`, and grants only the required sequence privileges to `comind_conversation_acquisition_writer`.
 
 The failed run is retained as evidence because it demonstrates that the acceptance gate caught an assumption about generated PostgreSQL identifiers before any live deployment.
+
+A subsequent freshness check found a separate namespace collision after other accepted lanes advanced `main`: `20261030_023_rlib_002_governed_drive_intake.sql`, `20261030_024_mdo_003_plan_scoped_claim_hardening.sql`, and `20261030_025_ce_004_friction_failure_register.sql` were present on current `main`. CFR-002 therefore moved to migration `_026` before branch reconciliation. This recovery preserves the one-migration-number ownership rule and prevents a stale branch from introducing a duplicate chronological migration identifier.
 
 ## Deliberate non-goals in this slice
 

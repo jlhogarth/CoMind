@@ -53,7 +53,7 @@ DECLARE
 BEGIN
   SELECT count(*) INTO missing_count
   FROM (VALUES
-    ('cm_epistemic_relationship_case_fkey','cm_epistemic_relationship','case_id'),
+    ('cm_epistemic_relationship_case_id_fkey','cm_epistemic_relationship','case_id'),
     ('cm_epistemic_relationship_subject_same_case','cm_epistemic_relationship','case_id,subject_object_id'),
     ('cm_epistemic_relationship_object_same_case','cm_epistemic_relationship','case_id,object_object_id'),
     ('cm_epistemic_event_case_id_fkey','cm_epistemic_event','case_id'),

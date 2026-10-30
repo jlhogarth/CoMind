@@ -1,0 +1,201 @@
+/* CUX-002 Console readability and mobile usability remediation.
+ * Presentation-only overrides. Governance semantics, data authority,
+ * authentication, and deployment behavior remain unchanged.
+ */
+
+/* Raise operator-critical microcopy to a readable baseline without
+ * changing the information hierarchy or the underlying data contract. */
+.hud-shell .hud-env,
+.hud-shell .hud-breadcrumb,
+.hud-shell .hud-source-state,
+.hud-shell .hud-eyebrow,
+.hud-shell .hud-data-note,
+.hud-shell .hud-read-error,
+.hud-shell .hud-stat span,
+.hud-shell .hud-stat small,
+.hud-shell .hud-list-heading p,
+.hud-shell .hud-snapshot-label,
+.hud-shell .hud-sort-explainer,
+.hud-shell .hud-pagination,
+.hud-shell .state-pill,
+.hud-shell .activity-key,
+.hud-shell .investigation-badge,
+.hud-shell .synthetic-badge,
+.hud-shell .activity-meta,
+.hud-shell .state-explanation,
+.hud-shell .resolution-pill,
+.hud-shell .no-resolution,
+.hud-shell .activity-details,
+.hud-shell .coverage-note,
+.hud-shell .hud-footer,
+.hud-shell .hud-side-note,
+.hud-shell .hud-side-note b {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.hud-shell .activity-summary-column p,
+.hud-shell .activity-details code,
+.hud-shell .evidence-block b,
+.hud-shell .evidence-block pre {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.hud-shell .hud-refresh,
+.hud-shell .hud-export {
+  min-height: 38px;
+  padding-block: 9px;
+  font-size: 12px;
+}
+
+.hud-shell .hud-search {
+  min-height: 38px;
+}
+
+.hud-shell .hud-search input,
+.hud-shell .hud-filters select,
+.hud-shell .hud-page-controls select,
+.hud-shell .hud-page-controls button {
+  min-height: 38px;
+  font-size: 12px;
+}
+
+.hud-shell .hud-search input {
+  padding-block: 8px;
+}
+
+.hud-shell .hud-page-controls button {
+  min-width: 38px;
+}
+
+/* RuleBook uses the generic card class from the original landing-page
+ * stylesheet. Normalize that surface into compact HUD summary tiles. */
+.hud-shell .cards {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 9px;
+  margin: 0 0 17px;
+}
+
+.hud-shell .card {
+  min-height: 112px;
+  padding: 13px;
+  border-radius: 10px;
+  background: #0c1d29;
+}
+
+.hud-shell .card h2 {
+  margin: 5px 0 5px;
+  font-size: 23px;
+  line-height: 1.1;
+}
+
+.hud-shell .card p {
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* RuleBook filter labels are visible labels rather than sr-only labels.
+ * Give them an explicit hierarchy and full-width native controls. */
+.hud-shell .hud-filters > label:not(.hud-search):not(.sr-only) {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  color: #a9bfcc;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.hud-shell .hud-filters > label:not(.hud-search):not(.sr-only) input,
+.hud-shell .hud-filters > label:not(.hud-search):not(.sr-only) select {
+  width: 100%;
+  min-height: 38px;
+  max-width: none;
+  padding: 8px 28px 8px 10px;
+  border: 1px solid #294659;
+  border-radius: 8px;
+  color: #c5d6df;
+  background: #102434;
+  font: inherit;
+  font-size: 12px;
+}
+
+.hud-shell .hud-filters > label:not(.hud-search):not(.sr-only) input:focus-visible,
+.hud-shell .hud-search:focus-within {
+  outline: 2px solid #62c5d0;
+  outline-offset: 2px;
+}
+
+@media (max-width: 650px) {
+  /* Primary phone controls use a 44px interaction target while desktop
+   * retains the denser operational layout. */
+  .hud-shell .hud-refresh,
+  .hud-shell .hud-export,
+  .hud-shell .hud-search,
+  .hud-shell .hud-filters select,
+  .hud-shell .hud-page-controls select,
+  .hud-shell .hud-page-controls button,
+  .hud-shell .hud-filters > label:not(.hud-search):not(.sr-only) input,
+  .hud-shell .hud-filters > label:not(.hud-search):not(.sr-only) select {
+    min-height: 44px;
+  }
+
+  .hud-shell .hud-refresh,
+  .hud-shell .hud-export,
+  .hud-shell .hud-search input,
+  .hud-shell .hud-filters select,
+  .hud-shell .hud-page-controls select,
+  .hud-shell .hud-page-controls button {
+    font-size: 13px;
+  }
+
+  .hud-shell .hud-page-controls button {
+    min-width: 44px;
+    padding-inline: 10px;
+  }
+
+  .hud-shell .hud-sidebar nav a.active {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Four tall RuleBook cards previously consumed most of the first phone
+   * viewport. A 2x2 compact summary preserves every metric while moving
+   * filters back into the operator's immediate working context. */
+  .hud-shell .cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  .hud-shell .card {
+    min-height: 88px;
+    padding: 11px;
+  }
+
+  .hud-shell .card h2 {
+    margin: 0 0 4px;
+    font-size: 21px;
+  }
+
+  .hud-shell .card p {
+    font-size: 12px;
+  }
+
+  .hud-shell .hud-filters > label:first-child:not(.hud-search):not(.sr-only) {
+    grid-column: 1 / -1;
+  }
+
+  .hud-shell .hud-filters > label:not(.hud-search):not(.sr-only) {
+    font-size: 12px;
+  }
+
+  /* The Control Plane side navigation measured 43px in CUA. Preserve its
+   * layout and close the one-pixel mobile target gap without depending on
+   * CSS-module implementation names. */
+  main:not(.hud-shell) > aside nav a {
+    min-height: 44px;
+  }
+}

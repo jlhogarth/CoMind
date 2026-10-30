@@ -89,9 +89,9 @@ The acceptance repair checks out one `PoolClient` before `BEGIN`, routes every f
 
 ## Freshness and collision reconciliation
 
-Before repairing the failed proof, the branch was reconciled against current `main` through commit `86c0ec6237e7867b77bd1d89433aea918939762e`, including CE-001 and CUX-002 work. The MDO implementation paths were otherwise disjoint.
+Before final acceptance, the branch was reconciled through current `main` commit `8c9d385fa3479c32aa2e1369607e93c3254e1152`, including CE-001, CUX-002, and HUD-MAIL-001. The intervening HUD-MAIL-001 paths are confined to the Operator Console and do not overlap the eight MDO-002 implementation, test, migration, workflow, or evidence paths.
 
-Freshness review found one namespace collision in migration ordering: CE-001 had occupied the `20261029_007`, `008`, and `009` sequence while MDO-002 had independently used `007`. MDO-002 was therefore resequenced to `20261029_010_mdo_002_foundry_terminal_alignment.sql` with the paired `verify_20261029_010...` verifier. The prior MDO `007` files were removed so the repository retains one unambiguous migration sequence.
+Freshness review found one earlier namespace collision in migration ordering: CE-001 had occupied the `20261029_007`, `008`, and `009` sequence while MDO-002 had independently used `007`. MDO-002 was therefore resequenced to `20261029_010_mdo_002_foundry_terminal_alignment.sql` with the paired `verify_20261029_010...` verifier. The prior MDO `007` files were removed so the repository retains one unambiguous migration sequence.
 
 ## Security and authority boundaries
 

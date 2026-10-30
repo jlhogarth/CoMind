@@ -67,11 +67,13 @@ SELECT
     WHEN 'done' THEN 'completed'
     WHEN 'completed' THEN 'completed'
     WHEN 'failed' THEN 'failed'
+    WHEN 'canceled' THEN 'cancelled'
     WHEN 'cancelled' THEN 'cancelled'
     WHEN 'cancellation_requested' THEN 'cancellation_requested'
     WHEN 'in_progress' THEN 'running'
     WHEN 'review' THEN 'awaiting_review'
     WHEN 'blocked' THEN 'blocked'
+    WHEN 'deferred' THEN 'deferred'
     WHEN 'ready' THEN 'queued'
     WHEN 'backlog' THEN 'queued'
     ELSE 'unknown'
@@ -80,10 +82,11 @@ SELECT
     WHEN 'done' THEN 'completed'
     WHEN 'completed' THEN 'completed'
     WHEN 'failed' THEN 'failed'
+    WHEN 'canceled' THEN 'cancelled'
     WHEN 'cancelled' THEN 'cancelled'
     ELSE NULL
   END AS evidence_based_resolution,
-  lower(COALESCE(wi.status, '')) IN ('done', 'completed', 'failed', 'cancelled') AS has_terminal_source_evidence,
+  lower(COALESCE(wi.status, '')) IN ('done', 'completed', 'failed', 'canceled', 'cancelled') AS has_terminal_source_evidence,
   false AS is_synthetic,
   'Canonical PM work-item state with latest linked PM event only. This projection does not infer source SLA/staleness, complete history, a lossless feed, or snapshot consistency.'::text AS coverage_limit
 FROM comind_pm.pm_work_items wi

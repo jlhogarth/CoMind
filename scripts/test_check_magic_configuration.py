@@ -46,12 +46,22 @@ class MagicConfigurationTests(unittest.TestCase):
         self.write_runtime(root, "const url = required(process.env.DATABASE_URL);\n")
         self.assertEqual([], MODULE.scan(root))
 
-    def test_literal_http_endpoint_is_candidate(self) -> None:
+    def test_connection_oriented_http_literal_is_candidate(self) -> None:
         temp, root = self.make_root(); self.addCleanup(temp.cleanup)
-        self.write_runtime(root, "const endpoint = 'http://127.0.0.1:3100/api';\n")
+        self.write_runtime(root, "const baseUrl = 'http://127.0.0.1:3100/api';\n")
         findings = MODULE.scan(root)
         self.assertEqual(1, len(findings))
         self.assertEqual("runtime-http-literal", findings[0].detector)
+
+    def test_navigation_http_literal_is_not_candidate(self) -> None:
+        temp, root = self.make_root(); self.addCleanup(temp.cleanup)
+        self.write_runtime(root, "const link = { href: 'https://github.com/example/project' };\n", "page.tsx")
+        self.assertEqual([], MODULE.scan(root))
+
+    def test_provenance_source_url_is_not_candidate(self) -> None:
+        temp, root = self.make_root(); self.addCleanup(temp.cleanup)
+        self.write_runtime(root, "export const RATE_CARD_SOURCE = 'https://example.com/pricing';\n", "rate-card.ts")
+        self.assertEqual([], MODULE.scan(root))
 
     def test_test_file_is_excluded(self) -> None:
         temp, root = self.make_root(); self.addCleanup(temp.cleanup)
@@ -62,7 +72,7 @@ class MagicConfigurationTests(unittest.TestCase):
     def test_fixture_file_is_excluded(self) -> None:
         temp, root = self.make_root(); self.addCleanup(temp.cleanup)
         fixture_dir = root / "server" / "src" / "fixtures"; fixture_dir.mkdir(parents=True)
-        (fixture_dir / "config.ts").write_text("const url = 'http://127.0.0.1:3100';\n", encoding="utf-8")
+        (fixture_dir / "config.ts").write_text("const baseUrl = 'http://127.0.0.1:3100';\n", encoding="utf-8")
         self.assertEqual([], MODULE.scan(root))
 
     def test_config_surface_is_excluded(self) -> None:

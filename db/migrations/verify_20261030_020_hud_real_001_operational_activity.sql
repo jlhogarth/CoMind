@@ -49,8 +49,8 @@ BEGIN
     WHEN insufficient_privilege THEN NULL;
   END;
 
-  SELECT count(*), min(hud_state), min(source_ref), bool_and(has_terminal_source_evidence), min(last_evidence)
-  INTO v_rows, v_state, v_source_ref, v_terminal, v_evidence
+  SELECT count(*)
+  INTO v_rows
   FROM public.operator_console_activity_feed(
     'hud-real-001-ci-capability-0000000000000000', 'operational', 1000
   )
@@ -59,6 +59,14 @@ BEGIN
   IF v_rows <> 1 THEN
     RAISE EXCEPTION 'Expected one operational HUD verification row, got %', v_rows;
   END IF;
+
+  SELECT hud_state, source_ref, has_terminal_source_evidence, last_evidence
+  INTO STRICT v_state, v_source_ref, v_terminal, v_evidence
+  FROM public.operator_console_activity_feed(
+    'hud-real-001-ci-capability-0000000000000000', 'operational', 1000
+  )
+  WHERE activity_key = 'HUD-REAL-001-CI';
+
   IF v_state <> 'awaiting_review' THEN
     RAISE EXCEPTION 'Expected review status to map to awaiting_review, got %', v_state;
   END IF;
@@ -90,7 +98,7 @@ BEGIN
   );
 
   SELECT hud_state, has_terminal_source_evidence
-  INTO v_state, v_terminal
+  INTO STRICT v_state, v_terminal
   FROM public.operator_console_activity_feed(
     'hud-real-001-ci-capability-0000000000000000', 'operational', 1000
   )

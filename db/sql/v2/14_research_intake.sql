@@ -179,17 +179,40 @@ INSERT INTO comind.cm_research_intake_source(source_key,display_name,drive_folde
 VALUES('saved-from-chrome','Saved from Chrome Research Intake','18I-qJ-MW40PybsxIkMbVo_hibh-3LgxG','https://drive.google.com/drive/folders/18I-qJ-MW40PybsxIkMbVo_hibh-3LgxG','1zswjOidkaPwh0qFoiSE29HQk-a2KvLhz','https://drive.google.com/drive/folders/1zswjOidkaPwh0qFoiSE29HQk-a2KvLhz','Test',false,true,true,60,jsonb_build_object('governing_issue','https://github.com/jlhogarth/CoMind/issues/362','production_activation',false,'classification_rule','ambiguous classification fails closed','fingerprint_rule','raw file bytes SHA-256 required for exact duplicate determination'))
 ON CONFLICT(source_key) DO UPDATE SET display_name=EXCLUDED.display_name,drive_folder_id=EXCLUDED.drive_folder_id,drive_url=EXCLUDED.drive_url,default_destination_folder_id=EXCLUDED.default_destination_folder_id,default_destination_url=EXCLUDED.default_destination_url,environment=EXCLUDED.environment,production=EXCLUDED.production,enabled=EXCLUDED.enabled,automation_allowed=EXCLUDED.automation_allowed,poll_interval_minutes=EXCLUDED.poll_interval_minutes,metadata=EXCLUDED.metadata;
 
-REVOKE ALL ON TABLE comind.cm_research_intake_source FROM PUBLIC,anon,authenticated;
-REVOKE ALL ON TABLE comind.cm_research_intake FROM PUBLIC,anon,authenticated;
-REVOKE ALL ON TABLE comind.cm_research_intake_event FROM PUBLIC,anon,authenticated;
-REVOKE ALL ON FUNCTION comind.set_updated_at_research_intake() FROM PUBLIC,anon,authenticated;
-REVOKE ALL ON FUNCTION comind.reject_research_intake_event_mutation() FROM PUBLIC,anon,authenticated;
-REVOKE ALL ON FUNCTION comind.register_research_intake_detection(text,text,text,text,text,bigint,timestamptz,timestamptz,text) FROM PUBLIC,anon,authenticated;
-REVOKE ALL ON FUNCTION comind.record_research_intake_fingerprint(uuid,text,text) FROM PUBLIC,anon,authenticated;
-REVOKE ALL ON FUNCTION comind.mark_research_intake_fingerprint_unavailable(uuid,text,text) FROM PUBLIC,anon,authenticated;
-REVOKE ALL ON FUNCTION comind.propose_research_intake_classification(uuid,text,text,text,text[],text[],text,numeric,jsonb,text,uuid,text) FROM PUBLIC,anon,authenticated;
-REVOKE ALL ON FUNCTION comind.mark_research_intake_ready_to_move(uuid,text) FROM PUBLIC,anon,authenticated;
-REVOKE ALL ON FUNCTION comind.mark_research_intake_moved(uuid,text,text) FROM PUBLIC,anon,authenticated;
-REVOKE ALL ON FUNCTION comind.block_research_intake(uuid,text,text) FROM PUBLIC,anon,authenticated;
+REVOKE ALL ON TABLE comind.cm_research_intake_source FROM PUBLIC;
+REVOKE ALL ON TABLE comind.cm_research_intake FROM PUBLIC;
+REVOKE ALL ON TABLE comind.cm_research_intake_event FROM PUBLIC;
+REVOKE ALL ON FUNCTION comind.set_updated_at_research_intake() FROM PUBLIC;
+REVOKE ALL ON FUNCTION comind.reject_research_intake_event_mutation() FROM PUBLIC;
+REVOKE ALL ON FUNCTION comind.register_research_intake_detection(text,text,text,text,text,bigint,timestamptz,timestamptz,text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION comind.record_research_intake_fingerprint(uuid,text,text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION comind.mark_research_intake_fingerprint_unavailable(uuid,text,text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION comind.propose_research_intake_classification(uuid,text,text,text,text[],text[],text,numeric,jsonb,text,uuid,text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION comind.mark_research_intake_ready_to_move(uuid,text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION comind.mark_research_intake_moved(uuid,text,text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION comind.block_research_intake(uuid,text,text) FROM PUBLIC;
+
+DO $$
+DECLARE
+  v_role text;
+BEGIN
+  FOREACH v_role IN ARRAY ARRAY['anon','authenticated'] LOOP
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname=v_role) THEN
+      EXECUTE format('REVOKE ALL ON TABLE comind.cm_research_intake_source FROM %I',v_role);
+      EXECUTE format('REVOKE ALL ON TABLE comind.cm_research_intake FROM %I',v_role);
+      EXECUTE format('REVOKE ALL ON TABLE comind.cm_research_intake_event FROM %I',v_role);
+      EXECUTE format('REVOKE ALL ON FUNCTION comind.set_updated_at_research_intake() FROM %I',v_role);
+      EXECUTE format('REVOKE ALL ON FUNCTION comind.reject_research_intake_event_mutation() FROM %I',v_role);
+      EXECUTE format('REVOKE ALL ON FUNCTION comind.register_research_intake_detection(text,text,text,text,text,bigint,timestamptz,timestamptz,text) FROM %I',v_role);
+      EXECUTE format('REVOKE ALL ON FUNCTION comind.record_research_intake_fingerprint(uuid,text,text) FROM %I',v_role);
+      EXECUTE format('REVOKE ALL ON FUNCTION comind.mark_research_intake_fingerprint_unavailable(uuid,text,text) FROM %I',v_role);
+      EXECUTE format('REVOKE ALL ON FUNCTION comind.propose_research_intake_classification(uuid,text,text,text,text[],text[],text,numeric,jsonb,text,uuid,text) FROM %I',v_role);
+      EXECUTE format('REVOKE ALL ON FUNCTION comind.mark_research_intake_ready_to_move(uuid,text) FROM %I',v_role);
+      EXECUTE format('REVOKE ALL ON FUNCTION comind.mark_research_intake_moved(uuid,text,text) FROM %I',v_role);
+      EXECUTE format('REVOKE ALL ON FUNCTION comind.block_research_intake(uuid,text,text) FROM %I',v_role);
+    END IF;
+  END LOOP;
+END
+$$;
 
 COMMIT;

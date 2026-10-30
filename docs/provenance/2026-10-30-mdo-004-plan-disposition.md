@@ -87,18 +87,24 @@ Every disposition has a unique idempotency key. Exact replay returns the existin
 
 Disposition events and evidence links reject UPDATE and DELETE through the existing MDO append-only provenance trigger.
 
+## Freshness and migration namespace recovery
+
+MDO-004 began from `main` after GER-001. While implementation was in progress, CE-004 merged and legitimately occupied migration slot `20261030_025` with its friction/failure register migration. The CE-004 file set is otherwise disjoint from MDO-004.
+
+MDO-004 therefore moved forward to migration slot `20261030_026`. No CE-004 file, runtime, schema object, or evidence is overwritten. The MDO branch must be reconciled onto the CE-004 merge before PR acceptance.
+
 ## Isolated acceptance strategy
 
 Before canonical Test promotion, the MDO-004 workflow must:
 
 1. rebuild and verify the accepted MDO-001 substrate in isolated PostgreSQL 17;
 2. apply accepted MDO-002 terminal alignment and MDO-003 plan-scope hardening;
-3. apply migration `20261030_025_mdo_004_governed_plan_disposition.sql` twice;
+3. apply migration `20261030_026_mdo_004_governed_plan_disposition.sql` twice;
 4. prove schema, permissions, capability, RLS, immutability, C2 exact-plan authority, completeness checks, supersession checks, and the module-maturity boundary;
 5. run a rollback-only lifecycle proof covering incomplete-plan rejection, person-only authority, expired authorization, block/resume, complete acceptance, exact replay, conflicting replay rejection, duplicate-acceptance rejection, immutable history, valid supersession, and unchanged maturity;
 6. build the server and run deterministic MDO-004 and existing MDO runtime tests.
 
-Only after those gates are green may migration `025` be promoted to canonical Supabase Test.
+Only after those gates are green may migration `026` be promoted to canonical Supabase Test.
 
 ## Supabase platform review
 

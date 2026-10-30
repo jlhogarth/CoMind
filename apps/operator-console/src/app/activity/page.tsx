@@ -333,7 +333,7 @@ export default function ActivityHudPage() {
             <span className="hud-snapshot-label"><Clock3 size={13} /> Last read {lastRefreshed ? new Date(lastRefreshed).toLocaleTimeString() : "not yet completed"} · refreshes every 30 seconds</span>
           </div>
           <div className="hud-filters">
-            <label className="hud-search"><Search size={15} /><input value={query} onChange={(event) => resetPage(() => setQuery(event.target.value))} placeholder="Search activity, source, owner, evidence" /></label>
+            <label className="hud-search"><Search size={15} aria-hidden="true" /><input aria-label="Search activities" value={query} onChange={(event) => resetPage(() => setQuery(event.target.value))} placeholder="Search activity, source, owner, evidence" /></label>
             <label className="sr-only" htmlFor="state-filter">Filter activity state</label>
             <select id="state-filter" value={stateFilter} onChange={(event) => resetPage(() => setStateFilter(event.target.value))}>
               <option value="all">All states</option>
@@ -401,4 +401,3 @@ export default function ActivityHudPage() {
     </main>
   );
 }
-

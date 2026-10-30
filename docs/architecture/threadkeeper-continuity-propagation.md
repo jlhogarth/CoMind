@@ -1,8 +1,10 @@
 # TK-008 - Governed Continuity Propagation
 
-Status: Implementation candidate  
+Status: Accepted implementation  
 Capability: ThreadKeeper  
 Issue: #305  
+Accepted PR: #310  
+Merge commit: `0dc6e42db72dab79ba72081ffc6df7a15eadf8d7`  
 Production activation: false  
 Schema change: none in this slice
 

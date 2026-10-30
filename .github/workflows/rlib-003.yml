@@ -42,6 +42,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Prove RLIB migration numbering is collision-free
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ -f db/migrations/20261030_024_mdo_003_plan_scoped_claim_hardening.sql ]]
+          [[ ! -e db/migrations/20261030_024_rlib_003_ve_standards_learning_path.sql ]]
+          [[ ! -e db/migrations/verify_20261030_024_rlib_003_ve_standards_learning_path.sql ]]
+          [[ -f db/migrations/20261030_025_rlib_003_ve_standards_learning_path.sql ]]
+          [[ -f db/migrations/verify_20261030_025_rlib_003_ve_standards_learning_path.sql ]]
+
       - name: Install PostgreSQL client
         run: |
           sudo apt-get update

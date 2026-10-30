@@ -1,0 +1,109 @@
+{
+  "schema_version": "comind.ve.research-evidence-contract.v0.1",
+  "contract_id": "SCOUT-002-EVIDENCE",
+  "contract_version": "0.1",
+  "status": "candidate",
+  "issue": 409,
+  "applies_to_actor_handle": "agent.scout",
+  "applies_to_capability": "research.evidence.synthesize",
+  "required_fields": [
+    "assignment_id",
+    "research_objective",
+    "source_provenance",
+    "source_authority",
+    "source_lifecycle",
+    "retrieval_or_observation_time",
+    "material_sources_consulted",
+    "findings",
+    "uncertainty",
+    "contradictory_or_negative_evidence",
+    "source_currentness_caveats",
+    "material_tool_use",
+    "provider_model_provenance",
+    "capability_code",
+    "capability_grant_id",
+    "authorization_decision_id",
+    "authority_used",
+    "environment",
+    "target_kind",
+    "target_ref",
+    "cost",
+    "work_product_ref",
+    "work_product_sha256",
+    "review_status",
+    "failures_blocks_and_escalations",
+    "material_developmental_change"
+  ],
+  "field_rules": {
+    "assignment_id": {
+      "required_value_for_first_assignment": "SCOUT-R001"
+    },
+    "capability_code": {
+      "required_value": "research.evidence.synthesize"
+    },
+    "authority_used": {
+      "allowed_values": [
+        "C0",
+        "C1"
+      ],
+      "first_assignment_required_value": "C1"
+    },
+    "environment": {
+      "required_value": "isolated"
+    },
+    "target_kind": {
+      "required_value": "research_assignment"
+    },
+    "target_ref": {
+      "first_assignment_required_value": "scout-r001:ve-standards-operational-readiness"
+    },
+    "cost": {
+      "currency": "USD",
+      "first_assignment_maximum": 0,
+      "explicit_zero_required": true
+    },
+    "provider_model_provenance": {
+      "provider_required": "ollama_local",
+      "model_required": "qwen3:0.6b",
+      "result_ref_prefix": "ollama-local://qwen3:0.6b/"
+    },
+    "work_product_sha256": {
+      "algorithm": "sha256",
+      "lowercase_hex_length": 64
+    },
+    "review_status": {
+      "allowed_values": [
+        "pending_human_review",
+        "accepted",
+        "accepted_with_corrections",
+        "rejected"
+      ],
+      "initial_value": "pending_human_review"
+    },
+    "material_developmental_change": {
+      "authority_effect": "none",
+      "default_for_first_assignment": false,
+      "separate_governance_required_if_true": true
+    }
+  },
+  "epistemic_requirements": {
+    "observation_inference_hypothesis_separation": true,
+    "material_uncertainty_must_be_explicit": true,
+    "contradictory_evidence_must_not_be_suppressed": true,
+    "missing_evidence_must_not_be_fabricated": true,
+    "secondary_guidance_must_not_be_presented_as_normative": true,
+    "withdrawn_sources_must_be_identified_as_withdrawn": true,
+    "superseding_source_must_be_identified_when_known": true,
+    "source_freshness_caveats_must_be_preserved": true,
+    "research_output_may_expand_authority": false,
+    "research_output_may_activate_lifecycle": false,
+    "research_output_may_mutate_developmental_identity": false
+  },
+  "acceptance": {
+    "all_required_fields_present": true,
+    "source_packet_reconcilable_to_rlib": true,
+    "exact_capability_grant_and_authorization_provenance_required": true,
+    "work_product_digest_required": true,
+    "human_review_required_before_accepted_status": true
+  }
+}

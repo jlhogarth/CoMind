@@ -42,3 +42,14 @@ The Console may derive presentation states only from explicit durable evidence. 
 5. Conversation summaries, copied prompts, and recollection.
 
 A lower layer must not override contradictory newer evidence from a higher layer.
+
+## Runtime capability binding
+
+The deployed Console does not require a Supabase service-role key. The internal zero-argument management RPC remains service-role-only for governed backend use. The server-facing runtime calls a separate overload with a dedicated capability, `l4a_management_v1`, over the browser-safe Supabase publishable-key channel.
+
+Only the SHA-256 digest of the dedicated capability is stored in `comind.cm_operator_console_read_capability`. The plaintext capability exists only in the protected Console server environment variable `OPERATOR_CONSOLE_MANAGEMENT_CAPABILITY`. The capability is distinct from the Activity HUD capability so compromise or rotation of one read surface does not silently grant access to the other.
+
+The capability wrapper is executable by the Supabase `anon` role only because the wrapper itself performs the secret comparison inside a `SECURITY DEFINER` boundary. `authenticated` and `PUBLIC` do not receive execute permission. The underlying zero-argument management RPC remains unavailable to `anon` and `authenticated`.
+
+Repository tests and the migration verifier use synthetic capability strings only. The verifier temporarily replaces the capability hash inside a transaction and rolls the transaction back, preserving any real runtime binding. Creating, rotating, or binding the real runtime capability is a security-sensitive operation and remains separately authorized.
+

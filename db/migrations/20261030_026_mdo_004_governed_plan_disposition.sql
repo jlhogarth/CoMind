@@ -204,10 +204,10 @@ BEGIN
     WHERE idempotency_key = p_idempotency_key;
 
     IF FOUND THEN
-        SELECT COALESCE(array_agg(evidence_id ORDER BY evidence_id), ARRAY[]::uuid[])
+        SELECT COALESCE(array_agg(de.evidence_id ORDER BY de.evidence_id), ARRAY[]::uuid[])
         INTO v_existing_evidence
-        FROM comind.cm_mdo_plan_disposition_evidence
-        WHERE disposition_event_id = v_existing.disposition_event_id;
+        FROM comind.cm_mdo_plan_disposition_evidence AS de
+        WHERE de.disposition_event_id = v_existing.disposition_event_id;
 
         IF v_existing.plan_id IS DISTINCT FROM p_plan_id
            OR v_existing.event_type IS DISTINCT FROM p_event_type

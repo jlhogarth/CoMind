@@ -28,6 +28,7 @@ function asyncEvents(events) {
 test('OpenAI streaming emits only output-text deltas and completes from response.completed', async () => {
   const calls = [];
   const observed = [];
+  const providerEvents = [];
   const provider = new OpenAIAssistantProvider(
     {
       async create(request) {
@@ -83,9 +84,8 @@ test('OpenAI streaming emits only output-text deltas and completes from response
     },
     {
       stage: 'direct',
-      onTextDelta(event) {
-        observed.push(event);
-      },
+      onTextDelta(event) { observed.push(event); },
+      onProviderEvent(event) { providerEvents.push(event); },
     }
   );
 
@@ -121,10 +121,20 @@ test('OpenAI streaming emits only output-text deltas and completes from response
     ]
   );
   assert.equal(observed.some((event) => event.delta.includes('hidden reasoning')), false);
+  assert.deepEqual(providerEvents.map((event) => event.providerEventType), [
+    'response.created', 'response.reasoning_text.delta', 'response.output_text.delta',
+    'response.output_text.delta', 'response.completed',
+  ]);
+  assert.deepEqual(providerEvents.map((event) => event.providerSequenceNumber), [1, 2, 3, 4, 5]);
+  assert.equal(providerEvents[0].providerResponseId, 'resp_stream_1');
+  assert.equal(providerEvents[1].payload.delta, 'hidden reasoning must not be observed');
+  assert.equal(providerEvents[1].provider, 'openai');
+  assert.equal(providerEvents[1].providerEndpoint, 'responses.create');
 });
 
 test('OpenAI streaming preserves observed deltas before an incomplete terminal', async () => {
   const observed = [];
+  const providerEvents = [];
   const provider = new OpenAIAssistantProvider(
     {
       async create(request) {
@@ -165,9 +175,8 @@ test('OpenAI streaming preserves observed deltas before an incomplete terminal',
       },
       {
         stage: 'draft',
-        onTextDelta(event) {
-          observed.push(event);
-        },
+        onTextDelta(event) { observed.push(event); },
+        onProviderEvent(event) { providerEvents.push(event); },
       }
     ),
     (error) => {
@@ -182,6 +191,33 @@ test('OpenAI streaming preserves observed deltas before an incomplete terminal',
   assert.equal(observed[0].stage, 'draft');
   assert.equal(observed[0].providerSequenceNumber, 2);
   assert.equal(observed[0].providerResponseId, 'resp_stream_incomplete');
+  assert.deepEqual(providerEvents.map((event) => event.providerEventType), [
+    'response.created', 'response.output_text.delta', 'response.incomplete',
+  ]);
+});
+
+test('OpenAI streaming emits exposed reasoning-summary events without mixing them into assistant text', async () => {
+  const providerEvents = []; const textDeltas = [];
+  const provider = new OpenAIAssistantProvider({ async create() { return asyncEvents([
+    { type: 'response.created', sequence_number: 1, response: { id: 'resp_summary_1', status: 'in_progress' } },
+    { type: 'response.reasoning_summary_text.delta', sequence_number: 2, delta: 'Summary fragment', item_id: 'reasoning_1', summary_index: 0 },
+    { type: 'response.reasoning_summary_text.done', sequence_number: 3, text: 'Summary fragment', item_id: 'reasoning_1', summary_index: 0 },
+    { type: 'response.output_text.delta', sequence_number: 4, delta: 'Visible answer' },
+    { type: 'response.completed', sequence_number: 5, response: { id: 'resp_summary_1', model: 'gpt-6-luna-2026-09-22', status: 'completed', usage: null } },
+  ]); } }, providerOptions(), true);
+  const response = await provider.generateResponse(
+    { conversationId: '44444444-4444-4444-8444-444444444449', messages: [{ role: 'user', content: 'Summarize reasoning.' }] },
+    { stage: 'direct', onTextDelta(event) { textDeltas.push(event); }, onProviderEvent(event) { providerEvents.push(event); } }
+  );
+  assert.equal(response.content, 'Visible answer');
+  assert.deepEqual(textDeltas.map((event) => event.delta), ['Visible answer']);
+  assert.deepEqual(providerEvents.map((event) => event.providerEventType), [
+    'response.created', 'response.reasoning_summary_text.delta', 'response.reasoning_summary_text.done',
+    'response.output_text.delta', 'response.completed',
+  ]);
+  assert.equal(providerEvents[1].payload.delta, 'Summary fragment');
+  assert.equal(providerEvents[2].payload.text, 'Summary fragment');
+  assert.equal(providerEvents[1].metadata.summary_index, 0);
 });
 
 test('direct OpenAI provider instances remain non-streaming unless explicitly enabled', async () => {

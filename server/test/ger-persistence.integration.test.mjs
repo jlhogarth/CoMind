@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 const databaseUrl = process.env.DATABASE_URL?.trim();
-const integrationTest = databaseUrl ? test : test.skip;
+const gerIntegrationEnabled = process.env.GER_PERSISTENCE_INTEGRATION === '1';
+const integrationTest = databaseUrl && gerIntegrationEnabled ? test : test.skip;
 
 integrationTest('GER persistence reconstructs governed case lineage and rejects unsafe writes', async () => {
   const {

@@ -13,13 +13,13 @@ MDO-002 proved the provider-neutral ten-role planning chain in a rollback-only P
 
 ## Collision boundary
 
-DRULE-005 owns shared RuleBook operational-preflight changes to `MdoOrchestrator.enqueuePlan()` and Foundry execution. MDO-003 is additive and does not modify that runtime seam. If DRULE-005 merges before MDO-003 acceptance, MDO-003 must reconcile to current `main` and reuse the accepted preflight contract rather than fork it.
+DRULE-005 owns shared RuleBook operational-preflight changes to `MdoOrchestrator.enqueuePlan()` and Foundry execution. MDO-003 is additive to that accepted runtime and does not fork the RuleBook or Foundry control plane.
 
 ## Reuse decisions
 
 MDO-003 reuses:
 
-- MDO-001 canonical module/plan/task/contribution schema and phase gates;
+- MDO-001 canonical module, plan, task, contribution schema and phase gates;
 - MDO-002 `mdo` adapter, bounded context projection, evidence contract, and planning worker;
 - canonical Foundry profiles, grants, authorization, runtime, terminal evidence, recovery, and fenced leases;
 - VE-LIFE-002 exact Supabase Test target guard and certificate posture;
@@ -27,7 +27,7 @@ MDO-003 reuses:
 - canonical `cm_evidence` and `cm_audit_log` rather than a new acceptance ledger;
 - local `ollama_local / qwen3:0.6b` only.
 
-No database schema or Production runtime change is required by the initial MDO-003 implementation.
+MDO-003 creates no new table and no new provider or authority plane. During persistent Test recovery it adds one bounded compatibility migration that hardens the existing MDO claimant to enforce canonical Foundry exact-plan grant scope.
 
 ## Durable Test identities
 
@@ -40,7 +40,7 @@ The harness creates or reuses only explicitly labeled Test identities in the can
 
 The Test module exists to prevent acceptance evidence from being attached to a real product module. Its lifecycle starts at `conceived` and MDO-003 must not change it.
 
-Worker profiles persist as Test identities. Execution authority does not. Every acceptance run creates a new exact-plan C1 isolated grant with a 45-minute expiry and a capability-specific task ceiling of 3, 2, 3, 1, and 1. The harness revokes those five grants after the proof and verifies zero remain active.
+Worker profiles persist as Test identities. Execution authority does not. Every acceptance run creates a new exact-plan C1 isolated grant with a 45-minute expiry and a capability-specific task ceiling of 3, 2, 3, 1, and 1. Foundry evaluates those ceilings against the exact plan target reference, so they are per-plan execution ceilings. The harness revokes all five grants after the proof and verifies zero remain active.
 
 ## Authorization boundary
 
@@ -121,9 +121,10 @@ Merge requires:
 
 - one issue, branch, and PR;
 - exact-head syntax, TypeScript build, MDO deterministic tests, bounded-context regression, and CE-003 regression;
+- isolated PostgreSQL proof that the exact-plan claimant hardening is idempotent and preserves client-role restrictions;
 - live canonical Supabase Test proof on the exact PR head;
 - local Ollama only and zero paid-provider cost;
-- both negative authorization proofs fail closed;
+- both negative authorization proofs fail closed at the intended authorization boundaries;
 - CE-003 returns `proceed` or `proceed_with_attention` with no blocking finding;
 - all ten roles and durable readback invariants pass;
 - run grants are revoked after proof;
@@ -131,7 +132,7 @@ Merge requires:
 - final current-main collision/freshness review is clean;
 - Production remains unchanged.
 
-## Recovery evidence: persistent Test terminal-alignment drift
+## Recovery evidence 1: persistent Test terminal-alignment drift
 
 The first persistent Supabase Test acceptance run, GitHub Actions run `41044987494` on pre-DRULE MDO-003 head `0c5e9b25d7ace8b4f0632117b6740e78c758f24e`, passed the repository contract job and failed during the live role chain when the first successful Foundry execution attempted to submit its MDO contribution.
 
@@ -147,10 +148,41 @@ The already-accepted MDO-002 migration `20261029_010_mdo_002_foundry_terminal_al
 
 The failed MDO-003 candidate retained its durable provenance. Its five historical run-scoped capability grants remain recorded, and independent readback confirmed zero active grants after cleanup.
 
-## DRULE-005 reconciliation requirement
+## DRULE-005 reconciliation
 
-DRULE-005 PR #371 subsequently merged at `ca6e64179fd60ccdc54087af01abd8b5a4014e16` and is now the accepted shared RuleBook operational-authority path for MDO and Foundry execution. MDO-003 must therefore be reconciled on top of that accepted runtime without restoring or forking its older runtime view.
+DRULE-005 PR #371 merged at `ca6e64179fd60ccdc54087af01abd8b5a4014e16` and is the accepted shared RuleBook operational-authority path for MDO and Foundry execution. MDO-003 was reconciled on top of that accepted runtime without restoring or forking its older runtime view.
 
-The MDO-003 lane remains intentionally additive: its workflow, persistent Test integration proof, five Test harness modules, and this provenance record are the only lane-owned files. Current `main` supplies the operational RuleBook, MDO runtime, MDO orchestrator, Foundry runtime, and all other shared control-plane code.
+The reconciliation used current `main` as first parent and preserved the MDO-003 line as second parent. Shared RuleBook, MDO runtime, MDO orchestrator, Foundry runtime, provider runtime, and other control-plane code all come from accepted `main`.
 
-Current disposition after recovery: RETEST REQUIRED. A fresh exact-head persistent Supabase Test run on the reconciled DRULE-005 base is required before PR #374 can be accepted or merged.
+## Recovery evidence 2: exact-plan work-claim scope
+
+The next persistent acceptance proof, GitHub Actions run `41046681755`, passed the exact-head contract job and reached the first negative authorization proof. The expired authorization was expected to fail as `authorization_expired`, but Foundry returned `grant_not_valid` first.
+
+Forensics showed that the MDO claimant had leased a ready task from an older retained failed plan while the new run's capability grant correctly named only the current plan in canonical Foundry `scope.target_refs`. The later Foundry runtime therefore rejected the old-plan task because it was outside the current grant scope. Safety was preserved, but the claimant had selected work that the canonical execution gate could never authorize.
+
+The stale plan and task were not deleted. Their durable failure evidence remains part of Test provenance.
+
+Root cause: the accepted MDO-001 database claimant enforced project, capability, phase gating, and its historical optional `module_ids` restriction, but it did not enforce Foundry's canonical exact-target `target_refs` restriction during lease selection.
+
+Repair: migration `20261030_024_mdo_003_plan_scoped_claim_hardening.sql` replaces only `comind.cm_mdo_claim_work(...)` and adds fail-closed exact-plan `target_refs` enforcement before a lease can be taken. It preserves the accepted `module_ids` restriction for backward compatibility, preserves phase gating, retries, lease fencing, authority ceilings, and client-role restrictions, and introduces no new authority.
+
+The paired verifier `verify_20261030_024_mdo_003_plan_scoped_claim_hardening.sql` requires:
+
+- canonical `target_refs` scope handling;
+- a non-empty array when that restriction is present;
+- exact current-plan membership;
+- preserved `module_ids` compatibility;
+- no `anon` or `authenticated` execute privilege;
+- continued `service_role` execution privilege.
+
+GitHub Actions run #7 on head `0bd0b33f0ab5c3544ab2cd0b313ef17f52cd23f3` proved the migration in isolated PostgreSQL 17 after rebuilding the accepted MDO-001 substrate. The migration applied successfully twice and the verifier passed. The same head's MDO harness contract also passed dependency audit, TypeScript build, harness syntax, deterministic MDO runtime/context tests, and CE-003 regression.
+
+After that isolated proof, migration `024` was promoted to canonical Supabase Test only. Direct Test readback proved `target_refs` enforcement, empty-list fail-closed behavior, exact plan membership, legacy `module_ids` compatibility, denied client execution, and intended `service_role` execution. Independent grant readback showed ten historical MDO-003 grants retained and zero active grants before the next acceptance attempt.
+
+No Production database, provider, deployment, or paid service was changed.
+
+## Workflow freshness control
+
+The MDO-003 workflow originally allowed superseded PR heads to remain queued in a non-cancelling concurrency group. That delayed current-head acceptance without adding evidence value. The workflow now uses a PR-scoped concurrency group with `cancel-in-progress: true`. Superseded runs remain visible in GitHub Actions as cancelled evidence, while only the newest exact PR head is eligible to continue through the live Test gate.
+
+Current disposition: RETEST REQUIRED. The next exact-head persistent Supabase Test run must prove the intended `authorization_expired` and `authorization_scope_mismatch` negative paths, then complete all ten local Ollama roles and durable invariants before PR #374 can be accepted or merged.

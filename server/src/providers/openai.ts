@@ -58,11 +58,15 @@ export interface OpenAIResponseStreamEventLike {
   type: string;
   sequence_number?: number;
   delta?: string;
+  text?: string;
   response?: OpenAIResponseLike;
+  response_id?: string;
   error?: unknown;
   item_id?: string;
   output_index?: number;
   content_index?: number;
+  summary_index?: number;
+  [key: string]: unknown;
 }
 
 export interface OpenAIResponseStreamLike extends AsyncIterable<OpenAIResponseStreamEventLike> {}
@@ -302,6 +306,21 @@ export function openAIProviderSuccessMetadata(
   };
 }
 
+function streamEventPayload(event: OpenAIResponseStreamEventLike): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(event).filter(([, value]) => value !== undefined)
+  );
+}
+
+function streamEventMetadata(event: OpenAIResponseStreamEventLike): Record<string, unknown> {
+  return {
+    ...(event.item_id ? { item_id: event.item_id } : {}),
+    ...(typeof event.output_index === 'number' ? { output_index: event.output_index } : {}),
+    ...(typeof event.content_index === 'number' ? { content_index: event.content_index } : {}),
+    ...(typeof event.summary_index === 'number' ? { summary_index: event.summary_index } : {}),
+  };
+}
+
 export class OpenAIAssistantProvider implements AssistantProvider {
   readonly name = 'openai';
 
@@ -337,7 +356,23 @@ export class OpenAIAssistantProvider implements AssistantProvider {
 
     try {
       for await (const event of stream) {
-        if (event.response?.id) responseId = event.response.id;
+        const eventResponseId = event.response?.id
+          ?? (typeof event.response_id === 'string' ? event.response_id : null);
+        if (eventResponseId) responseId = eventResponseId;
+
+        await observer.onProviderEvent?.({
+          provider: 'openai',
+          providerEndpoint: 'responses.create',
+          providerEventType: event.type,
+          stage: observer.stage,
+          observedAt: new Date().toISOString(),
+          ...(typeof event.sequence_number === 'number'
+            ? { providerSequenceNumber: event.sequence_number }
+            : {}),
+          ...(responseId ? { providerResponseId: responseId } : {}),
+          payload: streamEventPayload(event),
+          metadata: streamEventMetadata(event),
+        });
 
         if (event.type === 'response.output_text.delta') {
           if (typeof event.delta !== 'string' || event.delta.length === 0) continue;

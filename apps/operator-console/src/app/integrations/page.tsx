@@ -22,6 +22,7 @@ export default function IntegrationGatewayPage() {
           <a href="/">Overview</a>
           <a href="/activity">Activity HUD</a>
           <a href="/rulebook">RuleBook HUD</a>
+          <a href="/management-plane">L4A Management</a>
           <a className="active" href="/integrations" aria-current="page">Integration Gateway</a>
         </nav>
         <div className="hud-side-note">

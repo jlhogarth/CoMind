@@ -255,7 +255,8 @@ try {
 
   await pool.query(
     `UPDATE comind.cm_foundry_capability_grant
-        SET expires_at=clock_timestamp()-interval '1 minute'
+        SET granted_at=clock_timestamp()-interval '2 minutes',
+            expires_at=clock_timestamp()-interval '1 minute'
       WHERE grant_id=$1::uuid`,
     [grant.grant_id]
   );

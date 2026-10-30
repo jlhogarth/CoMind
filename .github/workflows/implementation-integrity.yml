@@ -14,8 +14,8 @@ permissions:
   contents: read
 
 jobs:
-  iic-shadow:
-    name: IIC-002 multi-control shadow scan
+  iic-enforce:
+    name: IIC-003 NDT hard enforcement and NFS shadow review
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -26,19 +26,27 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Run integrity engine tests
+      - name: Validate enforcement contract
+        run: python scripts/check_integrity_enforcement_contract.py .
+
+      - name: Run integrity engine regression tests
         run: python scripts/test_check_implementation_integrity.py
 
-      - name: Run implementation integrity in shadow mode
-        run: python scripts/check_implementation_integrity.py . --mode shadow --format json --output integrity-findings.json
+      - name: Run integrity enforcement adversarial tests
+        run: python scripts/test_integrity_enforcement_contract.py
+
+      - name: Enforce NDT-001 and report shadow candidates
+        run: python scripts/check_implementation_integrity.py . --mode enforce --format json --output integrity-findings.json
 
       - name: Render findings in job log
+        if: always()
         run: cat integrity-findings.json
 
       - name: Preserve exact-head integrity evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: iic-002-findings-${{ github.sha }}
+          name: iic-003-findings-${{ github.sha }}
           path: integrity-findings.json
           if-no-files-found: error
           retention-days: 14

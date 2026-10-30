@@ -6,12 +6,16 @@ on:
     branches:
       - main
 
+concurrency:
+  group: implementation-integrity-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 jobs:
   iic-shadow:
-    name: IIC-001 shadow integrity scan
+    name: IIC-002 multi-control shadow scan
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -25,7 +29,7 @@ jobs:
       - name: Run integrity engine tests
         run: python scripts/test_check_implementation_integrity.py
 
-      - name: Run NDT-001 in shadow mode
+      - name: Run implementation integrity in shadow mode
         run: python scripts/check_implementation_integrity.py . --mode shadow --format json --output integrity-findings.json
 
       - name: Render findings in job log
@@ -34,7 +38,7 @@ jobs:
       - name: Preserve exact-head integrity evidence
         uses: actions/upload-artifact@v4
         with:
-          name: iic-001-findings-${{ github.sha }}
+          name: iic-002-findings-${{ github.sha }}
           path: integrity-findings.json
           if-no-files-found: error
           retention-days: 14

@@ -153,6 +153,8 @@ class IntegrityEngineTests(unittest.TestCase):
         self.assertEqual(0, MODULE.main([str(root), "--mode", "shadow", "--format", "json", "--output", str(output)]))
         payload = json.loads(output.read_text(encoding="utf-8"))
         self.assertEqual(2, payload["schema_version"])
+        self.assertEqual("IIC", payload["lane"])
+        self.assertEqual("implementation-integrity", payload["component"])
         self.assertEqual(["NDT-001", "NFS-001"], payload["controls"])
         self.assertEqual(1, payload["candidate_count"])
         self.assertEqual(0, payload["blocking_count"])

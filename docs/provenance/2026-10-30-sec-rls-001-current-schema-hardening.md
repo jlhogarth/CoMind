@@ -123,7 +123,7 @@ SEC-RLS-001 uses:
 
 `20261030_027_sec_rls_001_current_schema_hardening`
 
-Freshness must be rechecked before acceptance because parallel development can claim the same number later.
+Freshness was rechecked before the first acceptance pass. No competing `_027` claim was found.
 
 ## Test-first sequence
 
@@ -150,7 +150,7 @@ The successor migration:
 - creates a scoped SELECT policy on the three conversation source tables for the derivation and reconciliation roles;
 - creates scoped SELECT, INSERT, and UPDATE policies on the two analytics tables for the derivation role;
 - creates no DELETE policy;
-- preserves `service_role`/`postgres` BYPASSRLS behavior;
+- preserves `service_role` and `postgres` BYPASSRLS behavior;
 - is designed for repeat application.
 
 ## Policy-preservation regression
@@ -171,6 +171,8 @@ The guard includes deterministic self-tests and is wired into the dedicated work
 
 This establishes a forward invariant so RLS hardening is not merely a one-time sweep.
 
+Read-only inspection also found no custom-schema default ACL granting PUBLIC, `anon`, `authenticated`, or `service_role` automatic access to future tables. The migration guard therefore complements a currently fail-closed default-privilege posture rather than compensating for an automatic broad grant.
+
 ## Verifier precision repair
 
 Before CI, self-review found that one reconciler negative check used a combined `has_table_privilege(..., 'SELECT,INSERT,UPDATE,DELETE')` predicate. PostgreSQL interprets that as requiring the complete privilege set, so a hypothetical partial unintended grant could escape the test.
@@ -178,6 +180,104 @@ Before CI, self-review found that one reconciler negative check used a combined 
 The verifier was tightened before PR acceptance to test each forbidden reconciler analytics privilege independently, for both analytics tables.
 
 The implementation migration was not changed by this verifier repair.
+
+## Mainline reconciliation
+
+The branch was initially leased from CE-004 main:
+
+`c3cc95cae33a2476027ce90639d4f473781f787b`
+
+During implementation, `main` advanced through the VE engineering standard and HAI-007 to:
+
+`4a7beacc8fc92a7b7e2d75dbadb202ed767509db`
+
+Those mainline changes touched only:
+
+- `docs/governance/VE-ENGINEERING-STANDARD-v0.1.md`;
+- `docs/research/HAI-007-literature-grounding-canonical-reconciliation.md`.
+
+They were path-disjoint from SEC-RLS-001 and were reconciled into the same branch with both histories preserved. Pre-PR compare then showed zero commits behind, exactly eight additive SEC-RLS-001 files, and zero deletions.
+
+## First exact-head acceptance pass
+
+Draft PR:
+
+`#396 SEC-RLS-001: current-schema RLS hardening and policy preservation`
+
+Semantic candidate:
+
+`9d546454f01f45f6f08e1983a98f71b6e8129883`
+
+Base main:
+
+`4a7beacc8fc92a7b7e2d75dbadb202ed767509db`
+
+Dedicated SEC-RLS workflow:
+
+`41067593148`
+
+Results:
+
+- exact-head checkout: pass;
+- migration guard self-test: pass;
+- changed-migration RLS integrity scan: pass;
+- PostgreSQL 17 service initialization: pass;
+- migration applied twice: pass;
+- all custom-schema fixture tables RLS-enabled after hardening: pass;
+- pre-existing literal-true policy preservation: pass;
+- real `SET ROLE` derivation read/write behavior: pass;
+- real reconciliation read behavior: pass;
+- forbidden derivation DELETE: rejected as required;
+- forbidden reconciler analytics access: rejected as required;
+- forbidden anon custom-schema access: rejected as required;
+- service-role BYPASSRLS compatibility: pass.
+
+Generic CI:
+
+`41067593211`
+
+Result: success.
+
+Additional exact-head workflows passed:
+
+- Implementation Integrity;
+- Integrity Governance;
+- No Placeholder Policy;
+- CoMind Repository Configuration;
+- Lane Health Sentinel;
+- DRB-002 Query Contract;
+- Runtime Budget Authority Adapter;
+- Governed Provider Execution;
+- Foundry Work Lease Kernel;
+- Foundry Runtime Orchestration;
+- Foundry Terminal Lifecycle;
+- Live Foundry Stage 1 Readiness;
+- Live Foundry LF-2 Readiness;
+- Live Foundry LF-3 Readiness;
+- bounded Foundry Test one-shot local handoff.
+
+No returned workflow failed on the semantic candidate.
+
+## Final read-only Test preflight refresh
+
+After the first exact-head acceptance pass and before the documentation-only provenance successor, the connected Test database remained unchanged:
+
+- custom-schema tables: 246;
+- RLS-disabled tables: 88;
+- current custom-schema policies: 218;
+- literal-true policies: 170;
+- `anon` custom-schema usage: false;
+- `authenticated` custom-schema usage: false;
+- `anon` DML-accessible custom-schema tables: 0;
+- `authenticated` DML-accessible custom-schema tables: 0.
+
+This confirms the lane has not silently applied live DDL during repository acceptance.
+
+## Final provenance successor
+
+This documentation update records the completed first acceptance pass only. It does not change migration SQL, verification SQL, the migration guard, the isolated behavioral test, privileges, or connected Test state.
+
+Because CoMind exact-head acceptance binds evidence to the reviewed commit rather than assuming documentation-only changes are harmless, the documentation successor must itself pass the applicable exact-head workflow before PR #396 is moved from draft to review.
 
 ## Current boundaries
 
@@ -190,15 +290,4 @@ The implementation migration was not changed by this verifier repair.
 - no claim that the Supabase advisor finding proves anonymous exposure;
 - no deletion of existing role-scoped policies based solely on predicate shape.
 
-## Remaining acceptance
-
-Before review readiness:
-
-1. execute the committed preflight read-only against the connected Test project;
-2. recheck current `main`, open lanes, and migration namespace;
-3. open one draft PR for Issue #392;
-4. require exact-head SEC-RLS-001 workflow success;
-5. require broad repository regressions relevant to schema, runtime, Foundry, conversation, RunBook, Continuous Excellence, and implementation integrity;
-6. preserve and repair any failures forward;
-7. refresh the live read-only preflight before final acceptance;
-8. keep live DDL blocked while PR #119 retains the shared mutation lease.
+Repository acceptance and live Test activation remain separate governed states.

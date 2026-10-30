@@ -141,13 +141,41 @@ first_registration="$(psql "${DATABASE_URL}" -X -q -At -F '|' -v ON_ERROR_STOP=1
 second_registration="$(psql "${DATABASE_URL}" -X -q -At -F '|' -v ON_ERROR_STOP=1 \
   -f "${repository_root}/scripts/provision_scout_002_c1_research_package.sql")"
 
-expected='agent.scout|draft|C0|C1||research.evidence.synthesize|synthesize_evidence|research_assignment|C1|low|f|ollama_local|0'
-if [[ "${first_registration}" != *"${expected}"* ]]; then
-  echo "SCOUT-002 first registration returned unexpected state: ${first_registration}" >&2
-  exit 1
-fi
-if [[ "${second_registration}" != *"${expected}"* ]]; then
-  echo "SCOUT-002 idempotent replay returned unexpected state: ${second_registration}" >&2
+validate_registration_state() {
+  local label="$1"
+  local state="$2"
+  local actor_handle profile_id status authority_floor authority_ceiling activated_at
+  local capability_code action target_kind max_authority risk_class cost_bearing adapter active_grants extra
+
+  IFS='|' read -r actor_handle profile_id status authority_floor authority_ceiling activated_at \
+    capability_code action target_kind max_authority risk_class cost_bearing adapter active_grants extra <<< "${state}"
+
+  if [[ "${actor_handle}" != "agent.scout" \
+     || ! "${profile_id}" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ \
+     || "${status}" != "draft" \
+     || "${authority_floor}" != "C0" \
+     || "${authority_ceiling}" != "C1" \
+     || -n "${activated_at}" \
+     || "${capability_code}" != "research.evidence.synthesize" \
+     || "${action}" != "synthesize_evidence" \
+     || "${target_kind}" != "research_assignment" \
+     || "${max_authority}" != "C1" \
+     || "${risk_class}" != "low" \
+     || "${cost_bearing}" != "f" \
+     || "${adapter}" != "ollama_local" \
+     || "${active_grants}" != "0" \
+     || -n "${extra}" ]]; then
+    echo "SCOUT-002 ${label} returned unexpected state: ${state}" >&2
+    exit 1
+  fi
+
+  printf '%s' "${profile_id}"
+}
+
+first_profile_id="$(validate_registration_state 'first registration' "${first_registration}")"
+second_profile_id="$(validate_registration_state 'idempotent replay' "${second_registration}")"
+if [[ "${first_profile_id}" != "${second_profile_id}" ]]; then
+  echo "SCOUT-002 idempotent replay changed Scout profile_id: ${first_profile_id} -> ${second_profile_id}" >&2
   exit 1
 fi
 

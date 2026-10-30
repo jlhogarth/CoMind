@@ -3,8 +3,8 @@
 
 The detector is intentionally conservative. It reports review candidates for
 consequential runtime configuration that is statically embedded as an
-operational fallback or literal network endpoint. It does not rewrite code,
-claim a violation, or block acceptance in this maturity state.
+operational fallback or connection-oriented literal endpoint. It does not
+rewrite code, claim a violation, or block acceptance in this maturity state.
 """
 
 from __future__ import annotations
@@ -52,6 +52,9 @@ ENV_FALLBACK_RE = re.compile(
     r"process\.env\.(?P<name>[A-Z][A-Z0-9_]*)[^\n;]{0,120}?(?:\?\?|\|\|)\s*(?P<value>(?:['\"][^'\"]+['\"]|\d+(?:\.\d+)?|true|false))"
 )
 HTTP_LITERAL_RE = re.compile(r"(?P<quote>['\"])(?P<url>https?://[^'\"\s]+)(?P=quote)")
+CONNECTION_CONTEXT_RE = re.compile(
+    r"\b(?:baseUrl|baseURL|endpoint|serviceUrl|serviceURL|apiUrl|apiURL|requestUrl|requestURL|fetch)\b"
+)
 
 
 @dataclass(frozen=True)
@@ -117,6 +120,15 @@ def is_consequential_env(name: str) -> bool:
     return any(hint in upper for hint in OPERATIONAL_ENV_HINTS)
 
 
+def is_connection_literal_context(line: str) -> bool:
+    """Limit endpoint candidates to connection-oriented runtime use.
+
+    Navigation links, documentation/provenance source URLs, and ordinary href
+    copy are not operational configuration merely because they are literals.
+    """
+    return bool(CONNECTION_CONTEXT_RE.search(line))
+
+
 def scan(root: Path) -> list[Candidate]:
     findings: list[Candidate] = []
     for source in iter_runtime_sources(root):
@@ -149,21 +161,22 @@ def scan(root: Path) -> list[Candidate]:
                     )
                 )
 
-            for match in HTTP_LITERAL_RE.finditer(raw_line):
-                url = match.group("url")
-                findings.append(
-                    candidate(
-                        detector="runtime-http-literal",
-                        path=relative,
-                        line=line_number,
-                        target=url,
-                        evidence=line,
-                        message=(
-                            "Runtime source contains a literal HTTP endpoint; review whether "
-                            "endpoint ownership belongs in governed configuration."
-                        ),
+            if is_connection_literal_context(raw_line):
+                for match in HTTP_LITERAL_RE.finditer(raw_line):
+                    url = match.group("url")
+                    findings.append(
+                        candidate(
+                            detector="runtime-http-literal",
+                            path=relative,
+                            line=line_number,
+                            target=url,
+                            evidence=line,
+                            message=(
+                                "Connection-oriented runtime source contains a literal HTTP endpoint; "
+                                "review whether endpoint ownership belongs in governed configuration."
+                            ),
+                        )
                     )
-                )
 
     unique = {item.fingerprint: item for item in findings}
     return sorted(

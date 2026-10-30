@@ -23,6 +23,7 @@ $$;
 
 CREATE TABLE IF NOT EXISTS comind.cm_conversation_acquisition_observation (
   acquisition_observation_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  acquisition_sequence bigint GENERATED ALWAYS AS IDENTITY UNIQUE,
   conv_id uuid NOT NULL REFERENCES comind.cm_conversation(conv_id) ON DELETE RESTRICT,
   generation_id uuid REFERENCES comind.cm_assistant_generation(generation_id) ON DELETE RESTRICT,
   source_family text NOT NULL CHECK (
@@ -39,21 +40,24 @@ CREATE TABLE IF NOT EXISTS comind.cm_conversation_acquisition_observation (
   raw_object_ref text,
   acquisition_metadata jsonb NOT NULL DEFAULT '{}'::jsonb
     CHECK (jsonb_typeof(acquisition_metadata) = 'object'),
-  captured_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT cm_conversation_acquisition_source_identity
-    UNIQUE (source_family, source_stream_ref, source_event_ref)
+  captured_at timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE INDEX IF NOT EXISTS idx_cm_conversation_acquisition_conv
-  ON comind.cm_conversation_acquisition_observation (conv_id, captured_at, acquisition_observation_id);
+  ON comind.cm_conversation_acquisition_observation (conv_id, acquisition_sequence);
 
 CREATE INDEX IF NOT EXISTS idx_cm_conversation_acquisition_generation
-  ON comind.cm_conversation_acquisition_observation (generation_id, captured_at)
+  ON comind.cm_conversation_acquisition_observation (generation_id, acquisition_sequence)
   WHERE generation_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_cm_conversation_acquisition_source_identity
+  ON comind.cm_conversation_acquisition_observation (
+    source_family, source_stream_ref, source_event_ref, acquisition_sequence
+  );
 
 CREATE INDEX IF NOT EXISTS idx_cm_conversation_acquisition_source_sequence
   ON comind.cm_conversation_acquisition_observation (
-    source_family, source_stream_ref, source_sequence_no
+    source_family, source_stream_ref, source_sequence_no, acquisition_sequence
   )
   WHERE source_sequence_no IS NOT NULL;
 
@@ -93,6 +97,9 @@ CREATE TABLE IF NOT EXISTS comind.cm_conversation_acquisition_normalization (
   normalized_capture_event_id uuid
     REFERENCES comind.cm_conversation_capture_event(capture_event_id)
     ON DELETE RESTRICT,
+  related_observation_id uuid
+    REFERENCES comind.cm_conversation_acquisition_observation(acquisition_observation_id)
+    ON DELETE RESTRICT,
   detail text,
   evidence jsonb NOT NULL DEFAULT '{}'::jsonb
     CHECK (jsonb_typeof(evidence) = 'object'),
@@ -102,6 +109,9 @@ CREATE TABLE IF NOT EXISTS comind.cm_conversation_acquisition_normalization (
     UNIQUE (acquisition_observation_id, normalizer_version),
   CONSTRAINT cm_conversation_acquisition_normalized_class_required CHECK (
     status <> 'normalized' OR normalization_class IS NOT NULL
+  ),
+  CONSTRAINT cm_conversation_acquisition_related_observation_required CHECK (
+    status NOT IN ('duplicate', 'out_of_order') OR related_observation_id IS NOT NULL
   )
 );
 
@@ -111,6 +121,10 @@ CREATE INDEX IF NOT EXISTS idx_cm_conversation_acquisition_normalization_state
 CREATE INDEX IF NOT EXISTS idx_cm_conversation_acquisition_normalized_capture
   ON comind.cm_conversation_acquisition_normalization (normalized_capture_event_id)
   WHERE normalized_capture_event_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_cm_conversation_acquisition_normalization_related
+  ON comind.cm_conversation_acquisition_normalization (related_observation_id)
+  WHERE related_observation_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS comind.cm_conversation_acquisition_reconciliation (
   acquisition_reconciliation_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -244,12 +258,15 @@ GRANT SELECT, INSERT ON TABLE
   comind.cm_conversation_acquisition_normalization,
   comind.cm_conversation_acquisition_reconciliation
 TO comind_conversation_acquisition_writer;
+GRANT USAGE, SELECT ON SEQUENCE
+  comind.cm_conversation_acquisition_observation_acquisition_sequence_seq
+TO comind_conversation_acquisition_writer;
 
 COMMENT ON TABLE comind.cm_conversation_acquisition_observation IS
-  'Immutable CFR-002 source observation identity and raw-envelope lineage. Large raw payloads may be retained out of row and referenced by raw_object_ref.';
+  'Immutable CFR-002 arrival ledger. Duplicate and replayed source events remain separate observations. Large raw payloads may be retained out of row and referenced by raw_object_ref.';
 
 COMMENT ON TABLE comind.cm_conversation_acquisition_normalization IS
-  'Immutable versioned normalization outcome. Drift and unknown source shapes remain explicit rather than guessed.';
+  'Immutable versioned normalization outcome. Drift, duplicate, out-of-order, and unknown source shapes remain explicit rather than guessed or discarded.';
 
 COMMENT ON TABLE comind.cm_conversation_acquisition_reconciliation IS
   'Immutable deterministic comparison receipt for independently observed live acquisition streams. Source evidence is never overwritten.';

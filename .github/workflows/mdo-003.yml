@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - '.github/workflows/mdo-003.yml'
+      - 'db/migrations/20261030_024_mdo_003_plan_scoped_claim_hardening.sql'
+      - 'db/migrations/verify_20261030_024_mdo_003_plan_scoped_claim_hardening.sql'
       - 'server/test/support/mdo-live-test-db.mjs'
       - 'server/test/support/mdo-live-test-fixtures.mjs'
       - 'server/test/support/mdo-live-test-governance.mjs'
@@ -74,6 +76,60 @@ jobs:
           node --test test/mdo-planning-runtime.test.mjs test/mdo-planning-context-bounds.test.mjs
           node --test test/ce-003-missingness-forward-reasoning.test.mjs
 
+  claim-scope-contract:
+    name: MDO-003 exact-plan claim scope
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.6-pg17-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+      - name: Build and verify accepted MDO-001 substrate
+        run: bash ./scripts/test_mdo_001.sh
+      - name: Apply exact-plan claim hardening twice
+        shell: bash
+        run: |
+          set -euo pipefail
+          for pass in 1 2; do
+            printf 'MDO-003 plan-scope migration pass %s\n' "$pass"
+            psql -X "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+              -f db/migrations/20261030_024_mdo_003_plan_scoped_claim_hardening.sql
+          done
+      - name: Verify exact-plan claim hardening
+        run: >-
+          psql -X "$DATABASE_URL" -v ON_ERROR_STOP=1
+          -f db/migrations/verify_20261030_024_mdo_003_plan_scoped_claim_hardening.sql
+
   live-test-acceptance:
     name: MDO-003 live Supabase Test proof
     if: >-
@@ -82,7 +138,7 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.repository_owner == 'jlhogarth' &&
       github.actor == 'jlhogarth'
-    needs: contract
+    needs: [contract, claim-scope-contract]
     runs-on: ubuntu-latest
     timeout-minutes: 40
     services:

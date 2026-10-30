@@ -45,8 +45,10 @@ The lane was created after PR #388 merged. A collision scan found SEC-RLS-001 ow
 - CFR-002 normalizer/database foundation regression
 - exact-head GitHub Actions proof
 
-## Inherited CFR-002 verification repair
+## Inherited CFR-002 verification defect and canonical reconciliation
 
-The first reconciled exact-head CFR-002A run exposed a latent arity defect in the merged CFR-002 database verification fixture. Observation `c0020000-0000-4000-8000-000000000105` omitted its `source_stream_ref`, causing PostgreSQL to reject the multi-row INSERT before CFR-002A code was exercised. The repair adds the intended `browser_synthetic_1` stream reference, preserving the fixture's existing `future_private_event_shape` event-family and `browser_event_drift` event reference. No schema, runtime, Production, or source-semantics change is introduced.
+The first reconciled exact-head CFR-002A run exposed a latent arity defect in the then-current merged CFR-002 database verification fixture before CFR-002A code was exercised. While this lane was diagnosing it, the independent CFR-002R lane merged the canonical correction to main under PR #419. CFR-002A therefore adopts the exact CFR-002R verification fixture rather than maintaining its independently proposed completion of the malformed row.
 
-The CFR-002A workflow path filter now explicitly includes the inherited CFR-002 verification SQL and parent acceptance script because CFR-002A depends on that regression harness.
+CFR-002R also moved the dual-acquisition foundation migration to `20261030_030_cfr_002_dual_acquisition_foundation.sql`. CFR-002A claims no migration slot and relies on the current mainline parent harness.
+
+The CFR-002A workflow path filter explicitly includes the inherited CFR-002 verification SQL and parent acceptance script because CFR-002A depends on that regression harness.

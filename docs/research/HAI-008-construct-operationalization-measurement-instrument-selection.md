@@ -124,7 +124,7 @@ Disposition: RECOMMENDED CANDIDATE for AI-specific self-reported trust.
 
 Source: Wischnewski, Doebler, and Krämer, 2026. DOI: 10.1080/29974100.2026.2715475.
 
-TAIS is a validated multidimensional instrument covering global trust and facets including ability, integrity, transparency, unbiasedness, and vigilance. HAI should administer it at selected longitudinal checkpoints rather than after every micro-task.
+TAIS is a validated multidimensional instrument with specific dimensions of ability, integrity, transparency, unbiasedness, and vigilance plus a global trust factor. HAI should administer it at selected longitudinal checkpoints rather than after every micro-task.
 
 Boundary: TAIS does not by itself measure calibration. Pair it with actual system correctness and behavioral reliance. Verify scoring and reproduction terms before deploying item text.
 
@@ -158,7 +158,7 @@ Disposition: RECOMMENDED METHOD FAMILY WITH MULTIMETHOD CAUTION.
 
 Candidate methods include concept mapping, paired ratings, causal mapping, structured knowledge elicitation, and network similarity. Meta-analytic evidence connects shared mental models to team process and performance, while research also shows that alternative SMM measures can exhibit weak convergent validity.
 
-Sources include DeChurch and Mesmer-Magnus, DOI 10.1037/a0017455; Ross and Allen, DOI 10.3758/s13428-012-0201-5; Andrews et al., DOI 10.1080/1463922X.2022.2061080.
+Sources include DeChurch and Mesmer-Magnus, DOI 10.1037/a0017328; Ross and Allen, DOI 10.3758/s13428-012-0201-5; Andrews et al., DOI 10.1080/1463922X.2022.2061080.
 
 ### Human-Autonomy Team trust toolkit
 
@@ -328,8 +328,8 @@ HAI-009 should convert this specification into an executable controlled pilot pr
 - Jian, J.-Y.; Bisantz, A. M.; Drury, C. G. 2000. Foundations for an Empirically Determined Scale of Trust in Automated Systems. DOI: 10.1207/S15327566IJCE0401_04.
 - NASA Human Systems Integration Division. NASA Task Load Index.
 - Moens, L. L. et al. 2026. Measuring Situation Awareness: A Meta-Review Across Domains. DOI: 10.1177/00187208251412110.
-- DeChurch, L. A.; Mesmer-Magnus, J. 2010. Measuring Shared Team Mental Models: A Meta-Analysis. DOI: 10.1037/a0017455.
-- Ross, S. J.; Allen, N. J. 2012. Examining the convergent validity of shared mental model measures. DOI: 10.3758/s13428-012-0201-5.
+- DeChurch, L. A.; Mesmer-Magnus, J. R. 2010. The Cognitive Underpinnings of Effective Teamwork: A Meta-Analysis. Journal of Applied Psychology 95(1):32-53. DOI: 10.1037/a0017328.
+- Ross, S. J.; Allen, N. J. 2012. Examining the convergent validity of shared mental model measures. Behavior Research Methods 44(4):1052-1062. DOI: 10.3758/s13428-012-0201-5.
 - Andrews, R. W. et al. 2023. The role of shared mental models in human-AI teams. DOI: 10.1080/1463922X.2022.2061080.
 - Krausman, A. S. et al. 2022. Trust Measurement in Human-Autonomy Teams. DOI: 10.1145/3530874.
 - Attig, C. et al. 2026. Measuring Successful Cooperation in Human-AI Teamwork. DOI: 10.1080/10447318.2026.2739657.

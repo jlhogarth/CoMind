@@ -92,6 +92,8 @@ BEGIN
        OR position('authority_level <> ''C2''' in v_function) = 0
        OR position('environment <> ''isolated''' in v_function) = 0
        OR position('target_kind <> ''module_plan''' in v_function) = 0
+       OR position('v_actor_kind <> ''person''' in v_function) = 0
+       OR position('de.disposition_event_id = v_existing.disposition_event_id' in v_function) = 0
        OR position('terminal_status = ''succeeded''' in v_function) = 0
        OR position('v_task_count <> 10' in v_function) = 0
        OR position('v_contribution_count <> 10' in v_function) = 0
@@ -111,6 +113,8 @@ $$;
 SELECT 'pass' AS result,
        'mdo-004' AS lane,
        'c2_exact_plan=true' AS authority,
+       'person_only=true' AS human_authority,
+       'replay_lookup_qualified=true' AS replay,
        'append_only=true' AS provenance,
        'complete_plan_gate=true' AS completeness,
        'supersession_gate=true' AS supersession,

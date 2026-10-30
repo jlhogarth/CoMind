@@ -1,8 +1,10 @@
 # TK-010 - Continuity Compatibility Gates and As-Of Reconstruction
 
-Status: Implementation candidate  
+Status: Accepted implementation  
 Capability: ThreadKeeper  
 Issue: #307  
+Accepted PR: #314  
+Merge commit: `189ef1ef9a273564db3a187d5573aa8d0b81acb5`  
 Production activation: false  
 Schema change: none in this slice
 

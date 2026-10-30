@@ -34,105 +34,121 @@ def validate(root: Path) -> list[str]:
     if not str(payload.get("governing_invariant", "")).strip():
         errors.append("governing_invariant is required")
 
-    controls = payload.get("controls")
-    if not isinstance(controls, list) or not controls:
-        errors.append("controls must be a non-empty list")
-        controls = []
+    defaults = payload.get("defaults")
+    if not isinstance(defaults, dict):
+        errors.append("defaults must be an object")
+    else:
+        semantics = defaults.get("classification_semantics")
+        if not isinstance(semantics, dict) or not DISPOSITIONS.issubset(semantics):
+            errors.append("defaults.classification_semantics must define candidate, verified-risk, accepted-pattern")
+        for field in ("applicability", "exception_authority"):
+            if not isinstance(defaults.get(field), str) or not defaults[field].strip():
+                errors.append(f"defaults.{field} is required")
+        evidence = defaults.get("evidence_requirements")
+        if not isinstance(evidence, list) or not evidence or not all(isinstance(x, str) and x.strip() for x in evidence):
+            errors.append("defaults.evidence_requirements must be a non-empty string list")
+
+    implemented = payload.get("implemented_controls")
+    defined = payload.get("defined_controls")
+    if not isinstance(implemented, list) or not implemented:
+        errors.append("implemented_controls must be a non-empty list")
+        implemented = []
+    if not isinstance(defined, list):
+        errors.append("defined_controls must be a list")
+        defined = []
 
     seen_ids: set[str] = set()
     state_by_id: dict[str, str] = {}
     detector_kind_by_id: dict[str, str] = {}
-    for index, control in enumerate(controls):
-        prefix = f"controls[{index}]"
+
+    def common(control: object, prefix: str) -> str | None:
         if not isinstance(control, dict):
             errors.append(f"{prefix} must be an object")
-            continue
-        control_id = control.get("control_id")
-        if not isinstance(control_id, str) or not CONTROL_RE.fullmatch(control_id):
+            return None
+        cid = control.get("control_id")
+        if not isinstance(cid, str) or not CONTROL_RE.fullmatch(cid):
             errors.append(f"{prefix}.control_id is invalid")
-            continue
-        if control_id in seen_ids:
-            errors.append(f"duplicate control_id: {control_id}")
-        seen_ids.add(control_id)
-        state = control.get("maturity_state")
-        if state not in MATURITY:
-            errors.append(f"{control_id}: invalid maturity_state {state!r}")
-        else:
-            state_by_id[control_id] = state
-
-        for field in ("name", "family", "definition", "applicability", "exception_authority"):
+            return None
+        if cid in seen_ids:
+            errors.append(f"duplicate control_id: {cid}")
+        seen_ids.add(cid)
+        for field in ("name", "family", "definition"):
             if not isinstance(control.get(field), str) or not control[field].strip():
-                errors.append(f"{control_id}: {field} is required")
+                errors.append(f"{cid}: {field} is required")
+        return cid
+
+    for index, control in enumerate(implemented):
+        cid = common(control, f"implemented_controls[{index}]")
+        if cid is None:
+            continue
+        state = control.get("maturity_state")
+        if state not in {"SHADOW", "PROVEN", "ENFORCED", "GOVERNED"}:
+            errors.append(f"{cid}: implemented control has invalid maturity_state {state!r}")
+        else:
+            state_by_id[cid] = state
 
         detector = control.get("detector")
         if not isinstance(detector, dict):
-            errors.append(f"{control_id}: detector must be an object")
+            errors.append(f"{cid}: detector must be an object")
             continue
         kind = detector.get("kind")
-        if kind not in {"none", "iic-engine", "external-checker"}:
-            errors.append(f"{control_id}: invalid detector kind {kind!r}")
+        if kind not in {"iic-engine", "external-checker"}:
+            errors.append(f"{cid}: implemented detector kind is invalid: {kind!r}")
         else:
-            detector_kind_by_id[control_id] = kind
+            detector_kind_by_id[cid] = kind
         paths = detector.get("paths")
-        if not isinstance(paths, list) or not all(isinstance(item, str) and item for item in paths):
-            errors.append(f"{control_id}: detector.paths must be a list of non-empty strings")
+        if not isinstance(paths, list) or not paths or not all(isinstance(x, str) and x for x in paths):
+            errors.append(f"{cid}: implemented detector must declare repository paths")
             paths = []
-        if state != "DEFINED" and kind == "none":
-            errors.append(f"{control_id}: non-DEFINED control cannot have detector kind none")
-        if state == "DEFINED" and kind != "none":
-            errors.append(f"{control_id}: DEFINED-only control must not claim an implemented detector")
-        if kind != "none" and not paths:
-            errors.append(f"{control_id}: implemented detector must declare repository paths")
         for repo_path in paths:
             if not (root / repo_path).is_file():
-                errors.append(f"{control_id}: detector path does not exist: {repo_path}")
+                errors.append(f"{cid}: detector path does not exist: {repo_path}")
 
         enforcement = control.get("enforcement")
         if not isinstance(enforcement, dict):
-            errors.append(f"{control_id}: enforcement must be an object")
+            errors.append(f"{cid}: enforcement must be an object")
         else:
             blocking = enforcement.get("blocking")
             if not isinstance(blocking, bool):
-                errors.append(f"{control_id}: enforcement.blocking must be boolean")
+                errors.append(f"{cid}: enforcement.blocking must be boolean")
             if state == "ENFORCED" and blocking is not True:
-                errors.append(f"{control_id}: ENFORCED control must be blocking")
-            if state in {"DEFINED", "SHADOW", "PROVEN"} and blocking is True:
-                errors.append(f"{control_id}: {state} control must not claim blocking enforcement")
+                errors.append(f"{cid}: ENFORCED control must be blocking")
+            if state in {"SHADOW", "PROVEN"} and blocking is True:
+                errors.append(f"{cid}: {state} control must not claim blocking enforcement")
             if not isinstance(enforcement.get("basis"), str) or not enforcement["basis"].strip():
-                errors.append(f"{control_id}: enforcement.basis is required")
-
-        semantics = control.get("classification_semantics")
-        if not isinstance(semantics, dict) or not DISPOSITIONS.issubset(semantics):
-            errors.append(f"{control_id}: classification_semantics must define candidate, verified-risk, accepted-pattern")
+                errors.append(f"{cid}: enforcement.basis is required")
 
         history = control.get("promotion_history")
         if not isinstance(history, list) or not history:
-            errors.append(f"{control_id}: promotion_history must be non-empty")
+            errors.append(f"{cid}: promotion_history must be non-empty")
         else:
             positions: list[int] = []
             for step_index, step in enumerate(history):
                 if not isinstance(step, dict) or step.get("state") not in MATURITY:
-                    errors.append(f"{control_id}: invalid promotion_history step {step_index}")
+                    errors.append(f"{cid}: invalid promotion_history step {step_index}")
                     continue
                 if not isinstance(step.get("evidence"), str) or not step["evidence"].strip():
-                    errors.append(f"{control_id}: promotion_history step {step_index} requires evidence")
+                    errors.append(f"{cid}: promotion_history step {step_index} requires evidence")
                 positions.append(MATURITY.index(step["state"]))
             if positions and positions != sorted(positions):
-                errors.append(f"{control_id}: promotion_history cannot move backward")
+                errors.append(f"{cid}: promotion_history cannot move backward")
             if history and isinstance(history[-1], dict) and history[-1].get("state") != state:
-                errors.append(f"{control_id}: maturity_state must equal final promotion_history state")
+                errors.append(f"{cid}: maturity_state must equal final promotion_history state")
 
         last = control.get("last_accepted_verification")
-        if state == "DEFINED" and last is not None:
-            errors.append(f"{control_id}: DEFINED-only control must not claim accepted verification")
-        if state != "DEFINED" and (not isinstance(last, str) or not last.strip()):
-            errors.append(f"{control_id}: implemented/proven control requires last_accepted_verification")
+        if not isinstance(last, str) or not last.strip():
+            errors.append(f"{cid}: implemented control requires last_accepted_verification")
 
-        evidence = control.get("evidence_requirements")
-        if not isinstance(evidence, list) or not evidence or not all(isinstance(item, str) and item.strip() for item in evidence):
-            errors.append(f"{control_id}: evidence_requirements must be a non-empty string list")
-        if not isinstance(control.get("exclusions"), list):
-            errors.append(f"{control_id}: exclusions must be a list")
+    for index, control in enumerate(defined):
+        cid = common(control, f"defined_controls[{index}]")
+        if cid is None:
+            continue
+        if control.get("maturity_state") != "DEFINED":
+            errors.append(f"{cid}: defined control maturity_state must be DEFINED")
+        state_by_id[cid] = "DEFINED"
+        for field in {"detector", "enforcement", "promotion_history", "last_accepted_verification"}:
+            if field in control:
+                errors.append(f"{cid}: DEFINED-only control must not contain {field}")
 
     reviewed = payload.get("reviewed_findings")
     if not isinstance(reviewed, list):
@@ -144,30 +160,32 @@ def validate(root: Path) -> list[str]:
         if not isinstance(record, dict):
             errors.append(f"{prefix} must be an object")
             continue
-        control_id = record.get("control_id")
-        fingerprint = record.get("fingerprint")
-        disposition = record.get("disposition")
-        if control_id not in seen_ids:
-            errors.append(f"{prefix}: unknown control_id {control_id!r}")
-        if not isinstance(fingerprint, str) or not FINGERPRINT_RE.fullmatch(fingerprint):
+        cid = record.get("control_id")
+        fp = record.get("fingerprint")
+        if cid not in seen_ids:
+            errors.append(f"{prefix}: unknown control_id {cid!r}")
+        if not isinstance(fp, str) or not FINGERPRINT_RE.fullmatch(fp):
             errors.append(f"{prefix}: fingerprint must be 24 lowercase hex characters")
         else:
-            key = (str(control_id), fingerprint)
+            key = (str(cid), fp)
             if key in seen_review:
-                errors.append(f"{prefix}: duplicate reviewed finding {control_id}/{fingerprint}")
+                errors.append(f"{prefix}: duplicate reviewed finding {cid}/{fp}")
             seen_review.add(key)
-        if disposition not in DISPOSITIONS:
-            errors.append(f"{prefix}: invalid disposition {disposition!r}")
+        if record.get("disposition") not in DISPOSITIONS:
+            errors.append(f"{prefix}: invalid disposition {record.get('disposition')!r}")
         for field in ("source_path", "target", "rationale", "evidence_source", "reconsideration_trigger"):
             if not isinstance(record.get(field), str) or not record[field].strip():
                 errors.append(f"{prefix}: {field} is required")
-        if control_id and state_by_id.get(control_id) == "DEFINED":
+        if state_by_id.get(str(cid)) == "DEFINED":
             errors.append(f"{prefix}: DEFINED-only control cannot have reviewed runtime findings")
 
+    if len(seen_ids) != 24:
+        errors.append(f"registry must contain 24 unique cataloged controls; found {len(seen_ids)}")
+
     required = {"NPH-001": "ENFORCED", "NDT-001": "ENFORCED", "NFS-001": "PROVEN"}
-    for control_id, expected_state in required.items():
-        if state_by_id.get(control_id) != expected_state:
-            errors.append(f"{control_id}: registry must reflect current state {expected_state}")
+    for cid, expected in required.items():
+        if state_by_id.get(cid) != expected:
+            errors.append(f"{cid}: registry must reflect current state {expected}")
     if detector_kind_by_id.get("NPH-001") != "external-checker":
         errors.append("NPH-001 must remain represented as the existing external checker")
     if detector_kind_by_id.get("NDT-001") != "iic-engine" or detector_kind_by_id.get("NFS-001") != "iic-engine":

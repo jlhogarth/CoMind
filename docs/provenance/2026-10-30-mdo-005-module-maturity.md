@@ -2,6 +2,7 @@
 
 Date: 2026-10-30
 Issue: #407
+PR: #410
 Environment: isolated PostgreSQL first; canonical Supabase Test only after repository acceptance and fresh collision review
 Production activation: false
 Paid provider authorized: false
@@ -19,6 +20,8 @@ The earlier hypothesis, Governed Module Plan Activation and Implementation Hando
 ## Authoritative baseline
 
 MDO-005 began from `main` commit `c6b27f7f61f4817e60c909b7026523333e7480ea`, which merged RLIB-003R PR #405 and repaired the post-merge migration namespace collision by moving RLIB-003 from slot `_026` to `_028`.
+
+While the lane was being established, `main` advanced to `68c702572f3724419782bdbfe2bc3bb222a56482` through HAI-008A documentation only. The changed path was disjoint from MDO-005. The MDO branch was reconciled with that main commit as first parent while preserving its development history.
 
 The accepted MDO Test state read from canonical Supabase Test before implementation was:
 
@@ -133,7 +136,7 @@ Lifecycle events and evidence links use the accepted MDO append-only mutation gu
 
 The new lifecycle tables enable RLS and revoke browser-role privileges. The security-definer transition function pins `search_path=pg_catalog`, revokes execution from PUBLIC, `anon`, and `authenticated`, and grants only `service_role` execution.
 
-This follows the current Supabase guidance that table grants and RLS must be treated together, and that security-definer function execution must be explicitly restricted.
+This follows current Supabase guidance that table grants and RLS must be treated together, and that security-definer function execution must be explicitly restricted.
 
 ## Test-first acceptance
 
@@ -152,13 +155,43 @@ Repository acceptance requires:
 - audit and evidence readback;
 - append-only mutation rejection.
 
-Shared Supabase Test promotion is a separate step after exact-head repository acceptance and a fresh shared-mutation collision review.
+## Failed proof, repair, and accepted isolated evidence
+
+The first exact-head MDO-005 workflow, run `41072826455` on candidate `38c19931e6f5ed20d425fe62a50f0dd3abbace50`, passed the server contract, MDO-001 regressions, MDO-004 regressions, two MDO-005 migration applications, and MDO-005 structural security verification. The behavioral proof then exposed a real PostgreSQL defect: `min(uuid)` does not exist in PostgreSQL 17.
+
+The failure occurred while resolving the single governed MDO-004 acceptance event. It did not weaken or invalidate any authority, evidence, maturity, RLS, grant, or idempotency rule. No shared Supabase Test DDL had been performed.
+
+Repair commit `2dcbee84ecaeeaf81f1348564c5e227437f78ad0` replaced only the unsupported UUID aggregate selector with ordered `array_agg(...)[1]` while retaining the exact `count(*) = 1` acceptance-event invariant.
+
+Repaired exact-head MDO-005 run `41073086099` passed both jobs completely:
+
+- server build and production dependency audit;
+- deterministic MDO-005 service contract;
+- accepted MDO service regressions;
+- isolated PostgreSQL 17 setup;
+- MDO-001 regression proof;
+- MDO-004 structural and behavioral regression proof;
+- MDO-005 migration applied twice;
+- MDO-005 structural security proof;
+- full MDO-005 maturity behavior proof.
+
+On the same repaired head, returned repository-wide gates also passed for Implementation Integrity, Integrity Governance, CoMind Repository Configuration, No Placeholder Policy, DRB-002 Query Contract, broad CI, Runtime Budget Authority, Governed Provider Execution, Foundry Work Lease Kernel, Foundry Runtime Orchestration, Foundry Terminal Lifecycle, Live Foundry Stage 1 readiness, LF-2 readiness, LF-3 readiness, and Lane Health Sentinel. The bounded Foundry one-shot handoff was still running when this provenance update was written and remains an independent exact-head regression gate.
+
+## Shared Supabase Test activation boundary
+
+MDO-005 repository acceptance and shared Test activation are deliberately separate.
+
+A fresh collision review found SEC-RLS-001 PR #396 active. Its current durable record states that shared Supabase Test mutation remains serialized behind the historical PR #119 boundary under Issue #126 and that even its own accepted RLS migration must not be applied until that boundary is reconciled or released.
+
+Older Issue #126 comments recorded earlier reassignment and release events, so the durable records are not sufficiently unambiguous to infer that MDO-005 currently owns the shared Test mutation lease. MDO-005 therefore does not override the newer active-lane restriction.
+
+No MDO-005 migration or maturity transition has been applied to canonical Supabase Test. The accepted persistent module consequently remains `conceived` until the shared mutation boundary is explicitly reconciled. This is a governance hold, not an implementation failure.
 
 ## Freshness and collisions
 
 The branch was created only after RLIB-003R repaired the duplicate migration slot. MDO-005 uses migration slot `20261030_029` after confirming no existing repository match for that slot at branch creation.
 
-SEC-RLS-001 remains an active security lane that may affect shared Test mutation sequencing. MDO-005 therefore does not infer database-write priority from repository readiness. A fresh shared Supabase mutation review is required before Test DDL.
+The final pre-merge process must recheck current `main`, the `_029` namespace, open MDO and security lanes, and exact-head CI before merge.
 
 ## Recovery
 
@@ -168,4 +201,6 @@ Database changes are additive. Failed isolated or Test acceptance is preserved a
 
 ## Successor boundary
 
-After MDO-005, the next candidate lifecycle gap is implementation activation. That successor must first establish a structured implementation work-package contract and explicit implementation authorization, while continuing to separate implementation execution, verification, integration acceptance, maturity advancement, operationalization, and Production authority.
+After MDO-005 repository acceptance, the next candidate lifecycle gap is implementation activation. That successor must first establish a structured implementation work-package contract and explicit implementation authorization, while continuing to separate implementation execution, verification, integration acceptance, maturity advancement, operationalization, and Production authority.
+
+Persistent Test implementation handoff must not treat the MDO Test module as `specified` until the deferred MDO-005 shared Test activation is actually completed and independently read back.

@@ -1,7 +1,8 @@
 # MDO-004 Governed Plan Disposition Provenance
 
-Status: implementation candidate
+Status: acceptance candidate
 Issue: #377
+PR: #391
 Environment: isolated PostgreSQL first, canonical Supabase Test second
 Production activated: false
 Paid provider authorized: false
@@ -39,6 +40,8 @@ A disposition is valid only when:
 6. the requested transition is legal.
 
 This prevents a service actor, Foundry agent, provider model, planning worker, or portfolio coordinator from accepting its own plan.
+
+The persistent Test acceptance uses an explicitly synthetic Test-only `person` actor tied to issue #377. It does not impersonate or expose a real human identity. This fixture proves the person-authority contract while the development lane remains governed by the Founder's explicit instructions and the CoMind Development Contract.
 
 ## Lifecycle contract
 
@@ -89,22 +92,93 @@ Disposition events and evidence links reject UPDATE and DELETE through the exist
 
 ## Freshness and migration namespace recovery
 
-MDO-004 began from `main` after GER-001. While implementation was in progress, CE-004 merged and legitimately occupied migration slot `20261030_025` with its friction/failure register migration. The CE-004 file set is otherwise disjoint from MDO-004.
+MDO-004 began from `main` after GER-001. While implementation was in progress, CE-004 merged and legitimately occupied migration slot `20261030_025` with its friction/failure register migration. The CE-004 file set was otherwise disjoint from MDO-004.
 
-MDO-004 therefore moved forward to migration slot `20261030_026`. No CE-004 file, runtime, schema object, or evidence is overwritten. The MDO branch must be reconciled onto the CE-004 merge before PR acceptance.
+MDO-004 therefore moved forward to migration slot `20261030_026`. No CE-004 file, runtime, schema object, or evidence was overwritten. The MDO branch was reconciled onto CE-004 as first parent while preserving the MDO development history as a second parent. PR #391 then compared as zero commits behind that `main` and exactly eight MDO-owned files before the persistent Test harness was added.
 
-## Isolated acceptance strategy
+## Isolated PostgreSQL acceptance and recovery
 
-Before canonical Test promotion, the MDO-004 workflow must:
+The first PR acceptance candidate reached the behavioral replay path and exposed a real PL/pgSQL defect. The initial acceptance event succeeded, but exact idempotent replay failed because the table column `disposition_event_id` was unqualified inside a function whose output parameter has the same name. PostgreSQL correctly rejected the query as ambiguous.
 
-1. rebuild and verify the accepted MDO-001 substrate in isolated PostgreSQL 17;
-2. apply accepted MDO-002 terminal alignment and MDO-003 plan-scope hardening;
-3. apply migration `20261030_026_mdo_004_governed_plan_disposition.sql` twice;
-4. prove schema, permissions, capability, RLS, immutability, C2 exact-plan authority, completeness checks, supersession checks, and the module-maturity boundary;
-5. run a rollback-only lifecycle proof covering incomplete-plan rejection, person-only authority, expired authorization, block/resume, complete acceptance, exact replay, conflicting replay rejection, duplicate-acceptance rejection, immutable history, valid supersession, and unchanged maturity;
-6. build the server and run deterministic MDO-004 and existing MDO runtime tests.
+That failed run is preserved in GitHub Actions. Supabase Test had not been changed at that point.
 
-Only after those gates are green may migration `026` be promoted to canonical Supabase Test.
+The repair qualified the replay evidence lookup through alias `de`:
+
+`de.disposition_event_id = v_existing.disposition_event_id`
+
+The structural verifier was strengthened to require that qualified replay contract so the ambiguity cannot silently regress.
+
+On repaired exact head `642aceb043d6bee22c2a9bc78a2e21801ac4b01c`:
+
+- the MDO-004 server contract completed successfully;
+- TypeScript build and production dependency audit passed;
+- deterministic MDO-004 service tests passed;
+- accepted MDO runtime regressions passed;
+- isolated PostgreSQL lifecycle verification passed;
+- migration `026` applied twice successfully;
+- structural verification passed;
+- rollback-only behavioral verification passed, including incomplete acceptance rejection, person-only authority, expired authority rejection, block/resume, complete acceptance, exact replay, conflicting replay rejection, duplicate acceptance rejection, append-only history, valid supersession, and unchanged module maturity.
+
+## Supabase Test promotion
+
+After isolated acceptance, migration `mdo_004_governed_plan_disposition` was promoted to canonical Supabase Test project `sbgfuanxiqepcoboxzcl` only. No Production database was changed.
+
+Direct Test readback confirmed:
+
+- `mdo.plan.disposition` exists with target kind `module_plan`, maximum authority `C2`, adapter `mdo`, and `cost_bearing=false`;
+- RLS is enabled on both disposition tables;
+- `anon` and `authenticated` cannot execute the security-definer disposition function;
+- `service_role` has the intended execution privilege;
+- the deployed function contains the person-only authority guard;
+- the deployed function contains the qualified idempotent replay lookup;
+- the deployed function contains no `cm_module_registry` mutation.
+
+## Persistent Test plan readiness
+
+The accepted MDO-003 Test plan was read back after migration promotion and before any MDO-004 disposition mutation.
+
+Canonical plan:
+
+- plan ID: `2b7a4901-48de-45b4-9023-5e37b73da8ac`;
+- version: 4;
+- project ID: `e9e96ac1-bdf7-4a97-a94f-ddf16218a2cb`;
+- module ID: `d371d297-34a0-4150-8a32-64b3aae77594`;
+- module code: `MDO3-TEST`;
+- plan status: `in_review`;
+- target stage: `specified`;
+- module lifecycle stage: `conceived`.
+
+Independent completeness readback confirmed:
+
+- 10 tasks;
+- 10 done tasks;
+- 10 completed leases;
+- 10 contributions;
+- 10 contributions with canonical evidence linkage;
+- 10 contribution execution contexts with successful terminal outcomes.
+
+The plan is therefore structurally eligible for governed MDO-004 acceptance, subject to the new exact C2 person-authority and evidence-bearing disposition path.
+
+## Persistent Test acceptance contract
+
+The final exact-head workflow adds a persistent Supabase Test proof that:
+
+1. verifies the exact canonical Test database and PostgreSQL 17 identity;
+2. resolves the canonical MDO-003 Test project, module, and latest plan by their accepted source identities;
+3. rechecks all ten completeness invariants before mutation;
+4. creates or reuses only an explicit synthetic Test `person` authority fixture;
+5. creates or reuses canonical human-review evidence;
+6. on the first acceptance, proves an expired C2 authorization creates zero disposition side effects;
+7. issues one exact, unexpired C2 isolated authorization for the exact plan;
+8. accepts the plan once through `cm_mdo_dispose_plan(...)`;
+9. proves exact replay returns `created=false`;
+10. proves conflicting replay fails closed;
+11. independently reads back exactly one acceptance event, one evidence link, and one acceptance audit record;
+12. requires the plan to be `accepted` while the module remains `conceived`;
+13. preserves a durable GitHub Actions acceptance artifact;
+14. remains replay-safe if the workflow is rerun after the plan has already been accepted.
+
+The persistent proof uses no model provider and no paid API. It creates no capability grant and grants no Production authority.
 
 ## Supabase platform review
 
@@ -114,4 +188,4 @@ The announced November 2026 HTTP TLS cipher retirement does not change this migr
 
 ## Recovery
 
-Repository work is isolated to issue #377, branch `mdo-004-governed-plan-disposition`, and its future PR. Database work is additive and Test-first. Failed isolated or Test acceptance remains evidence and is repaired forward. No Production activation is authorized.
+Repository work remains isolated to issue #377, branch `mdo-004-governed-plan-disposition`, and PR #391. Database work is additive and Test-only. Failed isolated or Test acceptance remains evidence and is repaired forward. No Production activation is authorized.

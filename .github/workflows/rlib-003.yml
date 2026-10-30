@@ -1,0 +1,130 @@
+name: RLIB-003 Clean Bootstrap
+
+on:
+  push:
+    branches:
+      - rlib-003-ve-standards-learning-path
+    paths:
+      - '.github/workflows/rlib-003.yml'
+      - 'scripts/test_rlib_003_adversarial.sh'
+      - 'db/sql/v2/**'
+      - 'db/migrations/20261030_026_rlib_003_ve_standards_learning_path.sql'
+      - 'db/migrations/verify_20261030_026_rlib_003_ve_standards_learning_path.sql'
+  pull_request:
+    paths:
+      - '.github/workflows/rlib-003.yml'
+      - 'scripts/test_rlib_003_adversarial.sh'
+      - 'db/sql/v2/**'
+      - 'db/migrations/20261030_026_rlib_003_ve_standards_learning_path.sql'
+      - 'db/migrations/verify_20261030_026_rlib_003_ve_standards_learning_path.sql'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  clean-bootstrap:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.6-pg17-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prove RLIB migration numbering is collision-free
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ -f db/migrations/20261030_024_mdo_003_plan_scoped_claim_hardening.sql ]]
+          [[ -f db/migrations/20261030_025_ce_004_friction_failure_register.sql ]]
+          [[ ! -e db/migrations/20261030_024_rlib_003_ve_standards_learning_path.sql ]]
+          [[ ! -e db/migrations/verify_20261030_024_rlib_003_ve_standards_learning_path.sql ]]
+          [[ ! -e db/migrations/20261030_025_rlib_003_ve_standards_learning_path.sql ]]
+          [[ ! -e db/migrations/verify_20261030_025_rlib_003_ve_standards_learning_path.sql ]]
+          [[ -f db/migrations/20261030_026_rlib_003_ve_standards_learning_path.sql ]]
+          [[ -f db/migrations/verify_20261030_026_rlib_003_ve_standards_learning_path.sql ]]
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+
+      - name: Build clean CoMind v2 database
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd db/sql/v2
+          psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -f MASTER.sql
+
+      - name: Prove RLIB-003 dependencies are absent before migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          seed_count="$(psql "${DATABASE_URL}" -X -Atc "
+            SELECT count(*)
+            FROM comind.cm_research_refs
+            WHERE drive_file_id IN (
+              '1p5hU1sYu7UbZdmX7Gsu2FI818DWH0dJx',
+              '1fZ4349LhmIovoxoz20tpAbgjlXmX479T',
+              '1-uL8611hNAkgu18wjbvMpkuaQRvKCjB6',
+              '1YV8Jt7JbbAu_jzhVHWezOkeGfI8jsgxx',
+              '19Cksd5HogXnQepDZCayPNURCmspGSBfO'
+            );")"
+          [[ "${seed_count}" == "0" ]]
+
+          path_count="$(psql "${DATABASE_URL}" -X -Atc "
+            SELECT count(*) FROM comind.cm_learning_path
+            WHERE slug='virtual-employee-standards-v0-1';")"
+          [[ "${path_count}" == "0" ]]
+
+          printf 'RLIB-003 clean precondition verified: corpus=%s path=%s\n' "${seed_count}" "${path_count}"
+
+      - name: Apply RLIB-003 twice for idempotency
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
+            -f db/migrations/20261030_026_rlib_003_ve_standards_learning_path.sql
+          psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
+            -f db/migrations/20261030_026_rlib_003_ve_standards_learning_path.sql
+
+      - name: Verify governed curriculum and canonical metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
+            -f db/migrations/verify_20261030_026_rlib_003_ve_standards_learning_path.sql
+
+          state="$(psql "${DATABASE_URL}" -X -At -F '|' -c "
+            SELECT
+              (SELECT count(*) FROM comind.cm_research_refs WHERE drive_file_id IN (
+                '1p5hU1sYu7UbZdmX7Gsu2FI818DWH0dJx',
+                '1fZ4349LhmIovoxoz20tpAbgjlXmX479T',
+                '1-uL8611hNAkgu18wjbvMpkuaQRvKCjB6',
+                '1YV8Jt7JbbAu_jzhVHWezOkeGfI8jsgxx',
+                '19Cksd5HogXnQepDZCayPNURCmspGSBfO'
+              )),
+              (SELECT count(*) FROM comind.cm_learning_path_item i
+                 JOIN comind.cm_learning_path p ON p.path_id=i.path_id
+                WHERE p.slug='virtual-employee-standards-v0-1'),
+              (SELECT status FROM comind.cm_learning_path WHERE slug='virtual-employee-standards-v0-1'),
+              (SELECT metadata->>'production_activation' FROM comind.cm_learning_path WHERE slug='virtual-employee-standards-v0-1');")"
+          [[ "${state}" == "5|5|draft|false" ]]
+          printf 'RLIB-003 isolated acceptance state: %s\n' "${state}"
+
+
+      - name: Reject incomplete evidence and destructive replay
+        run: bash scripts/test_rlib_003_adversarial.sh

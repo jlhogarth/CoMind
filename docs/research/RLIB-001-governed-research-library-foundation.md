@@ -34,6 +34,8 @@ The Library adds authority, version, lifecycle, supersession, Drive identity, fi
 
 Raw `content_sha256` means SHA-256 of the original bytes. It must remain null unless those bytes were actually hashed. Drive identity, byte size, extracted text, or another observation may be stored separately but may not be represented as raw-file SHA-256.
 
+RLIB-001 subsequently proved the strong-fingerprint path by streaming the original Drive file bytes into the governed working runtime and hashing those bytes with SHA-256. The first corpus now has verified raw fingerprints rather than inferred or metadata-derived hashes.
+
 ### Lifecycle
 
 Allowed lifecycle states are:
@@ -81,13 +83,13 @@ The first production candidate curriculum is intentionally deferred to RLIB-003 
 
 Five Drive records establish the initial corpus:
 
-| Document | Authority | Lifecycle | Freshness |
-| --- | --- | --- | --- |
-| NIST AI RMF 1.0 / NIST AI 100-1 | primary_authoritative | current, revision in progress | review due 2026-11-30 |
-| NIST AI RMF Playbook | primary_authoritative | current, update expected after AI RMF revision | review due 2026-11-30 |
-| NIST AI 600-1 Initial Public Draft | primary_authoritative | withdrawn | superseded by final |
-| NIST AI 600-1 Final | primary_authoritative | current | review due 2027-01-30 |
-| GSDC ISO 42001 Implementation Checklist | secondary_guidance | candidate | review due 2027-01-30 |
+| Document | Authority | Lifecycle | Freshness | Raw SHA-256 |
+| --- | --- | --- | --- | --- |
+| NIST AI RMF 1.0 / NIST AI 100-1 | primary_authoritative | current, revision in progress | review due 2026-11-30 | `7576edb531d9848825814ee88e28b1795d3a84b435b4b797d3670eafdc4a89f1` |
+| NIST AI RMF Playbook | primary_authoritative | current, update expected after AI RMF revision | review due 2026-11-30 | `65d6101d806502875aadb0fd19a75c3a9cc9a5e9461129e9398a39192d8202d2` |
+| NIST AI 600-1 Initial Public Draft | primary_authoritative | withdrawn | superseded by final | `ddb7a400c1c03fe4430e34e5a827d0c3699ebea5cb39d6664df9ff83fd6726ee` |
+| NIST AI 600-1 Final | primary_authoritative | current | review due 2027-01-30 | `6e73620ab6b64e90ef2c04bf0e0d6246185a2f4b1b13cab0df494496cff89b6a` |
+| GSDC ISO 42001 Implementation Checklist | secondary_guidance | candidate | review due 2027-01-30 | `b9d6a9b777409415316bc6006a5bec112891844b2b57dc1eb425024ea0acbd66` |
 
 NIST currently states that AI RMF 1.0 is being revised and that the Playbook will update after the framework revision. The Library therefore treats currentness and freshness as different concepts.
 
@@ -101,7 +103,7 @@ The five corpus records link to:
 - the `CoMind Research Source RunBook` projection;
 - authoritative publisher URLs where available.
 
-The research session completed only after 23 source records were captured and the Drive projection was marked synced.
+The research session completed only after 23 source records were captured and the Drive projection was marked synced. Fingerprint verification occurred afterward as engineering acceptance evidence and did not mutate the completed research-session source ledger.
 
 ## Security boundary
 
@@ -120,6 +122,7 @@ RLIB-001:
 1. A Drive revision read using revision ID `1` returned 404. The connector-supported `head` revision path was then used successfully.
 2. The first corpus upsert returned PostgreSQL `42P10` because the conflict target did not include the predicate of the partial unique Drive-file index. No seed rows were committed. The corrected upsert uses `ON CONFLICT (drive_file_id) WHERE drive_file_id IS NOT NULL`.
 3. Supabase Security Advisor exposed pre-existing search-path drift on `comind.set_updated_at_research_refs`. RLIB-001 added a dedicated hardening migration and verified fixed `search_path` plus SECURITY INVOKER semantics.
+4. The first PR exact-head No Placeholder run rejected `example.com` in a route-validation test. The policy was preserved, the marker was replaced with a CoMind-owned verification namespace, and the rerun passed.
 
 ## Successor sequence
 

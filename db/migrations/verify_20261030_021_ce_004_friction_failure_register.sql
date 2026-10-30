@@ -112,7 +112,7 @@ BEGIN
   END;
 
   PERFORM comind.record_ce_signal_event(
-    v_friction_1,NULL,NULL,'diagnosed',NULL,'pattern-explicit',
+    v_friction_1,NULL,NULL,'diagnosed','moderate','pattern-explicit',
     'Diagnosed recurring workflow boundary','{"diagnosis":"explicit synthetic pattern"}'::jsonb,
     'continuous_excellence','ce004://diagnosis/friction-1','diagnose-friction-1'
   );

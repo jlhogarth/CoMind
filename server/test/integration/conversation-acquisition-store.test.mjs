@@ -6,6 +6,7 @@ assert.ok(['localhost', '127.0.0.1', 'db'].includes(databaseUrl.hostname));
 assert.equal(databaseUrl.pathname, '/comind_ci');
 const { query, closePool } = await import('../../dist/db.js');
 const { persistOpenAIProviderAcquisitionEvent } = await import('../../dist/conversation-acquisition-store.js');
+const runStoreIntegration = process.env.CFR_002A_STORE_INTEGRATION === '1';
 after(closePool);
 async function createFixtureConversation() {
   const convId = 'c002a000-0000-4000-8000-000000000101';
@@ -22,7 +23,10 @@ async function createFixtureConversation() {
     [convId, message.rows[0].msg_id]);
   assert.ok(generation.rows[0]?.generation_id); return { convId, generationId: generation.rows[0].generation_id };
 }
-test('CFR-002A store persists source-distinct provider events under constrained writer role', async () => {
+test(
+  'CFR-002A store persists source-distinct provider events under constrained writer role',
+  { skip: runStoreIntegration ? false : 'requires isolated CFR-002A acquisition schema and writer role' },
+  async () => {
   const { convId, generationId } = await createFixtureConversation();
   const summaryReceipt = await persistOpenAIProviderAcquisitionEvent({ conversationId: convId, generationId, localSequence: 1, event: {
     provider: 'openai', providerEndpoint: 'responses.create', providerEventType: 'response.reasoning_summary_text.delta',

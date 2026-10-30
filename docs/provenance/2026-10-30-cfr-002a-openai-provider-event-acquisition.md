@@ -52,3 +52,9 @@ The first reconciled exact-head CFR-002A run exposed a latent arity defect in th
 CFR-002R also moved the dual-acquisition foundation migration to `20261030_030_cfr_002_dual_acquisition_foundation.sql`. CFR-002A claims no migration slot and relies on the current mainline parent harness.
 
 The CFR-002A workflow path filter explicitly includes the inherited CFR-002 verification SQL and parent acceptance script because CFR-002A depends on that regression harness.
+
+## Integration-test isolation repair
+
+The full conversation-lifecycle matrix deliberately bootstraps the core `db/sql/v2` conversation schema rather than every feature migration. Because CFR-002 acquisition evidence is immutable and its conversation/generation foreign keys are `ON DELETE RESTRICT`, a schema-specific acquisition fixture must not be created inside that shared lifecycle database and then deleted as cleanup.
+
+The acquisition-store database proof is therefore explicitly enabled only by `CFR_002A_STORE_INTEGRATION=1`. The dedicated CFR-002A harness sets that flag after provisioning the CFR-002 foundation migration in its disposable `comind_ci` database. The broad conversation-lifecycle suite discovers the test file but skips the schema-specific proof before fixture creation. The route-level provider acquisition ordering test remains active in the broad suite, preserving cross-system regression coverage without polluting deterministic conversation fixtures.

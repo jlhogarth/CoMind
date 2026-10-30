@@ -14,7 +14,7 @@ bash "${repository_root}/scripts/test_cfr_002_dual_acquisition.sh"
 printf 'Running CFR-002A OpenAI provider stream unit proof...\n'
 (cd "${repository_root}/server" && node --test test/openai-provider-streaming.test.mjs)
 printf 'Running CFR-002A constrained acquisition-store integration proof...\n'
-(cd "${repository_root}/server" && node --test test/integration/conversation-acquisition-store.test.mjs)
+(cd "${repository_root}/server" && CFR_002A_STORE_INTEGRATION=1 node --test test/integration/conversation-acquisition-store.test.mjs)
 printf 'Running CFR-001 continuity regression with CFR-002A ordering proof...\n'
 (cd "${repository_root}/server" && node --test test/integration/assistant-continuity-streaming.test.mjs)
 printf 'CFR-002A supported OpenAI provider-event acquisition acceptance: PASS\n'

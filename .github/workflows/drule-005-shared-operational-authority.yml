@@ -1,0 +1,59 @@
+name: DRULE-005 Shared Operational RuleBook Authority
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/drule-005-shared-operational-authority.yml'
+      - 'server/src/providers/rulebook-execution-preflight.ts'
+      - 'server/src/rulebook-operational-authority.ts'
+      - 'server/src/rulebook-governed-runtimes.ts'
+      - 'server/scripts/run-cux-001-test-agent.mjs'
+      - 'server/test/rulebook-governed-runtimes.test.mjs'
+      - 'docs/provenance/2026-10-29-drule-005-shared-operational-authority.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  shared-authority-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+      - name: Use Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install exact dependencies
+        working-directory: server
+        run: npm ci
+      - name: Build server
+        working-directory: server
+        run: npm run build
+      - name: Prove shared RuleBook authority and operational no-bypass contract
+        working-directory: server
+        run: node --test test/rulebook-governed-runtimes.test.mjs
+      - name: Run provider and operational kernel regressions
+        working-directory: server
+        run: |
+          node --test \
+            test/governed-openai-assistant.test.mjs \
+            test/foundry-runtime.test.mjs \
+            test/ve-lifecycle-coordinator.test.mjs \
+            test/mdo-orchestrator.test.mjs
+      - name: Run non-database server regression suite
+        working-directory: server
+        run: npm test

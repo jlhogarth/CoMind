@@ -1,0 +1,131 @@
+name: SCOUT-003 Governed First Day
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/scout-003.yml'
+      - 'docs/ve/scout/SCOUT-003-ACTIVATION-AND-FIRST-DAY.v0.1.json'
+      - 'docs/ve/scout/SCOUT-R001-EVIDENCE-PACKET.v0.1.json'
+      - 'server/test/support/scout-003-live-first-day.mjs'
+      - 'server/test/scout-003-contract.test.mjs'
+      - 'scripts/validate_scout_003_package.py'
+      - 'docs/provenance/2026-10-30-scout-003-governed-activation-first-day.md'
+  workflow_dispatch:
+    inputs:
+      attestation_audit_id:
+        description: 'Exact cm_audit_log UUID for Joseph Hogarth learning-path activation attestation'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scout-003-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    name: SCOUT-003 contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validate machine-readable package
+        run: python scripts/validate_scout_003_package.py
+      - name: Install server dependencies
+        working-directory: server
+        run: npm ci
+      - name: Build server
+        working-directory: server
+        run: npm run build
+      - name: Check live runner syntax
+        working-directory: server
+        run: node --check test/support/scout-003-live-first-day.mjs
+      - name: Run SCOUT-003 contract test
+        working-directory: server
+        run: node --test test/scout-003-contract.test.mjs
+
+  live-first-day:
+    name: Scout live Test first day
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      ollama:
+        image: ollama/ollama:0.40.8
+        env:
+          OLLAMA_NO_CLOUD: '1'
+          OLLAMA_NUM_PARALLEL: '1'
+          OLLAMA_MAX_QUEUE: '1'
+        ports:
+          - 11434:11434
+        options: >-
+          --health-cmd "ollama list >/dev/null 2>&1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      OLLAMA_BASE_URL: http://127.0.0.1:11434
+      OLLAMA_MODEL: qwen3:0.6b
+      SCOUT_ATTESTATION_AUDIT_ID: ${{ inputs.attestation_audit_id }}
+      SCOUT_FIRST_DAY_ARTIFACT: artifacts/scout-003-first-day-evidence.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install server dependencies
+        working-directory: server
+        run: npm ci
+      - name: Build server
+        working-directory: server
+        run: npm run build
+      - name: Pull bounded local model
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:11434/api/version >/dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              echo "Local Ollama server did not become ready." >&2
+              exit 1
+            fi
+            sleep 2
+          done
+          curl --fail --silent --show-error --max-time 900             -H 'Content-Type: application/json'             -d '{"model":"qwen3:0.6b","stream":false}'             http://127.0.0.1:11434/api/pull
+      - name: Install and verify Supabase database CA
+        shell: bash
+        run: |
+          set -euo pipefail
+          ca_path="$RUNNER_TEMP/supabase-prod-ca-2021.crt"
+          curl --fail --silent --show-error --location             --proto '=https' --tlsv1.2             https://supabase-downloads.s3-ap-southeast-1.amazonaws.com/prod/ssl/prod-ca-2021.crt             --output "$ca_path"
+          expected='807025AD50D4ED219D2C9C7D299C004F824EB00CF7F65AFEF607D07B72E6CAFA'
+          actual="$(openssl x509 -in "$ca_path" -noout -fingerprint -sha256 | cut -d= -f2 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+          if [ "$actual" != "$expected" ]; then
+            echo "Supabase CA fingerprint mismatch. Refusing database connection." >&2
+            exit 1
+          fi
+          echo "NODE_EXTRA_CA_CERTS=$ca_path" >> "$GITHUB_ENV"
+      - name: Execute Scout governed first day
+        working-directory: server
+        env:
+          SUPABASE_SESSION_DATABASE_URL: ${{ secrets.SUPABASE_SESSION_DATABASE_URL }}
+        run: node test/support/scout-003-live-first-day.mjs
+      - name: Preserve Scout first-day evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scout-003-first-day-${{ github.run_id }}
+          path: server/artifacts/scout-003-first-day-evidence.json
+          if-no-files-found: error
+          retention-days: 30

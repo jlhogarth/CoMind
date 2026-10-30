@@ -1,0 +1,87 @@
+{
+  "schema_version": "comind.ve.scout-first-day.v0.1",
+  "control_id": "SCOUT-003",
+  "issue": 427,
+  "title": "Governed activation and first day of work",
+  "status": "implementation_candidate",
+  "predecessor": {
+    "scout_002_merge_commit": "8ef4583c0cc125eb22376b69030aaa42911a4f8a",
+    "scout_002_issue": 409,
+    "scout_002_pr": 412
+  },
+  "identity": {
+    "actor_handle": "agent.scout",
+    "actor_id": "262090af-c3ae-4eb0-9771-0fa050ac44d3",
+    "agent_id": "f1545f02-4616-4fe5-952c-1f6de66ce967",
+    "profile_id": "cc67411c-1da0-4b15-8c8a-4d4d7533bc7c",
+    "role_code": "emerging_technology_research_analyst",
+    "authority_floor": "C0",
+    "authority_ceiling": "C1"
+  },
+  "learning_gate": {
+    "path_id": "3dec10d9-032e-42c3-abcb-608e0b275a7d",
+    "slug": "virtual-employee-standards-v0-1",
+    "pre_activation_status": "draft",
+    "execution_status_required": "active",
+    "automatic_activation_allowed": false,
+    "accountable_human_attestation_required": true,
+    "attestation_actor_handle": "joseph.hogarth",
+    "attestation_actor_id": "78c69f2f-0d0d-4551-8c37-3007263e3ce9",
+    "attestation_audit_action": "scout.learning_path.activation_attested",
+    "attestation_target_table": "comind.cm_learning_path",
+    "workflow_dispatch_requires_exact_audit_id": true
+  },
+  "assignment": {
+    "assignment_id": "SCOUT-R001",
+    "title": "VE Standards Operational-Readiness Synthesis",
+    "capability_code": "research.evidence.synthesize",
+    "capability_action": "synthesize_evidence",
+    "target_kind": "research_assignment",
+    "target_ref": "scout-r001:ve-standards-operational-readiness",
+    "authority_level": "C1",
+    "environment": "isolated",
+    "max_tasks": 1,
+    "cost_usd_max": 0,
+    "provider": "ollama_local",
+    "model": "qwen3:0.6b",
+    "human_review_required": true
+  },
+  "lifecycle_activation": {
+    "capability_code": "ve.lifecycle.activate",
+    "authority_level": "C2",
+    "environment": "isolated",
+    "target_kind": "foundry_agent_profile",
+    "requesting_actor_id": "78c69f2f-0d0d-4551-8c37-3007263e3ce9",
+    "self_activation_allowed": false
+  },
+  "grant": {
+    "authority_ceiling": "C1",
+    "environment": "isolated",
+    "max_tasks": 1,
+    "delegation_allowed": false,
+    "expires_hours": 2,
+    "revoke_after_first_day": true
+  },
+  "runtime": {
+    "adapter": "ollama_local",
+    "model": "qwen3:0.6b",
+    "ollama_cloud_disabled": true,
+    "local_loopback_only": true,
+    "max_output_tokens": 256,
+    "paid_provider_allowed": false,
+    "production_allowed": false,
+    "external_resource_mutation_allowed": false
+  },
+  "replay": {
+    "second_authoritative_assignment_allowed": false,
+    "successful_rerun_mode": "readback_only",
+    "one_task_ceiling_required": true
+  },
+  "postcondition": {
+    "profile_status": "active",
+    "active_research_grants": 0,
+    "external_resources": 0,
+    "authoritative_scoutr001_executions": 1,
+    "review_status": "pending_human_review"
+  }
+}

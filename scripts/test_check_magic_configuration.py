@@ -55,12 +55,12 @@ class MagicConfigurationTests(unittest.TestCase):
 
     def test_navigation_http_literal_is_not_candidate(self) -> None:
         temp, root = self.make_root(); self.addCleanup(temp.cleanup)
-        self.write_runtime(root, "const link = { href: 'https://github.com/example/project' };\n", "page.tsx")
+        self.write_runtime(root, "const link = { href: 'https://github.com/openai/openai' };\n", "page.tsx")
         self.assertEqual([], MODULE.scan(root))
 
     def test_provenance_source_url_is_not_candidate(self) -> None:
         temp, root = self.make_root(); self.addCleanup(temp.cleanup)
-        self.write_runtime(root, "export const RATE_CARD_SOURCE = 'https://example.com/pricing';\n", "rate-card.ts")
+        self.write_runtime(root, "export const RATE_CARD_SOURCE = 'https://developers.openai.com/api/docs/pricing';\n", "rate-card.ts")
         self.assertEqual([], MODULE.scan(root))
 
     def test_test_file_is_excluded(self) -> None:

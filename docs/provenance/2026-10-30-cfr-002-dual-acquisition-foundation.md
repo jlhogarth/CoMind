@@ -66,7 +66,7 @@ Migration:
 
 Immutable arrival ledger containing source identity, local acquisition order, source sequence when available, endpoint family, source timestamp, raw-envelope SHA-256, byte count, optional out-of-row raw object reference, and non-payload acquisition metadata.
 
-An early draft made `(source_family, source_stream_ref, source_event_ref)` unique. That was rejected before acceptance because it would erase evidence of duplicate/replayed arrivals. The accepted design assigns every arrival its own generated `acquisition_sequence`; source identity is indexed but not unique.
+An early draft made `(source_family, source_stream_ref, source_event_ref)` unique. That was rejected before acceptance because it would erase evidence of duplicate/replayed arrivals. The accepted design assigns every arrival its own generated `acquisition_sequence`; source identity is indexed but not unique. The sequence is backed by the explicitly named short sequence `comind.cm_conv_acq_seq` so grants and replay are not dependent on PostgreSQL's implicit identifier generation or truncation.
 
 ### `cm_conversation_acquisition_normalization`
 
@@ -169,6 +169,16 @@ Dedicated workflow:
 `.github/workflows/cfr-002-dual-acquisition.yml`
 
 The workflow uses PostgreSQL 17 and Node 24 and requires no private data or provider call.
+
+## Failure and repair evidence
+
+The first exact-head dedicated run, GitHub Actions run `41063870395`, reached the CFR-002 migration after the accepted v2 substrate reconstructed successfully. The migration then failed while granting sequence privileges.
+
+The original table used `acquisition_sequence bigint GENERATED ALWAYS AS IDENTITY`. The migration attempted to grant against the expected generated sequence name `cm_conversation_acquisition_observation_acquisition_sequence_seq`. PostgreSQL truncated the identifier to 63 bytes, but the actual implicit identity sequence did not have that assumed truncated name. The grant therefore failed with `relation does not exist`.
+
+This was a migration portability defect, not a reason to weaken the least-privilege requirement. The repair replaces the implicit identity sequence with the explicit short sequence `comind.cm_conv_acq_seq`, uses it as the column default, binds it to the acquisition column with `OWNED BY`, and grants only the required sequence privileges to `comind_conversation_acquisition_writer`.
+
+The failed run is retained as evidence because it demonstrates that the acceptance gate caught an assumption about generated PostgreSQL identifiers before any live deployment.
 
 ## Deliberate non-goals in this slice
 

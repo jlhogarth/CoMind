@@ -27,6 +27,9 @@ const EVIDENCE_URI = /^comind-evidence:\/\/([0-9a-f-]{36})$/i;
 const SENSITIVE_KEY = /(secret|password|credential|api[_-]?key|access[_-]?token|refresh[_-]?token|private[_-]?key)/i;
 const DEFAULT_MAX_PROMPT_CHARS = 5_900;
 const DEFAULT_MAX_OUTPUT_CHARS = 32_000;
+const OBJECTIVE_EXCERPT_CHARS = 800;
+const PRIOR_CONTENT_EXCERPT_CHARS = 224;
+const MAX_MODEL_VISIBLE_EVIDENCE_REFS = 2;
 
 export class MdoPlanningRuntimeError extends Error {
   constructor(public readonly code: string, message: string) {
@@ -46,6 +49,18 @@ interface EvidenceRow {
   evidence_id: string;
   metadata: unknown;
   checksum: string | null;
+}
+
+interface LeaseDiagnosticRow {
+  state: string;
+  worker_matches: boolean;
+  token_matches: boolean;
+  fencing_epoch: number | string;
+  epoch_matches: boolean;
+  lease_expires_at: string | null;
+  expired: boolean | null;
+  attempt_count: number | string;
+  max_attempts: number | string;
 }
 
 export interface MdoInferenceSelection {
@@ -141,14 +156,52 @@ function assertNoSensitiveKeys(value: unknown, path = 'context'): void {
   if (value === null || typeof value !== 'object') return;
   for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
     if (SENSITIVE_KEY.test(key)) {
-      throw new MdoPlanningRuntimeError('sensitive_context_rejected', `Sensitive key rejected from model-visible MDO context at ${path}.${key}`);
+      throw new MdoPlanningRuntimeError(
+        'sensitive_context_rejected',
+        `Sensitive key rejected from model-visible MDO context at ${path}.${key}`
+      );
     }
     assertNoSensitiveKeys(child, `${path}.${key}`);
   }
 }
 
+function excerpt(value: string, maxChars: number): { text: string; truncated: boolean } {
+  if (value.length <= maxChars) return { text: value, truncated: false };
+  return { text: value.slice(0, maxChars), truncated: true };
+}
+
+function modelVisiblePriorContribution(value: unknown): Readonly<Record<string, unknown>> {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return Object.freeze({ content_excerpt: '', content_truncated: false, evidence_refs: Object.freeze([]) });
+  }
+  const record = value as Record<string, unknown>;
+  const payload = record.payload !== null && typeof record.payload === 'object' && !Array.isArray(record.payload)
+    ? record.payload as Record<string, unknown>
+    : null;
+  const narrative = typeof payload?.narrative === 'string'
+    ? payload.narrative
+    : payload === null
+      ? ''
+      : JSON.stringify(payload);
+  const content = excerpt(narrative, PRIOR_CONTENT_EXCERPT_CHARS);
+  const evidenceRefs = Array.isArray(record.evidence_ids)
+    ? record.evidence_ids
+        .filter((item): item is string => typeof item === 'string' && SAFE_CODE.test(item))
+        .slice(0, MAX_MODEL_VISIBLE_EVIDENCE_REFS)
+    : [];
+  return Object.freeze({
+    role_code: typeof record.role_code === 'string' ? record.role_code : null,
+    sequence_no: typeof record.sequence_no === 'number' ? record.sequence_no : Number(record.sequence_no) || null,
+    content_excerpt: content.text,
+    content_truncated: content.truncated,
+    evidence_refs: Object.freeze(evidenceRefs),
+  });
+}
+
 function canonicalContributionContext(context: MdoTaskContext): Record<string, unknown> {
   assertNoSensitiveKeys(context.priorContributions);
+  const objective = excerpt(context.objective, OBJECTIVE_EXCERPT_CHARS);
+  const prior = context.priorContributions.map(modelVisiblePriorContribution);
   return {
     module: {
       id: context.moduleId,
@@ -158,7 +211,8 @@ function canonicalContributionContext(context: MdoTaskContext): Record<string, u
     },
     plan: {
       id: context.planId,
-      objective: context.objective,
+      objective_excerpt: objective.text,
+      objective_truncated: objective.truncated,
       target_stage: context.targetStage,
       status: context.planStatus,
     },
@@ -168,11 +222,14 @@ function canonicalContributionContext(context: MdoTaskContext): Record<string, u
       sequence_no: context.sequenceNo,
       capability: context.requiredCapabilityCode,
     },
-    prior_contributions: context.priorContributions,
+    prior_contributions: prior,
   };
 }
 
-export function buildMdoPlanningPrompt(context: MdoTaskContext, maxPromptChars = DEFAULT_MAX_PROMPT_CHARS): string {
+export function buildMdoPlanningPrompt(
+  context: MdoTaskContext,
+  maxPromptChars = DEFAULT_MAX_PROMPT_CHARS
+): string {
   boundedInteger(maxPromptChars, 'maxPromptChars', 1_000, 64_000);
   const modelContext = canonicalContributionContext(context);
   const prompt = [
@@ -180,6 +237,7 @@ export function buildMdoPlanningPrompt(context: MdoTaskContext, maxPromptChars =
     'Produce only the requested planning deliverable. Do not claim authority to merge, deploy, spend money, change Production, grant capabilities, or advance module maturity.',
     'Prefer reuse of verified CoMind capabilities and trustworthy existing implementations over reinvention.',
     'Separate evidence, assumptions, risks, rejected alternatives, unresolved questions, and recommendations. Do not invent evidence.',
+    'Prior contribution content may be a bounded excerpt. Evidence references identify the canonical durable source. Do not infer or fabricate omitted text.',
     'Return concise implementation-planning content that another governed reviewer can inspect.',
     '',
     JSON.stringify(modelContext),
@@ -193,7 +251,11 @@ export function buildMdoPlanningPrompt(context: MdoTaskContext, maxPromptChars =
   return prompt;
 }
 
-function parseEvidenceMetadata(evidenceId: string, metadata: unknown, checksum: string | null): MdoInferenceEvidence {
+function parseEvidenceMetadata(
+  evidenceId: string,
+  metadata: unknown,
+  checksum: string | null
+): MdoInferenceEvidence {
   if (metadata === null || typeof metadata !== 'object' || Array.isArray(metadata)) {
     throw new MdoPlanningRuntimeError('malformed_evidence', 'MDO inference evidence metadata is missing');
   }
@@ -220,10 +282,16 @@ function parseEvidenceMetadata(evidenceId: string, metadata: unknown, checksum: 
   });
 }
 
-export async function loadMdoInferenceEvidence(queryFn: QueryFunction, resultRef: string | null): Promise<MdoInferenceEvidence> {
+export async function loadMdoInferenceEvidence(
+  queryFn: QueryFunction,
+  resultRef: string | null
+): Promise<MdoInferenceEvidence> {
   const match = typeof resultRef === 'string' ? EVIDENCE_URI.exec(resultRef) : null;
   if (!match) {
-    throw new MdoPlanningRuntimeError('evidence_reference_missing', 'Successful MDO execution did not return a canonical evidence reference');
+    throw new MdoPlanningRuntimeError(
+      'evidence_reference_missing',
+      'Successful MDO execution did not return a canonical evidence reference'
+    );
   }
   const result = await queryFn<EvidenceRow>(
     `SELECT evidence_id::text, metadata, checksum
@@ -233,7 +301,10 @@ export async function loadMdoInferenceEvidence(queryFn: QueryFunction, resultRef
     [match[1]]
   );
   if (result.rows.length !== 1) {
-    throw new MdoPlanningRuntimeError('evidence_reference_missing', 'MDO inference evidence did not resolve exactly once');
+    throw new MdoPlanningRuntimeError(
+      'evidence_reference_missing',
+      'MDO inference evidence did not resolve exactly once'
+    );
   }
   const row = result.rows[0];
   return parseEvidenceMetadata(row.evidence_id, row.metadata, row.checksum);
@@ -250,7 +321,10 @@ async function persistInferenceEvidence(
 ): Promise<string> {
   const outputText = providerResult.summary.trim();
   if (!outputText || outputText.length > maxOutputChars) {
-    throw new MdoPlanningRuntimeError('invalid_provider_output', 'MDO provider output is empty or exceeds the configured evidence bound');
+    throw new MdoPlanningRuntimeError(
+      'invalid_provider_output',
+      'MDO provider output is empty or exceeds the configured evidence bound'
+    );
   }
   const sourceRef = `foundry-adapter-operation:${request.adapterOperationId}`;
   const existing = await queryFn<EvidenceRow>(
@@ -263,12 +337,22 @@ async function persistInferenceEvidence(
     [sourceRef]
   );
   if (existing.rows.length > 1) {
-    throw new MdoPlanningRuntimeError('duplicate_provider_evidence', 'MDO provider operation resolved multiple evidence records');
+    throw new MdoPlanningRuntimeError(
+      'duplicate_provider_evidence',
+      'MDO provider operation resolved multiple evidence records'
+    );
   }
   if (existing.rows.length === 1) {
-    const parsed = parseEvidenceMetadata(existing.rows[0].evidence_id, existing.rows[0].metadata, existing.rows[0].checksum);
+    const parsed = parseEvidenceMetadata(
+      existing.rows[0].evidence_id,
+      existing.rows[0].metadata,
+      existing.rows[0].checksum
+    );
     if (parsed.taskId !== context.taskId || parsed.planId !== context.planId) {
-      throw new MdoPlanningRuntimeError('provider_evidence_conflict', 'Existing MDO provider evidence belongs to another task or plan');
+      throw new MdoPlanningRuntimeError(
+        'provider_evidence_conflict',
+        'Existing MDO provider evidence belongs to another task or plan'
+      );
     }
     return parsed.evidenceId;
   }
@@ -311,25 +395,44 @@ async function persistInferenceEvidence(
     ]
   );
   if (inserted.rows.length !== 1) {
-    throw new MdoPlanningRuntimeError('evidence_persistence_failed', 'MDO provider evidence was not persisted exactly once');
+    throw new MdoPlanningRuntimeError(
+      'evidence_persistence_failed',
+      'MDO provider evidence was not persisted exactly once'
+    );
   }
   return inserted.rows[0].evidence_id;
 }
 
 export function createMdoFoundryAdapter(options: MdoFoundryAdapterOptions): FoundryAdapter {
-  const maxPromptChars = boundedInteger(options.maxPromptChars ?? DEFAULT_MAX_PROMPT_CHARS, 'maxPromptChars', 1_000, 64_000);
-  const maxOutputChars = boundedInteger(options.maxOutputChars ?? DEFAULT_MAX_OUTPUT_CHARS, 'maxOutputChars', 256, 128_000);
+  const maxPromptChars = boundedInteger(
+    options.maxPromptChars ?? DEFAULT_MAX_PROMPT_CHARS,
+    'maxPromptChars',
+    1_000,
+    64_000
+  );
+  const maxOutputChars = boundedInteger(
+    options.maxOutputChars ?? DEFAULT_MAX_OUTPUT_CHARS,
+    'maxOutputChars',
+    256,
+    128_000
+  );
   const mdo = options.mdo ?? new MdoOrchestrator(options.queryFn);
 
   return async (request: FoundryAdapterRequest): Promise<FoundryAdapterResult> => {
     if (!MDO_CAPABILITIES.has(request.capabilityCode) || request.authorityLevel !== 'C1') {
-      throw new MdoPlanningRuntimeError('unsupported_capability', 'MDO adapter accepts only bounded C1 planning capabilities');
+      throw new MdoPlanningRuntimeError(
+        'unsupported_capability',
+        'MDO adapter accepts only bounded C1 planning capabilities'
+      );
     }
     if (request.targetKind !== 'module_plan' || request.targetRef === null) {
       throw new MdoPlanningRuntimeError('target_mismatch', 'MDO adapter requires one exact module_plan target');
     }
     if (Object.keys(request.input).length !== 0) {
-      throw new MdoPlanningRuntimeError('runtime_override_rejected', 'MDO adapter does not accept prompt, provider, model, or target overrides');
+      throw new MdoPlanningRuntimeError(
+        'runtime_override_rejected',
+        'MDO adapter does not accept prompt, provider, model, or target overrides'
+      );
     }
 
     const execution = await options.queryFn<MdoRuntimeProfileRow>(
@@ -341,7 +444,10 @@ export function createMdoFoundryAdapter(options: MdoFoundryAdapterOptions): Foun
     );
     const executionRow = execution.rows.length === 1 ? execution.rows[0] : undefined;
     if (!executionRow?.task_id || !executionRow.project_id) {
-      throw new MdoPlanningRuntimeError('execution_context_mismatch', 'MDO execution context did not resolve one profile, project, and task');
+      throw new MdoPlanningRuntimeError(
+        'execution_context_mismatch',
+        'MDO execution context did not resolve one profile, project, and task'
+      );
     }
     const context = await mdo.loadTaskContext(executionRow.task_id);
     if (
@@ -349,7 +455,10 @@ export function createMdoFoundryAdapter(options: MdoFoundryAdapterOptions): Foun
       || context.projectId !== executionRow.project_id
       || context.requiredCapabilityCode !== request.capabilityCode
     ) {
-      throw new MdoPlanningRuntimeError('execution_context_mismatch', 'MDO execution context does not match the exact plan, project, task, and capability');
+      throw new MdoPlanningRuntimeError(
+        'execution_context_mismatch',
+        'MDO execution context does not match the exact plan, project, task, and capability'
+      );
     }
 
     const selection = parseInferenceSelection(executionRow.runtime_defaults);
@@ -386,7 +495,10 @@ export function createMdoFoundryAdapter(options: MdoFoundryAdapterOptions): Foun
       selection.adapter === 'ollama_local'
       && !providerResult.resultRef?.startsWith(`ollama-local://${selection.model}/`)
     ) {
-      throw new MdoPlanningRuntimeError('provider_provenance_mismatch', 'Local Ollama result did not confirm the configured model identity');
+      throw new MdoPlanningRuntimeError(
+        'provider_provenance_mismatch',
+        'Local Ollama result did not confirm the configured model identity'
+      );
     }
 
     const evidenceId = await persistInferenceEvidence(
@@ -404,18 +516,6 @@ export function createMdoFoundryAdapter(options: MdoFoundryAdapterOptions): Foun
       summary: `MDO ${context.roleCode} planning output recorded as governed evidence via ${selection.provider}/${selection.model}.`,
     };
   };
-}
-
-interface LeaseDiagnosticRow {
-  state: string;
-  worker_matches: boolean;
-  token_matches: boolean;
-  fencing_epoch: number | string;
-  epoch_matches: boolean;
-  lease_expires_at: string | null;
-  expired: boolean | null;
-  attempt_count: number | string;
-  max_attempts: number | string;
 }
 
 function errorIdentity(error: unknown): string {
@@ -473,7 +573,10 @@ async function finishLease(
     [claim.taskId]
   );
   if (readback.rows.length !== 1 || typeof readback.rows[0].lease_state !== 'string') {
-    throw new MdoPlanningRuntimeError('lease_readback_failed', 'MDO lease state could not be read after fenced completion');
+    throw new MdoPlanningRuntimeError(
+      'lease_readback_failed',
+      'MDO lease state could not be read after fenced completion'
+    );
   }
   return readback.rows[0].lease_state;
 }
@@ -506,11 +609,20 @@ export class MdoPlanningWorker {
 
   async executeClaim(input: MdoExecuteClaimInput): Promise<MdoExecuteClaimResult> {
     if (!SAFE_CODE.test(input.workerInstanceId) || !input.idempotencyKey.trim()) {
-      throw new MdoPlanningRuntimeError('invalid_worker_request', 'MDO worker identity and idempotency key are required');
+      throw new MdoPlanningRuntimeError(
+        'invalid_worker_request',
+        'MDO worker identity and idempotency key are required'
+      );
     }
     const context = await this.mdo.loadTaskContext(input.claim.taskId);
-    if (context.planId !== input.claim.planId || context.requiredCapabilityCode !== input.claim.capabilityCode) {
-      throw new MdoPlanningRuntimeError('claim_context_mismatch', 'MDO claim does not match its canonical task context');
+    if (
+      context.planId !== input.claim.planId
+      || context.requiredCapabilityCode !== input.claim.capabilityCode
+    ) {
+      throw new MdoPlanningRuntimeError(
+        'claim_context_mismatch',
+        'MDO claim does not match its canonical task context'
+      );
     }
 
     let execution: FoundryExecutionResult;
@@ -539,20 +651,31 @@ export class MdoPlanningWorker {
     }
 
     if (execution.terminalStatus !== 'succeeded') {
-      const leaseState = await finishLease(this.options.queryFn, input.claim, input.workerInstanceId, false);
+      const leaseState = await finishLease(
+        this.options.queryFn,
+        input.claim,
+        input.workerInstanceId,
+        false
+      );
       if (leaseState === 'exhausted') {
         await this.options.queryFn(
           `UPDATE comind.cm_task SET status = 'blocked' WHERE task_id = $1::uuid AND status <> 'done'`,
           [input.claim.taskId]
         );
       }
-      throw new MdoPlanningRuntimeError('planning_execution_failed', `MDO planning execution ended ${execution.terminalStatus}`);
+      throw new MdoPlanningRuntimeError(
+        'planning_execution_failed',
+        `MDO planning execution ended ${execution.terminalStatus}`
+      );
     }
 
     const evidence = await loadMdoInferenceEvidence(this.options.queryFn, execution.resultRef);
     if (evidence.taskId !== input.claim.taskId || evidence.planId !== input.claim.planId) {
       await finishLease(this.options.queryFn, input.claim, input.workerInstanceId, false);
-      throw new MdoPlanningRuntimeError('evidence_context_mismatch', 'MDO provider evidence does not match the claimed task and plan');
+      throw new MdoPlanningRuntimeError(
+        'evidence_context_mismatch',
+        'MDO provider evidence does not match the claimed task and plan'
+      );
     }
 
     const contributionId = await this.mdo.submitContribution({
@@ -576,9 +699,17 @@ export class MdoPlanningWorker {
       evidenceIds: [evidence.evidenceId],
     });
 
-    const leaseState = await finishLease(this.options.queryFn, input.claim, input.workerInstanceId, true);
+    const leaseState = await finishLease(
+      this.options.queryFn,
+      input.claim,
+      input.workerInstanceId,
+      true
+    );
     if (leaseState !== 'completed') {
-      throw new MdoPlanningRuntimeError('terminal_state_mismatch', 'Successful MDO contribution did not complete its work lease');
+      throw new MdoPlanningRuntimeError(
+        'terminal_state_mismatch',
+        'Successful MDO contribution did not complete its work lease'
+      );
     }
     await this.options.queryFn(
       `UPDATE comind.cm_task SET status = 'done' WHERE task_id = $1::uuid AND status <> 'done'`,

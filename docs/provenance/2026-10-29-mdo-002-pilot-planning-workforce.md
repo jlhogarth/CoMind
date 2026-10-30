@@ -1,7 +1,8 @@
 # MDO-002 Pilot Planning Workforce and Provider-Neutral Execution Adapter
 
-Date: 2026-10-29
+Date: 2026-10-29, acceptance repair 2026-10-30
 Issue: #316
+PR: #334
 Governance tier: T2 bounded cross-agent planning execution in isolated development
 Production activation: false
 Paid provider authorization: false
@@ -78,12 +79,26 @@ The proof requires all ten planning tasks to:
 
 After all ten contributions, the plan remains `in_review` and module maturity remains `conceived`. MDO-002 does not self-accept a plan or advance module maturity.
 
+## Failed pilot evidence and root cause
+
+The first full local acceptance run reached three successful roles and failed during the fourth role. PostgreSQL rejected insertion into `cm_foundry_adapter_operation_result` with foreign-key error `23503` because the referenced adapter-operation row was no longer present. The subsequent retry-release was also rejected by the lease fence because the rollback had removed the synthetic lease fixture. No inconsistent contribution was accepted.
+
+The failure was traced to the rollback-only test harness rather than the Foundry lifecycle contract. The pilot opened its transaction with `pool.query('BEGIN')` and subsequently used `pool.query(...)` for all work. That pattern does not reserve one PostgreSQL client for a transaction. The local Ollama calls progressively took about 4.7, 6.9, 9.6, and 13.2 seconds. The fourth inference exceeded the pool's default idle-client timeout, allowing the transaction-bearing connection to be closed and the synthetic fixture to roll back. The next database operation used a fresh connection and correctly could not resolve the rolled-back adapter operation.
+
+The acceptance repair checks out one `PoolClient` before `BEGIN`, routes every fixture query through that same client, performs `ROLLBACK` on that client, and releases it only after rollback. The pool idle timeout is deliberately set to one second in the pilot so the regression proof depends on explicit client ownership rather than on a forgiving timeout. Foundry authorization, terminal evidence requirements, retry semantics, and lease fencing are unchanged.
+
+## Freshness and collision reconciliation
+
+Before repairing the failed proof, the branch was reconciled against current `main` through commit `86c0ec6237e7867b77bd1d89433aea918939762e`, including CE-001 and CUX-002 work. The MDO implementation paths were otherwise disjoint.
+
+Freshness review found one namespace collision in migration ordering: CE-001 had occupied the `20261029_007`, `008`, and `009` sequence while MDO-002 had independently used `007`. MDO-002 was therefore resequenced to `20261029_010_mdo_002_foundry_terminal_alignment.sql` with the paired `verify_20261029_010...` verifier. The prior MDO `007` files were removed so the repository retains one unambiguous migration sequence.
+
 ## Security and authority boundaries
 
 MDO-002 does not authorize:
 
 - Production execution or mutation;
-- autonomous merge or deployment;
+- autonomous merge or deployment outside this explicitly authorized development lane;
 - destructive operations;
 - capability self-granting or self-escalation;
 - paid provider execution;
@@ -94,14 +109,16 @@ A later external-model planning run remains subject to the existing paid-call pr
 
 ## Recovery
 
-Provider failure, malformed evidence, target drift, capability mismatch, stale fencing, and context-policy violations fail closed. Failed attempts do not become accepted MDO contributions. Retry remains controlled by the existing lease attempt counter and expiry semantics.
+Provider failure, malformed evidence, target drift, capability mismatch, stale fencing, context-policy violations, and transaction-lifetime loss fail closed. Failed attempts do not become accepted MDO contributions. Retry remains controlled by the existing lease attempt counter and expiry semantics.
 
 ## Acceptance evidence required before merge
 
 - server TypeScript build succeeds on the exact PR head;
 - deterministic adapter/worker tests pass;
 - MDO-001 isolated substrate verification remains green;
+- the resequenced MDO-002 terminal-alignment migration and verifier pass;
 - the zero-cost local Ollama ten-role phase-chain workflow passes;
 - the evidence artifact shows 10 contributions, 10 completed leases, 10 inference-evidence records, 10 done tasks, exact `ollama_local / qwen3:0.6b` provenance, plan status `in_review`, and unchanged module maturity;
 - relevant broad CI and Foundry regressions remain green;
+- final freshness review shows no unresolved collision with `main`;
 - no paid provider or Production action occurs.

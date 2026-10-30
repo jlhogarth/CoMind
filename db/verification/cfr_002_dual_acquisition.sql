@@ -152,6 +152,7 @@ INSERT INTO comind.cm_conversation_acquisition_observation (
   'chatgpt_browser_observed',
   'future_private_event_shape',
   'browser_event_drift',
+  'browser_event_drift_1',
   3,
   'synthetic-browser-adapter',
   '2026-10-30T12:00:00.040Z'::timestamptz,

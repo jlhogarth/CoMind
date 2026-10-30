@@ -4,7 +4,7 @@ on:
   pull_request:
     paths:
       - 'docs/architecture/cfr-002-native-conversation-interface.md'
-      - 'db/migrations/20261030_026_cfr_002_dual_acquisition_foundation.sql'
+      - 'db/migrations/20261030_030_cfr_002_dual_acquisition_foundation.sql'
       - 'db/verification/cfr_002_dual_acquisition.sql'
       - 'server/src/conversation-acquisition.ts'
       - 'server/test/conversation-acquisition.test.mjs'

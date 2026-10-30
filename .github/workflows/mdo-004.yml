@@ -1,0 +1,100 @@
+name: MDO-004 Governed Plan Disposition
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/mdo-004.yml'
+      - 'db/migrations/20261030_025_mdo_004_governed_plan_disposition.sql'
+      - 'db/migrations/verify_20261030_025_mdo_004_governed_plan_disposition.sql'
+      - 'db/migrations/verify_20261030_025_mdo_004_behavior.sql'
+      - 'scripts/test_mdo_004.sh'
+      - 'server/src/mdo-plan-disposition.ts'
+      - 'server/test/mdo-plan-disposition.test.mjs'
+      - 'server/test/integration/mdo-plan-disposition-live.e2e.mjs'
+      - 'docs/provenance/2026-10-30-mdo-004-plan-disposition.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mdo-004-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  server-contract:
+    name: MDO-004 server contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify exact checked-out head
+        working-directory: .
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install exact dependencies
+        run: npm ci
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - name: Build server
+        run: npm run build
+      - name: Prove deterministic MDO-004 service contract
+        run: node --test test/mdo-plan-disposition.test.mjs
+      - name: Re-run accepted MDO runtime contracts
+        run: node --test test/mdo-planning-runtime.test.mjs test/mdo-planning-context-bounds.test.mjs
+
+  postgres-contract:
+    name: MDO-004 isolated PostgreSQL lifecycle proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.6-pg17-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+      - name: Prove MDO-004 schema and lifecycle contract
+        run: bash ./scripts/test_mdo_004.sh

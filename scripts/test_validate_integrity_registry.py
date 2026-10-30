@@ -27,7 +27,7 @@ class RegistryTests(unittest.TestCase):
         destination = root / MODULE.REGISTRY_PATH
         destination.parent.mkdir(parents=True)
         destination.write_text(json.dumps(registry, indent=2) + "\n", encoding="utf-8")
-        for control in registry["controls"]:
+        for control in registry["implemented_controls"]:
             for repo_path in control["detector"]["paths"]:
                 target = root / repo_path
                 target.parent.mkdir(parents=True, exist_ok=True)
@@ -42,27 +42,27 @@ class RegistryTests(unittest.TestCase):
 
     def test_duplicate_control_id_fails(self) -> None:
         temp, root, registry = self.make_root(); self.addCleanup(temp.cleanup)
-        registry["controls"].append(copy.deepcopy(registry["controls"][0]))
+        registry["defined_controls"].append(copy.deepcopy(registry["implemented_controls"][0]))
         self.write_registry(root, registry)
         self.assertTrue(any("duplicate control_id" in item for item in MODULE.validate(root)))
 
     def test_defined_control_cannot_claim_detector(self) -> None:
         temp, root, registry = self.make_root(); self.addCleanup(temp.cleanup)
-        item = next(c for c in registry["controls"] if c["control_id"] == "NMC-001")
+        item = next(c for c in registry["defined_controls"] if c["control_id"] == "NMC-001")
         item["detector"] = {"kind": "iic-engine", "paths": ["scripts/check_implementation_integrity.py"]}
         self.write_registry(root, registry)
         self.assertTrue(any("DEFINED-only control" in item for item in MODULE.validate(root)))
 
     def test_enforced_control_must_be_blocking(self) -> None:
         temp, root, registry = self.make_root(); self.addCleanup(temp.cleanup)
-        item = next(c for c in registry["controls"] if c["control_id"] == "NDT-001")
+        item = next(c for c in registry["implemented_controls"] if c["control_id"] == "NDT-001")
         item["enforcement"]["blocking"] = False
         self.write_registry(root, registry)
         self.assertTrue(any("ENFORCED control must be blocking" in item for item in MODULE.validate(root)))
 
     def test_promotion_history_cannot_move_backward(self) -> None:
         temp, root, registry = self.make_root(); self.addCleanup(temp.cleanup)
-        item = next(c for c in registry["controls"] if c["control_id"] == "NFS-001")
+        item = next(c for c in registry["implemented_controls"] if c["control_id"] == "NFS-001")
         item["promotion_history"].append({"state": "SHADOW", "evidence": "regression"})
         item["maturity_state"] = "SHADOW"
         self.write_registry(root, registry)
@@ -87,12 +87,18 @@ class RegistryTests(unittest.TestCase):
 
     def test_current_foundation_states_cannot_be_downgraded_silently(self) -> None:
         temp, root, registry = self.make_root(); self.addCleanup(temp.cleanup)
-        ndt = next(c for c in registry["controls"] if c["control_id"] == "NDT-001")
+        ndt = next(c for c in registry["implemented_controls"] if c["control_id"] == "NDT-001")
         ndt["maturity_state"] = "PROVEN"
         ndt["promotion_history"] = ndt["promotion_history"][:-1]
         ndt["enforcement"]["blocking"] = False
         self.write_registry(root, registry)
         self.assertTrue(any("registry must reflect current state ENFORCED" in item for item in MODULE.validate(root)))
+
+    def test_registry_requires_complete_catalog(self) -> None:
+        temp, root, registry = self.make_root(); self.addCleanup(temp.cleanup)
+        registry["defined_controls"].pop()
+        self.write_registry(root, registry)
+        self.assertTrue(any("24 unique cataloged controls" in item for item in MODULE.validate(root)))
 
 
 if __name__ == "__main__":

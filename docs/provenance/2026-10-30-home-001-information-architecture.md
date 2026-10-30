@@ -78,7 +78,9 @@ IIC-005 #349 and successor integrity lanes own detector and registry maturity se
 
 Disposition: HOME-001 can project `config/integrity-registry.v1.json` and exact execution evidence but cannot change integrity-control definitions or maturity.
 
-## Tooling failure preserved
+## Tooling failures preserved
+
+### Accidental inert branch
 
 Before the collision scan was complete, a setup call accidentally created branch `tmp-do-not-use` from `main`.
 
@@ -86,7 +88,15 @@ The branch contains no unique commit and no file changes. The connected GitHub a
 
 The actual HOME-001 branch was created only after the scan from the exact accepted baseline.
 
-This is preserved because development-process failures are evidence under the Contract rather than something to hide from the record.
+### First low-level reconciliation attempt
+
+When `main` advanced during HOME-001 authoring, the first low-level Git-tree reconciliation attempt used cached tree-search identifiers for the six HOME files. GitHub rejected the request with HTTP 422 because the cached identifier supplied for `.github/workflows/home-001.yml` was not a valid blob SHA.
+
+No tree, commit, or branch ref was moved by the failed request.
+
+The repair re-read every HOME file directly with the contents API, obtained each current blob SHA, rebuilt the tree from those authoritative identifiers, created a two-parent reconciliation commit, and advanced the HOME branch with an expected-head lease.
+
+These failures are preserved because development-process failures are evidence under the Contract rather than something to hide from the record.
 
 ## Live Test source inventory
 
@@ -185,7 +195,7 @@ Consequence: Home must not copy the registry to a competing database merely for 
 2. `Now` is a bounded composition of registered attention sources and gets no durable Home ledger.
 3. Projects preserve `cm_project` canonical identity and PM operational projection separately.
 4. VE identity, lifecycle, grants, and authority remain Foundry/VE-owned.
-5. Decisions and Approvals are separate concepts.
+5. Decisions and Approvals are separate concepts and the validator rejects Foundry authorization records as Decision truth.
 6. Evidence is both a dedicated surface and a cross-cutting source-link affordance.
 7. RunBook chronology remains canonical and is never copied into a Home event history.
 8. Research and Learning reuse RLIB-001 by reference.
@@ -193,6 +203,26 @@ Consequence: Home must not copy the registry to a competing database merely for 
 10. Reflection is journal-backed and retains explicit authorship.
 11. Implementation Integrity combines canonical registry maturity with exact-head execution evidence without inflating either.
 12. Unknown/unavailable state fails closed throughout the Home experience.
+
+## Reconciliation after CE-002 merge
+
+While HOME-001 was being authored, `main` advanced from the initial lease SHA `162a1355d361ec7f2139035b89d0a7211862e69d` to CE-002 merge commit:
+
+`e6e8cd50365542110218c790623a5bde833a353e`
+
+The incoming delta was inspected before reconciliation. It consisted of CE-002 workflow, database migration and verifier, recovery architecture/provenance documentation, recovery runtime code, and recovery tests. None of the six HOME-001 paths overlapped.
+
+HOME-001 was then reconciled with a two-parent commit:
+
+`f45147bdee1678b7289d7cb9d38e47276383e9ab`
+
+The branch ref update used the expected pre-reconciliation HOME head as a lease. Post-reconciliation comparison against `main` reported:
+
+- behind: 0;
+- changed files: exactly six HOME-001 files;
+- no CE-002 file in the HOME delta.
+
+CE-002 ownership and semantics therefore remain separate.
 
 ## v0.1 implementation
 
@@ -216,6 +246,8 @@ The dedicated HOME-001 workflow must prove that:
 - no Home domain creates a persistent source-of-truth store;
 - Now remains composed;
 - Projects preserve canonical identity ownership;
+- Decisions cannot use authorization records as decision truth;
+- Approvals include both authorization-request and authorization-decision truth;
 - Watchtower remains federated;
 - Reflection remains journal-backed;
 - Learning remains linked to governed Research;

@@ -2,6 +2,9 @@ export type HudState =
   | "queued"
   | "running"
   | "waiting_external"
+  | "awaiting_review"
+  | "blocked"
+  | "deferred"
   | "cancellation_requested"
   | "completed"
   | "failed"
@@ -27,7 +30,7 @@ export interface ActivityHudRow {
   last_source_occurred_at: string | null;
   last_observed_at: string | null;
   last_observation_summary: string | null;
-  last_evidence: unknown[];
+  last_evidence: unknown;
   hud_state: HudState;
   evidence_based_resolution: "completed" | "failed" | "cancelled" | null;
   has_terminal_source_evidence: boolean;
@@ -74,19 +77,23 @@ const INVESTIGATION_RANK: Record<HudState, number> = {
   stale_unknown: 1,
   unknown: 2,
   cancellation_requested: 3,
-  failed: 4,
-  running: 5,
-  waiting_external: 5,
-  queued: 6,
-  cancelled: 7,
-  completed: 8,
+  blocked: 4,
+  failed: 5,
+  awaiting_review: 6,
+  running: 7,
+  waiting_external: 7,
+  queued: 8,
+  deferred: 9,
+  cancelled: 10,
+  completed: 11,
 } as Record<HudState, number>;
 
-const NO_RETURN_STATES = new Set<HudState>([
+const NEEDS_INVESTIGATION_STATES = new Set<HudState>([
   "deadline_exceeded",
   "stale_unknown",
   "unknown",
   "cancellation_requested",
+  "blocked",
 ]);
 
 function timestamp(value: string | null | undefined, fallback: string): number {
@@ -97,7 +104,7 @@ function timestamp(value: string | null | undefined, fallback: string): number {
 }
 
 export function needsInvestigation(row: ActivityHudRow): boolean {
-  return NO_RETURN_STATES.has(row.hud_state) || (row.hud_state === "failed" && row.has_terminal_source_evidence);
+  return NEEDS_INVESTIGATION_STATES.has(row.hud_state) || (row.hud_state === "failed" && row.has_terminal_source_evidence);
 }
 
 export function hasNoTerminalReturn(row: ActivityHudRow): boolean {

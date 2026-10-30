@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import "./globals.css";
 import "./cux-002.css";
+import "./activity-operational.css";
 
 export const metadata: Metadata = {
   title: {

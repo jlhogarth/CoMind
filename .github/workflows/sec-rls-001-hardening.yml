@@ -1,0 +1,81 @@
+name: SEC-RLS-001 Custom Schema RLS Hardening
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/sec-rls-001-hardening.yml'
+      - 'db/migrations/**'
+      - 'db/verification/sec_rls_001_current_preflight.sql'
+      - 'scripts/test_sec_rls_001_current_schema_hardening.sh'
+      - 'scripts/check_custom_schema_rls_migrations.py'
+      - 'docs/architecture/sec-rls-001-current-schema-hardening.md'
+      - 'docs/provenance/2026-10-30-sec-rls-001-current-schema-hardening.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  migration-integrity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+      - name: Self-test custom-schema RLS migration guard
+        run: python3 scripts/check_custom_schema_rls_migrations.py --self-test
+      - name: Verify changed migrations enable RLS for new custom-schema tables
+        if: github.event_name == 'pull_request'
+        run: >-
+          python3 scripts/check_custom_schema_rls_migrations.py
+          --base-sha '${{ github.event.pull_request.base.sha }}'
+          --head-sha '${{ github.event.pull_request.head.sha }}'
+
+  isolated-rls-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/comind_ci
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Prove current-schema RLS hardening contract
+        run: bash scripts/test_sec_rls_001_current_schema_hardening.sh

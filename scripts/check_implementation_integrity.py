@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """CoMind hard implementation-integrity control engine.
 
-IIC-001 begins in shadow mode. Findings are reported deterministically, while
-only engine failures are blocking. Enforcement can later reject unbaselined
-findings without changing detector semantics.
+IIC-002 extends the IIC-001 engine to host multiple controls while preserving
+stable NDT-001 fingerprints. Controls may emit deterministic verified risks or
+review candidates. Shadow mode never blocks on findings; enforce mode blocks
+only unbaselined findings classified as verified risks.
 """
 
 from __future__ import annotations
@@ -41,29 +42,79 @@ class Finding:
     control_id: str
     detector: str
     severity: str
+    classification: str
     path: str
     line: int
     target: str
     message: str
+    evidence: str
     fingerprint: str
 
 
 def fingerprint(control_id: str, detector: str, path: str, target: str) -> str:
+    """Stable finding identity.
+
+    This is intentionally unchanged from IIC-001 so existing NDT-001 finding
+    fingerprints remain stable across the multi-control refactor.
+    """
     payload = "|".join((control_id, detector, path, target)).encode("utf-8")
     return hashlib.sha256(payload).hexdigest()[:24]
 
 
-def finding(*, detector: str, path: Path, line: int, target: str, message: str) -> Finding:
+def finding(
+    *,
+    control_id: str,
+    detector: str,
+    severity: str,
+    classification: str,
+    path: Path,
+    line: int,
+    target: str,
+    message: str,
+    evidence: str,
+) -> Finding:
     normalized_path = path.as_posix()
     return Finding(
-        control_id="NDT-001",
+        control_id=control_id,
         detector=detector,
-        severity="error",
+        severity=severity,
+        classification=classification,
         path=normalized_path,
         line=line,
         target=target,
         message=message,
-        fingerprint=fingerprint("NDT-001", detector, normalized_path, target),
+        evidence=evidence,
+        fingerprint=fingerprint(control_id, detector, normalized_path, target),
+    )
+
+
+def ndt_finding(*, detector: str, path: Path, line: int, target: str, message: str) -> Finding:
+    return finding(
+        control_id="NDT-001",
+        detector=detector,
+        severity="error",
+        classification="verified-risk",
+        path=path,
+        line=line,
+        target=target,
+        message=message,
+        evidence=target,
+    )
+
+
+def nfs_candidate(
+    *, detector: str, path: Path, line: int, target: str, message: str, evidence: str
+) -> Finding:
+    return finding(
+        control_id="NFS-001",
+        detector=detector,
+        severity="warning",
+        classification="candidate",
+        path=path,
+        line=line,
+        target=target,
+        message=message,
+        evidence=evidence,
     )
 
 
@@ -102,9 +153,12 @@ def action_target_exists(root: Path, target: str) -> bool:
     )
 
 
-def extract_run_blocks(lines: list[str]) -> list[tuple[int, str]]:
-    """Extract literal run bodies without requiring a YAML dependency."""
-    blocks: list[tuple[int, str]] = []
+def extract_run_blocks(lines: list[str]) -> list[tuple[int, int, str]]:
+    """Extract literal run bodies without requiring a YAML dependency.
+
+    Returns (zero-based source index, one-based source line, body).
+    """
+    blocks: list[tuple[int, int, str]] = []
     for index, line in enumerate(lines):
         match = re.match(r"^(?P<indent>\s*)(?:-\s*)?run:\s*(?P<body>.*)$", line)
         if not match:
@@ -113,7 +167,7 @@ def extract_run_blocks(lines: list[str]) -> list[tuple[int, str]]:
         body = match.group("body").strip()
         start_line = index + 1
         if body and body not in {"|", ">", "|-", ">-", "|+", ">+"}:
-            blocks.append((start_line, body))
+            blocks.append((index, start_line, body))
             continue
         collected: list[str] = []
         for nested in lines[index + 1 :]:
@@ -124,8 +178,22 @@ def extract_run_blocks(lines: list[str]) -> list[tuple[int, str]]:
             if nested_indent <= indent:
                 break
             collected.append(nested.strip())
-        blocks.append((start_line, "\n".join(collected)))
+        blocks.append((index, start_line, "\n".join(collected)))
     return blocks
+
+
+def workflow_step_label(lines: list[str], index: int) -> str:
+    """Return a bounded, stable label for the surrounding workflow step."""
+    current_indent = len(lines[index]) - len(lines[index].lstrip())
+    for candidate_index in range(index, max(-1, index - 12), -1):
+        candidate = lines[candidate_index]
+        match = re.match(r"^\s*-?\s*name:\s*(.+?)\s*$", candidate)
+        if not match:
+            continue
+        candidate_indent = len(candidate) - len(candidate.lstrip())
+        if candidate_indent <= current_indent:
+            return match.group(1).strip().strip("'\"")[:120]
+    return "unlabeled-step"
 
 
 def static_command_targets(command_text: str) -> list[str]:
@@ -168,7 +236,7 @@ def static_command_targets(command_text: str) -> list[str]:
     return targets
 
 
-def scan_workflows(root: Path) -> list[Finding]:
+def scan_ndt_workflows(root: Path) -> list[Finding]:
     findings: list[Finding] = []
     for workflow in iter_workflows(root):
         relative = workflow.relative_to(root)
@@ -184,7 +252,7 @@ def scan_workflows(root: Path) -> list[Finding]:
                 continue
             if not action_target_exists(root, target):
                 findings.append(
-                    finding(
+                    ndt_finding(
                         detector="workflow-local-use",
                         path=relative,
                         line=line_number,
@@ -193,12 +261,10 @@ def scan_workflows(root: Path) -> list[Finding]:
                     )
                 )
 
-        # A workflow-level or step-level working directory changes command
-        # resolution semantics. Skip run-path checks rather than infer scope.
         if re.search(r"^\s*(?:-\s*)?working-directory\s*:", text, re.MULTILINE):
             continue
 
-        for line_number, body in extract_run_blocks(lines):
+        for _index, line_number, body in extract_run_blocks(lines):
             for target in static_command_targets(body):
                 candidate = (root / target).resolve()
                 try:
@@ -209,7 +275,7 @@ def scan_workflows(root: Path) -> list[Finding]:
                     exists = candidate.is_file()
                 if not exists:
                     findings.append(
-                        finding(
+                        ndt_finding(
                             detector="workflow-run-path",
                             path=relative,
                             line=line_number,
@@ -264,7 +330,7 @@ def generated_package_target_exists(package_dir: Path, target: str) -> bool:
     return any(candidate.is_file() for candidate in candidates)
 
 
-def scan_package_scripts(root: Path) -> list[Finding]:
+def scan_ndt_package_scripts(root: Path) -> list[Finding]:
     findings: list[Finding] = []
     for package_file in iter_package_json(root):
         relative = package_file.relative_to(root)
@@ -286,11 +352,9 @@ def scan_package_scripts(root: Path) -> list[Finding]:
                     exists = False
                 else:
                     exists = candidate.is_file()
-                if not exists and not generated_package_target_exists(
-                    package_file.parent, target
-                ):
+                if not exists and not generated_package_target_exists(package_file.parent, target):
                     findings.append(
-                        finding(
+                        ndt_finding(
                             detector="package-script-path",
                             path=relative,
                             line=1,
@@ -304,8 +368,116 @@ def scan_package_scripts(root: Path) -> list[Finding]:
     return findings
 
 
+def normalized_shell_line(raw_line: str) -> str:
+    return " ".join(raw_line.strip().split())[:240]
+
+
+def failure_mask_pattern(raw_line: str) -> str | None:
+    """Return the visible failure-mask token when the line contains one."""
+    line = raw_line.strip()
+    if not line or line.startswith("#"):
+        return None
+    if re.search(r"(?:^|\s)\|\|\s*true(?:\s|$|[;&])", line):
+        return "|| true"
+    if re.search(r"(?:^|\s)\|\|\s*:(?:\s|$|[;&])", line):
+        return "|| :"
+    if re.match(r"^set\s+\+e(?:\s|$)", line):
+        return "set +e"
+    return None
+
+
+def scan_nfs_workflows(root: Path) -> list[Finding]:
+    findings: list[Finding] = []
+    for workflow in iter_workflows(root):
+        relative = workflow.relative_to(root)
+        text = workflow.read_text(encoding="utf-8")
+        lines = text.splitlines()
+
+        for index, line in enumerate(lines):
+            match = re.match(r"^\s*(?:-\s*)?continue-on-error\s*:\s*(true)\s*(?:#.*)?$", line, re.I)
+            if not match:
+                continue
+            label = workflow_step_label(lines, index)
+            target = f"{label}:continue-on-error:true"
+            findings.append(
+                nfs_candidate(
+                    detector="workflow-continue-on-error",
+                    path=relative,
+                    line=index + 1,
+                    target=target,
+                    message=(
+                        "Step is explicitly allowed to continue after failure; review whether "
+                        "required behavior can be reported successful despite this failure."
+                    ),
+                    evidence=line.strip(),
+                )
+            )
+
+        for index, line_number, body in extract_run_blocks(lines):
+            label = workflow_step_label(lines, index)
+            for raw_line in body.splitlines():
+                pattern = failure_mask_pattern(raw_line)
+                if pattern is None:
+                    continue
+                normalized = normalized_shell_line(raw_line)
+                findings.append(
+                    nfs_candidate(
+                        detector="workflow-shell-failure-mask",
+                        path=relative,
+                        line=line_number,
+                        target=f"{label}:{pattern}:{normalized}",
+                        message=(
+                            "Shell failure masking is present; review whether the step can "
+                            "return success after required behavior fails."
+                        ),
+                        evidence=normalized,
+                    )
+                )
+    return findings
+
+
+def scan_nfs_package_scripts(root: Path) -> list[Finding]:
+    findings: list[Finding] = []
+    for package_file in iter_package_json(root):
+        relative = package_file.relative_to(root)
+        try:
+            payload = json.loads(package_file.read_text(encoding="utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            continue
+        scripts = payload.get("scripts")
+        if not isinstance(scripts, dict):
+            continue
+        for script_name, command_text in scripts.items():
+            if not isinstance(command_text, str):
+                continue
+            for raw_line in command_text.splitlines():
+                pattern = failure_mask_pattern(raw_line)
+                if pattern is None:
+                    continue
+                normalized = normalized_shell_line(raw_line)
+                findings.append(
+                    nfs_candidate(
+                        detector="package-shell-failure-mask",
+                        path=relative,
+                        line=1,
+                        target=f"{script_name}:{pattern}:{normalized}",
+                        message=(
+                            "Package script contains failure masking; review whether the script "
+                            "can return success after required behavior fails."
+                        ),
+                        evidence=normalized,
+                    )
+                )
+    return findings
+
+
 def scan(root: Path) -> list[Finding]:
-    findings = scan_workflows(root) + scan_package_scripts(root)
+    findings = (
+        scan_ndt_workflows(root)
+        + scan_ndt_package_scripts(root)
+        + scan_nfs_workflows(root)
+        + scan_nfs_package_scripts(root)
+    )
     return sorted(
         findings,
         key=lambda item: (
@@ -323,27 +495,31 @@ def load_baseline(path: Path | None) -> set[str]:
         return set()
     payload = json.loads(path.read_text(encoding="utf-8"))
     fingerprints = payload.get("fingerprints", [])
-    if not isinstance(fingerprints, list) or not all(
-        isinstance(item, str) for item in fingerprints
-    ):
+    if not isinstance(fingerprints, list) or not all(isinstance(item, str) for item in fingerprints):
         raise ValueError("baseline fingerprints must be a list of strings")
     return set(fingerprints)
 
 
-def render_text(findings: list[Finding], baseline: set[str]) -> str:
+def is_blocking(item: Finding, baseline: set[str]) -> bool:
+    return item.classification == "verified-risk" and item.fingerprint not in baseline
+
+
+def render_text(findings: list[Finding], baseline: set[str], mode: str) -> str:
     if not findings:
-        return "IIC-001 shadow scan: NDT-001 PASS, no statically provable dead paths found."
+        return "Implementation Integrity: PASS, no findings in enabled controls."
     lines = []
     for item in findings:
         disposition = "baseline" if item.fingerprint in baseline else "new"
         lines.append(
             f"{item.path}:{item.line}: {item.control_id} {item.detector} "
-            f"[{disposition}] {item.target}: {item.message} "
+            f"[{item.classification}/{disposition}] {item.target}: {item.message} "
             f"fingerprint={item.fingerprint}"
         )
+    blocking = sum(is_blocking(item, baseline) for item in findings)
+    candidates = sum(item.classification == "candidate" for item in findings)
     lines.append(
-        f"IIC-001 shadow scan: {len(findings)} finding(s), "
-        f"{sum(item.fingerprint not in baseline for item in findings)} unbaselined."
+        f"Implementation Integrity {mode}: {len(findings)} finding(s), "
+        f"{blocking} blocking risk(s), {candidates} review candidate(s)."
     )
     return "\n".join(lines)
 
@@ -353,42 +529,39 @@ def render_json(findings: list[Finding], baseline: set[str], mode: str) -> str:
     for item in findings:
         record = asdict(item)
         record["disposition"] = "baseline" if item.fingerprint in baseline else "new"
+        record["blocking"] = is_blocking(item, baseline)
         records.append(record)
+    control_ids = sorted({item.control_id for item in findings} | {"NDT-001", "NFS-001"})
+    counts = {
+        control_id: sum(item.control_id == control_id for item in findings)
+        for control_id in control_ids
+    }
     payload = {
-        "schema_version": 1,
-        "lane": "IIC-001",
+        "schema_version": 2,
+        "lane": "IIC-002",
         "mode": mode,
-        "controls": ["NDT-001"],
+        "controls": control_ids,
         "finding_count": len(findings),
-        "unbaselined_count": sum(
-            item.fingerprint not in baseline for item in findings
-        ),
+        "finding_count_by_control": counts,
+        "blocking_count": sum(is_blocking(item, baseline) for item in findings),
+        "candidate_count": sum(item.classification == "candidate" for item in findings),
         "findings": records,
     }
     return json.dumps(payload, indent=2, sort_keys=True)
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="Run CoMind implementation-integrity controls."
-    )
+    parser = argparse.ArgumentParser(description="Run CoMind implementation-integrity controls.")
     parser.add_argument("root", nargs="?", default=".", help="Repository root")
     parser.add_argument("--mode", choices=("shadow", "enforce"), default="shadow")
     parser.add_argument("--format", choices=("text", "json"), default="text")
-    parser.add_argument(
-        "--baseline", type=Path, help="Reviewed baseline JSON containing fingerprints"
-    )
-    parser.add_argument(
-        "--output", type=Path, help="Optional output file; stdout is still written"
-    )
+    parser.add_argument("--baseline", type=Path, help="Reviewed baseline JSON containing fingerprints")
+    parser.add_argument("--output", type=Path, help="Optional output file; stdout is still written")
     arguments = parser.parse_args(argv)
 
     root = Path(arguments.root).resolve()
     if not root.is_dir():
-        print(
-            f"Integrity engine error: repository root is not a directory: {root}",
-            file=sys.stderr,
-        )
+        print(f"Integrity engine error: repository root is not a directory: {root}", file=sys.stderr)
         return 2
 
     try:
@@ -401,15 +574,14 @@ def main(argv: list[str] | None = None) -> int:
     rendered = (
         render_json(findings, baseline, arguments.mode)
         if arguments.format == "json"
-        else render_text(findings, baseline)
+        else render_text(findings, baseline, arguments.mode)
     )
     print(rendered)
     if arguments.output is not None:
         arguments.output.parent.mkdir(parents=True, exist_ok=True)
         arguments.output.write_text(rendered + "\n", encoding="utf-8")
 
-    unbaselined = [item for item in findings if item.fingerprint not in baseline]
-    if arguments.mode == "enforce" and unbaselined:
+    if arguments.mode == "enforce" and any(is_blocking(item, baseline) for item in findings):
         return 1
     return 0
 

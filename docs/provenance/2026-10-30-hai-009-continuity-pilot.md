@@ -2,6 +2,7 @@
 
 Date: 2026-10-30
 Issue: https://github.com/jlhogarth/CoMind/issues/408
+Canonical Drive document: https://docs.google.com/document/d/1fJ2tQz8_jBBCUGHjxT90GdSVg4TV-HPv51s4W-14t6o/edit
 Lane: HAI-009
 Environment: repository and synthetic Test-safe evidence only
 Production activation: false

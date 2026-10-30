@@ -75,8 +75,14 @@ try {
   assert.equal(await page.getByText("No mailbox API access is used by this panel.", { exact: true }).count(), 1);
   assert.equal(await page.getByText("Two governed domains", { exact: true }).count(), 1);
   assert.equal(await page.getByText("No paid call triggered by this page", { exact: true }).count(), 1);
-  assert.equal(await page.getByText("Production deployment", { exact: true }).count(), 1);
-  assert.equal(await page.getByText("Not activated by HUD-001", { exact: true }).count(), 1);
+  assert.equal(await page.getByText("Live behind governed access perimeter", { exact: true }).count(), 1);
+  assert.equal(await page.getByText("Live at console.comindinc.com", { exact: true }).count(), 1);
+  assert.equal(await page.getByText("Deployment perimeter", { exact: true }).count(), 1);
+  assert.equal(await page.getByText("Cloudflare Access + origin proxy + Vercel protection", { exact: true }).count(), 1);
+  assert.equal(await page.getByText("Dev/Test", { exact: true }).count(), 1);
+  assert.equal(await page.getByText("Production activation excluded", { exact: true }).count(), 0);
+  assert.equal(await page.getByText("Not activated by HUD-001", { exact: true }).count(), 0);
+  assert.equal(await page.getByText("HUD-001 branch implementation", { exact: true }).count(), 0);
 
   const sidebar = page.getByRole("complementary", { name: "CoMind control plane navigation" });
   assert.equal(await sidebar.getByRole("link", { name: /Monitoring/ }).count(), 1);
@@ -87,7 +93,7 @@ try {
     await page.screenshot({ path: process.env.CONTROL_PLANE_BROWSER_SCREENSHOT, fullPage: true });
   }
 
-  console.log("PASS Control Plane browser: branded landing page, Workspace Mail quick access, wired destinations, governance labels, and responsive shell rendered.");
+  console.log("PASS Control Plane browser: Workspace Mail, truthful deployed Development/Test state, wired destinations, governance labels, and responsive shell rendered.");
 } finally {
   await browser?.close();
   server.kill("SIGTERM");

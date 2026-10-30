@@ -231,8 +231,6 @@ export async function executeGovernedContinuity(fixture, manifest) {
       openQuestionRefs: unresolvedRefs,
       evidenceRefs: [`evidence:hai-010:fixture:${fixture.id}:${digest}`],
     },
-    authorityEvidenceRefs: [SYNTHETIC_AUTHORITY.evidenceRef],
-    policyRefs: [SYNTHETIC_AUTHORITY.policyRef],
     sensitivity: 'internal',
     retentionClass: 'durable',
     issuedAt: '2026-10-30T16:40:08.000Z',

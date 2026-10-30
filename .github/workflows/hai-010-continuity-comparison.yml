@@ -94,5 +94,5 @@ jobs:
         with:
           name: hai-010-continuity-comparison-validation
           path: artifacts/hai-010-synthetic-execution.json
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 30

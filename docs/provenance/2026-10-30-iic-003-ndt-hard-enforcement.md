@@ -31,6 +31,17 @@ IIC-003 uses both self-validation in the primary Implementation Integrity workfl
 
 No baseline file is created because accepted NDT debt is zero.
 
+## Exact-head evidence metadata defect and repair
+
+The first successful IIC-003 enforcement artifact correctly reported zero NDT findings, four NFS candidates, and zero blocking findings, but its JSON still contained the historical field `lane: IIC-002` inherited from the multi-control refactor. The control behavior was correct, but the artifact metadata overstated stale lane identity.
+
+The branch was not accepted in that state. The engine evidence identity was changed to stable, lane-neutral metadata:
+
+- `lane: IIC`;
+- `component: implementation-integrity`.
+
+The engine docstring was also made increment-neutral, and the regression suite now asserts both metadata fields. NDT/NFS fingerprint identity was not changed. Local engine, enforcement, contract, and compile checks were rerun successfully after the repair. Fresh exact-head CI is required after this change.
+
 ## Known boundary
 
 GitHub branch metadata reports `protected: false` and required status-check enforcement off for `main`. The repository-level setting is therefore not claimed as implemented. CoMind acceptance discipline and CI fail-closed behavior are implemented here; repository-administration hardening remains a separate boundary.

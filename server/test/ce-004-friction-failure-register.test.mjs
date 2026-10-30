@@ -34,6 +34,7 @@ function registerRow(overrides = {}) {
     pattern_key: 'provider-timeout',
     pattern_occurrence_count: 2,
     linked_improvement_count: 0,
+    pattern_linked_improvement_count: 0,
     open_action: true,
     improvement_review_recommended: true,
     ...overrides,

@@ -1,0 +1,102 @@
+name: CE-004 Friction and Failure Register
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/ce-004-friction-failure-register.yml'
+      - 'server/src/continuous-excellence/**'
+      - 'server/test/ce-004-friction-failure-register.test.mjs'
+      - 'db/migrations/20261030_021_ce_004_friction_failure_register.sql'
+      - 'db/migrations/verify_20261030_021_ce_004_friction_failure_register.sql'
+      - 'docs/architecture/ce-004-friction-failure-register.md'
+      - 'docs/provenance/2026-10-30-ce-004-friction-failure-register.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  database-register-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/comind_ci
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Build accepted CE substrate and CE-004 migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f db/test/ce_001_prerequisites.sql
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f db/migrations/20261029_007_ce_001_continuous_excellence_foundation.sql
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f db/migrations/20261029_008_ce_001_improvement_event_ordering.sql
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f db/migrations/20261030_021_ce_004_friction_failure_register.sql
+      - name: Prove append-only friction and failure register contract
+        run: psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f db/migrations/verify_20261030_021_ce_004_friction_failure_register.sql
+
+  deterministic-register-adapter:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+      - name: Use Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - name: Install exact dependencies
+        working-directory: server
+        run: npm ci
+      - name: Audit production dependencies
+        working-directory: server
+        run: npm audit --omit=dev --audit-level=high
+      - name: Build server
+        working-directory: server
+        run: npm run build
+      - name: Prove deterministic CE-004 adapter
+        working-directory: server
+        run: node --test test/ce-004-friction-failure-register.test.mjs
+      - name: Run server regression suite
+        working-directory: server
+        run: npm test

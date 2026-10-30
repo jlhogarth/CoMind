@@ -131,9 +131,9 @@ async function ensureGrant(capabilityId) {
   const active = (await query(`SELECT grant_id::text,scope,expires_at FROM comind.cm_foundry_capability_grant WHERE profile_id=$1::uuid AND capability_id=$2::uuid AND org_id=$3::uuid AND project_id=$4::uuid AND environment='isolated' AND revoked_at IS NULL AND expires_at>clock_timestamp() ORDER BY granted_at`, [SCOUT_PROFILE_ID, capabilityId, ORG_ID, PROJECT_ID])).rows;
   if (active.length > 1) throw new Error('Multiple active Scout research grants detected');
   if (active.length === 1) {
-    assert.deepEqual(active[0].scope?.target_refs, [TARGET_REF]); assert.equal(Number(active[0].scope?.max_tasks), 1); assert.equal(active[0].scope?.delegation_allowed, false); return active[0];
+    assert.deepEqual(Object.keys(active[0].scope ?? {}).sort(), ['max_tasks','target_refs']); assert.deepEqual(active[0].scope?.target_refs, [TARGET_REF]); assert.equal(Number(active[0].scope?.max_tasks), 1); return active[0];
   }
-  return one(`INSERT INTO comind.cm_foundry_capability_grant(profile_id,capability_id,org_id,project_id,environment,authority_ceiling,scope,granted_by_actor_id,grant_reason,expires_at) VALUES($1::uuid,$2::uuid,$3::uuid,$4::uuid,'isolated','C1',$5::jsonb,$6::uuid,'SCOUT-003 exact-target first-day grant',clock_timestamp()+interval '2 hours') RETURNING grant_id::text,scope,expires_at`, [SCOUT_PROFILE_ID, capabilityId, ORG_ID, PROJECT_ID, JSON.stringify({ target_refs:[TARGET_REF], max_tasks:1, delegation_allowed:false, assignment_id:'SCOUT-R001' }), FOUNDER_ACTOR_ID]);
+  return one(`INSERT INTO comind.cm_foundry_capability_grant(profile_id,capability_id,org_id,project_id,environment,authority_ceiling,scope,granted_by_actor_id,grant_reason,expires_at) VALUES($1::uuid,$2::uuid,$3::uuid,$4::uuid,'isolated','C1',$5::jsonb,$6::uuid,'SCOUT-003 exact-target one-task first-day grant; SCOUT-R001; delegation prohibited by governing manifest',clock_timestamp()+interval '2 hours') RETURNING grant_id::text,scope,expires_at`, [SCOUT_PROFILE_ID, capabilityId, ORG_ID, PROJECT_ID, JSON.stringify({ target_refs:[TARGET_REF], max_tasks:1 }), FOUNDER_ACTOR_ID]);
 }
 
 async function workAuthorization(capabilityId, taskId, reason) {

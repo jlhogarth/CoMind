@@ -5,6 +5,7 @@ import {
   activityAttentionCandidates,
   continuousExcellenceAttentionCandidates,
   rankNowCandidates,
+  type NowCandidate,
   type NowSnapshot,
   type NowSourceStatus,
 } from "@/lib/home/now-model";
@@ -46,7 +47,7 @@ export async function composeNowSnapshot(
     readers.readContinuousExcellence(),
   ]);
 
-  const candidates = [];
+  const candidates: NowCandidate[] = [];
   const sources: NowSourceStatus[] = [];
 
   if (activityResult.status === "fulfilled") {

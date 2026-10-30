@@ -2,6 +2,7 @@
 
 Date: 2026-10-30
 Issue: #378
+Pull request: #386
 Branch: `ger-001-governed-epistemic-reasoning-foundation`
 Base main: `9579814e6e86af8af78a7e604d23ab3d8406baad`
 Environment: Test-first
@@ -134,6 +135,8 @@ No partial row from either failed transaction survived.
 
 Each successor is intentionally separate so persistence, reasoning orchestration, Agent authority, Digital Twin inference, Console operations, historical reconciliation, and adversarial evaluation can be accepted independently under one issue = one branch = one PR.
 
-## Acceptance status at this evidence revision
+## Pull-request acceptance boundary
 
-Implemented foundation artifacts are present on the GER branch. Exact-head CI evidence and pull-request review state are recorded in a later revision of this same provenance record once those GitHub objects exist.
+PR #386 is the GER-001 acceptance surface. It was opened against `main` after a compare proved exactly five GER files, five commits ahead, and zero commits behind. The PR must not be accepted or merged unless its final exact head passes GER-specific CI and existing regression/integrity checks and a final freshness review shows that neighboring work has not invalidated the recovered boundary.
+
+Exact-head CI results are preserved through GitHub workflow evidence and the GER-001 RunBook/evidence records. A CI result tied to an earlier head does not prove a later head.

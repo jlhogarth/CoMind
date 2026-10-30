@@ -63,32 +63,130 @@ For a successful transition, acceptance requires:
 
 ## Issue #369 bootstrap proof
 
-The synthetic fixture remains provider-free and uses profile:
+Synthetic profile:
 
 `57a3f546-2e01-4499-b677-fc59b9ad5412`
 
-The negative proof uses expired decision:
+Expired authorization decision:
 
 `9867a158-5bcf-4485-813d-ed9ca9682891`
 
-Expected result:
+Fresh bounded authorization decision:
 
-`authorization_expired`, profile remains `draft`, zero lifecycle audit mutation.
+`97205bf1-20b6-4da6-adc6-aeb2bba14819`
 
-The positive proof uses the separately minted bounded authorization decision recorded in the issue #369 acceptance test. Expected result:
+Fresh authorization request:
 
-`draft -> active`, coordinator status `succeeded`, one `ve.lifecycle.started` event and one `ve.lifecycle.completed` event, with exact authorization and idempotency provenance.
+`c03fa3d3-54d4-4927-807f-11cf62b70b12`
 
-The acceptance script is replay-safe. Once the synthetic profile is active, a rerun verifies the unique accepted terminal audit instead of minting authority or attempting a second activation.
+Fresh authorization effective until:
+
+`2026-10-30T11:59:22.444Z`
+
+### Negative proof
+
+Candidate head that performed the proof:
+
+`e23134432dca9a7e326d2efdc80303810a3e1aaf`
+
+GitHub Actions run:
+
+`41041278063`
+
+Result:
+
+- expected error: `authorization_expired`;
+- actual error: `authorization_expired`;
+- profile before: `draft`;
+- profile after: `draft`;
+- lifecycle audits before: `0`;
+- lifecycle audits after: `0`;
+- external provider resources: `0`.
+
+This proves the coordinator rejected the expired authorization before lifecycle mutation or audit-start evidence.
+
+### Positive proof
+
+Coordinator operation:
+
+`9a2103d1-0f78-4081-8e43-bc98df78b931`
+
+Idempotency key:
+
+`ve-life-002-issue369-synthetic-activate-v1`
+
+Result:
+
+- coordinator status: `succeeded`;
+- transition: `draft -> active`;
+- activated at: `2026-10-30T10:31:13.375365Z`;
+- provider reconciliation steps: none;
+- external provider resources: `0`.
+
+Durable audit evidence:
+
+- started audit: `d2ffd8d9-ee2f-43cc-9071-9598f71791f0`;
+- completed audit: `86d5bbec-b2d4-464e-8ed1-7d0fb7a698ed`;
+- both carry idempotency key `ve-life-002-issue369-synthetic-activate-v1`;
+- both carry authorization decision `97205bf1-20b6-4da6-adc6-aeb2bba14819`.
+
+Independent Test database readback confirmed exactly two lifecycle audit events for the profile, `ve.lifecycle.started` followed by `ve.lifecycle.completed`, and confirmed the profile is `active`.
+
+### Workflow artifact
+
+Artifact ID:
+
+`12969574699`
+
+Artifact name:
+
+`ve-life-002-issue369-evidence-41041278063`
+
+Artifact digest:
+
+`sha256:a4ce58af810a340a945bee8cbd17dcd72eda1d0c43633eba321f265f027c066b`
+
+Artifact outcome:
+
+`negative_and_positive_proofs_passed`
+
+The workflow artifact is retained for 30 days. Repository provenance and durable database audit evidence remain authoritative after artifact expiry.
+
+## Replay behavior
+
+The issue #369 acceptance script is replay-safe. Once the synthetic profile is active, a rerun does not attempt a second activation and does not mint authority. It verifies the unique terminal audit for the accepted idempotency key and records `replay_verified` evidence.
 
 ## Reuse for Scout and future VEs
 
-After merge, the `VE Lifecycle Test Acceptance` workflow exposes `workflow_dispatch` inputs for any future provider-free Test VE lifecycle proof. The caller must supply an already-issued authorization decision.
+After merge, the `VE Lifecycle Test Acceptance` workflow exposes `workflow_dispatch` inputs for future provider-free Test VE lifecycle proofs. The caller must supply an already-issued authorization decision.
 
 Provider-specific lifecycle testing is intentionally separate. Scout's later Google Workspace test will require a Google lifecycle adapter and its own explicit provider acceptance boundary rather than weakening this provider-free harness.
 
-## Evidence
+## Acceptance status
 
-Each live execution writes a machine-readable JSON artifact containing the authorization snapshot, before/after lifecycle state, coordinator result or governed error, terminal audit evidence, and explicit boundary statements. GitHub Actions retains the artifact for 30 days.
+The candidate that performed the first live proof passed:
 
-Repository provenance plus durable database audit evidence remain authoritative after the transient workflow artifact expires.
+- exact-head lifecycle harness contract;
+- dependency audit;
+- TypeScript build;
+- harness syntax checks;
+- existing lifecycle coordinator tests;
+- live expired-authorization negative proof;
+- live fresh-authorization positive proof;
+- machine-readable artifact preservation;
+- independent Test database readback;
+- Implementation Integrity;
+- Integrity Governance;
+- No Placeholder Policy;
+- Foundry Runtime Orchestration;
+- Foundry Work Lease Kernel;
+- Governed Provider Execution;
+- Runtime Budget Authority Adapter;
+- Live Foundry LF-2 Readiness;
+- Live Foundry LF-3 Readiness;
+- Live Foundry Stage 1 Readiness;
+- CoMind Repository Configuration;
+- Lane Health Sentinel Observe;
+- DRB-002 Query Contract.
+
+Broad CI was still completing its devcontainer runtime job at the moment this evidence section was written. Final merge remains gated on exact-head CI and a final freshness/collision check.

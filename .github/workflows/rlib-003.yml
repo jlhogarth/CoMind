@@ -6,12 +6,14 @@ on:
       - rlib-003-ve-standards-learning-path
     paths:
       - '.github/workflows/rlib-003.yml'
+      - 'scripts/test_rlib_003_adversarial.sh'
       - 'db/sql/v2/**'
       - 'db/migrations/20261030_026_rlib_003_ve_standards_learning_path.sql'
       - 'db/migrations/verify_20261030_026_rlib_003_ve_standards_learning_path.sql'
   pull_request:
     paths:
       - '.github/workflows/rlib-003.yml'
+      - 'scripts/test_rlib_003_adversarial.sh'
       - 'db/sql/v2/**'
       - 'db/migrations/20261030_026_rlib_003_ve_standards_learning_path.sql'
       - 'db/migrations/verify_20261030_026_rlib_003_ve_standards_learning_path.sql'
@@ -122,3 +124,7 @@ jobs:
               (SELECT metadata->>'production_activation' FROM comind.cm_learning_path WHERE slug='virtual-employee-standards-v0-1');")"
           [[ "${state}" == "5|5|draft|false" ]]
           printf 'RLIB-003 isolated acceptance state: %s\n' "${state}"
+
+
+      - name: Reject incomplete evidence and destructive replay
+        run: bash scripts/test_rlib_003_adversarial.sh

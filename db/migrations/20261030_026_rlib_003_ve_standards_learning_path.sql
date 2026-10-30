@@ -2,6 +2,25 @@ BEGIN;
 
 SET search_path TO comind, public;
 
+-- Replays may not rewrite an activated or successor curriculum.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM comind.cm_learning_path
+    WHERE slug='virtual-employee-standards-v0-1'
+      AND (status IS DISTINCT FROM 'draft'
+        OR metadata->>'curriculum_version' IS DISTINCT FROM '0.1'
+        OR (metadata->>'governing_standard_state' IS DISTINCT FROM 'draft_dependency'
+          AND NOT (
+            metadata->>'governing_standard_state'='accepted_main'
+            AND metadata->>'governing_standard_commit'='ef1f4ebf6b37addc1ce7c1c1ea06839ba67ecfc8'
+          ) IS TRUE))
+  ) THEN
+    RAISE EXCEPTION 'RLIB-003 refuses to rewrite a changed curriculum or governing dependency';
+  END IF;
+END
+$$;
+
 -- RLIB-003 clean-bootstrap contract:
 -- seed only governed metadata and verified fingerprints for the five accepted
 -- RLIB-001 corpus records. Google Drive remains the document store. No PDF
@@ -207,7 +226,7 @@ ON CONFLICT (drive_file_id) WHERE drive_file_id IS NOT NULL DO UPDATE SET
     WHEN cardinality(existing.related_capabilities)=0 THEN EXCLUDED.related_capabilities
     ELSE existing.related_capabilities
   END,
-  metadata = COALESCE(existing.metadata,'{}'::jsonb) || EXCLUDED.metadata,
+  metadata = EXCLUDED.metadata || COALESCE(existing.metadata,'{}'::jsonb),
   updated_at = now();
 
 -- Fail closed if a Drive identity already exists with bytes that disagree with
@@ -218,13 +237,13 @@ DECLARE
 BEGIN
   SELECT count(*) INTO v_conflicts
   FROM comind.cm_research_refs
-  WHERE (drive_file_id,content_sha256) NOT IN (
+  WHERE (content_sha256 IS NULL OR (drive_file_id,content_sha256) NOT IN (
     ('1p5hU1sYu7UbZdmX7Gsu2FI818DWH0dJx','7576edb531d9848825814ee88e28b1795d3a84b435b4b797d3670eafdc4a89f1'::char(64)),
     ('1fZ4349LhmIovoxoz20tpAbgjlXmX479T','65d6101d806502875aadb0fd19a75c3a9cc9a5e9461129e9398a39192d8202d2'::char(64)),
     ('1-uL8611hNAkgu18wjbvMpkuaQRvKCjB6','6e73620ab6b64e90ef2c04bf0e0d6246185a2f4b1b13cab0df494496cff89b6a'::char(64)),
     ('1YV8Jt7JbbAu_jzhVHWezOkeGfI8jsgxx','b9d6a9b777409415316bc6006a5bec112891844b2b57dc1eb425024ea0acbd66'::char(64)),
     ('19Cksd5HogXnQepDZCayPNURCmspGSBfO','ddb7a400c1c03fe4430e34e5a827d0c3699ebea5cb39d6664df9ff83fd6726ee'::char(64))
-  )
+  ))
   AND drive_file_id IN (
     '1p5hU1sYu7UbZdmX7Gsu2FI818DWH0dJx',
     '1fZ4349LhmIovoxoz20tpAbgjlXmX479T',
@@ -284,8 +303,9 @@ INSERT INTO comind.cm_learning_path AS existing_path(
     'governing_issue','https://github.com/jlhogarth/CoMind/issues/376',
     'governing_standard_candidate','VE-STD-001',
     'governing_standard_pr','https://github.com/jlhogarth/CoMind/pull/355',
-    'governing_standard_state','draft_dependency',
-    'activation_rule','Do not activate until the governing VE standard is accepted on main and required Research Library sources pass freshness/currentness checks.',
+    'governing_standard_state','accepted_main',
+    'governing_standard_commit','ef1f4ebf6b37addc1ce7c1c1ea06839ba67ecfc8',
+    'activation_rule','Remain draft until a separate governed activation decision and fresh source/currentness verification. Standard acceptance alone does not activate the curriculum.',
     'production_activation',false,
     'curriculum_version','0.1',
     'bootstrap_mode','canonical metadata references only; no document bytes'
@@ -331,9 +351,13 @@ BEGIN
   FROM comind.cm_research_refs
   WHERE drive_file_id='19Cksd5HogXnQepDZCayPNURCmspGSBfO';
 
-  DELETE FROM comind.cm_learning_path_item
-  WHERE path_id=v_path_id
-    AND ref_id NOT IN (v_ai_rmf,v_playbook,v_gai_final,v_iso_guide,v_gai_draft);
+  IF EXISTS (
+    SELECT 1 FROM comind.cm_learning_path_item
+    WHERE path_id=v_path_id
+      AND ref_id NOT IN (v_ai_rmf,v_playbook,v_gai_final,v_iso_guide,v_gai_draft)
+  ) THEN
+    RAISE EXCEPTION 'RLIB-003 refuses to delete additional curriculum items';
+  END IF;
 
   INSERT INTO comind.cm_learning_path_item(
     path_id,ref_id,sequence_no,section_title,rationale,required,learning_objectives,metadata

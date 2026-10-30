@@ -19,16 +19,21 @@ BEGIN
   FROM comind.cm_learning_path
   WHERE slug='virtual-employee-standards-v0-1';
 
-  IF v_status <> 'draft' THEN
-    RAISE EXCEPTION 'RLIB-003 learning path must remain draft until VE-STD-001 is accepted; status=%',v_status;
+  IF v_status IS DISTINCT FROM 'draft' THEN
+    RAISE EXCEPTION 'RLIB-003 learning path must remain draft until separately authorized activation; status=%',v_status;
   END IF;
 
   IF v_production IS DISTINCT FROM 'false' THEN
     RAISE EXCEPTION 'RLIB-003 Production boundary drifted: production_activation=%',v_production;
   END IF;
 
-  IF v_dependency_state IS DISTINCT FROM 'draft_dependency' THEN
-    RAISE EXCEPTION 'RLIB-003 governing VE standard dependency is not explicitly draft: %',v_dependency_state;
+  IF v_dependency_state IS DISTINCT FROM 'accepted_main' THEN
+    RAISE EXCEPTION 'RLIB-003 governing VE standard dependency is not accepted: %',v_dependency_state;
+  END IF;
+
+  IF (SELECT metadata->>'governing_standard_commit' FROM comind.cm_learning_path WHERE path_id=v_path_id)
+      IS DISTINCT FROM 'ef1f4ebf6b37addc1ce7c1c1ea06839ba67ecfc8' THEN
+    RAISE EXCEPTION 'RLIB-003 governing standard commit is not the accepted VE-STD-001 merge';
   END IF;
 
   SELECT count(*) INTO v_seed_count
@@ -47,13 +52,13 @@ BEGIN
 
   SELECT count(*) INTO v_bad_fingerprint
   FROM comind.cm_research_refs
-  WHERE (drive_file_id,content_sha256) NOT IN (
+  WHERE (content_sha256 IS NULL OR fingerprint_algorithm IS DISTINCT FROM 'sha256:raw-bytes' OR (drive_file_id,content_sha256) NOT IN (
     ('1p5hU1sYu7UbZdmX7Gsu2FI818DWH0dJx','7576edb531d9848825814ee88e28b1795d3a84b435b4b797d3670eafdc4a89f1'::char(64)),
     ('1fZ4349LhmIovoxoz20tpAbgjlXmX479T','65d6101d806502875aadb0fd19a75c3a9cc9a5e9461129e9398a39192d8202d2'::char(64)),
     ('1-uL8611hNAkgu18wjbvMpkuaQRvKCjB6','6e73620ab6b64e90ef2c04bf0e0d6246185a2f4b1b13cab0df494496cff89b6a'::char(64)),
     ('1YV8Jt7JbbAu_jzhVHWezOkeGfI8jsgxx','b9d6a9b777409415316bc6006a5bec112891844b2b57dc1eb425024ea0acbd66'::char(64)),
     ('19Cksd5HogXnQepDZCayPNURCmspGSBfO','ddb7a400c1c03fe4430e34e5a827d0c3699ebea5cb39d6664df9ff83fd6726ee'::char(64))
-  )
+  ))
   AND drive_file_id IN (
     '1p5hU1sYu7UbZdmX7Gsu2FI818DWH0dJx',
     '1fZ4349LhmIovoxoz20tpAbgjlXmX479T',
@@ -88,11 +93,11 @@ BEGIN
   WHERE i.path_id=v_path_id
     AND i.required=true
     AND (
-      r.authority_level <> 'primary_authoritative'
-      OR r.lifecycle_status <> 'current'
+      r.authority_level IS DISTINCT FROM 'primary_authoritative'
+      OR r.lifecycle_status IS DISTINCT FROM 'current'
       OR r.content_sha256 IS NULL
-      OR r.fingerprint_algorithm <> 'sha256:raw-bytes'
-      OR (r.freshness_due_at IS NOT NULL AND r.freshness_due_at < now())
+      OR r.fingerprint_algorithm IS DISTINCT FROM 'sha256:raw-bytes'
+      OR (r.freshness_due_at IS NULL OR r.freshness_due_at < now())
     );
 
   IF v_bad_required <> 0 THEN
@@ -104,13 +109,13 @@ BEGIN
   JOIN comind.cm_research_refs r ON r.ref_id=i.ref_id
   WHERE i.path_id=v_path_id
     AND r.drive_file_id='1YV8Jt7JbbAu_jzhVHWezOkeGfI8jsgxx'
-    AND NOT (
+    AND (
       i.required=false
       AND r.authority_level='secondary_guidance'
       AND r.lifecycle_status='candidate'
       AND i.metadata->>'source_expectation'='secondary guidance, non-normative'
       AND r.metadata->>'authority_note'='secondary guidance, not ISO normative text'
-    );
+    ) IS NOT TRUE;
 
   IF v_bad_guidance <> 0 THEN
     RAISE EXCEPTION 'RLIB-003 secondary ISO-related guidance classification drifted';
@@ -122,13 +127,13 @@ BEGIN
   LEFT JOIN comind.cm_research_refs final ON final.ref_id=draft.superseded_by_ref_id
   WHERE i.path_id=v_path_id
     AND draft.drive_file_id='19Cksd5HogXnQepDZCayPNURCmspGSBfO'
-    AND NOT (
+    AND (
       i.required=false
       AND draft.lifecycle_status='withdrawn'
       AND draft.superseded_by_ref_id IS NOT NULL
       AND final.drive_file_id='1-uL8611hNAkgu18wjbvMpkuaQRvKCjB6'
       AND final.lifecycle_status='current'
-    );
+    ) IS NOT TRUE;
 
   IF v_bad_history <> 0 THEN
     RAISE EXCEPTION 'RLIB-003 supersession literacy source drifted';

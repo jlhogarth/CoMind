@@ -21,9 +21,14 @@ const { MdoOrchestrator } = await import('../../dist/mdo-orchestrator.js');
 const { MdoPlanningWorker, createMdoFoundryAdapter } = await import('../../dist/mdo-planning-runtime.js');
 const { createLocalOllamaFoundryAdapter } = await import('../../dist/providers/ollama-foundry-adapter.js');
 
-const pool = new Pool({ connectionString: databaseUrl, max: 1 });
+// Keep the pool idle timeout deliberately short. The rollback-only pilot must
+// remain correct because it owns one checked-out client for the whole fixture,
+// not because a pooled client happens to survive a slow local inference call.
+const pool = new Pool({ connectionString: databaseUrl, max: 1, idleTimeoutMillis: 1_000 });
+let transactionClient = null;
 async function query(sql, params = []) {
-  const result = await pool.query(sql, params);
+  const runner = transactionClient ?? pool;
+  const result = await runner.query(sql, params);
   return { rows: result.rows };
 }
 async function one(sql, params = []) {
@@ -174,7 +179,9 @@ async function authorizeClaim(profile, claim, projectId, planId, founderActorId)
 }
 
 test('MDO-002 executes the complete ten-role phase chain through local Ollama with rollback-only state', async () => {
-  await pool.query('BEGIN');
+  const client = await pool.connect();
+  transactionClient = client;
+  await client.query('BEGIN');
   const suffix = randomUUID().replaceAll('-', '').slice(0, 16);
   try {
     const org = await one(
@@ -417,7 +424,12 @@ test('MDO-002 executes the complete ten-role phase chain through local Ollama wi
     };
     writeEvidence(evidence);
   } finally {
-    await pool.query('ROLLBACK');
+    try {
+      await client.query('ROLLBACK');
+    } finally {
+      transactionClient = null;
+      client.release();
+    }
   }
 });
 

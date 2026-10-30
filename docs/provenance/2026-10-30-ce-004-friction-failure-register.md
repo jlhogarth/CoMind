@@ -12,21 +12,11 @@ No pre-existing CE-004 issue, branch, pull request, canonical task, RunBook item
 
 The existing CE substrate already contained real friction/failure evidence, including historical CE-001 and CE-002 failures. CE-004 therefore addresses an observed lifecycle gap rather than creating a speculative subsystem.
 
-The accepted CE architecture already supported:
-
-- immutable `cm_ce_signal` observations;
-- evidence links;
-- improvement records/events;
-- signal-to-improvement relationships;
-- signal backlog projection.
-
-It did not provide an authoritative signal disposition history for triage, diagnosis, deferral, resolution, no-action closure, reopening, recurrence risk, ownership, or explicit pattern identity.
+The accepted CE architecture already supported immutable `cm_ce_signal` observations, evidence links, improvement records/events, signal-to-improvement relationships, and signal backlog projection. It did not provide an authoritative signal disposition history for triage, diagnosis, deferral, resolution, no-action closure, reopening, recurrence risk, ownership, or explicit pattern identity.
 
 ## Reuse and collision review
 
-Active lanes were inspected before branch creation.
-
-No active lane owned the selected CE-004 paths or friction/failure signal lifecycle semantics.
+Active lanes were inspected before branch creation. No active lane owned the selected CE-004 paths or friction/failure signal lifecycle semantics. CE-004 reuses CE-001, CE-002, CE-003, RunBook, canonical project/task identity, canonical evidence, and existing CE improvement linkage.
 
 Relevant boundaries:
 
@@ -36,272 +26,73 @@ Relevant boundaries:
 - Home/Watchtower consume CE attention projections but do not own CE signal lifecycle truth.
 - MDO owns module-development orchestration.
 
-CE-004 reuses CE-001, CE-002, CE-003, RunBook, canonical project/task identity, canonical evidence, and existing CE improvement linkage.
-
-## Freshness lease
-
-Immediately before branch creation, authoritative `main` was verified at:
-
-`61ea87316aa5fd0aa702e530c4ba34aed3c61896`
-
-Commit: `Merge HOME-002 governed Now read model`
-
-The branch was created from that exact SHA.
-
 ## Durable lane registration
 
-Issue:
+Issue: https://github.com/jlhogarth/CoMind/issues/372
 
-https://github.com/jlhogarth/CoMind/issues/372
+Canonical task: `e9a0ca84-d793-4711-b659-e8a898ba9ede`
 
-Canonical task:
+RunBook work item: `0d5b15a1-db5b-4e5e-99ac-e9a5a6766719`
 
-`e9a0ca84-d793-4711-b659-e8a898ba9ede`
+Continuity Capsule v1: `b2d091f8-bde0-4539-a463-4289866e80c8`
 
-RunBook work item:
+Lane registration evidence: `a9c46bb5-c2aa-4bc4-9575-2430c64ef5e1`
 
-`0d5b15a1-db5b-4e5e-99ac-e9a5a6766719`
+The first durable-registration transaction used noncanonical RunBook actor type `assistant`. PostgreSQL rejected it atomically. Readback verified zero partial CE-004 task, RunBook, Capsule, or issue-evidence state. Registration was replayed with canonical `actor_type='agent'` without weakening the RunBook constraint.
 
-Continuity Capsule v1:
+## Test-first implementation
 
-`b2d091f8-bde0-4539-a463-4289866e80c8`
+The acceptance verifier and focused server test were committed before implementation. CE-004 then added the append-only `comind.cm_ce_signal_event` lifecycle, the constrained `record_ce_signal_event(...)` writer, private `v_ce_friction_failure_register`, and deterministic server adapter.
 
-Lane registration evidence:
+Lifecycle safety includes serialized per-signal transition evaluation, first-event triage, legal transition enforcement, recurrence-risk snapshots on every persisted event, terminal provenance, no-action disposition reason, explicit reopen from terminal states, exact idempotent replay, and conflicting replay rejection.
 
-`a9c46bb5-c2aa-4bc4-9575-2430c64ef5e1`
+Recurrence is explicit only. Similar prose is never treated as recurrence unless a reviewed caller supplies the same `pattern_key`.
 
-## Registration failure preserved
+The original `cm_ce_signal` remains immutable observation truth. Existing `comind.v_ce_signal_backlog` semantics remain unchanged.
 
-The first durable-registration transaction used `assistant` as the RunBook `actor_type`.
+## Preserved pre-acceptance failures
 
-The live RunBook constraint accepts only:
+Self-review found that an initial synthetic register-row fixture omitted `pattern_linked_improvement_count`. The fixture was corrected without changing runtime semantics.
 
-- `human`
-- `agent`
-- `system`
-- `connector`
-
-PostgreSQL rejected the transaction before commit. A readback verified zero CE-004 task rows, RunBook rows, Capsules, and issue-evidence rows survived.
-
-The registration was replayed with canonical `actor_type='agent'` and succeeded without weakening the RunBook constraint.
-
-## Test-first sequence
-
-The acceptance proofs were committed before the implementation files.
-
-First:
-
-- `db/migrations/verify_20261030_021_ce_004_friction_failure_register.sql`
-- `server/test/ce-004-friction-failure-register.test.mjs`
-
-Then implementation:
-
-- `db/migrations/20261030_021_ce_004_friction_failure_register.sql`
-- `server/src/continuous-excellence/friction-failure.ts`
-
-Then:
-
-- `.github/workflows/ce-004-friction-failure-register.yml`
-- `docs/architecture/ce-004-friction-failure-register.md`
-- this provenance record
-
-The migration sequence was inspected before naming. Existing `20261030_020` was present, so CE-004 uses the next unused slot `20261030_021` rather than assuming an older CE-local sequence.
-
-## Pre-acceptance self-review repair
-
-Initial candidate:
-
-`8b9f5081fa2226ffd4501f360a0ae95f2d392bb5`
-
-Before queued Actions runners reached the focused server test, self-review found that the synthetic register-row fixture omitted the projection field `pattern_linked_improvement_count` even though the adapter intentionally requires and validates that column.
-
-The implementation contract was correct. The test fixture was incomplete.
-
-The fixture was corrected without changing the adapter or database contract. Corrected candidate:
-
-`c0a909d4aed43bdcfa103687571197938e84492e`
-
-All acceptance claims for the earlier candidate were discarded.
-
-## First exact-head PostgreSQL verifier failure
-
-Dedicated CE-004 run:
-
-`41044632350`
-
-Database job:
-
-`124025604066`
-
-The following steps passed on exact head `c0a909d4aed43bdcfa103687571197938e84492e`:
-
-- exact-head checkout and verification;
-- PostgreSQL 17 startup;
-- CE-001 prerequisite build;
-- CE-001 foundation migration;
-- CE-001 improvement ordering migration;
-- CE-004 migration build.
-
-The database acceptance verifier then failed with:
-
-`CE-004 recurrence risk is required and must be valid`
-
-The failing synthetic call attempted a valid `diagnosed` lifecycle transition with recurrence risk `NULL`.
-
-That contradicted the intentional CE-004 classification contract: every persisted lifecycle event carries the complete current classification snapshot, including non-null recurrence risk. The schema was enforcing the intended rule.
-
-The server-side exact-head job independently passed:
-
-- production dependency audit;
-- TypeScript build;
-- focused CE-004 adapter tests;
-- full server regression suite.
-
-The failure was therefore classified as a verifier-fixture defect, not an implementation defect.
-
-Durable CE failure signal:
-
-`5e7cf502-79df-4b3c-8628-f6e9d44ffe0b`
-
-Failure Continuity Capsule v3:
-
-`a4b69a8a-6f5e-4d4a-9431-33f7c337bfee`
-
-State:
-
-`partial / verified`
-
-The repair changed only the valid diagnosed verifier fixture from recurrence risk `NULL` to the already-established `moderate` classification. The migration and server adapter were not weakened.
-
-Repair commit:
-
-`a073bcd72b60c9c0db466cfba66351d9703176c4`
+Dedicated exact-head PostgreSQL verification later failed because a valid `diagnosed` verifier fixture passed recurrence risk `NULL`. The schema correctly rejected it. The failure was preserved as CE signal `5e7cf502-79df-4b3c-8628-f6e9d44ffe0b`. Only the verifier fixture was repaired to retain the established `moderate` recurrence-risk snapshot. The migration and server adapter were not weakened.
 
 ## DRULE-005 reconciliation
 
-While CE-004 acceptance was running, DRULE-005 merged to `main` as:
-
-`ca6e64179fd60ccdc54087af01abd8b5a4014e16`
-
-DRULE-005 changed eight RuleBook/MDO/Foundry files. Its paths were inspected and were disjoint from CE-004's seven files. Its authority contract is compatible with CE-004: RuleBook remains the operational authority substrate for its owned execution paths, while CE-004 records the lifecycle of CE friction/failure observations.
-
-CE-004 was reconciled on the same branch with both histories preserved. Reconciliation commit:
-
-`6005ab3ca275ee21d12bad72496398f32f2300af`
-
-Post-reconciliation compare against `ca6e64179fd60ccdc54087af01abd8b5a4014e16` was zero commits behind and exactly seven additive CE-004 files.
-
-The pre-reconciliation green matrix remains predecessor evidence only. Final acceptance must run on a head containing this reconciliation.
+DRULE-005 merged while CE-004 acceptance was running. CE-004 was reconciled onto main with both histories preserved. DRULE-005 paths were disjoint from CE-004 and its authority contract remained compatible: RuleBook owns operational authority for its execution paths while CE-004 owns friction/failure signal lifecycle state.
 
 ## Supabase Test proof
 
-Migration `20261030_021_ce_004_friction_failure_register` was applied to canonical CoMind Supabase Test only.
+CE-004 was applied and verified in canonical CoMind Supabase Test only. Historical CE failure signals projected as `untriaged` without historical mutation. The event table retained zero rows after migration until explicit lifecycle writes. `service_role` had constrained writer execution but no direct event INSERT, UPDATE, or DELETE authority. A rollback-only proof exercised an existing CE-002 failure through the constrained path and left zero durable lifecycle events afterward.
 
-Readback proved:
+Supabase migration history records the logical migration name `ce_004_friction_failure_register`; Production was not migrated or activated.
 
-- seven real historical CE failure signals projected into the register;
-- all seven remained `untriaged` without historical mutation;
-- lifecycle event count remained zero immediately after migration;
-- `service_role` had no direct INSERT/UPDATE/DELETE on the event table;
-- `service_role` had execution authority for the constrained lifecycle writer;
-- existing `v_ce_signal_backlog` remained intact.
+## Final merge-authorized freshness reconciliation
 
-A rollback-only Test proof used the existing CE-002 failure signal `73b23417-6fda-47ca-9133-47bffb7ebb8a` through the constrained service-role path. After rollback it was again `untriaged`, pattern key was null, and event count was zero.
+After Joseph explicitly authorized merge of PR #373, `main` had advanced by 36 commits from the previously accepted base to:
 
-Production was not migrated or activated.
+`35e156dab1a586e4103a727b843ab8bba09530c3`
 
-## Implementation decision
+The newer mainline includes GER-001, MDO-003, RLIB-002, and related accepted work. A full compare showed those changes were path-disjoint from CE-004's seven files.
 
-A new table is justified only for the missing append-only lifecycle history:
+A second collision scan found a migration-namespace conflict that path comparison alone could not detect: current main already contained `db/migrations/20261030_021_rlib_001_governed_research_library.sql`, while CE-004 also used the `_021` repository migration slot.
 
-`comind.cm_ce_signal_event`
+CE-004 was therefore not merged stale. The next unused repository migration slot, `_025`, was verified unused. The CE-004 migration and verifier were renamed to:
 
-The original `cm_ce_signal` remains immutable observation truth.
+- `db/migrations/20261030_025_ce_004_friction_failure_register.sql`
+- `db/migrations/verify_20261030_025_ce_004_friction_failure_register.sql`
 
-Each CE-004 event stores the current classification snapshot for:
+The migration SQL and verifier semantics were unchanged. The CE-004 workflow was updated to execute the `_025` paths. The branch was reconstructed on current main with both histories preserved in reconciliation commit:
 
-- owner;
-- recurrence risk;
-- optional explicit pattern key.
+`f0380e614087c8e1b05810ccd3e8d3acea583364`
 
-This choice avoids hidden inheritance semantics. A later event can explicitly change or clear a classification without modifying old events.
+Post-reconciliation compare proved:
 
-## Lifecycle safety
+- behind current main: 0
+- changed files: exactly 7
+- deletions: 0
+- no inherited GER, RLIB, or MDO paths
+- no old CE-004 `_021` migration path
 
-The constrained writer:
+This late migration collision and its repair invalidate the older exact-head acceptance as merge authority. The reconciled head and any subsequent documentation-only head must pass exact-head acceptance again before merge.
 
-- accepts friction/failure signals only;
-- serializes concurrent transition evaluation with a per-signal transaction advisory lock;
-- requires triage as the first lifecycle event;
-- validates a legal transition matrix;
-- requires recurrence risk on every persisted lifecycle event;
-- requires source provenance for terminal disposition;
-- requires `details.disposition_reason` for `closed_no_action`;
-- permits terminal re-entry only through explicit `reopened`;
-- supports exact idempotent replay;
-- rejects conflicting reuse of an idempotency key.
-
-## Recurrence policy
-
-CE-004 never groups signals from prose similarity.
-
-Only an explicit current `pattern_key` creates recurrence identity.
-
-The register derives pattern occurrence count and improvement-link coverage from that explicit key. A repeated material open pattern can recommend an improvement review, but CE-004 does not automatically create or approve an improvement.
-
-## Cross-lane protection
-
-`comind.v_ce_signal_backlog` is intentionally unchanged.
-
-HOME-001/HOME-002 and Watchtower already consume it as an attention projection. CE-004 adds the new private `v_ce_friction_failure_register` instead of silently changing accepted attention semantics.
-
-## Security posture
-
-The new event table is RLS enabled and forced.
-
-No browser/Data API role receives direct write privileges. `service_role` is limited to read access and execution of the constrained writer. Direct event INSERT/UPDATE/DELETE remains unavailable to `service_role`.
-
-## Acceptance evidence before final provenance wording correction
-
-Reconciled candidate `6005ab3ca275ee21d12bad72496398f32f2300af` passed:
-
-Dedicated CE-004 exact-head run `41045807589`:
-
-- PostgreSQL 17 substrate, migration, and full lifecycle verifier;
-- dependency audit, TypeScript build, focused adapter tests, and full server regression suite.
-
-Generic CI run `41045807680`:
-
-- ordinary server build/tests/audit;
-- devcontainer runtime;
-- real HTTP/PostgreSQL and browser reload persistence;
-- conversation lifecycle integration;
-- PM ledger migration;
-- Foundry agent substrate;
-- SDN Test ingestion;
-- FinOps budget authority.
-
-Additional reconciled-head workflows passed:
-
-- Repository Configuration;
-- Integrity Governance;
-- Implementation Integrity;
-- No Placeholder Policy;
-- Lane Health Sentinel;
-- CE-002 Recovery and Reorientation;
-- DRB-002 Query Contract;
-- Runtime Budget Authority;
-- Governed Provider Execution;
-- Foundry Work Lease Kernel;
-- Foundry Terminal Lifecycle;
-- Foundry Runtime Orchestration;
-- Live Foundry Stage 1, LF-2, and LF-3 readiness;
-- bounded Foundry Test one-shot local handoff.
-
-Current `main` remained `ca6e64179fd60ccdc54087af01abd8b5a4014e16` through that matrix.
-
-This provenance wording correction changes documentation only and therefore requires a final exact-head matrix before review readiness. It does not alter schema, runtime, tests, privileges, or Test database state.
-
-No Production migration has been applied. The CE-004 migration was applied only to canonical Supabase Test.
-No paid provider call has been made.
-No merge has been performed.
+Production remains unchanged. No paid provider call was made. Merge remains separately authorized by Joseph and will execute only after the fresh acceptance gates pass.

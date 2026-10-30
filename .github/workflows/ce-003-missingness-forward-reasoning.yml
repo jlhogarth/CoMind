@@ -1,0 +1,112 @@
+name: CE-003 Missingness and Forward Reasoning
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/ce-003-missingness-forward-reasoning.yml'
+      - 'server/src/continuous-excellence/missingness.ts'
+      - 'server/test/ce-003-missingness-forward-reasoning.test.mjs'
+      - 'server/test/integration/ce-003-missingness-persistence.e2e.mjs'
+      - 'db/test/ce_001_prerequisites.sql'
+      - 'db/migrations/20261029_007_ce_001_continuous_excellence_foundation.sql'
+      - 'docs/architecture/ce-003-missingness-forward-reasoning.md'
+      - 'docs/provenance/2026-10-30-ce-003-missingness-forward-reasoning.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deterministic-scan-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify exact checked-out head
+        working-directory: .
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+      - name: Use Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install exact dependencies
+        run: npm ci
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - name: Build server
+        run: npm run build
+      - name: Prove deterministic Missingness and Forward Reasoning contract
+        run: node --test test/ce-003-missingness-forward-reasoning.test.mjs
+      - name: Run server regression suite
+        run: npm test
+
+  ce-signal-persistence-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+      - name: Use Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+      - name: Build accepted CE-001 signal substrate
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/test/ce_001_prerequisites.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/migrations/20261029_007_ce_001_continuous_excellence_foundation.sql
+      - name: Install exact server dependencies
+        working-directory: server
+        run: npm ci
+      - name: Build server
+        working-directory: server
+        run: npm run build
+      - name: Prove CE-001 signal persistence and replay idempotency
+        working-directory: server
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+        run: node --test test/integration/ce-003-missingness-persistence.e2e.mjs

@@ -1,0 +1,262 @@
+{
+  "schema_version": 1,
+  "contract_id": "COMIND-HOME-IA-V1",
+  "issue": 363,
+  "base_sha": "162a1355d361ec7f2139035b89d0a7211862e69d",
+  "purpose": "Compose CoMind authoritative systems into one governed personal cognitive control plane without creating a competing source of truth.",
+  "governing_invariant": "CoMind Home may organize attention and route governed actions, but observable state must remain traceable to the authoritative owner system and must never exceed verified implementation reality.",
+  "home_owns": [
+    "presentation",
+    "navigation",
+    "attention_composition",
+    "bounded_projection",
+    "governed_action_routing"
+  ],
+  "home_must_not_own": [
+    "project_truth",
+    "virtual_employee_identity",
+    "decision_truth",
+    "approval_authority",
+    "evidence_truth",
+    "runbook_chronology",
+    "research_content_truth",
+    "learning_content_copies",
+    "monitoring_event_truth",
+    "reflection_truth",
+    "implementation_integrity_maturity"
+  ],
+  "global_rules": {
+    "browser_privileged_credentials": false,
+    "unknown_state": "unavailable_or_uncertain",
+    "write_policy": "route_to_owner_system",
+    "requested_authorized_executed_verified_distinct": true,
+    "source_native_identifiers_preserved": true,
+    "mobile_preserves_authority_semantics": true,
+    "home_persistent_store_allowed": false
+  },
+  "navigation": [
+    {"group_id": "attention", "label": "Now", "domains": ["now"]},
+    {"group_id": "work", "label": "Work", "domains": ["projects", "runbook"]},
+    {"group_id": "workforce", "label": "Workforce", "domains": ["virtual_employees"]},
+    {"group_id": "governance", "label": "Governance", "domains": ["decisions", "approvals", "evidence", "implementation_integrity"]},
+    {"group_id": "knowledge", "label": "Knowledge", "domains": ["research", "learning", "reflection"]},
+    {"group_id": "watch", "label": "Watch", "domains": ["watchtower"]}
+  ],
+  "utility_surfaces": [
+    {"id": "activity", "role": "operational_detail", "route": "/activity", "owner": "HUD-REAL-001"},
+    {"id": "rulebook", "role": "governance_detail", "route": "/rulebook", "owner": "DRULE-004"},
+    {"id": "continuous_excellence", "role": "improvement_detail", "route": "/continuous-excellence", "owner": "CE-001"},
+    {"id": "threadkeeper", "role": "continuity_utility", "route": "#threadkeeper", "owner": "ThreadKeeper"},
+    {"id": "workspace_mail", "role": "workspace_utility", "route": "#workspace-mail", "owner": "Workspace Mail"}
+  ],
+  "domains": [
+    {
+      "id": "now",
+      "label": "Now",
+      "source_mode": "composed",
+      "creates_store": false,
+      "projection_status": "contract_defined",
+      "authoritative_sources": [
+        {"ref": "comind_pm.v_operator_console_activity", "authority_role": "operational_projection"},
+        {"ref": "comind.v_ce_signal_backlog", "authority_role": "attention_projection"},
+        {"ref": "comind.cm_foundry_authorization_request", "authority_role": "approval_request_truth"},
+        {"ref": "public.comind_cost_alerts", "authority_role": "cost_alert_truth"},
+        {"ref": "comind.v_ce_current_continuity_capsule", "authority_role": "continuity_projection"}
+      ],
+      "projection_policy": "Rank bounded attention candidates without persisting a second attention ledger. Preserve each source identity, source state, authority state, and freshness.",
+      "freshness": "source_specific",
+      "coverage_limit": "Only registered attention sources participate. Absence from Now does not prove absence from the source system.",
+      "unavailable_semantics": "Unavailable source remains visibly unavailable and cannot be converted to zero attention items.",
+      "write_authority": "none_direct; actions route to the owning source system"
+    },
+    {
+      "id": "projects",
+      "label": "Projects",
+      "source_mode": "canonical_plus_operational_projection",
+      "creates_store": false,
+      "projection_status": "source_ready_projection_pending",
+      "authoritative_sources": [
+        {"ref": "comind.cm_project", "authority_role": "canonical_identity"},
+        {"ref": "comind_pm.pm_projects", "authority_role": "operational_projection", "join": "canonical_project_id"}
+      ],
+      "projection_policy": "Use cm_project for project identity and hierarchy. Use pm_projects only for operational RunBook state linked through canonical_project_id.",
+      "freshness": "canonical_and_operational_timestamps_separate",
+      "coverage_limit": "Operational PM rows may be absent for canonical projects that have no active RunBook projection.",
+      "unavailable_semantics": "Do not fabricate operational status for a canonical project with no PM projection.",
+      "write_authority": "project mutations route to canonical project owner; operational work mutations route to PM and RunBook owner"
+    },
+    {
+      "id": "virtual_employees",
+      "label": "Virtual Employees",
+      "source_mode": "canonical",
+      "creates_store": false,
+      "projection_status": "source_ready_projection_pending",
+      "authoritative_sources": [
+        {"ref": "comind.cm_foundry_agent_profile", "authority_role": "runtime_profile_truth"},
+        {"ref": "comind.cm_agent", "authority_role": "agent_identity"},
+        {"ref": "comind.cm_actor", "authority_role": "actor_identity"},
+        {"ref": "comind.cm_foundry_capability_grant", "authority_role": "capability_authority"},
+        {"ref": "server/src/ve-lifecycle-coordinator.ts", "authority_role": "lifecycle_command_boundary"}
+      ],
+      "projection_policy": "Render identity, lifecycle, authority ceiling, grants, activity, and resource references from Foundry and VE owner systems. No Home-local VE roster.",
+      "freshness": "lifecycle_and_grant_observation_time",
+      "coverage_limit": "A profile is not proof of current authorization for a consequential action.",
+      "unavailable_semantics": "Unknown lifecycle or authority fails closed and is shown as unknown.",
+      "write_authority": "VE lifecycle and capability changes route through governed VE and Foundry commands"
+    },
+    {
+      "id": "decisions",
+      "label": "Decisions",
+      "source_mode": "canonical_by_decision_type",
+      "creates_store": false,
+      "projection_status": "source_ready_projection_pending",
+      "authoritative_sources": [
+        {"ref": "comind_pm.pm_decision_records", "authority_role": "operational_work_decision_truth"},
+        {"ref": "comind.cm_decision_tree", "authority_role": "structured_decision_analysis"},
+        {"ref": "comind.cm_decision_node", "authority_role": "structured_decision_analysis"},
+        {"ref": "comind.cm_decision_edge", "authority_role": "structured_decision_analysis"}
+      ],
+      "projection_policy": "Present operational decisions and structured decision analyses with distinct provenance. Do not reinterpret authorization decisions as product or architecture decisions.",
+      "freshness": "decision_record_time",
+      "coverage_limit": "Not every discussion or recommendation is a decision record.",
+      "unavailable_semantics": "Missing decision evidence is not represented as approval or rejection.",
+      "write_authority": "decision recording routes to the owning decision system"
+    },
+    {
+      "id": "approvals",
+      "label": "Approvals",
+      "source_mode": "canonical",
+      "creates_store": false,
+      "projection_status": "source_ready_projection_pending",
+      "authoritative_sources": [
+        {"ref": "comind.cm_foundry_authorization_request", "authority_role": "authorization_request_truth"},
+        {"ref": "comind.cm_foundry_authorization_decision", "authority_role": "authorization_decision_truth"},
+        {"ref": "comind.cm_api_approval_link", "authority_role": "approval_link_truth"},
+        {"ref": "https://approvals.comindinc.com", "authority_role": "human_approval_surface"}
+      ],
+      "projection_policy": "Keep requested, authorized, expired, executed, and verified states separate. A visible request never implies approval or execution.",
+      "freshness": "authorization_expiry_aware",
+      "coverage_limit": "Home shows approval state but does not grant authority.",
+      "unavailable_semantics": "Unknown or unavailable authority is not authorized.",
+      "write_authority": "approval decisions route through the governed approval or authorization owner"
+    },
+    {
+      "id": "evidence",
+      "label": "Evidence",
+      "source_mode": "canonical_plus_native_refs",
+      "creates_store": false,
+      "projection_status": "source_ready_projection_pending",
+      "authoritative_sources": [
+        {"ref": "comind.cm_evidence", "authority_role": "canonical_evidence_identity"},
+        {"ref": "source-native evidence references", "authority_role": "native_provenance"}
+      ],
+      "projection_policy": "Index evidence identity and provenance while preserving native source references. Home may summarize but not replace source artifacts.",
+      "freshness": "evidence_timestamp_plus_separate_currentness",
+      "coverage_limit": "Evidence presence proves only what the evidence contract supports.",
+      "unavailable_semantics": "Unavailable evidence remains unavailable and cannot be replaced by narrative confidence.",
+      "write_authority": "evidence creation routes through existing evidence capture paths"
+    },
+    {
+      "id": "runbook",
+      "label": "RunBook",
+      "source_mode": "operational_projection",
+      "creates_store": false,
+      "projection_status": "existing_projection_ready",
+      "authoritative_sources": [
+        {"ref": "comind_pm.v_runbook_lane_state", "authority_role": "current_lane_projection"},
+        {"ref": "comind_pm.v_runbook_timeline", "authority_role": "operational_chronology_projection"},
+        {"ref": "comind_pm.v_runbook_authority", "authority_role": "authority_projection"},
+        {"ref": "comind_pm.v_runbook_verification", "authority_role": "verification_projection"}
+      ],
+      "projection_policy": "Reuse Durable RunBook views for chronology, lane state, authority, verification, and next action. Home does not copy RunBook events.",
+      "freshness": "latest_event_time",
+      "coverage_limit": "RunBook may lag external systems until reconciled.",
+      "unavailable_semantics": "Unavailable RunBook state is unknown, not completed.",
+      "write_authority": "RunBook writes use canonical append paths only"
+    },
+    {
+      "id": "research",
+      "label": "Research",
+      "source_mode": "canonical",
+      "creates_store": false,
+      "projection_status": "source_ready_projection_pending",
+      "authoritative_sources": [
+        {"ref": "comind.cm_research_refs", "authority_role": "research_reference_truth"},
+        {"ref": "Google Drive governed research collection", "authority_role": "document_artifact_truth"}
+      ],
+      "projection_policy": "Project RLIB metadata, authority, version, freshness, supersession, provenance, and artifact links. Do not copy document bodies into a Home store.",
+      "freshness": "last_verified_at_and_freshness_due_at",
+      "coverage_limit": "RLIB intake state is not canonical research until accepted by the RLIB owner workflow.",
+      "unavailable_semantics": "Unverified or inaccessible source remains visibly unverified or unavailable.",
+      "write_authority": "research intake and classification route to RLIB owner workflows"
+    },
+    {
+      "id": "learning",
+      "label": "Learning",
+      "source_mode": "reference_composition",
+      "creates_store": false,
+      "projection_status": "source_ready_projection_pending",
+      "authoritative_sources": [
+        {"ref": "comind.cm_learning_path", "authority_role": "learning_path_truth"},
+        {"ref": "comind.cm_learning_path_item", "authority_role": "learning_path_composition"},
+        {"ref": "comind.cm_research_refs", "authority_role": "referenced_research_truth"}
+      ],
+      "projection_policy": "Render ordered learning paths as references to governed Research Library records. Never duplicate research content into learning copies.",
+      "freshness": "inherits_research_freshness",
+      "coverage_limit": "Learning path membership does not upgrade research authority or freshness.",
+      "unavailable_semantics": "Unavailable referenced research is shown as unavailable in the path.",
+      "write_authority": "learning-path composition routes to the Learning and RLIB owner contract"
+    },
+    {
+      "id": "watchtower",
+      "label": "Watchtower",
+      "source_mode": "federated",
+      "creates_store": false,
+      "projection_status": "contract_defined",
+      "authoritative_sources": [
+        {"ref": "comind.v_ce_signal_backlog", "authority_role": "continuous_excellence_attention"},
+        {"ref": "public.comind_cost_alerts", "authority_role": "cost_alert_truth"},
+        {"ref": "GitHub Actions and Lane Health Sentinel", "authority_role": "repository_execution_observation"},
+        {"ref": "registered future monitor adapters", "authority_role": "bounded_future_extension"}
+      ],
+      "projection_policy": "Federate registered alert and monitoring sources into one attention surface. Preserve source identity and source lifecycle. Do not create a universal Watchtower event ledger.",
+      "freshness": "per_source",
+      "coverage_limit": "Watchtower covers only registered monitor adapters. It is not proof that every subsystem is healthy.",
+      "unavailable_semantics": "Unavailable monitor is degraded visibility, never healthy.",
+      "write_authority": "acknowledgement or remediation routes to the source monitor owner; Watchtower has no implicit remediation authority"
+    },
+    {
+      "id": "reflection",
+      "label": "Reflection",
+      "source_mode": "canonical",
+      "creates_store": false,
+      "projection_status": "source_ready_projection_pending",
+      "authoritative_sources": [
+        {"ref": "comind.cm_journal_entry", "authority_role": "journal_truth"},
+        {"ref": "comind.v_ce_current_continuity_capsule", "authority_role": "context_link_only"}
+      ],
+      "projection_policy": "Render authored journal and reflection entries from cm_journal_entry. CE continuity may provide context links, never silently become journal content or personal truth.",
+      "freshness": "authored_and_updated_time",
+      "coverage_limit": "No inference, trait, memory, or CE signal is promoted to Reflection without an explicit journal write through the owner path.",
+      "unavailable_semantics": "No journal entry means no recorded reflection, not a negative inference.",
+      "write_authority": "reflection writes route to the canonical journal owner with explicit authorship"
+    },
+    {
+      "id": "implementation_integrity",
+      "label": "Implementation Integrity",
+      "source_mode": "repository_plus_execution_evidence",
+      "creates_store": false,
+      "projection_status": "source_ready_projection_pending",
+      "authoritative_sources": [
+        {"ref": "config/integrity-registry.v1.json", "authority_role": "control_definition_and_maturity_truth"},
+        {"ref": "GitHub Actions exact-head checks", "authority_role": "current_execution_evidence"},
+        {"ref": "docs/integrity/", "authority_role": "control_rationale_and_contract"}
+      ],
+      "projection_policy": "Combine canonical registry definitions and maturity with exact execution evidence. Never infer ENFORCED or GOVERNED from a passing unrelated workflow.",
+      "freshness": "commit_bound",
+      "coverage_limit": "Repository controls do not by themselves establish Production runtime conformity.",
+      "unavailable_semantics": "Missing exact-head evidence is unverified, not passing.",
+      "write_authority": "integrity maturity changes remain owned by Implementation Integrity lanes"
+    }
+  ]
+}

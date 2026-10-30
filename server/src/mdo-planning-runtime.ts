@@ -182,7 +182,7 @@ function modelVisiblePriorContribution(value: unknown): Readonly<Record<string, 
     ? payload.narrative
     : payload === null
       ? ''
-      : JSON.stringify(payload);
+      : JSON.stringify(payload) ?? '';
   const content = excerpt(narrative, PRIOR_CONTENT_EXCERPT_CHARS);
   const evidenceRefs = Array.isArray(record.evidence_ids)
     ? record.evidence_ids

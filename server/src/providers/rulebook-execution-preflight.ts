@@ -188,14 +188,15 @@ function validateDecision(
   });
 }
 
-async function evaluate(
+export async function requireRulebookExecutionDecision(
   evaluator: RulebookExecutionPreflightEvaluator,
   controlKey: RulebookExecutionControlKey,
-  context: Readonly<Record<string, unknown>>
+  context: Readonly<Record<string, unknown>>,
+  record = true
 ): Promise<RulebookExecutionDecision> {
   let rawDecision: unknown;
   try {
-    rawDecision = await evaluator.evaluate(controlKey, context, true);
+    rawDecision = await evaluator.evaluate(controlKey, context, record);
   } catch (error) {
     if (error instanceof RulebookExecutionPreflightError) throw error;
     const detail = error instanceof Error ? error.message : String(error);
@@ -233,7 +234,7 @@ export async function runRequiredRulebookExecutionPreflight(
   const binding = validateBinding(input.binding);
   const decisions: RulebookExecutionDecision[] = [];
 
-  decisions.push(await evaluate(input.evaluator, 'DRULE-C11', Object.freeze({
+  decisions.push(await requireRulebookExecutionDecision(input.evaluator, 'DRULE-C11', Object.freeze({
     untrusted_input: governance.untrusted_input,
     asks_for_secrets: governance.asks_for_secrets,
     authority_escalation: governance.authority_escalation,
@@ -241,7 +242,7 @@ export async function runRequiredRulebookExecutionPreflight(
     human_approved: governance.human_approved,
   })));
 
-  decisions.push(await evaluate(input.evaluator, 'DRULE-C17', Object.freeze({
+  decisions.push(await requireRulebookExecutionDecision(input.evaluator, 'DRULE-C17', Object.freeze({
     source_tenant: governance.source_tenant,
     target_tenant: governance.target_tenant,
     source_project: governance.source_project,
@@ -249,7 +250,7 @@ export async function runRequiredRulebookExecutionPreflight(
     action: binding.action,
   })));
 
-  decisions.push(await evaluate(input.evaluator, 'DRULE-C13', Object.freeze({
+  decisions.push(await requireRulebookExecutionDecision(input.evaluator, 'DRULE-C13', Object.freeze({
     asset_key: governance.asset_key,
     destination_key: binding.destination_key,
     region: binding.region,

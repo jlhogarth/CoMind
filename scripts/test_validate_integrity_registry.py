@@ -48,7 +48,7 @@ class RegistryTests(unittest.TestCase):
 
     def test_defined_control_cannot_claim_detector(self) -> None:
         temp, root, registry = self.make_root(); self.addCleanup(temp.cleanup)
-        item = next(c for c in registry["defined_controls"] if c["control_id"] == "NMC-001")
+        item = next(c for c in registry["defined_controls"] if c["control_id"] == "NHC-001")
         item["detector"] = {"kind": "iic-engine", "paths": ["scripts/check_implementation_integrity.py"]}
         self.write_registry(root, registry)
         self.assertTrue(any("DEFINED-only control" in item for item in MODULE.validate(root)))

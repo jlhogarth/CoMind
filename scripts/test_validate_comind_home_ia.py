@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import copy
 import importlib.util
 import json
 import unittest
@@ -57,6 +56,25 @@ class HomeInformationArchitectureContractTests(unittest.TestCase):
         projects = domain(contract, "projects")
         projects["authoritative_sources"] = [
             {"ref": "comind_pm.pm_projects", "authority_role": "canonical_identity", "join": "canonical_project_id"}
+        ]
+        with self.assertRaises(validator.ContractError):
+            validator.validate_contract(contract)
+
+    def test_decisions_cannot_use_authorization_as_decision_truth(self):
+        contract = load_manifest()
+        decisions = domain(contract, "decisions")
+        decisions["authoritative_sources"].append(
+            {"ref": "comind.cm_foundry_authorization_request", "authority_role": "decision_truth"}
+        )
+        with self.assertRaises(validator.ContractError):
+            validator.validate_contract(contract)
+
+    def test_approvals_require_authorization_request_and_decision(self):
+        contract = load_manifest()
+        approvals = domain(contract, "approvals")
+        approvals["authoritative_sources"] = [
+            source for source in approvals["authoritative_sources"]
+            if source["ref"] != "comind.cm_foundry_authorization_decision"
         ]
         with self.assertRaises(validator.ContractError):
             validator.validate_contract(contract)

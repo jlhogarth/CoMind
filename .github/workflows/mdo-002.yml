@@ -8,6 +8,7 @@ on:
       - 'server/src/foundry-runtime.ts'
       - 'server/src/providers/ollama-foundry-adapter.ts'
       - 'server/test/mdo-planning-runtime.test.mjs'
+      - 'server/test/mdo-planning-context-bounds.test.mjs'
       - 'server/test/integration/mdo-ollama-pilot.e2e.mjs'
       - 'db/migrations/20261029_010_mdo_002_foundry_terminal_alignment.sql'
       - 'db/migrations/verify_20261029_010_mdo_002_foundry_terminal_alignment.sql'
@@ -115,9 +116,9 @@ jobs:
         working-directory: server
         run: npm run build
 
-      - name: Run deterministic MDO-002 adapter and worker tests
+      - name: Run deterministic MDO-002 adapter, worker, and bounded-context tests
         working-directory: server
-        run: node --test test/mdo-planning-runtime.test.mjs
+        run: node --test test/mdo-planning-runtime.test.mjs test/mdo-planning-context-bounds.test.mjs
 
       - name: Run zero-cost ten-role Ollama planning pilot
         working-directory: server

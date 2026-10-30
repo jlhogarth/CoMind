@@ -4,19 +4,20 @@ on:
   push:
     branches:
       - rlib-003-ve-standards-learning-path
+      - rlib-003r-migration-namespace-reconciliation
     paths:
       - '.github/workflows/rlib-003.yml'
       - 'scripts/test_rlib_003_adversarial.sh'
       - 'db/sql/v2/**'
-      - 'db/migrations/20261030_026_rlib_003_ve_standards_learning_path.sql'
-      - 'db/migrations/verify_20261030_026_rlib_003_ve_standards_learning_path.sql'
+      - 'db/migrations/20261030_028_rlib_003_ve_standards_learning_path.sql'
+      - 'db/migrations/verify_20261030_028_rlib_003_ve_standards_learning_path.sql'
   pull_request:
     paths:
       - '.github/workflows/rlib-003.yml'
       - 'scripts/test_rlib_003_adversarial.sh'
       - 'db/sql/v2/**'
-      - 'db/migrations/20261030_026_rlib_003_ve_standards_learning_path.sql'
-      - 'db/migrations/verify_20261030_026_rlib_003_ve_standards_learning_path.sql'
+      - 'db/migrations/20261030_028_rlib_003_ve_standards_learning_path.sql'
+      - 'db/migrations/verify_20261030_028_rlib_003_ve_standards_learning_path.sql'
   workflow_dispatch:
 
 permissions:
@@ -50,12 +51,14 @@ jobs:
           set -euo pipefail
           [[ -f db/migrations/20261030_024_mdo_003_plan_scoped_claim_hardening.sql ]]
           [[ -f db/migrations/20261030_025_ce_004_friction_failure_register.sql ]]
-          [[ ! -e db/migrations/20261030_024_rlib_003_ve_standards_learning_path.sql ]]
-          [[ ! -e db/migrations/verify_20261030_024_rlib_003_ve_standards_learning_path.sql ]]
-          [[ ! -e db/migrations/20261030_025_rlib_003_ve_standards_learning_path.sql ]]
-          [[ ! -e db/migrations/verify_20261030_025_rlib_003_ve_standards_learning_path.sql ]]
-          [[ -f db/migrations/20261030_026_rlib_003_ve_standards_learning_path.sql ]]
-          [[ -f db/migrations/verify_20261030_026_rlib_003_ve_standards_learning_path.sql ]]
+          [[ -f db/migrations/20261030_026_mdo_004_governed_plan_disposition.sql ]]
+          [[ ! -e db/migrations/20261030_026_rlib_003_ve_standards_learning_path.sql ]]
+          [[ ! -e db/migrations/verify_20261030_026_rlib_003_ve_standards_learning_path.sql ]]
+          [[ -f db/migrations/20261030_028_rlib_003_ve_standards_learning_path.sql ]]
+          [[ -f db/migrations/verify_20261030_028_rlib_003_ve_standards_learning_path.sql ]]
+          mapfile -t slot028 < <(find db/migrations -maxdepth 1 -type f -name '20261030_028_*.sql' ! -name 'verify_*' -printf '%f\n' | sort)
+          [[ ${#slot028[@]} -eq 1 ]]
+          [[ "${slot028[0]}" == "20261030_028_rlib_003_ve_standards_learning_path.sql" ]]
 
       - name: Install PostgreSQL client
         run: |
@@ -97,16 +100,16 @@ jobs:
         run: |
           set -euo pipefail
           psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
-            -f db/migrations/20261030_026_rlib_003_ve_standards_learning_path.sql
+            -f db/migrations/20261030_028_rlib_003_ve_standards_learning_path.sql
           psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
-            -f db/migrations/20261030_026_rlib_003_ve_standards_learning_path.sql
+            -f db/migrations/20261030_028_rlib_003_ve_standards_learning_path.sql
 
       - name: Verify governed curriculum and canonical metadata
         shell: bash
         run: |
           set -euo pipefail
           psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
-            -f db/migrations/verify_20261030_026_rlib_003_ve_standards_learning_path.sql
+            -f db/migrations/verify_20261030_028_rlib_003_ve_standards_learning_path.sql
 
           state="$(psql "${DATABASE_URL}" -X -At -F '|' -c "
             SELECT
@@ -124,7 +127,6 @@ jobs:
               (SELECT metadata->>'production_activation' FROM comind.cm_learning_path WHERE slug='virtual-employee-standards-v0-1');")"
           [[ "${state}" == "5|5|draft|false" ]]
           printf 'RLIB-003 isolated acceptance state: %s\n' "${state}"
-
 
       - name: Reject incomplete evidence and destructive replay
         run: bash scripts/test_rlib_003_adversarial.sh

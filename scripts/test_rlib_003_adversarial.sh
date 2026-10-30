@@ -2,8 +2,8 @@
 # Synthetic isolated CI cases only. Every mutation rolls back on expected failure.
 set -euo pipefail
 : "${DATABASE_URL:?DATABASE_URL is required}"
-verifier="db/migrations/verify_20261030_026_rlib_003_ve_standards_learning_path.sql"
-migration="db/migrations/20261030_026_rlib_003_ve_standards_learning_path.sql"
+verifier="db/migrations/verify_20261030_028_rlib_003_ve_standards_learning_path.sql"
+migration="db/migrations/20261030_028_rlib_003_ve_standards_learning_path.sql"
 expect_rejected() {
   local label="$1" mutation="$2" expected="$3" output
   output="$(mktemp)"

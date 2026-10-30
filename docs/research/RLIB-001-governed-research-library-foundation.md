@@ -110,7 +110,7 @@ The research session completed only after 23 source records were captured and th
 RLIB-001:
 
 - grants no browser access to private research tables;
-- revokes direct `PUBLIC`, `anon`, and `authenticated` table privileges;
+- always revokes direct `PUBLIC` privileges and revokes Supabase browser-role privileges when those roles exist;
 - uses SECURITY INVOKER update triggers with fixed search paths;
 - creates no new public RPC;
 - adds no provider credentials;
@@ -122,7 +122,8 @@ RLIB-001:
 1. A Drive revision read using revision ID `1` returned 404. The connector-supported `head` revision path was then used successfully.
 2. The first corpus upsert returned PostgreSQL `42P10` because the conflict target did not include the predicate of the partial unique Drive-file index. No seed rows were committed. The corrected upsert uses `ON CONFLICT (drive_file_id) WHERE drive_file_id IS NOT NULL`.
 3. Supabase Security Advisor exposed pre-existing search-path drift on `comind.set_updated_at_research_refs`. RLIB-001 added a dedicated hardening migration and verified fixed `search_path` plus SECURITY INVOKER semantics.
-4. The first PR exact-head No Placeholder run rejected `example.com` in a route-validation test. The policy was preserved, the marker was replaced with a CoMind-owned verification namespace, and the rerun passed.
+4. The first PR exact-head No Placeholder run rejected a prohibited external test-domain marker in a route-validation test. The policy was preserved, the marker was replaced with a CoMind-owned verification namespace, and the rerun passed.
+5. A later exact-head merge-ref run exposed two portability issues: the preserved failure narrative reproduced the prohibited marker, and fresh-install SQL assumed Supabase browser roles existed in isolated PostgreSQL. The narrative was sanitized without weakening policy, and role-specific revokes were made conditional while `PUBLIC` revocation remains unconditional.
 
 ## Successor sequence
 

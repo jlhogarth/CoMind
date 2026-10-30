@@ -121,9 +121,23 @@ BEFORE UPDATE ON comind.cm_learning_path
 FOR EACH ROW
 EXECUTE FUNCTION comind.set_updated_at_learning_path();
 
-REVOKE ALL ON TABLE comind.cm_research_refs FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON TABLE comind.cm_learning_path FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON TABLE comind.cm_learning_path_item FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE comind.cm_research_refs FROM PUBLIC;
+REVOKE ALL ON TABLE comind.cm_learning_path FROM PUBLIC;
+REVOKE ALL ON TABLE comind.cm_learning_path_item FROM PUBLIC;
+
+DO $$
+DECLARE
+  v_role text;
+BEGIN
+  FOREACH v_role IN ARRAY ARRAY['anon','authenticated'] LOOP
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = v_role) THEN
+      EXECUTE format('REVOKE ALL ON TABLE comind.cm_research_refs FROM %I', v_role);
+      EXECUTE format('REVOKE ALL ON TABLE comind.cm_learning_path FROM %I', v_role);
+      EXECUTE format('REVOKE ALL ON TABLE comind.cm_learning_path_item FROM %I', v_role);
+    END IF;
+  END LOOP;
+END
+$$;
 
 -- Legacy seed links remain candidates until explicitly reverified by the governed Research Library.
 INSERT INTO comind.cm_research_refs (title, url, notes, tags) VALUES

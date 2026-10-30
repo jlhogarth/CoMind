@@ -1,0 +1,108 @@
+name: CE-002 Recovery and Reorientation
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/ce-002-recovery-reorientation.yml'
+      - 'server/src/continuous-excellence/**'
+      - 'server/src/continuity/**'
+      - 'server/src/threadkeeper/**'
+      - 'server/test/ce-002-recovery-reorientation.test.mjs'
+      - 'db/migrations/20261030_001_ce_002_recovery_idempotency.sql'
+      - 'db/migrations/verify_20261030_001_ce_002_recovery_idempotency.sql'
+      - 'db/migrations/20261029_007_ce_001_continuous_excellence_foundation.sql'
+      - 'db/migrations/20261029_008_ce_001_improvement_event_ordering.sql'
+      - 'db/migrations/20261029_009_ce_001_operator_view_least_privilege.sql'
+      - 'db/test/ce_001_prerequisites.sql'
+      - 'docs/architecture/ce-002-recovery-reorientation.md'
+      - 'docs/provenance/2026-10-30-ce-002-recovery-reorientation.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  database-idempotency-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+      - name: Install PostgreSQL client and contrib extensions
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client postgresql-contrib
+      - name: Build CE-001 substrate and prove CE-002 recovery idempotency
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/test/ce_001_prerequisites.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/migrations/20261029_007_ce_001_continuous_excellence_foundation.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/migrations/20261029_008_ce_001_improvement_event_ordering.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/migrations/20261029_009_ce_001_operator_view_least_privilege.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/migrations/20261030_001_ce_002_recovery_idempotency.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/migrations/20261030_001_ce_002_recovery_idempotency.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/migrations/verify_20261030_001_ce_002_recovery_idempotency.sql
+
+  deterministic-recovery-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify exact checked-out head
+        working-directory: .
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+      - name: Use Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install exact dependencies
+        run: npm ci
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - name: Build server
+        run: npm run build
+      - name: Prove CE-002 deterministic recovery states and replay safety
+        run: node --test test/ce-002-recovery-reorientation.test.mjs
+      - name: Run server regression suite
+        run: npm test

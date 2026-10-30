@@ -2,9 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ArrowDownToLine, Clock3, ExternalLink, RefreshCw, Search, ShieldAlert } from "lucide-react";
-import { getBrowserSupabaseClient } from "@/lib/supabase/browser";
-import { getPublicSupabaseConfig } from "@/lib/supabase/config";
-import { assertActivityHudTestProject } from "@/lib/activity-hud/source";
+import { resolveActivityReference } from "@/lib/activity-hud/links";
 import {
   formatElapsed,
   hasNoTerminalReturn,
@@ -20,6 +18,9 @@ const stateLabels: Record<HudState, string> = {
   queued: "Queued",
   running: "Running",
   waiting_external: "Waiting on source",
+  awaiting_review: "Awaiting review",
+  blocked: "Blocked",
+  deferred: "Deferred",
   cancellation_requested: "Cancellation requested",
   completed: "Completed",
   failed: "Returned failure",
@@ -34,8 +35,20 @@ const stateDescriptions: Partial<Record<HudState, string>> = {
   stale_unknown: "The source has stopped reporting within its expected interval. The outcome is unknown.",
   unknown: "No source observation is available. The outcome is unknown.",
   cancellation_requested: "Cancellation was requested. Source confirmation has not arrived.",
+  blocked: "The canonical work item is blocked and needs operator attention before it can advance.",
+  awaiting_review: "The canonical work item is waiting for review rather than source completion.",
+  deferred: "The canonical work item is intentionally deferred. It is not failed or cancelled.",
   failed: "The source returned a failure result. Review the linked evidence.",
 };
+
+type ActivityScope = "operational" | "synthetic" | "all";
+
+interface ActivityApiResponse {
+  scope: ActivityScope;
+  rows: ActivityHudRow[];
+  total: number;
+  coverage_limit: string;
+}
 
 function sourceLabel(source: string): string {
   return source.replaceAll("_", " ").replace(/\b\w/g, (char) => char.toUpperCase());
@@ -81,28 +94,29 @@ function downloadInvestigation(rows: ActivityHudRow[]) {
   URL.revokeObjectURL(url);
 }
 
-function evidenceText(row: ActivityHudRow): string {
-  return JSON.stringify(
-    {
-      activity_key: row.activity_key,
-      source_ref: row.source_ref,
-      hud_state: row.hud_state,
-      last_reported_status: row.last_reported_status,
-      last_observed_at: row.last_observed_at,
-      last_source_event_ref: row.last_source_event_ref,
-      last_observation_summary: row.last_observation_summary,
-      last_evidence: row.last_evidence,
-      coverage_limit: row.coverage_limit,
-    },
-    null,
-    2,
+function ReferenceValue({
+  sourceSystem,
+  value,
+  linkLabel,
+}: {
+  sourceSystem: string;
+  value: string | null;
+  linkLabel: string;
+}) {
+  if (!value) return <>Not provided</>;
+  const resolved = resolveActivityReference(sourceSystem, value);
+  if (!resolved) return <code>{value}</code>;
+  return (
+    <a href={resolved.href} target="_blank" rel="noreferrer" aria-label={`${linkLabel}: ${value}`}>
+      <span>{value}</span> <ExternalLink size={12} aria-hidden="true" />
+    </a>
   );
 }
 
 function ActivityCard({ row, now }: { row: ActivityHudRow; now: number }) {
   const unresolved = hasNoTerminalReturn(row);
   const investigate = needsInvestigation(row);
-  const httpSource = /^https?:\/\//i.test(row.source_ref);
+  const sourceLink = resolveActivityReference(row.source_system, row.source_ref);
 
   return (
     <article className={`activity-card state-${row.hud_state}`}>
@@ -116,7 +130,13 @@ function ActivityCard({ row, now }: { row: ActivityHudRow; now: number }) {
         </div>
         <div className="activity-summary-column">
           <div className="activity-title-row">
-            <h3>{row.title}</h3>
+            <h3>
+              {sourceLink ? (
+                <a href={sourceLink.href} target="_blank" rel="noreferrer" aria-label={`Open source for ${row.title}`}>
+                  {row.title} <ExternalLink size={14} aria-hidden="true" />
+                </a>
+              ) : row.title}
+            </h3>
             {investigate && <span className="investigation-badge"><AlertTriangle size={13} /> Investigate</span>}
             {row.is_synthetic && <span className="synthetic-badge">Synthetic</span>}
           </div>
@@ -149,9 +169,11 @@ function ActivityCard({ row, now }: { row: ActivityHudRow; now: number }) {
               <div><dt>Recorded by HUD</dt><dd>{dateLabel(row.last_observed_at)}</dd></div>
               <div><dt>Expected deadline</dt><dd>{dateLabel(row.expected_deadline_at)}</dd></div>
               <div><dt>Last event</dt><dd>{row.latest_event_type ?? "None"}</dd></div>
-              <div><dt>Source event ID</dt><dd>{row.last_source_event_ref ?? "Not provided"}</dd></div>
+              <div className="source-reference"><dt>Source event ID</dt><dd>
+                <ReferenceValue sourceSystem={row.source_system} value={row.last_source_event_ref} linkLabel="Open source event" />
+              </dd></div>
               <div className="source-reference"><dt>Source reference</dt><dd>
-                {httpSource ? <a href={row.source_ref} target="_blank" rel="noreferrer">Open source <ExternalLink size={12} /></a> : <code>{row.source_ref}</code>}
+                <ReferenceValue sourceSystem={row.source_system} value={row.source_ref} linkLabel="Open source reference" />
               </dd></div>
             </dl>
             <div className="evidence-block"><b>Source evidence</b><pre>{JSON.stringify(row.last_evidence, null, 2)}</pre></div>
@@ -168,6 +190,7 @@ export default function ActivityHudPage() {
   const [stateFilter, setStateFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState("all");
   const [sort, setSort] = useState<ActivitySort>("investigation");
+  const [dataScope, setDataScope] = useState<ActivityScope>("operational");
   const [now, setNow] = useState(() => Date.now());
   const [rows, setRows] = useState<ActivityHudRow[]>([]);
   const [refreshNonce, setRefreshNonce] = useState(0);
@@ -175,6 +198,7 @@ export default function ActivityHudPage() {
   const [sourceError, setSourceError] = useState<string | null>(null);
   const [lastRefreshed, setLastRefreshed] = useState<string | null>(null);
   const [reportedTotal, setReportedTotal] = useState(0);
+  const [coverageLimit, setCoverageLimit] = useState("");
   const [ownerFilter, setOwnerFilter] = useState("all");
   const [resultFilter, setResultFilter] = useState("all");
   const [reportAgeFilter, setReportAgeFilter] = useState("all");
@@ -195,29 +219,35 @@ export default function ActivityHudPage() {
       setIsLoading(true);
       setSourceError(null);
       try {
-        assertActivityHudTestProject(getPublicSupabaseConfig().url);
-        const { data, error, count } = await getBrowserSupabaseClient()
-          .from("v_activity_hud_test")
-          .select("*", { count: "exact" })
-          .order("has_terminal_source_evidence", { ascending: true, nullsFirst: true })
-          .order("last_observed_at", { ascending: true, nullsFirst: true })
-          .order("started_at", { ascending: true })
-          .limit(1000);
-        if (error) throw error;
-        const nextRows = (data ?? []) as unknown as ActivityHudRow[];
-        if (nextRows.some((row) => row.is_synthetic !== true)) {
-          throw new Error("The Test browser projection returned a non-synthetic activity.");
+        const response = await fetch(`/api/activity?scope=${encodeURIComponent(dataScope)}`, {
+          cache: "no-store",
+          headers: { Accept: "application/json" },
+        });
+        const payload = await response.json() as ActivityApiResponse | { error?: string };
+        if (!response.ok || !("rows" in payload)) {
+          throw new Error("error" in payload && payload.error ? payload.error : "Unknown Activity HUD read error");
+        }
+        if (payload.rows.length > 1000) {
+          throw new Error("Activity HUD server returned more than the allowed 1,000 rows.");
+        }
+        if (dataScope === "operational" && payload.rows.some((row) => row.is_synthetic)) {
+          throw new Error("Operational Activity HUD scope returned synthetic data.");
+        }
+        if (dataScope === "synthetic" && payload.rows.some((row) => !row.is_synthetic)) {
+          throw new Error("Synthetic Activity HUD scope returned operational data.");
         }
         if (active) {
-          setRows(nextRows);
-          setReportedTotal(count ?? nextRows.length);
+          setRows(payload.rows);
+          setReportedTotal(payload.total);
+          setCoverageLimit(payload.coverage_limit);
           setLastRefreshed(new Date().toISOString());
         }
       } catch (error) {
         if (active) {
           setRows([]);
           setReportedTotal(0);
-          setSourceError(error instanceof Error ? error.message : "Unknown Supabase read error");
+          setCoverageLimit("");
+          setSourceError(error instanceof Error ? error.message : "Unknown Activity HUD read error");
         }
       } finally {
         if (active) setIsLoading(false);
@@ -225,7 +255,7 @@ export default function ActivityHudPage() {
     };
     void load();
     return () => { active = false; };
-  }, [refreshNonce]);
+  }, [dataScope, refreshNonce]);
 
   const sources = useMemo(() => [...new Set(rows.map((row) => row.source_system))].sort(), [rows]);
   const owners = useMemo(() => [...new Set(rows.map((row) => row.owner_label).filter((owner): owner is string => Boolean(owner)))].sort(), [rows]);
@@ -273,19 +303,27 @@ export default function ActivityHudPage() {
   const investigationCount = rows.filter(needsInvestigation).length;
   const failed = rows.filter((row) => row.hud_state === "failed").length;
   const resolved = rows.filter((row) => row.has_terminal_source_evidence).length;
+  const operationalCount = rows.filter((row) => !row.is_synthetic).length;
+  const syntheticCount = rows.filter((row) => row.is_synthetic).length;
+
+  const scopeStatus = dataScope === "operational"
+    ? "Canonical PM / RunBook projection"
+    : dataScope === "synthetic"
+      ? "Synthetic verification projection"
+      : "Operational + synthetic projections";
 
   return (
     <main className="hud-shell">
       <aside className="hud-sidebar">
         <a className="hud-brand" href="/">CoMind <span>Operator Console</span></a>
-        <div className="hud-env"><i /> TEST ENVIRONMENT</div>
+        <div className="hud-env"><i /> GOVERNED TEST DATA PLANE</div>
         <nav aria-label="Operator Console">
           <a href="/">Overview</a>
           <a className="active" href="/activity" aria-current="page">Activity HUD</a>
         </nav>
         <div className="hud-side-note">
           <b>Source evidence stays separate</b>
-          RunBook events, activity reports, PM decisions, Foundry authorizations, and human assessments remain distinct records.
+          The HUD is a read projection. Canonical work items and append-only events remain authoritative database records.
         </div>
       </aside>
 
@@ -293,7 +331,7 @@ export default function ActivityHudPage() {
         <header className="hud-topbar">
           <div className="hud-breadcrumb">CoMind <span>/</span> Operator Console <span>/</span> <b>Activity HUD</b></div>
           <div className={`hud-source-state ${sourceError ? "source-error" : "source-connected"}`}>
-            <i /> {sourceError ? "Supabase Test read failed" : isLoading ? "Connecting to Supabase Test" : "Supabase Test · read-only synthetic view"}
+            <i /> {sourceError ? "Governed activity read failed" : isLoading ? "Reading governed activity" : `${scopeStatus} · read-only`}
           </div>
         </header>
 
@@ -301,30 +339,37 @@ export default function ActivityHudPage() {
           <div>
             <p className="hud-eyebrow">Bounded operational view</p>
             <h1>Activity HUD</h1>
-            <p>Find work that stopped reporting, sort by time without a terminal return, and inspect the source evidence before deciding what to investigate.</p>
+            <p>Inspect canonical work state, follow resolvable source references, and separate operational records from synthetic verification data.</p>
           </div>
           <div className="hud-heading-actions">
-          <button className="hud-refresh" onClick={() => setRefreshNonce((current) => current + 1)} disabled={isLoading}>
-            <RefreshCw size={14} /> {isLoading ? "Refreshing" : "Refresh"}
-          </button>
-          <button className="hud-export" onClick={() => downloadInvestigation(visibleRows)} disabled={visibleRows.length === 0}>
-            <ArrowDownToLine size={15} /> Export no-return set
-          </button>
+            <button className="hud-refresh" onClick={() => setRefreshNonce((current) => current + 1)} disabled={isLoading}>
+              <RefreshCw size={14} /> {isLoading ? "Refreshing" : "Refresh"}
+            </button>
+            <button className="hud-export" onClick={() => downloadInvestigation(visibleRows)} disabled={visibleRows.length === 0}>
+              <ArrowDownToLine size={15} /> Export no-return set
+            </button>
           </div>
         </div>
 
         <div className="hud-data-note" role="status">
           <ShieldAlert size={16} />
-          <span>Connected to <code>public.v_activity_hud_test</code>, a read-only Test projection limited to synthetic rows from <code>comind_hud_test.v_activity_hud</code>. It refreshes every 30 seconds and returns at most 1,000 rows per read. Results are bounded and changing, not a lossless feed or a fixed snapshot.</span>
+          <span>
+            {dataScope === "operational"
+              ? "Operational scope reads a bounded server-side projection of canonical PM work items and each item’s latest linked event. Direct browser access to the private PM schema remains denied."
+              : dataScope === "synthetic"
+                ? "Synthetic scope reads the isolated Activity HUD verification dataset only. It is test evidence, not operational truth."
+                : "Combined scope shows the governed operational projection and the isolated synthetic verification dataset together; synthetic records remain explicitly labeled."}
+            {coverageLimit ? ` ${coverageLimit}` : ""}
+          </span>
         </div>
-        {sourceError && <div className="hud-read-error" role="alert">Supabase read failed: {sourceError}. Confirm this app is configured for the CoMind Test project and reload.</div>}
+        {sourceError && <div className="hud-read-error" role="alert">Activity read failed: {sourceError}</div>}
         {reportedTotal > rows.length && <div className="hud-read-error" role="status">Showing {rows.length} of {reportedTotal} rows reported by the latest read. The 1,000-row query limit was reached, so some activities may not be shown.</div>}
 
         <div className="hud-stats" aria-label="Activity summary">
-          <article className="hud-stat attention"><span>Needs investigation</span><b>{investigationCount}</b><small>Stale, overdue, unknown, awaiting cancellation, or returned failure</small></article>
-          <article className="hud-stat pending"><span>No terminal result</span><b>{noTerminal}</b><small>Source has not confirmed completion, failure, or cancellation</small></article>
+          <article className="hud-stat attention"><span>Needs investigation</span><b>{investigationCount}</b><small>Blocked, stale, overdue, unknown, awaiting cancellation, or returned failure</small></article>
+          <article className="hud-stat pending"><span>No terminal result</span><b>{noTerminal}</b><small>Canonical state has not reached completion, failure, or cancellation</small></article>
           <article className="hud-stat returned"><span>Terminal source result</span><b>{resolved}</b><small>{failed} returned failure · other terminal outcomes are listed</small></article>
-          <article className="hud-stat sources"><span>Activities loaded</span><b>{rows.length}</b><small>{reportedTotal} rows reported · {sources.length} source types loaded</small></article>
+          <article className="hud-stat sources"><span>Activities loaded</span><b>{rows.length}</b><small>{operationalCount} operational · {syntheticCount} synthetic · {sources.length} source types</small></article>
         </div>
 
         <section className="hud-list-panel" aria-labelledby="activity-list-title">
@@ -334,6 +379,20 @@ export default function ActivityHudPage() {
           </div>
           <div className="hud-filters">
             <label className="hud-search"><Search size={15} aria-hidden="true" /><input aria-label="Search activities" value={query} onChange={(event) => resetPage(() => setQuery(event.target.value))} placeholder="Search activity, source, owner, evidence" /></label>
+            <label className="sr-only" htmlFor="data-scope-filter">Choose Activity HUD data scope</label>
+            <select id="data-scope-filter" value={dataScope} onChange={(event) => {
+              setDataScope(event.target.value as ActivityScope);
+              setSourceFilter("all");
+              setOwnerFilter("all");
+              setStateFilter("all");
+              setResultFilter("all");
+              setReportAgeFilter("all");
+              setPage(1);
+            }}>
+              <option value="operational">Operational data</option>
+              <option value="synthetic">Synthetic test data</option>
+              <option value="all">Operational + synthetic</option>
+            </select>
             <label className="sr-only" htmlFor="state-filter">Filter activity state</label>
             <select id="state-filter" value={stateFilter} onChange={(event) => resetPage(() => setStateFilter(event.target.value))}>
               <option value="all">All states</option>
@@ -375,11 +434,11 @@ export default function ActivityHudPage() {
             </select>
           </div>
 
-          <div className="hud-sort-explainer"><AlertTriangle size={14} /> Default ordering puts deadline overruns and stale or unconfirmed work first, then sorts unresolved rows by the oldest source observation. A local deadline is not a source failure.</div>
+          <div className="hud-sort-explainer"><AlertTriangle size={14} /> Default ordering puts blocked, deadline-overrun, stale, or unconfirmed work first. Review and deferred work are represented separately from failure. A local deadline is not a source failure.</div>
 
           <div className="activity-list" aria-live="polite">
-            {visiblePage.length ? visiblePage.map((row) => <ActivityCard key={row.activity_id} row={row} now={now} />) : (
-              <div className="hud-empty"><b>{isLoading ? "Loading Test activities" : "No matching activities"}</b><span>{isLoading ? "Reading the synthetic Activity HUD view from Supabase." : "Change the filters or search terms to see more rows."}</span></div>
+            {visiblePage.length ? visiblePage.map((row) => <ActivityCard key={`${row.is_synthetic ? "synthetic" : "operational"}:${row.activity_id}`} row={row} now={now} />) : (
+              <div className="hud-empty"><b>{isLoading ? "Loading governed activities" : "No matching activities"}</b><span>{isLoading ? `Reading ${dataScope} activity scope.` : "Change the data scope, filters, or search terms to see more rows."}</span></div>
             )}
           </div>
           <nav className="hud-pagination" aria-label="Activity pages">
@@ -396,7 +455,7 @@ export default function ActivityHudPage() {
             </div>
           </nav>
         </section>
-        <footer className="hud-footer">Bounded observations only. This view does not establish complete history, a lossless feed, or snapshot consistency.</footer>
+        <footer className="hud-footer">Bounded read projection only. Canonical database records and append-only event history remain authoritative.</footer>
       </section>
     </main>
   );

@@ -1,0 +1,84 @@
+name: HUD-REAL-001 Governed Operational Activity
+
+on:
+  pull_request:
+    paths:
+      - "apps/operator-console/**"
+      - "db/migrations/20261030_020_hud_real_001_operational_activity.sql"
+      - "db/migrations/verify_20261030_020_hud_real_001_operational_activity.sql"
+      - "db/test/activity_hud_test.sql"
+      - "db/test/activity_hud_api_test.sql"
+      - ".github/workflows/hud-real-001.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  postgres-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: comind_runtime
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_runtime"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGDATABASE: comind_runtime
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create Supabase-compatible database roles and schemas
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $roles$
+          BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN CREATE ROLE anon NOLOGIN; END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN CREATE ROLE authenticated NOLOGIN; END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN CREATE ROLE service_role NOLOGIN; END IF;
+          END
+          $roles$;
+          CREATE SCHEMA IF NOT EXISTS extensions;
+          CREATE SCHEMA IF NOT EXISTS comind;
+          SQL
+
+      - name: Apply canonical PM ledger
+        run: psql -v ON_ERROR_STOP=1 -f db/migrations/20261006_001_comind_pm_ledger.sql
+
+      - name: Apply Durable RunBook foundation
+        run: psql -v ON_ERROR_STOP=1 -f db/migrations/20261016_001_durable_runbook_foundation.sql
+
+      - name: Apply existing synthetic Activity HUD contract
+        run: |
+          psql -v ON_ERROR_STOP=1 -f db/test/activity_hud_test.sql
+          psql -v ON_ERROR_STOP=1 -f db/test/activity_hud_api_test.sql
+
+      - name: Apply HUD-REAL-001 operational read contract
+        run: psql -v ON_ERROR_STOP=1 -f db/migrations/20261030_020_hud_real_001_operational_activity.sql
+
+      - name: Prove HUD-REAL-001 migration reapplication
+        run: psql -v ON_ERROR_STOP=1 -f db/migrations/20261030_020_hud_real_001_operational_activity.sql
+
+      - name: Verify capability, state mapping, safe evidence and private-schema boundary
+        run: psql -v ON_ERROR_STOP=1 -f db/migrations/verify_20261030_020_hud_real_001_operational_activity.sql
+
+      - name: Prove ordinary browser role cannot query PM schema directly
+        run: |
+          if psql -v ON_ERROR_STOP=1 -c "SET ROLE anon; SELECT count(*) FROM comind_pm.pm_work_items;"; then
+            echo "anon unexpectedly queried private PM work items" >&2
+            exit 1
+          fi
+          psql -v ON_ERROR_STOP=1 -c "SELECT has_schema_privilege('anon','comind_pm','USAGE') AS anon_pm_usage, has_function_privilege('anon','public.operator_console_activity_feed(text,text,integer)','EXECUTE') AS anon_feed_execute;"

@@ -50,6 +50,8 @@ DROP TABLE IF EXISTS comind.cm_conversation_recovery_checkpoint CASCADE;
 DROP TABLE IF EXISTS comind.cm_conversation_capture_event CASCADE;
 DROP TABLE IF EXISTS comind.cm_conversation_capture_cursor CASCADE;
 DROP TABLE IF EXISTS comind.cm_assistant_generation CASCADE;
+DROP TABLE IF EXISTS comind.cm_learning_path_item;
+DROP TABLE IF EXISTS comind.cm_learning_path;
 
 DROP POLICY IF EXISTS conv_modify_own ON comind.cm_conversation;
 DROP POLICY IF EXISTS conv_select_all ON comind.cm_conversation;

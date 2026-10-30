@@ -171,3 +171,11 @@ Provider failure, malformed evidence, target drift, capability mismatch, stale f
 - relevant broad CI and Foundry regressions remain green;
 - final freshness review shows no unresolved collision with `main`;
 - no paid provider or Production action occurs.
+
+## Subsequent acceptance and 97-commit freshness reconciliation
+
+A later exact-head proof at branch head `87d36124306136ab6facbe7a50d360d44a0f2dc4`, GitHub Actions run `41021071168`, passed the complete MDO-002 workflow and all relevant exact-head regressions. Its preserved artifact independently confirmed 10 contributions, 10 completed leases, 10 inference-evidence rows, 10 done tasks, plan status `in_review`, module lifecycle `conceived`, provider `ollama_local`, model `qwen3:0.6b`, Production authorization false, and paid-provider authorization false.
+
+After that proof, parallel lanes advanced `main` by 97 commits from `927caa0a69eb7cb2622480d783961549abd93c4d` to `d238720e83276457ad0a1d544ee83bf269449714`. A full compare found no direct path overlap with the nine MDO-002 files. The intervening work is concentrated in Continuous Excellence, CoMind Home/Operator Console, Activity HUD, Research Library, and implementation-integrity controls. No MDO-002 runtime, test, workflow, migration, or provenance path was modified. The new 2026-10-30 migration sequence begins at `020`, so MDO-002's accepted `20261029_010` migration remains unambiguous.
+
+The branch is therefore being reconciled onto `d238720e83276457ad0a1d544ee83bf269449714` without altering the previously proven MDO implementation blobs. This reconciliation itself is not acceptance. The same exact-head build, database verification, deterministic tests, ten-role zero-cost Ollama proof, artifact invariants, broad CI, Foundry regressions, and final freshness check remain mandatory before PR #334 may merge.

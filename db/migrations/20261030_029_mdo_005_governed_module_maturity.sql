@@ -251,7 +251,8 @@ BEGIN
         RAISE EXCEPTION 'Only a conceived module can transition to specified in MDO-005';
     END IF;
 
-    SELECT count(*)::int, min(de.disposition_event_id)
+    SELECT count(*)::int,
+           (array_agg(de.disposition_event_id ORDER BY de.created_at))[1]
     INTO v_accept_count, v_accept_event_id
     FROM comind.cm_mdo_plan_disposition_event de
     WHERE de.plan_id = p_plan_id

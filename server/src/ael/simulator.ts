@@ -190,8 +190,8 @@ export function simulateAelScenario(input: unknown): AelSimulationResult {
         `ael:source-event:${scenario.scenarioId}:${seedFingerprint}:${source.sourceKey}:${sequence}`,
       );
       const eventId = deterministicUuid(`ael:event:${sourceId}:${sourceEventId}`);
-      const observedMs = timing.idealMs + 100 + (sourceIndex * 10);
-      const ingestedMs = observedMs + 25;
+      const observedMs = timing.idealMs;
+      const ingestedMs = observedMs + 25 + (sourceIndex * 10);
       const contentDescriptor = {
         kind: 'synthetic-ael-content-v1',
         scenarioId: scenario.scenarioId,

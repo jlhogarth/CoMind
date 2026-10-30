@@ -130,3 +130,27 @@ Merge requires:
 - No Placeholder, Implementation Integrity, Integrity Governance, Foundry, provider, budget, DRB, and broad CI regressions pass;
 - final current-main collision/freshness review is clean;
 - Production remains unchanged.
+
+## Recovery evidence: persistent Test terminal-alignment drift
+
+The first persistent Supabase Test acceptance run, GitHub Actions run `41044987494` on pre-DRULE MDO-003 head `0c5e9b25d7ace8b4f0632117b6740e78c758f24e`, passed the repository contract job and failed during the live role chain when the first successful Foundry execution attempted to submit its MDO contribution.
+
+The failure was traced to durable Test deployment drift, not to Ollama, Foundry authorization, RuleBook preflight, or lease fencing. Supabase Test still had the MDO-001-era `comind.cm_mdo_submit_contribution(...)` definition requiring `execution_context.closed_at`, while accepted MDO-002 had replaced that gate with canonical terminal evidence in `cm_foundry_execution_outcome` plus the matching `cm_foundry_adapter_operation_result`.
+
+The already-accepted MDO-002 migration `20261029_010_mdo_002_foundry_terminal_alignment.sql` was promoted to the canonical CoMind Supabase Test project only. No Production database was changed. Independent Test readback after migration proved:
+
+- matching adapter-operation-result evidence is required;
+- a successful Foundry execution outcome is required;
+- the legacy `ec.closed_at IS NOT NULL` requirement is absent;
+- `anon` and `authenticated` cannot execute the security-definer contribution function;
+- `service_role` retains the intended execution privilege.
+
+The failed MDO-003 candidate retained its durable provenance. Its five historical run-scoped capability grants remain recorded, and independent readback confirmed zero active grants after cleanup.
+
+## DRULE-005 reconciliation requirement
+
+DRULE-005 PR #371 subsequently merged at `ca6e64179fd60ccdc54087af01abd8b5a4014e16` and is now the accepted shared RuleBook operational-authority path for MDO and Foundry execution. MDO-003 must therefore be reconciled on top of that accepted runtime without restoring or forking its older runtime view.
+
+The MDO-003 lane remains intentionally additive: its workflow, persistent Test integration proof, five Test harness modules, and this provenance record are the only lane-owned files. Current `main` supplies the operational RuleBook, MDO runtime, MDO orchestrator, Foundry runtime, and all other shared control-plane code.
+
+Current disposition after recovery: RETEST REQUIRED. A fresh exact-head persistent Supabase Test run on the reconciled DRULE-005 base is required before PR #374 can be accepted or merged.

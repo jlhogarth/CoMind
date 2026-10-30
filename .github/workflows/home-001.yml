@@ -1,0 +1,37 @@
+name: HOME-001 CoMind Home Information Architecture
+
+on:
+  pull_request:
+    paths:
+      - "config/comind-home-information-architecture.v1.json"
+      - "scripts/validate_comind_home_ia.py"
+      - "scripts/test_validate_comind_home_ia.py"
+      - "docs/architecture/HOME-001-comind-home-information-architecture.md"
+      - "docs/provenance/2026-10-30-home-001-information-architecture.md"
+      - ".github/workflows/home-001.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  architecture-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify JSON syntax
+        run: python -m json.tool config/comind-home-information-architecture.v1.json >/dev/null
+
+      - name: Validate Home information architecture contract
+        run: python scripts/validate_comind_home_ia.py
+
+      - name: Run Home information architecture regression tests
+        run: python -m unittest scripts/test_validate_comind_home_ia.py

@@ -1,7 +1,7 @@
 # CoMind Development Environment Contract
 
-**Version:** 1.0  
-**Effective:** October 29, 2026  
+**Version:** 1.1  
+**Effective:** October 30, 2026  
 **Status:** Standing Founder-Assistant Development Operating Agreement  
 **Canonical source:** `jlhogarth/CoMind/docs/governance/COMIND-DEVELOPMENT-ENVIRONMENT-CONTRACT.md`  
 **Google Drive mirror:** https://docs.google.com/document/d/1L8PkOMdPg2sopn9kx7RLmZlJRxrNLUtI2g57GgH5mKg/edit  
@@ -34,6 +34,35 @@ This contract never authorizes silent weakening of security, governance, financi
 - Preserve evidence of failures, repairs, rejected approaches, important decisions, and acceptance results rather than presenting only a sanitized successful history.
 - Do not weaken security, governance, authority boundaries, or evidence requirements merely to make an implementation easier.
 - Do not activate Production unless Production activation is explicitly authorized under the applicable CoMind gates.
+
+## L4A Bounded Autonomous Development Authority
+
+Joseph's standing L4A Bounded Autonomous Development Authority is part of this contract when a durable granted authorization is present in the canonical CoMind evidence system. L4A permits autonomous non-Production development, recovery, issue/branch/PR progression, qualifying merge, evidence capture, and dependency-valid continuation without routine human approval.
+
+Before relying on L4A for consequential work, a lane must resolve current durable authority rather than infer authority from conversational tone or an old copied prompt. Connection availability does not itself grant authority.
+
+L4A never bypasses its mandatory human stop boundaries. Production activation or consequential Production modification, irreversible destructive Production operations, canonical-evidence deletion or corruption, material weakening of security or governance, unauthorized credential changes, new paid commitments, material departure from approved architecture, consequential legal or corporate commitments, separately governed external publication, and platform-enforced human confirmation remain human gates.
+
+## Governed Integration Gateway
+
+CoMind may use managed integration gateways to provide durable, reusable access to external developer tools and services. Composio is the current CIG-001 integration provider for the verified GitHub and Supabase development paths. This designation makes Composio an execution and authentication substrate, not a source of CoMind authority.
+
+For every consequential external action performed through an integration gateway, the lane must:
+
+1. resolve the current canonical version of this contract and current durable authority when those sources are available;
+2. confirm that the required provider connection is active and scoped to the intended account, project, repository, or resource;
+3. apply applicable RuleBook trust-boundary, egress, tenancy/project, secret-handling, logging, and human-review controls;
+4. execute the least-privilege action needed for the authorized objective;
+5. independently verify the resulting provider state when practical;
+6. preserve non-secret provenance, result, failure, and recovery evidence in the canonical evidence system.
+
+OAuth access tokens, refresh tokens, passwords, authorization headers, API keys, client secrets, service-role keys, and equivalent credential material must remain in the provider, connector, approved secrets manager, or authenticated platform session. Raw credential material must not be copied into prompts, RunBook events, RuleBook evidence, Console projections, source-control documentation, or ordinary agent logs.
+
+An integration interruption is an operational state, not automatically a lane failure. Use states such as `AUTH_REQUIRED`, `SCOPE_REQUIRED`, `EXPIRED`, `HUMAN_CONFIRMATION_REQUIRED`, or `BLOCKED` to checkpoint the affected operation. Continue unrelated safe work when dependencies permit. Never bypass a platform authentication, confirmation, scope, or safety boundary.
+
+Prefer an existing native connector when it provides a safer, narrower, or more reliable path. Prefer the governed integration gateway when coordinated multi-application execution, managed credential lifecycle, or cross-session continuity materially improves the authorized workflow. Do not maintain duplicate integration implementations without a documented reason.
+
+For a ChatGPT-hosted plugin path, these controls are enforced procedurally by the acting lane because the external plugin call is outside CoMind runtime interception. A CoMind-hosted agent, Virtual Employee, or application runtime that uses the Composio SDK or another integration broker must invoke the common RuleBook preflight before consequential external execution.
 
 ## Keep Joseph in the Loop
 
@@ -126,7 +155,7 @@ The lane owner may omit any field that is not needed. After the supplied sequenc
 
 ## Cross-Conversation Invocation
 
-Every CoMind or related software-development conversation should automatically invoke this contract when the contract or its durable pointer is available to the assistant.
+Every CoMind or related software-development conversation should automatically invoke this contract when the contract or its durable pointer is available to the assistant. At lane start, lane recovery, and before consequential external execution, the acting lane should refresh the canonical contract version and durable authority when tool access permits. Cached chat context, copied prompts, and memory summaries are pointers and must not override a newer canonical contract or durable authorization record.
 
 Phrases such as **“Proceed,” “continue,” “pick this up,” “complete this lane,”** or a direct request to work on a CoMind development issue should be interpreted as invoking this contract unless Joseph explicitly overrides part of it.
 
@@ -136,7 +165,7 @@ The full canonical GitHub contract is authoritative over summaries, copied promp
 
 The durable ChatGPT Memory summary pointer should read:
 
-> **Standing CoMind Development Environment Contract:** In every conversation involving CoMind or related software-development work, automatically apply the canonical CoMind Development Environment Contract. Treat it as the default development operating agreement unless Joseph explicitly overrides a provision. This includes autonomous execution within existing authority, meaningful progress updates, decision/rationale visibility, collision and freshness checks, reuse-before-reinvention, evidence preservation, governed paid-provider approvals with in-chat request text and approval-page links, Production separation, infrastructure discipline, verification before closure, and next-step proposals. Canonical source: `jlhogarth/CoMind/docs/governance/COMIND-DEVELOPMENT-ENVIRONMENT-CONTRACT.md`. The canonical full contract is authoritative over any abbreviated memory summary.
+> **Standing CoMind Development Environment Contract:** In every conversation involving CoMind or related software-development work, automatically apply the canonical CoMind Development Environment Contract. Treat it as the default development operating agreement unless Joseph explicitly overrides a provision. This includes L4A bounded autonomy when durably granted, canonical-contract freshness checks, governed integration-gateway use, managed credential custody, meaningful progress updates, decision/rationale visibility, collision and freshness checks, reuse-before-reinvention, evidence preservation, governed paid-provider approvals with in-chat request text and approval-page links, Production separation, infrastructure discipline, verification before closure, and next-step proposals. Canonical source: `jlhogarth/CoMind/docs/governance/COMIND-DEVELOPMENT-ENVIRONMENT-CONTRACT.md`. The canonical full contract is authoritative over any abbreviated memory summary.
 
 The Memory summary is an invocation pointer, not the authoritative copy of this contract.
 
@@ -146,4 +175,4 @@ This contract may be revised only with Joseph's explicit approval. Material chan
 
 ---
 
-End of CoMind Development Environment Contract v1.0.
+End of CoMind Development Environment Contract v1.1.

@@ -320,6 +320,8 @@ export default function ActivityHudPage() {
         <nav aria-label="Operator Console">
           <a href="/">Overview</a>
           <a className="active" href="/activity" aria-current="page">Activity HUD</a>
+          <a href="/rulebook">RuleBook HUD</a>
+          <a href="/integrations">Integration Gateway</a>
         </nav>
         <div className="hud-side-note">
           <b>Source evidence stays separate</b>

@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 
 const manifest = JSON.parse(readFileSync(new URL('../../docs/ve/scout/SCOUT-003-ACTIVATION-AND-FIRST-DAY.v0.1.json', import.meta.url), 'utf8'));
 const packet = JSON.parse(readFileSync(new URL('../../docs/ve/scout/SCOUT-R001-EVIDENCE-PACKET.v0.1.json', import.meta.url), 'utf8'));
+const liveHarness = readFileSync(new URL('./support/scout-003-live-first-day.mjs', import.meta.url), 'utf8');
 
 assert.equal(manifest.control_id, 'SCOUT-003');
 assert.equal(manifest.issue, 427);
@@ -19,6 +20,8 @@ assert.equal(manifest.runtime.model, 'qwen3:0.6b');
 assert.equal(manifest.runtime.paid_provider_allowed, false);
 assert.equal(manifest.runtime.production_allowed, false);
 assert.equal(manifest.grant.revoke_after_first_day, true);
+assert.equal((liveHarness.match(/jsonb_build_object\('issue',427,'control_id','SCOUT-003'/g) ?? []).length, 0);
+assert.equal((liveHarness.match(/jsonb_build_array\('github:issue:427','control:SCOUT-003'/g) ?? []).length, 4);
 const required = packet.sources.filter((source) => source.required);
 assert.equal(required.length, 3);
 assert.ok(required.every((source) => source.authority_level === 'primary_authoritative'));

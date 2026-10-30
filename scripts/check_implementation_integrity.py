@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """CoMind hard implementation-integrity control engine.
 
-IIC-002 extends the IIC-001 engine to host multiple controls while preserving
-stable NDT-001 fingerprints. Controls may emit deterministic verified risks or
-review candidates. Shadow mode never blocks on findings; enforce mode blocks
-only unbaselined findings classified as verified risks.
+The reusable engine hosts multiple controls while preserving stable finding
+identity across IIC development increments. Controls may emit deterministic
+verified risks or review candidates. Shadow mode never blocks on findings;
+enforce mode blocks only unbaselined findings classified as verified risks.
 """
 
 from __future__ import annotations
@@ -538,7 +538,8 @@ def render_json(findings: list[Finding], baseline: set[str], mode: str) -> str:
     }
     payload = {
         "schema_version": 2,
-        "lane": "IIC-002",
+        "lane": "IIC",
+        "component": "implementation-integrity",
         "mode": mode,
         "controls": control_ids,
         "finding_count": len(findings),

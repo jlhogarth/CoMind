@@ -1,0 +1,33 @@
+name: Integrity Governance
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: integrity-governance-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  enforcement-contract:
+    name: Validate hard-enforcement contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate IIC enforcement workflow contract
+        run: python scripts/check_integrity_enforcement_contract.py .
+
+      - name: Run enforcement adversarial tests
+        run: python scripts/test_integrity_enforcement_contract.py

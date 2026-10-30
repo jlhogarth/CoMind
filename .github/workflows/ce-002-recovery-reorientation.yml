@@ -1,0 +1,53 @@
+name: CE-002 Recovery and Reorientation
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/ce-002-recovery-reorientation.yml'
+      - 'server/src/continuous-excellence/**'
+      - 'server/src/continuity/**'
+      - 'server/src/threadkeeper/**'
+      - 'server/test/ce-002-recovery-reorientation.test.mjs'
+      - 'docs/architecture/ce-002-recovery-reorientation.md'
+      - 'docs/provenance/2026-10-30-ce-002-recovery-reorientation.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deterministic-recovery-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify exact checked-out head
+        working-directory: .
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+      - name: Use Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install exact dependencies
+        run: npm ci
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - name: Build server
+        run: npm run build
+      - name: Prove CE-002 deterministic recovery states and replay safety
+        run: node --test test/ce-002-recovery-reorientation.test.mjs
+      - name: Run server regression suite
+        run: npm test

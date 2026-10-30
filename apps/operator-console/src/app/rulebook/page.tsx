@@ -111,6 +111,7 @@ export default function RulebookHudPage() {
           <a href="/">Overview</a>
           <a href="/activity">Activity HUD</a>
           <a className="active" href="/rulebook" aria-current="page">RuleBook HUD</a>
+          <a href="/management-plane">L4A Management</a>
           <a href="/integrations">Integration Gateway</a>
         </nav>
         <div className="hud-side-note">

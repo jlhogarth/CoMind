@@ -321,6 +321,7 @@ export default function ActivityHudPage() {
           <a href="/">Overview</a>
           <a className="active" href="/activity" aria-current="page">Activity HUD</a>
           <a href="/rulebook">RuleBook HUD</a>
+          <a href="/management-plane">L4A Management</a>
           <a href="/integrations">Integration Gateway</a>
         </nav>
         <div className="hud-side-note">

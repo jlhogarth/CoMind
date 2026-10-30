@@ -1,0 +1,61 @@
+name: HAI-009 Controlled Continuity Pilot
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "config/hai-009-continuity-pilot.v1.json"
+      - "scripts/hai_009_continuity_pilot.mjs"
+      - "server/test/hai-009-continuity-pilot.test.mjs"
+      - "docs/research/HAI-009-controlled-continuity-pilot-protocol.md"
+      - "docs/provenance/*hai-009*"
+      - ".github/workflows/hai-009-continuity-pilot.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate HAI-009 continuity pilot contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Validate and score the synthetic protocol fixtures
+        run: |
+          mkdir -p artifacts
+          node scripts/hai_009_continuity_pilot.mjs | tee artifacts/hai-009-phase-a-validation.json
+
+      - name: Run adversarial HAI-009 contract tests
+        run: node --test server/test/hai-009-continuity-pilot.test.mjs
+
+      - name: Upload HAI-009 validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hai-009-continuity-pilot-validation
+          path: artifacts/hai-009-phase-a-validation.json
+          if-no-files-found: error
+          retention-days: 30

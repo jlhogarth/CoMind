@@ -1,7 +1,9 @@
 # TK-012 Governed Branch-and-Merge Continuity
 
-Status: implementation candidate  
+Status: Accepted implementation  
 Issue: #309  
+Accepted PR: #320  
+Merge commit: `b2374dde291671c38c665c902e7894bd986dfa93`  
 Capability: ThreadKeeper  
 Production activation: false
 

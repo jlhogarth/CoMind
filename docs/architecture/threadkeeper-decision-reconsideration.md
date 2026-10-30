@@ -1,8 +1,10 @@
 # TK-011 - Decision Reconsideration Triggers
 
-Status: Implementation candidate  
+Status: Accepted implementation  
 Capability: ThreadKeeper  
 Issue: #308  
+Accepted PR: #317  
+Merge commit: `c45f9af7a93686df8c2b5d432de0de1aca625a4b`  
 Production activation: false  
 Schema change: none in this slice
 

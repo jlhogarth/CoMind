@@ -1,8 +1,10 @@
 # TK-009 - Continuity Dependency Impact, Cumulative Drift, and Continuity Debt
 
-Status: Implementation candidate  
+Status: Accepted implementation  
 Capability: ThreadKeeper  
 Issue: #306  
+Accepted PR: #312  
+Merge commit: `59128da152af8d6c09e9392770bea143ac75d0ca`  
 Production activation: false  
 Schema change: none in this slice
 

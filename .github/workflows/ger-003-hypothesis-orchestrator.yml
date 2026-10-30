@@ -1,0 +1,92 @@
+name: GER-003 Hypothesis Orchestrator
+
+on:
+  pull_request:
+    paths:
+      - 'server/src/epistemic/hypothesis-orchestrator.ts'
+      - 'server/test/ger-hypothesis-orchestrator.test.mjs'
+      - 'server/test/ger-hypothesis-orchestrator.integration.test.mjs'
+      - 'docs/architecture/ger-003-competing-hypothesis-test-orchestrator.md'
+      - 'docs/provenance/2026-10-30-ger-003-competing-hypothesis-test-orchestrator.md'
+      - '.github/workflows/ger-003-hypothesis-orchestrator.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exact-head-hypothesis-proof:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+      - name: Apply accepted GER persistence substrate
+        shell: bash
+        run: |
+          set -euo pipefail
+          for migration in \
+            db/migrations/20261030133633_ger_002_epistemic_case_persistence_contract.sql \
+            db/migrations/20261030133740_ger_002_epistemic_persistence_hardening.sql \
+            db/migrations/20261030133825_ger_002_payload_validation_privilege_hardening.sql \
+            db/migrations/20261030134047_ger_002_relationship_fk_index_hardening.sql
+          do
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
+          done
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/migrations/verify_20261030133633_ger_002_epistemic_case_persistence_contract.sql
+      - name: Install server dependencies
+        working-directory: server
+        run: npm ci
+      - name: Audit production dependencies
+        working-directory: server
+        run: npm audit --omit=dev --audit-level=high
+      - name: Typecheck and build
+        working-directory: server
+        run: npm run build
+      - name: Run deterministic GER foundation tests
+        working-directory: server
+        run: node --test test/ger.test.mjs
+      - name: Run GER-003 hypothesis orchestration tests
+        working-directory: server
+        run: node --test test/ger-hypothesis-orchestrator.test.mjs
+      - name: Run full server regression suite
+        working-directory: server
+        run: npm test
+      - name: Run GER-003 persistence integration proof
+        working-directory: server
+        env:
+          GER_HYPOTHESIS_INTEGRATION: '1'
+        run: node --test test/ger-hypothesis-orchestrator.integration.test.mjs

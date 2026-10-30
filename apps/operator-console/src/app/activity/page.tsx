@@ -20,6 +20,7 @@ const stateLabels: Record<HudState, string> = {
   waiting_external: "Waiting on source",
   awaiting_review: "Awaiting review",
   blocked: "Blocked",
+  deferred: "Deferred",
   cancellation_requested: "Cancellation requested",
   completed: "Completed",
   failed: "Returned failure",
@@ -36,6 +37,7 @@ const stateDescriptions: Partial<Record<HudState, string>> = {
   cancellation_requested: "Cancellation was requested. Source confirmation has not arrived.",
   blocked: "The canonical work item is blocked and needs operator attention before it can advance.",
   awaiting_review: "The canonical work item is waiting for review rather than source completion.",
+  deferred: "The canonical work item is intentionally deferred. It is not failed or cancelled.",
   failed: "The source returned a failure result. Review the linked evidence.",
 };
 
@@ -432,7 +434,7 @@ export default function ActivityHudPage() {
             </select>
           </div>
 
-          <div className="hud-sort-explainer"><AlertTriangle size={14} /> Default ordering puts blocked, deadline-overrun, stale, or unconfirmed work first. Review is represented separately from failure. A local deadline is not a source failure.</div>
+          <div className="hud-sort-explainer"><AlertTriangle size={14} /> Default ordering puts blocked, deadline-overrun, stale, or unconfirmed work first. Review and deferred work are represented separately from failure. A local deadline is not a source failure.</div>
 
           <div className="activity-list" aria-live="polite">
             {visiblePage.length ? visiblePage.map((row) => <ActivityCard key={`${row.is_synthetic ? "synthetic" : "operational"}:${row.activity_id}`} row={row} now={now} />) : (

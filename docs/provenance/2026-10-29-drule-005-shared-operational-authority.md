@@ -1,7 +1,8 @@
 # DRULE-005 shared operational RuleBook authority provenance
 
-Date: 2026-10-29
+Date: 2026-10-29 through 2026-10-30
 Issue: #331
+PR: #371
 Environment: repository plus Supabase Test evaluation only
 Production activation: false
 Paid provider use: none
@@ -9,6 +10,19 @@ Paid provider use: none
 ## Purpose
 
 DRULE-005 makes the Durable RuleBook a shared fail-closed operational authority substrate for consequential execution across Foundry, Virtual Employee lifecycle operations, and MDO plan creation while preserving each subsystem's existing authorization, budget, idempotency, fencing, and recovery controls.
+
+## Recovery and lane provenance
+
+This work was recovered after conversation reasoning/context loss under the canonical CoMind Development Environment Contract. Durable GitHub evidence established that DRULE-004 had already completed and merged as PR #329, while DRULE-005 remained the sole unfinished RuleBook milestone owned by this lane.
+
+The interrupted DRULE-005 branch head was `36962e1dca0a33d24581872e9f7bb036d21747e1`. Recovery preserved that history rather than recreating or overwriting it.
+
+Two ancestry-preserving reconciliation commits were used as main advanced during recovery:
+
+- `8300bd78c6995b936057eb0dcc92892ac9a348b0`, first parent accepted VE-LIFE-002 main and second parent the interrupted DRULE-005 head;
+- `3c8b6c7a4b9002ef3564983d87b2af05f749f741`, first parent accepted MDO-002 main and second parent the recovered DRULE-005 line.
+
+No force rewrite discarded the interrupted history. Later HOME-002 changes were file-disjoint and were exercised through the PR merge-ref regression matrix.
 
 ## Architectural decision
 
@@ -88,6 +102,54 @@ A static acceptance test scans operational `server/src` and `server/scripts` fil
 
 The only allowed construction site is `server/src/rulebook-governed-runtimes.ts`.
 
+## MDO-002 bypass discovered and repaired
+
+The first reconciled DRULE-005 candidate exposed a real freshness regression introduced by the separately accepted MDO-002 lane. `server/src/mdo-planning-runtime.ts` had two new operational defaults that directly constructed `MdoOrchestrator`.
+
+The dedicated DRULE-005 gate failed on that raw construction. Foundry Runtime Orchestration and DRULE-002 also failed because their broad server suites execute the same no-bypass test. The failures were preserved rather than bypassed.
+
+The static rule was not weakened. Repair commit `ed65ba4a98351f543c5aaef8adc15c5a1fe79d99` changed both MDO-002 planning defaults to `GovernedMdoOrchestrator` and converted the raw MDO import to a TypeScript type-only import. MDO prompt construction, local Ollama routing, evidence persistence, work leases, fencing, contribution persistence, and provider-neutral behavior were otherwise unchanged.
+
+After repair:
+
+- DRULE-005 Shared Operational RuleBook Authority passed;
+- Foundry Runtime Orchestration passed;
+- DRULE-002 Successor Control Plane passed;
+- the MDO-002 deterministic adapter/worker/context tests passed;
+- the zero-cost ten-role local Ollama planning pilot passed and preserved its evidence;
+- broad CI passed at the job level;
+- CUX governed adapter, Chromium, Firefox, and WebKit desktop/mobile checks passed;
+- provider, budget, Foundry lease/readiness, implementation-integrity, No Placeholder, DRB, and repository configuration checks passed.
+
+No paid provider was used by the MDO pilot.
+
+## Supabase Test evaluation proof
+
+Supabase Test project: `sbgfuanxiqepcoboxzcl`.
+
+Canonical scope used for evaluation:
+
+- organization `CoMind, Inc.`: `997bfcdf-e42f-4757-8d1c-d0da44d26482`;
+- project `COMIND`: `8ac9fab3-35df-48fb-b1df-95285fee9dc0`.
+
+All RuleBook calls used `comind_pm.governance_preflight(..., false)`, so runtime decisions were evaluated without recording a durable decision.
+
+Observed results:
+
+- C11 ordinary structured consequential input: `allow`, `TRUST_BOUNDARY_ACCEPTABLE`;
+- C11 secret-disclosure request: `deny`, `UNTRUSTED_SECRET_REQUEST`;
+- C17 canonical same tenant/project scope: `allow`, `SAME_SCOPE`;
+- C17 synthetic cross-project scope: `deny`, `CROSS_SCOPE_DENIED`.
+
+Before and after reconciliation was exact:
+
+- RuleBook runtime decisions: `5 -> 5`;
+- paid API executions: `0 -> 0`;
+- API cost receipts: `0 -> 0`;
+- budget reservations: `0 -> 0`.
+
+No Supabase schema, RLS, role grant, or Production state was changed by DRULE-005.
+
 ## Safety boundaries
 
 DRULE-005 does not:
@@ -106,10 +168,14 @@ C13 remains mandatory on the governed provider path. The shared operational help
 ## Acceptance sequence
 
 1. Dedicated exact-head Node 24 build and shared-authority test.
-2. Existing provider, Foundry, VE, and MDO kernel regressions.
+2. Existing provider, Foundry, VE, MDO-001, MDO-002, and lifecycle regressions.
 3. Full non-database server regression suite.
 4. Broad repository CI and inherited implementation-integrity/no-placeholder gates.
 5. Supabase Test read-only/evaluation proof using `record=false`, with before/after RuleBook decision-count reconciliation.
 6. No paid execution, cost receipt, or budget reservation change.
-7. Final current-main collision review.
-8. Expected-head merge only after every returned exact-head workflow is green.
+7. Current-main collision review and merge-ref proof against newer accepted lanes.
+8. Expected-head merge only after every substantive final-head workflow is green.
+
+## Completion boundary
+
+DRULE-005 is ready for final exact-head acceptance once this documentation-complete head is generated. Production activation remains outside this milestone. Historical DRULE-002 archaeology remains independently open and is not a blocker to successor operational RuleBook adoption.

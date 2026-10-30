@@ -1,0 +1,100 @@
+name: GER-002 Epistemic Persistence
+
+on:
+  pull_request:
+    paths:
+      - 'db/migrations/*ger_002*'
+      - 'db/migrations/verify_*ger_002*'
+      - 'server/src/epistemic/**'
+      - 'server/test/ger-persistence.integration.test.mjs'
+      - '.github/workflows/ger-002-epistemic-persistence.yml'
+      - 'docs/architecture/ger-002-epistemic-persistence-contract.md'
+      - 'docs/provenance/2026-10-30-ger-002-persistence-contract.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exact-head-persistence-proof:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+
+      - name: Apply GER-002 migrations to isolated PostgreSQL 17
+        shell: bash
+        run: |
+          set -euo pipefail
+          for migration in \
+            db/migrations/20261030133633_ger_002_epistemic_case_persistence_contract.sql \
+            db/migrations/20261030133740_ger_002_epistemic_persistence_hardening.sql \
+            db/migrations/20261030133825_ger_002_payload_validation_privilege_hardening.sql \
+            db/migrations/20261030134047_ger_002_relationship_fk_index_hardening.sql
+          do
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
+          done
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+            -f db/migrations/verify_20261030133633_ger_002_epistemic_case_persistence_contract.sql
+
+      - name: Install server dependencies
+        run: |
+          cd server
+          npm ci
+
+      - name: Audit production dependencies
+        run: |
+          cd server
+          npm audit --omit=dev --audit-level=high
+
+      - name: Typecheck and build
+        run: |
+          cd server
+          npm run build
+
+      - name: Run deterministic GER policy tests
+        run: |
+          cd server
+          node --test test/ger.test.mjs
+
+      - name: Run GER persistence integration proof
+        run: |
+          cd server
+          node --test test/ger-persistence.integration.test.mjs

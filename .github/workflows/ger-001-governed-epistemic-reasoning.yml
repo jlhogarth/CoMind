@@ -1,0 +1,51 @@
+name: GER-001 Governed Epistemic Reasoning
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/ger-001-governed-epistemic-reasoning.yml'
+      - 'server/src/epistemic/ger.ts'
+      - 'server/test/ger.test.mjs'
+      - 'docs/architecture/ger-001-governed-epistemic-reasoning.md'
+      - 'docs/provenance/2026-10-30-ger-001-foundation.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deterministic-ger-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify exact checked-out head
+        working-directory: .
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+      - name: Use Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install exact dependencies
+        run: npm ci
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - name: Build server
+        run: npm run build
+      - name: Prove deterministic GER policy contract
+        run: node --test test/ger.test.mjs
+      - name: Run server regression suite
+        run: npm test

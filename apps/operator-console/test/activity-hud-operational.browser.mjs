@@ -198,6 +198,7 @@ try {
   assert.equal(await page.getByText("Live Foundry LF-3 Security and Compatibility Readiness", { exact: true }).count(), 0);
   assert.equal((await cards.count()) > 0, true);
 
+  await page.getByLabel("Filter source", { exact: true }).selectOption("all");
   await page.getByLabel("Choose Activity HUD data scope").selectOption("synthetic");
   await page.getByText("Synthetic activity 1", { exact: true }).waitFor();
   assert.equal(await cards.count(), 5);

@@ -36,6 +36,8 @@ The active HCH-001 lane was initially found to be changing `server/src/conversat
 
 A later freshness check found that current `main` had advanced and now owned migration numbers `20261030_023`, `20261030_024`, and `20261030_025`. CFR-002 was therefore renumbered to `20261030_026` before reconciliation with current `main`. The earlier `_023` CFR path was removed from the branch and was never merged to `main`.
 
+After PR #388 merged, MDO-005T freshness checking found that current `main` also contained MDO-004 at `20261030_026`, creating a duplicate repository migration slot. Canonical Supabase Test already contained MDO-004 and had never applied CFR-002. CFR-002R issue #418 therefore renames only the unapplied CFR-002 repository migration to `20261030_030`, verified free on `main` and every open PR at repair time. The migration SQL bytes are unchanged.
+
 ## External contract verification
 
 Official OpenAI Responses streaming documentation was checked on 2026-10-30 before encoding supported event names.
@@ -62,7 +64,7 @@ The API reference also lists `response.reasoning_text.delta` and `.done`. CFR-00
 
 Migration:
 
-`db/migrations/20261030_026_cfr_002_dual_acquisition_foundation.sql`
+`db/migrations/20261030_030_cfr_002_dual_acquisition_foundation.sql`
 
 ### `cm_conversation_acquisition_observation`
 

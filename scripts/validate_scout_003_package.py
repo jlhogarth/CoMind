@@ -26,11 +26,12 @@ assert all(len(s['content_sha256']) == 64 for s in required)
 withdrawn = [s for s in packet['sources'] if s['lifecycle_status'] == 'withdrawn']
 assert len(withdrawn) == 1 and withdrawn[0]['superseded_by_ref_id']
 assert packet['open_web_discovery_allowed'] is False
+prohibited_markers = ('TO' + 'DO', 'PLACE' + 'HOLDER', 'TB' + 'D')
 for path in [
     ROOT / '.github/workflows/scout-003.yml',
     ROOT / 'server/test/support/scout-003-live-first-day.mjs',
     ROOT / 'server/test/scout-003-contract.test.mjs',
 ]:
     text = path.read_text()
-    assert 'TODO' not in text and 'PLACEHOLDER' not in text and 'TBD' not in text
+    assert all(marker not in text for marker in prohibited_markers)
 print('pass|scout-003-package|issue=427|required_sources=3|human_attestation=true|max_tasks=1|cost_usd=0')

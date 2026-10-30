@@ -53,6 +53,14 @@ The GER-003 integration proof is guarded by `GER_HYPOTHESIS_INTEGRATION=1`. A ge
 
 The dedicated workflow uses PostgreSQL 17, applies the accepted GER-002 migrations, verifies the GER-002 persistence contract, builds the server, runs deterministic GER tests, runs GER-003 unit tests, runs the full server regression suite, and executes the GER-003 integration fixture.
 
+## First exact-head failure and repair
+
+PR #422 first exact-head candidate `0f5e0847576529ce03dc7212692abab0877781a5` passed the TypeScript build, GER foundation tests, GER-003 deterministic tests, and full server regression suite. The dedicated PostgreSQL integration fixture then failed closed on `comind.cm_epistemic_event` constraint `cm_epistemic_event_target_shape`.
+
+Cause: the fixture supplied `targetObjectId` to case-level `case_concluded` and `case_reopened` events. The accepted GER-002 persistence contract requires case-level events to have both target columns null. Object state and case state are separate concerns.
+
+Repair: remove object targets from the two case-level fixture events. No GER-002 schema or production state was changed. This is a fixture-contract correction, not a persistence-policy weakening.
+
 ## Explicit non-goals
 
 GER-003 does not activate Production, create a second hypothesis store, migrate legacy ILP or decision-tree tables, expand Agent or Virtual Employee authority, change Digital Twin identity/promotion, create a paid provider commitment, or weaken RuleBook, evidence, or L4A controls.

@@ -28,7 +28,7 @@ test('research create rejects unsupported lifecycle state before querying', asyn
       url: '/api/research',
       payload: {
         title: 'Invalid lifecycle',
-        url: 'https://example.com/reference',
+        url: 'https://comindinc.com/internal/verification/rlib-lifecycle',
         lifecycle_status: 'latest',
       },
     });
@@ -46,6 +46,7 @@ test('research create accepts governed metadata and persists through canonical t
         ref_id: '11111111-1111-4111-8111-111111111111',
         title: 'NIST AI RMF 1.0',
         url: 'https://doi.org/10.6028/NIST.AI.100-1',
+        document_identifier: 'NIST AI 100-1',
         source_kind: 'framework',
         authority_level: 'primary_authoritative',
         lifecycle_status: 'current',
@@ -71,7 +72,7 @@ test('research create accepts governed metadata and persists through canonical t
     });
 
     assert.equal(response.statusCode, 201);
-    assert.equal(response.json().document_identifier ?? 'NIST AI 100-1', 'NIST AI 100-1');
+    assert.equal(response.json().document_identifier, 'NIST AI 100-1');
     assert.equal(calls.length, 1);
     assert.match(calls[0].text, /INSERT INTO comind\.cm_research_refs/);
     assert.ok(calls[0].params.includes('primary_authoritative'));

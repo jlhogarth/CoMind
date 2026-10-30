@@ -26,7 +26,7 @@ permissions:
 
 concurrency:
   group: mdo-003-test-acceptance-${{ github.event.pull_request.number || github.run_id }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   contract:

@@ -12,7 +12,7 @@ IIC-004 reuses the existing Integrity Governance workflow rather than creating a
 
 ## Registry composition
 
-The initial registry contains 24 cataloged controls.
+The registry contains 24 cataloged controls.
 
 Truthful maturity at creation:
 
@@ -21,16 +21,26 @@ Truthful maturity at creation:
 - NFS-001: PROVEN, candidate-only and nonblocking;
 - 21 successor controls: DEFINED only, with no detector or accepted-verification claim.
 
+The compact registry schema separates `implemented_controls` from `defined_controls`, so a definition-only control cannot accidentally inherit detector or enforcement fields.
+
 The four NFS candidate fingerprints reviewed in PR #346 are recorded as `accepted-pattern` with rationale, evidence source, and reconsideration triggers. They are not added to a scanner baseline or exclusion list.
 
-## Local verification
+## Initial verification
 
 Before repository write:
 
 - canonical registry validation passed;
-- 9 registry adversarial tests passed.
+- 9 initial registry adversarial tests passed.
 
-The suite covers duplicate IDs, definition-only detector overclaim, false enforcement state, backward maturity transitions, missing reconsideration triggers, unknown reviewed controls, missing detector paths, and silent NDT maturity downgrade.
+## No Placeholder collision and repair
+
+The first exact-head PR run failed the existing No Placeholder Policy because the NPH definition itself used the explanatory token `TODO-bound`. The policy scanner correctly treats `TODO` as an unresolved development marker and does not infer semantic context.
+
+The gate was not weakened and no exclusion was added. The definition was reworded to `unfinished-marker-bound behavior`.
+
+During the repair, the registry was also simplified so the three implemented controls and 21 definition-only controls occupy separate structural collections. The validator was adapted to the compact schema and now additionally requires exactly 24 unique cataloged controls. The adversarial suite increased to 10 tests.
+
+The failed exact-head run remains development evidence and a fresh exact-head run is required after repair.
 
 ## Storage decision
 

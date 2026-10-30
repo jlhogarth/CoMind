@@ -166,7 +166,7 @@ try {
   assert.equal(await page.getByLabel("Choose Activity HUD data scope").inputValue(), "operational");
   assert.equal(await page.getByText("Synthetic activity 1", { exact: true }).count(), 0);
 
-  const sourceOptions = await page.getByLabel("Filter source").locator("option").allTextContents();
+  const sourceOptions = await page.getByLabel("Filter source", { exact: true }).locator("option").allTextContents();
   for (const expected of ["Github", "Supabase", "Chatgpt", "Drive"]) {
     assert.equal(sourceOptions.includes(expected), true, `real source dropdown should include ${expected}`);
   }
@@ -182,11 +182,11 @@ try {
     "https://github.com/jlhogarth/CoMind/issues/250",
   );
 
-  await page.getByLabel("Filter source").selectOption("drive");
+  await page.getByLabel("Filter source", { exact: true }).selectOption("drive");
   const driveCard = page.locator(".activity-card").filter({ hasText: "Research Source RunBook projection synchronized" });
   await driveCard.locator("summary").click();
   assert.equal(await driveCard.locator(".source-reference a").count(), 0, "opaque Drive refs must remain text");
-  await page.getByLabel("Filter source").selectOption("all");
+  await page.getByLabel("Filter source", { exact: true }).selectOption("all");
 
   const cards = page.locator(".activity-card");
   assert.equal(await cards.count(), 10);
@@ -194,7 +194,7 @@ try {
   await page.getByRole("button", { name: "Next page" }).click();
   assert.equal(await cards.count(), 3);
 
-  await page.getByLabel("Filter source").selectOption("github");
+  await page.getByLabel("Filter source", { exact: true }).selectOption("github");
   assert.equal(await page.getByText("Live Foundry LF-3 Security and Compatibility Readiness", { exact: true }).count(), 0);
   assert.equal((await cards.count()) > 0, true);
 

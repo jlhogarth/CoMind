@@ -29,7 +29,11 @@
 .hud-shell .coverage-note,
 .hud-shell .hud-footer,
 .hud-shell .hud-side-note,
-.hud-shell .hud-side-note b {
+.hud-shell .hud-side-note b,
+.hud-shell .hud-empty,
+.hud-shell .hud-empty span,
+.hud-shell .hud-brand span,
+.hud-shell .hud-sidebar nav a.active {
   font-size: 12px;
   line-height: 1.5;
 }
@@ -126,12 +130,40 @@
   outline-offset: 2px;
 }
 
+/* The landing page is a CSS-module surface, so use stable semantic markup
+ * rather than module-generated class names for CUX readability overrides. */
+main:not(.hud-shell) [aria-label="Current control plane scope"] span,
+main:not(.hud-shell) [aria-label="Current control plane scope"] kbd,
+main:not(.hud-shell) section[aria-labelledby="control-plane-title"] p:first-of-type,
+main:not(.hud-shell) [aria-label="Control plane design principles"] span,
+main:not(.hud-shell) section[aria-labelledby="quick-actions-heading"] p,
+main:not(.hud-shell) section[aria-labelledby="quick-actions-heading"] a span,
+main:not(.hud-shell) article:has(a[href="/activity"]) strong,
+main:not(.hud-shell) article:has(a[href="/activity"]) p,
+main:not(.hud-shell) article:has(a[href="/activity"]) a,
+main:not(.hud-shell) aside:has(a[href*="/issues/291"]) p,
+main:not(.hud-shell) aside:has(a[href*="/issues/291"]) a,
+main:not(.hud-shell) aside[aria-label="CoMind control plane navigation"] > div span {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+@media (max-width: 1000px) {
+  /* The original compact sidebar represented CoMind by a first letter at
+   * tablet and phone-landscape widths. Keep the full brand readable. */
+  .hud-shell .hud-brand,
+  .hud-shell .hud-brand:first-letter {
+    font-size: 14px;
+  }
+}
+
 @media (max-width: 650px) {
   /* Primary phone controls use a 44px interaction target while desktop
    * retains the denser operational layout. */
   .hud-shell .hud-refresh,
   .hud-shell .hud-export,
   .hud-shell .hud-search,
+  .hud-shell .hud-search input,
   .hud-shell .hud-filters select,
   .hud-shell .hud-page-controls select,
   .hud-shell .hud-page-controls button,
@@ -193,9 +225,42 @@
   }
 
   /* The Control Plane side navigation measured 43px in CUA. Preserve its
-   * layout and close the one-pixel mobile target gap without depending on
-   * CSS-module implementation names. */
+   * layout and close the one-pixel phone target gap. */
   main:not(.hud-shell) > aside nav a {
+    min-height: 44px !important;
+  }
+}
+
+/* The phone-landscape profile is 844x390. Width-only phone media queries
+ * do not apply there, so explicitly preserve the same interaction target. */
+@media (max-width: 900px) and (max-height: 500px) {
+  .hud-shell .hud-refresh,
+  .hud-shell .hud-export,
+  .hud-shell .hud-search,
+  .hud-shell .hud-search input,
+  .hud-shell .hud-filters select,
+  .hud-shell .hud-page-controls select,
+  .hud-shell .hud-page-controls button,
+  .hud-shell .hud-filters > label:not(.hud-search):not(.sr-only) input,
+  .hud-shell .hud-filters > label:not(.hud-search):not(.sr-only) select,
+  .hud-shell .hud-sidebar nav a.active {
     min-height: 44px;
+  }
+
+  .hud-shell .hud-page-controls button {
+    min-width: 44px;
+  }
+
+  .hud-shell .hud-refresh,
+  .hud-shell .hud-export,
+  .hud-shell .hud-search input,
+  .hud-shell .hud-filters select,
+  .hud-shell .hud-page-controls select,
+  .hud-shell .hud-page-controls button {
+    font-size: 13px;
+  }
+
+  main:not(.hud-shell) > aside nav a {
+    min-height: 44px !important;
   }
 }

@@ -177,6 +177,39 @@ Repair commit:
 
 `a073bcd72b60c9c0db466cfba66351d9703176c4`
 
+## DRULE-005 reconciliation
+
+While CE-004 acceptance was running, DRULE-005 merged to `main` as:
+
+`ca6e64179fd60ccdc54087af01abd8b5a4014e16`
+
+DRULE-005 changed eight RuleBook/MDO/Foundry files. Its paths were inspected and were disjoint from CE-004's seven files. Its authority contract is compatible with CE-004: RuleBook remains the operational authority substrate for its owned execution paths, while CE-004 records the lifecycle of CE friction/failure observations.
+
+CE-004 was reconciled on the same branch with both histories preserved. Reconciliation commit:
+
+`6005ab3ca275ee21d12bad72496398f32f2300af`
+
+Post-reconciliation compare against `ca6e64179fd60ccdc54087af01abd8b5a4014e16` was zero commits behind and exactly seven additive CE-004 files.
+
+The pre-reconciliation green matrix remains predecessor evidence only. Final acceptance must run on the reconciled head.
+
+## Supabase Test proof
+
+Migration `20261030_021_ce_004_friction_failure_register` was applied to canonical CoMind Supabase Test only.
+
+Readback proved:
+
+- seven real historical CE failure signals projected into the register;
+- all seven remained `untriaged` without historical mutation;
+- lifecycle event count remained zero immediately after migration;
+- `service_role` had no direct INSERT/UPDATE/DELETE on the event table;
+- `service_role` had execution authority for the constrained lifecycle writer;
+- existing `v_ce_signal_backlog` remained intact.
+
+A rollback-only Test proof used the existing CE-002 failure signal `73b23417-6fda-47ca-9133-47bffb7ebb8a` through the constrained service-role path. After rollback it was again `untriaged`, pattern key was null, and event count was zero.
+
+Production was not migrated or activated.
+
 ## Implementation decision
 
 A new table is justified only for the missing append-only lifecycle history:
@@ -230,16 +263,44 @@ No browser/Data API role receives direct write privileges. `service_role` is lim
 
 ## Acceptance state
 
-At this provenance checkpoint, exact-head CI has not yet been claimed as passed. The dedicated CE-004 workflow is the acceptance authority for:
+The reconciled final candidate is:
 
-- PostgreSQL 17 schema and transition proof;
-- constrained privilege proof;
-- deterministic server adapter;
-- TypeScript build;
-- production dependency audit;
-- full server regressions.
+`6005ab3ca275ee21d12bad72496398f32f2300af`
 
-The final accepted candidate must include this provenance update and must rerun the dedicated and broad exact-head gates. Broad repository workflows and final freshness/collision checks remain required before review readiness.
+Dedicated CE-004 exact-head run `41045807589` passed both jobs:
+
+- PostgreSQL 17 substrate, migration, and full lifecycle verifier;
+- dependency audit, TypeScript build, focused adapter tests, and full server regression suite.
+
+Generic CI run `41045807680` passed all jobs, including:
+
+- ordinary server build/tests/audit;
+- devcontainer runtime;
+- real HTTP/PostgreSQL and browser reload persistence;
+- conversation lifecycle integration;
+- PM ledger migration;
+- Foundry agent substrate;
+- SDN Test ingestion;
+- FinOps budget authority.
+
+Additional reconciled-head workflows passed:
+
+- Repository Configuration;
+- Integrity Governance;
+- Implementation Integrity;
+- No Placeholder Policy;
+- Lane Health Sentinel;
+- CE-002 Recovery and Reorientation;
+- DRB-002 Query Contract;
+- Runtime Budget Authority;
+- Governed Provider Execution;
+- Foundry Work Lease Kernel;
+- Foundry Terminal Lifecycle;
+- Foundry Runtime Orchestration;
+- Live Foundry Stage 1, LF-2, and LF-3 readiness;
+- bounded Foundry Test one-shot local handoff.
+
+At this checkpoint, current `main` remains `ca6e64179fd60ccdc54087af01abd8b5a4014e16` and no second freshness drift has occurred.
 
 No Production migration has been applied.
 No paid provider call has been made.

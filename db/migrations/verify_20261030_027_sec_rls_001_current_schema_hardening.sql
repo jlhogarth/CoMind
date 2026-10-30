@@ -132,8 +132,22 @@ BEGIN
       RAISE EXCEPTION 'SEC-RLS-001 reconciler lost recovery-checkpoint read grant';
     END IF;
     IF to_regclass('comind.cm_message_analytics') IS NOT NULL
-       AND has_table_privilege('comind_conversation_reconciler','comind.cm_message_analytics','SELECT,INSERT,UPDATE,DELETE') THEN
-      RAISE EXCEPTION 'SEC-RLS-001 reconciler unexpectedly gained analytics DML';
+       AND (
+         has_table_privilege('comind_conversation_reconciler','comind.cm_message_analytics','SELECT')
+         OR has_table_privilege('comind_conversation_reconciler','comind.cm_message_analytics','INSERT')
+         OR has_table_privilege('comind_conversation_reconciler','comind.cm_message_analytics','UPDATE')
+         OR has_table_privilege('comind_conversation_reconciler','comind.cm_message_analytics','DELETE')
+       ) THEN
+      RAISE EXCEPTION 'SEC-RLS-001 reconciler unexpectedly gained message-analytics privilege';
+    END IF;
+    IF to_regclass('comind.cm_conversation_analytics') IS NOT NULL
+       AND (
+         has_table_privilege('comind_conversation_reconciler','comind.cm_conversation_analytics','SELECT')
+         OR has_table_privilege('comind_conversation_reconciler','comind.cm_conversation_analytics','INSERT')
+         OR has_table_privilege('comind_conversation_reconciler','comind.cm_conversation_analytics','UPDATE')
+         OR has_table_privilege('comind_conversation_reconciler','comind.cm_conversation_analytics','DELETE')
+       ) THEN
+      RAISE EXCEPTION 'SEC-RLS-001 reconciler unexpectedly gained conversation-analytics privilege';
     END IF;
   END IF;
 

@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "protocolId": "HAI-010-CONTINUITY-COMPARISON-v1",
+  "protocolVersion": "1.0.0",
+  "lane": "HAI-010",
+  "issue": 417,
+  "leaseBaseCommit": "fef77eeb46c6844774d7527e674f028e00b45098",
+  "domain": "continuity",
+  "frozenHai009": {
+    "protocolId": "HAI-009-CONTINUITY-PILOT-v1",
+    "protocolVersion": "1.0.0",
+    "manifestPath": "config/hai-009-continuity-pilot.v1.json",
+    "manifestSha256": "b15611028f4b87b2ad4be60f46a4b3a0731b6e075b54d018238f16626d80cf5d",
+    "scorerPath": "scripts/hai_009_continuity_pilot.mjs",
+    "scorerSha256": "6e0d1c9747645d6063148da77ad35c093af2261986872319ce0440006cd9f438",
+    "immutable": true
+  },
+  "executionBoundary": {
+    "phase": "synthetic_implementation_comparison",
+    "fixedExecutionTimestamp": "2026-10-30T16:40:05.000Z",
+    "realParticipantDataAllowed": false,
+    "privateUserDataAllowed": false,
+    "paidProviderAllowed": false,
+    "productionMutationAllowed": false,
+    "schemaMutationAllowed": false,
+    "phaseBActivated": false,
+    "claimBoundary": "Synthetic engineering comparison of frozen HAI-009 semantic observations plus actual CoMind mechanism execution. It does not establish human benefit, psychological construct validity, or Phase B efficacy."
+  },
+  "conditions": [
+    {
+      "id": "FRESH_SESSION",
+      "adapter": "fresh_session_none",
+      "actualMechanism": "none",
+      "description": "No retained state or continuity mechanism is provided."
+    },
+    {
+      "id": "MEMORY_ONLY",
+      "adapter": "conversation_history_retention_only",
+      "actualMechanism": "CHIST-001 isolated Conversation History reader proof",
+      "description": "Actual retained Conversation History content is read from isolated synthetic PostgreSQL and sanitized to retention-only message content with governed annotations withheld."
+    },
+    {
+      "id": "GOVERNED_CONTINUITY",
+      "adapter": "threadkeeper_capsule",
+      "actualMechanism": "ThreadKeeper service plus continuity capsule and precondition runtime",
+      "description": "Actual ThreadKeeper observation, assessment, checkpoint acceptance, handoff integrity, capsule integrity, precondition, and fidelity mechanisms are exercised using synthetic fixture references and synthetic external Test authority."
+    }
+  ],
+  "fixtures": [
+    "ATLAS_RELEASE",
+    "MERIDIAN_MIGRATION",
+    "HARBOR_EVENT"
+  ],
+  "metricSource": "frozen_hai009_synthetic_observation_contract",
+  "mechanismEvidencePolicy": {
+    "separateFromMetrics": true,
+    "fixtureInputsMustBeLabeled": true,
+    "systemProducedMustBeLabeled": true,
+    "memoryOnlyForbiddenKeys": [
+      "authority",
+      "checkpoint",
+      "capsule",
+      "provenance",
+      "correction",
+      "unresolved",
+      "evidence",
+      "sourceRef",
+      "continuityDigest",
+      "policyRef",
+      "lineage",
+      "governance"
+    ],
+    "globalCompositeScoreAllowed": false
+  },
+  "memoryOnlyProof": {
+    "setupScript": "scripts/test_chist_001_conversation_history.sh",
+    "preflightPath": "/tmp/chist_preflight.json",
+    "showPath": "/tmp/chist_show.json",
+    "expectedReaderRole": "comind_conversation_history_reader",
+    "expectedSyntheticConversationId": "native-history-1",
+    "privateDataAllowed": false
+  },
+  "acceptance": {
+    "expectedTrialCount": 9,
+    "expectedFixtureCount": 3,
+    "expectedConditionCount": 3,
+    "requireDeterministicReplay": true,
+    "requireConditionSeparation": true,
+    "requireFrozenHai009Hashes": true,
+    "requireActualGovernedMechanisms": true,
+    "requireActualMemoryReaderProof": true,
+    "singleHaiMaturityScoreAllowed": false
+  }
+}

@@ -1,0 +1,73 @@
+name: SCOUT-002 Minimum C1 Research Package
+
+on:
+  push:
+    branches:
+      - scout-002-minimum-c1-research-package
+    paths:
+      - '.github/workflows/scout-002.yml'
+      - 'docs/ve/scout/SCOUT-002-*.json'
+      - 'docs/ve/scout/SCOUT-R001-*.json'
+      - 'scripts/provision_scout_001_draft.sql'
+      - 'scripts/provision_scout_002_c1_research_package.sql'
+      - 'scripts/validate_scout_002_package.py'
+      - 'scripts/test_scout_002_c1_research.sh'
+      - 'server/src/foundry-runtime.ts'
+      - 'server/src/providers/ollama-foundry-adapter.ts'
+      - 'server/test/integration/scout-002-c1-research.test.mjs'
+  pull_request:
+    paths:
+      - '.github/workflows/scout-002.yml'
+      - 'docs/ve/scout/SCOUT-002-*.json'
+      - 'docs/ve/scout/SCOUT-R001-*.json'
+      - 'scripts/provision_scout_001_draft.sql'
+      - 'scripts/provision_scout_002_c1_research_package.sql'
+      - 'scripts/validate_scout_002_package.py'
+      - 'scripts/test_scout_002_c1_research.sh'
+      - 'server/src/foundry-runtime.ts'
+      - 'server/src/providers/ollama-foundry-adapter.ts'
+      - 'server/test/integration/scout-002-c1-research.test.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scout-002-isolated-acceptance:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.6-pg17-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+
+      - name: Validate package and run isolated Foundry acceptance
+        run: bash ./scripts/test_scout_002_c1_research.sh

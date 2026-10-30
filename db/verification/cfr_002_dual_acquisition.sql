@@ -150,6 +150,7 @@ INSERT INTO comind.cm_conversation_acquisition_observation (
   'c0020000-0000-4000-8000-000000000105'::uuid,
   'c0020000-0000-4000-8000-000000000001'::uuid,
   'chatgpt_browser_observed',
+  'browser_synthetic_1',
   'future_private_event_shape',
   'browser_event_drift',
   3,

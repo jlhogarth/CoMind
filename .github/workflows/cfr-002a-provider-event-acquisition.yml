@@ -9,6 +9,8 @@ on:
       - 'server/src/app.ts'
       - 'server/src/conversation-acquisition-store.ts'
       - 'server/src/conversation-acquisition.ts'
+      - 'db/verification/cfr_002_dual_acquisition.sql'
+      - 'scripts/test_cfr_002_dual_acquisition.sh'
       - 'server/test/openai-provider-streaming.test.mjs'
       - 'server/test/integration/assistant-continuity-streaming.test.mjs'
       - 'server/test/integration/conversation-acquisition-store.test.mjs'

@@ -1,0 +1,98 @@
+name: HAI-010 Continuity Implementation Comparison
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'config/hai-010-continuity-comparison.v1.json'
+      - 'scripts/hai_010_continuity_comparison.mjs'
+      - 'server/test/support/hai-010-continuity-adapter.mjs'
+      - 'server/test/hai-010-continuity-comparison.test.mjs'
+      - 'docs/research/HAI-010-continuity-implementation-comparison.md'
+      - 'docs/provenance/*hai-010*'
+      - '.github/workflows/hai-010-continuity-comparison.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate HAI-010 continuity comparison
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.6-pg17-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+
+      - name: Build current CoMind server runtime
+        working-directory: server
+        run: |
+          npm ci
+          npm run build
+
+      - name: Prove actual isolated Conversation History reader
+        run: bash ./scripts/test_chist_001_conversation_history.sh
+
+      - name: Re-run frozen HAI-009 contract
+        run: node --test server/test/hai-009-continuity-pilot.test.mjs
+
+      - name: Run adversarial HAI-010 contract tests
+        run: node --test server/test/hai-010-continuity-comparison.test.mjs
+
+      - name: Execute HAI-010 synthetic comparison
+        run: |
+          mkdir -p artifacts
+          node scripts/hai_010_continuity_comparison.mjs \
+            --memory-show /tmp/chist_show.json \
+            --memory-preflight /tmp/chist_preflight.json \
+            --out artifacts/hai-010-synthetic-execution.json
+
+      - name: Upload HAI-010 execution evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hai-010-continuity-comparison-validation
+          path: artifacts/hai-010-synthetic-execution.json
+          if-no-files-found: warn
+          retention-days: 30

@@ -1,7 +1,11 @@
-import { createClient } from "@supabase/supabase-js";
-
 import { assertActivityHudTestProject } from "@/lib/activity-hud/source";
 import { assertManagementPlaneSnapshot, type ManagementPlaneSnapshot } from "@/lib/management-plane/model";
+
+export interface ManagementPlaneRuntimeConfig {
+  supabaseUrl: string;
+  publishableKey: string;
+  capability: string;
+}
 
 export type ManagementPlaneEnvironment = Readonly<Record<string, string | undefined>>;
 
@@ -19,38 +23,68 @@ function required(name: string, value: string | undefined): string {
   return value.trim();
 }
 
-export function getManagementPlaneRuntimeConfig(environment: ManagementPlaneEnvironment = process.env) {
-  const url = required("NEXT_PUBLIC_SUPABASE_URL", environment.NEXT_PUBLIC_SUPABASE_URL);
-  const secretKey = required("SUPABASE_SECRET_KEY", environment.SUPABASE_SECRET_KEY);
+export function getManagementPlaneRuntimeConfig(
+  environment: ManagementPlaneEnvironment = process.env,
+): ManagementPlaneRuntimeConfig {
+  const supabaseUrl = required("NEXT_PUBLIC_SUPABASE_URL", environment.NEXT_PUBLIC_SUPABASE_URL);
+  const publishableKey = required("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", environment.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
+  const capability = required("OPERATOR_CONSOLE_MANAGEMENT_CAPABILITY", environment.OPERATOR_CONSOLE_MANAGEMENT_CAPABILITY);
   try {
-    assertActivityHudTestProject(url);
+    assertActivityHudTestProject(supabaseUrl);
   } catch (error) {
     throw new ManagementPlaneUnavailableError(
       "configuration",
       error instanceof Error ? error.message : "Management-plane project validation failed",
     );
   }
-  return { url, secretKey };
+  if (capability.length < 32) {
+    throw new ManagementPlaneUnavailableError("configuration", "OPERATOR_CONSOLE_MANAGEMENT_CAPABILITY is invalid.");
+  }
+  return { supabaseUrl, publishableKey, capability };
 }
 
 export async function readManagementPlaneSnapshot(
   environment: ManagementPlaneEnvironment = process.env,
+  fetchFn: typeof fetch = fetch,
 ): Promise<ManagementPlaneSnapshot> {
   const config = getManagementPlaneRuntimeConfig(environment);
   if (typeof window !== "undefined") throw new ManagementPlaneUnavailableError("configuration", "Management-plane client is server-only");
-  const client = createClient(config.url, config.secretKey, {
-    db: { schema: "public" },
-    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-  });
-  const { data, error } = await client.rpc("operator_console_l4a_management_plane");
-  if (error) throw new ManagementPlaneUnavailableError("upstream", `Management-plane upstream failed with ${error.code ?? "unknown"}`);
+
+  let response: Response;
   try {
-    assertManagementPlaneSnapshot(data);
+    response = await fetchFn(`${config.supabaseUrl}/rest/v1/rpc/operator_console_l4a_management_plane`, {
+      method: "POST",
+      cache: "no-store",
+      headers: {
+        apikey: config.publishableKey,
+        Authorization: `Bearer ${config.publishableKey}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ p_capability: config.capability }),
+    });
+  } catch {
+    throw new ManagementPlaneUnavailableError("upstream", "Management-plane upstream request failed");
+  }
+
+  if (!response.ok) {
+    throw new ManagementPlaneUnavailableError("upstream", `Management-plane upstream returned HTTP ${response.status}`);
+  }
+
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch {
+    throw new ManagementPlaneUnavailableError("upstream", "Management-plane upstream returned invalid JSON");
+  }
+
+  try {
+    assertManagementPlaneSnapshot(payload);
   } catch (error) {
     throw new ManagementPlaneUnavailableError(
       "upstream",
       error instanceof Error ? error.message : "Management-plane source returned invalid data",
     );
   }
-  return data;
+  return payload;
 }

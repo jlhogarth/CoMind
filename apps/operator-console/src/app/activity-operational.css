@@ -30,12 +30,20 @@
   border-left: 3px solid #79b8dc;
 }
 
+.activity-card.state-deferred {
+  border-left: 3px solid #8f9aa6;
+}
+
 .state-pill-blocked i {
   background: #e3a276;
 }
 
 .state-pill-awaiting_review i {
   background: #79b8dc;
+}
+
+.state-pill-deferred i {
+  background: #8f9aa6;
 }
 
 .hud-shell .hud-filters {

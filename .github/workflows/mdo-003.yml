@@ -4,6 +4,10 @@ on:
   pull_request:
     paths:
       - '.github/workflows/mdo-003.yml'
+      - 'server/test/support/mdo-live-test-db.mjs'
+      - 'server/test/support/mdo-live-test-fixtures.mjs'
+      - 'server/test/support/mdo-live-test-governance.mjs'
+      - 'server/test/support/mdo-live-test-runner.mjs'
       - 'server/test/support/mdo-live-test-harness.mjs'
       - 'server/test/integration/mdo-live-test-acceptance.e2e.mjs'
       - 'server/src/mdo-planning-runtime.ts'
@@ -58,6 +62,10 @@ jobs:
       - name: Check MDO-003 harness syntax
         working-directory: server
         run: |
+          node --check test/support/mdo-live-test-db.mjs
+          node --check test/support/mdo-live-test-fixtures.mjs
+          node --check test/support/mdo-live-test-governance.mjs
+          node --check test/support/mdo-live-test-runner.mjs
           node --check test/support/mdo-live-test-harness.mjs
           node --check test/integration/mdo-live-test-acceptance.e2e.mjs
       - name: Re-run MDO and CE deterministic contracts

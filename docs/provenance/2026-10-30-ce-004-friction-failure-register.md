@@ -66,7 +66,7 @@ CE-004 was applied and verified in canonical CoMind Supabase Test only. Historic
 
 Supabase migration history records the logical migration name `ce_004_friction_failure_register`; Production was not migrated or activated.
 
-## Final merge-authorized freshness reconciliation
+## Merge-authorized freshness reconciliation
 
 After Joseph explicitly authorized merge of PR #373, `main` had advanced by 36 commits from the previously accepted base to:
 
@@ -93,6 +93,6 @@ Post-reconciliation compare proved:
 - no inherited GER, RLIB, or MDO paths
 - no old CE-004 `_021` migration path
 
-This late migration collision and its repair invalidate the older exact-head acceptance as merge authority. The reconciled head and any subsequent documentation-only head must pass exact-head acceptance again before merge.
+Subsequent commits updated this provenance and the architecture record so the final repository evidence names the `_025` migration namespace explicitly. Those documentation changes require a final exact-head acceptance matrix before merge.
 
-Production remains unchanged. No paid provider call was made. Merge remains separately authorized by Joseph and will execute only after the fresh acceptance gates pass.
+Production remains unchanged. No paid provider call was made. Merge remains explicitly authorized by Joseph and will execute only after the fresh acceptance gates pass.

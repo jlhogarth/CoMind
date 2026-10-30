@@ -12,8 +12,8 @@ const { query, closePool } = await import('../../dist/db.js');
 
 after(closePool);
 
-async function setup(t, assistantProvider) {
-  const app = await buildApp({ assistantProvider, closePool: async () => {} });
+async function setup(t, assistantProvider, providerAcquisitionWriter) {
+  const app = await buildApp({ assistantProvider, ...(providerAcquisitionWriter ? { providerAcquisitionWriter } : {}), closePool: async () => {} });
   const ids = [];
   t.after(async () => {
     try {
@@ -223,4 +223,29 @@ test('interrupted streaming generation preserves partial deltas with no canonica
   );
   assert.equal(events[4].raw_payload.observed_delta_count, 2);
   assert.equal(events[4].raw_payload.captured_delta_count, 2);
+});
+
+
+test('provider acquisition is awaited before canonical assistant delta persistence', async (t) => {
+  const ordering = [];
+  const provider = { name: 'openai', async generateResponse(_request, observer) {
+    assert.ok(observer?.onProviderEvent);
+    await observer.onProviderEvent({ provider: 'openai', providerEndpoint: 'responses.create',
+      providerEventType: 'response.output_text.delta', providerSequenceNumber: 31,
+      providerResponseId: 'synthetic-acquisition-1', observedAt: '2026-10-30T16:50:00.000Z',
+      stage: observer.stage, payload: { type: 'response.output_text.delta', sequence_number: 31, delta: 'Ordered proof' } });
+    ordering.push('provider-continued');
+    await observer.onTextDelta({ delta: 'Ordered proof', stage: observer.stage, providerEventType: 'response.output_text.delta',
+      providerSequenceNumber: 31, providerResponseId: 'synthetic-acquisition-1' });
+    return { content: 'Ordered proof', metadata: { provider: 'openai', response_id: 'synthetic-acquisition-1' } };
+  } };
+  const writer = async (input) => { ordering.push(`acquisition:${input.event.providerEventType}`); return {
+    acquisitionObservationId: 'c002a000-0000-4000-8000-000000000001', normalizationId: 'c002a000-0000-4000-8000-000000000002',
+    normalizationStatus: 'normalized', normalizationClass: 'assistant_text_delta' }; };
+  const f = await setup(t, provider, writer); const id = await f.createConversation();
+  await f.appendUser(id, 'Prove acquisition ordering.'); const response = await f.generate(id);
+  assert.equal(response.statusCode, 201);
+  assert.deepEqual(ordering.slice(0, 2), ['acquisition:response.output_text.delta', 'provider-continued']);
+  const events = await captureEvents(id);
+  assert.equal(events.filter((row) => row.event_type === 'assistant_delta').map((row) => row.content_delta).join(''), 'Ordered proof');
 });

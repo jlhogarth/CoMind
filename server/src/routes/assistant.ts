@@ -2,11 +2,16 @@ import { performance } from 'node:perf_hooks';
 import { FastifyInstance } from 'fastify';
 import {
   AssistantProvider,
+  AssistantProviderEvent,
   AssistantResponseObserver,
   AssistantTextDelta,
   ConversationMessage,
   ConversationRole,
 } from '../assistant.js';
+import {
+  persistOpenAIProviderAcquisitionEvent,
+  type ProviderAcquisitionWriter,
+} from '../conversation-acquisition-store.js';
 import {
   ConversationLockRunner,
   QueryFunction,
@@ -142,7 +147,8 @@ export function registerAssistantRoutes(
   queryFn: QueryFunction = query,
   assistantProvider: AssistantProvider | null = null,
   maxHistoryMessages = 40,
-  conversationLock: ConversationLockRunner = withConversationLock
+  conversationLock: ConversationLockRunner = withConversationLock,
+  providerAcquisitionWriter: ProviderAcquisitionWriter = persistOpenAIProviderAcquisitionEvent
 ) {
   app.get('/api/assistant/status', async () => ({
     enabled: assistantProvider !== null,
@@ -333,8 +339,16 @@ export function registerAssistantRoutes(
       let observedDeltaCount = 0;
       let capturedDeltaCount = 0;
       let localDeltaSequence = 0;
+      let localProviderEventSequence = 0;
       const observer: AssistantResponseObserver = {
         stage: 'direct',
+        async onProviderEvent(event: AssistantProviderEvent) {
+          localProviderEventSequence += 1;
+          await providerAcquisitionWriter({
+            conversationId: id, generationId: claim.generation_id,
+            localSequence: localProviderEventSequence, event,
+          });
+        },
         async onTextDelta(event) {
           observedDeltaCount += 1;
           localDeltaSequence += 1;

@@ -6,6 +6,10 @@ import multipart from '@fastify/multipart';
 import { env } from './env.js';
 import { AssistantProvider } from './assistant.js';
 import { createConfiguredAssistantProvider } from './assistant-provider.js';
+import {
+  persistOpenAIProviderAcquisitionEvent,
+  type ProviderAcquisitionWriter,
+} from './conversation-acquisition-store.js';
 import { createCheckpointScheduler } from './continuity/scheduler.js';
 import { registerConversationRoutes } from './routes/conversations.js';
 import { registerIngestRoutes } from './routes/ingest.js';
@@ -35,6 +39,7 @@ type AppDependencies = {
   assistantProvider: AssistantProvider | null;
   assistantMaxHistoryMessages: number;
   conversationLock: ConversationLockRunner;
+  providerAcquisitionWriter: ProviderAcquisitionWriter;
   checkpointingEnabled: boolean;
 };
 
@@ -45,6 +50,7 @@ const defaultDependencies: AppDependencies = {
   assistantProvider: createConfiguredAssistantProvider(),
   assistantMaxHistoryMessages: env.ASSISTANT_MAX_HISTORY_MESSAGES,
   conversationLock: withConversationLock,
+  providerAcquisitionWriter: persistOpenAIProviderAcquisitionEvent,
   checkpointingEnabled: env.ACP_CHECKPOINTS_ENABLED,
 };
 
@@ -123,7 +129,8 @@ export async function buildApp(overrides: Partial<AppDependencies> = {}) {
     dependencies.query,
     dependencies.assistantProvider,
     dependencies.assistantMaxHistoryMessages,
-    dependencies.conversationLock
+    dependencies.conversationLock,
+    dependencies.providerAcquisitionWriter
   );
   registerMemoryRoutes(app, dependencies.query, dependencies.conversationLock);
   registerAdminRoutes(app);

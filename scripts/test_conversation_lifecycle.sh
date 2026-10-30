@@ -24,7 +24,8 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$fixture_file"
   mapfile -t integration_tests < <(
     find test/integration -maxdepth 1 -type f -name '*.test.mjs' \
       ! -name 'foundry-work-lease-kernel.test.mjs' \
-      ! -name 'foundry-runtime-orchestration.test.mjs' -print | sort
+      ! -name 'foundry-runtime-orchestration.test.mjs' \
+      ! -name 'scout-002-c1-research.test.mjs' -print | sort
   )
   if [[ "${#integration_tests[@]}" -eq 0 ]]; then
     echo "No conversation-lifecycle integration tests were discovered." >&2

@@ -28,7 +28,7 @@ printf 'Reconstructing accepted CoMind v2 substrate...\n'
 printf 'Applying CFR-002 dual-acquisition migration twice to prove replay safety...\n'
 for _ in 1 2; do
   psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
-    -f "${repository_root}/db/migrations/20261030_026_cfr_002_dual_acquisition_foundation.sql"
+    -f "${repository_root}/db/migrations/20261030_030_cfr_002_dual_acquisition_foundation.sql"
 done
 
 printf 'Running CFR-002 database evidence proof...\n'

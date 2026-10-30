@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   enforcement-contract:
-    name: Validate hard-enforcement contract
+    name: Validate hard-enforcement and registry contracts
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -31,3 +31,9 @@ jobs:
 
       - name: Run enforcement adversarial tests
         run: python scripts/test_integrity_enforcement_contract.py
+
+      - name: Validate canonical Integrity Registry
+        run: python scripts/validate_integrity_registry.py .
+
+      - name: Run Integrity Registry adversarial tests
+        run: python scripts/test_validate_integrity_registry.py

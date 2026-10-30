@@ -14,7 +14,7 @@ DECLARE
     v_profile_id uuid;
     v_capability_id uuid;
     v_active_grant_count integer;
-    v_resource_count integer;
+    v_resource_count integer := 0;
     v_budget_binding_count integer;
 BEGIN
     SELECT org_id INTO v_org_id
@@ -27,10 +27,10 @@ BEGIN
     SELECT project_id INTO v_project_id
     FROM comind.cm_project
     WHERE org_id = v_org_id
-      AND project_code::text = 'COMIND'
+      AND slug::text = 'comind'
       AND status = 'active';
     IF v_project_id IS NULL THEN
-        RAISE EXCEPTION 'SCOUT-002 requires active canonical COMIND project';
+        RAISE EXCEPTION 'SCOUT-002 requires active canonical CoMind project slug comind';
     END IF;
 
     SELECT actor_id INTO v_founder_actor_id
@@ -87,9 +87,15 @@ BEGIN
         RAISE EXCEPTION 'SCOUT-002 requires Scout to remain at zero active capability grants before package registration, found %', v_active_grant_count;
     END IF;
 
-    SELECT count(*) INTO v_resource_count
-    FROM comind.cm_actor_external_resource
-    WHERE actor_id = v_scout_actor_id;
+    -- External provider-resource projection is a later VE substrate surface and is
+    -- intentionally absent from the minimal v2 bootstrap. When present, it is an
+    -- authoritative zero-resource gate. When absent, this lane still cannot create
+    -- any provider resource and live Test readback supplies the authoritative check.
+    IF to_regclass('comind.cm_actor_external_resource') IS NOT NULL THEN
+        EXECUTE 'SELECT count(*) FROM comind.cm_actor_external_resource WHERE actor_id = $1'
+        INTO v_resource_count
+        USING v_scout_actor_id;
+    END IF;
     IF v_resource_count <> 0 THEN
         RAISE EXCEPTION 'SCOUT-002 requires zero Scout external resources, found %', v_resource_count;
     END IF;

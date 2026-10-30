@@ -6,7 +6,7 @@ SET search_path TO comind, public;
 -- seed only governed metadata and verified fingerprints for the five accepted
 -- RLIB-001 corpus records. Google Drive remains the document store. No PDF
 -- bytes, VE authority, provider authority, or Production activation live here.
-INSERT INTO comind.cm_research_refs(
+INSERT INTO comind.cm_research_refs AS existing(
   title,
   url,
   notes,
@@ -183,31 +183,31 @@ FROM (
   related_capabilities,metadata
 )
 ON CONFLICT (drive_file_id) WHERE drive_file_id IS NOT NULL DO UPDATE SET
-  notes = COALESCE(comind.cm_research_refs.notes, EXCLUDED.notes),
-  publisher = COALESCE(comind.cm_research_refs.publisher, EXCLUDED.publisher),
-  document_identifier = COALESCE(comind.cm_research_refs.document_identifier, EXCLUDED.document_identifier),
+  notes = COALESCE(existing.notes, EXCLUDED.notes),
+  publisher = COALESCE(existing.publisher, EXCLUDED.publisher),
+  document_identifier = COALESCE(existing.document_identifier, EXCLUDED.document_identifier),
   source_kind = CASE
-    WHEN comind.cm_research_refs.source_kind='web_reference' THEN EXCLUDED.source_kind
-    ELSE comind.cm_research_refs.source_kind
+    WHEN existing.source_kind='web_reference' THEN EXCLUDED.source_kind
+    ELSE existing.source_kind
   END,
   authority_level = CASE
-    WHEN comind.cm_research_refs.authority_level='unverified' THEN EXCLUDED.authority_level
-    ELSE comind.cm_research_refs.authority_level
+    WHEN existing.authority_level='unverified' THEN EXCLUDED.authority_level
+    ELSE existing.authority_level
   END,
-  version_label = COALESCE(comind.cm_research_refs.version_label, EXCLUDED.version_label),
-  published_on = COALESCE(comind.cm_research_refs.published_on, EXCLUDED.published_on),
-  drive_url = COALESCE(comind.cm_research_refs.drive_url, EXCLUDED.drive_url),
-  drive_folder_id = COALESCE(comind.cm_research_refs.drive_folder_id, EXCLUDED.drive_folder_id),
-  mime_type = COALESCE(comind.cm_research_refs.mime_type, EXCLUDED.mime_type),
-  byte_size = COALESCE(comind.cm_research_refs.byte_size, EXCLUDED.byte_size),
-  content_sha256 = COALESCE(comind.cm_research_refs.content_sha256, EXCLUDED.content_sha256),
-  fingerprint_algorithm = COALESCE(comind.cm_research_refs.fingerprint_algorithm, EXCLUDED.fingerprint_algorithm),
-  freshness_due_at = COALESCE(comind.cm_research_refs.freshness_due_at, EXCLUDED.freshness_due_at),
+  version_label = COALESCE(existing.version_label, EXCLUDED.version_label),
+  published_on = COALESCE(existing.published_on, EXCLUDED.published_on),
+  drive_url = COALESCE(existing.drive_url, EXCLUDED.drive_url),
+  drive_folder_id = COALESCE(existing.drive_folder_id, EXCLUDED.drive_folder_id),
+  mime_type = COALESCE(existing.mime_type, EXCLUDED.mime_type),
+  byte_size = COALESCE(existing.byte_size, EXCLUDED.byte_size),
+  content_sha256 = COALESCE(existing.content_sha256, EXCLUDED.content_sha256),
+  fingerprint_algorithm = COALESCE(existing.fingerprint_algorithm, EXCLUDED.fingerprint_algorithm),
+  freshness_due_at = COALESCE(existing.freshness_due_at, EXCLUDED.freshness_due_at),
   related_capabilities = CASE
-    WHEN cardinality(comind.cm_research_refs.related_capabilities)=0 THEN EXCLUDED.related_capabilities
-    ELSE comind.cm_research_refs.related_capabilities
+    WHEN cardinality(existing.related_capabilities)=0 THEN EXCLUDED.related_capabilities
+    ELSE existing.related_capabilities
   END,
-  metadata = COALESCE(comind.cm_research_refs.metadata,'{}'::jsonb) || EXCLUDED.metadata,
+  metadata = COALESCE(existing.metadata,'{}'::jsonb) || EXCLUDED.metadata,
   updated_at = now();
 
 -- Fail closed if a Drive identity already exists with bytes that disagree with
@@ -267,7 +267,7 @@ BEGIN
 END
 $$;
 
-INSERT INTO comind.cm_learning_path(
+INSERT INTO comind.cm_learning_path AS existing_path(
   slug,
   title,
   objective,
@@ -295,7 +295,7 @@ ON CONFLICT (slug) DO UPDATE SET
   title = EXCLUDED.title,
   objective = EXCLUDED.objective,
   audience = EXCLUDED.audience,
-  metadata = comind.cm_learning_path.metadata || EXCLUDED.metadata,
+  metadata = existing_path.metadata || EXCLUDED.metadata,
   updated_at = now();
 
 DO $$

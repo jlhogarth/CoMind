@@ -12,8 +12,10 @@ const AUTHORITY = 'C1';
 const ENVIRONMENT = 'isolated';
 const BROWSERS = ['chromium'];
 
-const { FoundryAdapterRegistry, FoundryRuntimeOrchestrator } =
+const { FoundryAdapterRegistry } =
   await import('../dist/foundry-runtime.js');
+const { GovernedFoundryRuntimeOrchestrator } =
+  await import('../dist/rulebook-governed-runtimes.js');
 const { createConsoleUsabilityFoundryAdapter } =
   await import('../dist/providers/console-usability-foundry-adapter.js');
 
@@ -203,7 +205,7 @@ try {
     browsers: BROWSERS,
     timeoutMs: 300_000,
   }));
-  const orchestrator = new FoundryRuntimeOrchestrator(query, registry);
+  const orchestrator = new GovernedFoundryRuntimeOrchestrator(query, registry);
   const execution = await orchestrator.execute({
     profileId: fixture.profile_id,
     capabilityCode: CAPABILITY_CODE,

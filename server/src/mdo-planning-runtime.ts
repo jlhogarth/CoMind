@@ -9,11 +9,12 @@ import {
   FoundryRuntimeOrchestrator,
   sha256Fingerprint,
 } from './foundry-runtime.js';
-import {
+import type {
   MdoClaimedWork,
   MdoOrchestrator,
   MdoTaskContext,
 } from './mdo-orchestrator.js';
+import { GovernedMdoOrchestrator } from './rulebook-governed-runtimes.js';
 
 const MDO_CAPABILITIES = new Set([
   'mdo.plan.analyze',
@@ -416,7 +417,7 @@ export function createMdoFoundryAdapter(options: MdoFoundryAdapterOptions): Foun
     256,
     128_000
   );
-  const mdo = options.mdo ?? new MdoOrchestrator(options.queryFn);
+  const mdo = options.mdo ?? new GovernedMdoOrchestrator(options.queryFn);
 
   return async (request: FoundryAdapterRequest): Promise<FoundryAdapterResult> => {
     if (!MDO_CAPABILITIES.has(request.capabilityCode) || request.authorityLevel !== 'C1') {
@@ -604,7 +605,7 @@ export class MdoPlanningWorker {
   private readonly mdo: Pick<MdoOrchestrator, 'loadTaskContext' | 'submitContribution'>;
 
   constructor(private readonly options: MdoPlanningWorkerOptions) {
-    this.mdo = options.mdo ?? new MdoOrchestrator(options.queryFn);
+    this.mdo = options.mdo ?? new GovernedMdoOrchestrator(options.queryFn);
   }
 
   async executeClaim(input: MdoExecuteClaimInput): Promise<MdoExecuteClaimResult> {

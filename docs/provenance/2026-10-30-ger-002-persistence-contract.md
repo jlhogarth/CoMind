@@ -237,6 +237,67 @@ GER-002 adds a TypeScript persistence repository that uses:
 
 The dedicated CI workflow uses PostgreSQL 17 and applies the exact migration sequence before running migration verification, build, policy tests, and GER persistence integration tests.
 
+## Freshness reconciliation
+
+GER-002 started from GER-001 merge commit `35e156dab1a586e4103a727b843ab8bba09530c3`.
+
+While the lane was active, CE-004 merged to `main` at `c3cc95cae33a2476027ce90639d4f473781f787b`. The CE-004 and GER-002 changed-file sets were compared and found to be disjoint. GER-002 was reconciled with that exact `main` lineage in merge commit `4e26b3064720afa83196669cb88dbeaac8de30dc`. The resulting branch was 0 commits behind and changed exactly 10 GER files relative to that fresh base.
+
+During PR validation, HAI-007 then advanced `main` again to `4a7beacc8fc92a7b7e2d75dbadb202ed767509db`. The intervening `main` changes consisted of two added documentation files:
+
+- `docs/governance/VE-ENGINEERING-STANDARD-v0.1.md`
+- `docs/research/HAI-007-literature-grounding-canonical-reconciliation.md`
+
+Those files were disjoint from GER-002. GER-002 was reconciled again, producing merge commit `a7228b57eba629dc2ec2a106a40f8ff324245d2e`. At that point the branch was 0 commits behind current `main` and still changed exactly the same 10 GER-002 files.
+
+## PR validation failure and recovery
+
+PR #394 was opened for GER-002.
+
+The first dedicated GER exact-head PostgreSQL 17 workflow passed on candidate `4e26b3064720afa83196669cb88dbeaac8de30dc` in run `41066549289`.
+
+The wider repository matrix nevertheless exposed two integration defects:
+
+1. `server/test/ger-persistence.integration.test.mjs` originally activated whenever `DATABASE_URL` existed. Unrelated Foundry workflows use isolated PostgreSQL databases and therefore unintentionally ran the GER integration suite without applying GER migrations.
+2. The dedicated GER workflow changed directories with `cd server` and then invoked literal paths such as `test/ger.test.mjs`. NDT-001 resolves literal workflow paths from the repository root when no workflow `working-directory` is declared and correctly classified those paths as dead-path risks.
+
+The affected first-pass workflows included:
+
+- Foundry Runtime Orchestration, run `41066549135`
+- Foundry Test one-shot local handoff, run `41066548987`
+- Foundry Terminal Lifecycle, run `41066548928`
+- Implementation Integrity, run `41066548940`
+
+Repairs:
+
+- GER persistence integration tests now require both `DATABASE_URL` and `GER_PERSISTENCE_INTEGRATION=1`.
+- The explicit GER integration flag is set only in the dedicated GER workflow step.
+- Server workflow steps now use `working-directory: server`, satisfying both execution semantics and NDT-001 static path resolution.
+
+On the HAI-reconciled candidate `a7228b57eba629dc2ec2a106a40f8ff324245d2e`, the repaired controls were independently confirmed by successful exact-head runs including:
+
+- Implementation Integrity `41067389164`
+- Foundry Terminal Lifecycle `41067389288`
+- Foundry Runtime Orchestration `41067388998`
+- GER-002 Epistemic Persistence `41067388987`
+
+This demonstrates both that the dedicated GER persistence proof still runs and that unrelated database-backed suites no longer activate it accidentally.
+
+## RunBook evidence recovery
+
+A RunBook recovery event was intentionally used to preserve the first PR matrix failure and its repair.
+
+Two initial evidence-write assumptions were rejected safely by the live RunBook schema:
+
+1. `event_type='failure'` was rejected by `pm_events_event_type_check`.
+2. `event_type='recovery'` with `outcome='recovered'` was rejected by `pm_events_outcome_check`.
+
+Both statements were atomic and rolled back. The canonical constraint vocabulary was then read directly. The successful record used `event_type='recovery'` and `outcome='partial'`.
+
+Successful RunBook recovery event:
+
+`c7fc41bb-babc-4cc1-8d14-03ac796e80f7`
+
 ## Explicit boundary
 
 GER-002 has not:

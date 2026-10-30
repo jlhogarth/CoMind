@@ -4,6 +4,7 @@ export type HudState =
   | "waiting_external"
   | "awaiting_review"
   | "blocked"
+  | "deferred"
   | "cancellation_requested"
   | "completed"
   | "failed"
@@ -82,8 +83,9 @@ const INVESTIGATION_RANK: Record<HudState, number> = {
   running: 7,
   waiting_external: 7,
   queued: 8,
-  cancelled: 9,
-  completed: 10,
+  deferred: 9,
+  cancelled: 10,
+  completed: 11,
 } as Record<HudState, number>;
 
 const NEEDS_INVESTIGATION_STATES = new Set<HudState>([

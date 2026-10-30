@@ -107,6 +107,76 @@ Then:
 
 The migration sequence was inspected before naming. Existing `20261030_020` was present, so CE-004 uses the next unused slot `20261030_021` rather than assuming an older CE-local sequence.
 
+## Pre-acceptance self-review repair
+
+Initial candidate:
+
+`8b9f5081fa2226ffd4501f360a0ae95f2d392bb5`
+
+Before queued Actions runners reached the focused server test, self-review found that the synthetic register-row fixture omitted the projection field `pattern_linked_improvement_count` even though the adapter intentionally requires and validates that column.
+
+The implementation contract was correct. The test fixture was incomplete.
+
+The fixture was corrected without changing the adapter or database contract. Corrected candidate:
+
+`c0a909d4aed43bdcfa103687571197938e84492e`
+
+All acceptance claims for the earlier candidate were discarded.
+
+## First exact-head PostgreSQL verifier failure
+
+Dedicated CE-004 run:
+
+`41044632350`
+
+Database job:
+
+`124025604066`
+
+The following steps passed on exact head `c0a909d4aed43bdcfa103687571197938e84492e`:
+
+- exact-head checkout and verification;
+- PostgreSQL 17 startup;
+- CE-001 prerequisite build;
+- CE-001 foundation migration;
+- CE-001 improvement ordering migration;
+- CE-004 migration build.
+
+The database acceptance verifier then failed with:
+
+`CE-004 recurrence risk is required and must be valid`
+
+The failing synthetic call attempted a valid `diagnosed` lifecycle transition with recurrence risk `NULL`.
+
+That contradicted the intentional CE-004 classification contract: every persisted lifecycle event carries the complete current classification snapshot, including non-null recurrence risk. The schema was enforcing the intended rule.
+
+The server-side exact-head job independently passed:
+
+- production dependency audit;
+- TypeScript build;
+- focused CE-004 adapter tests;
+- full server regression suite.
+
+The failure was therefore classified as a verifier-fixture defect, not an implementation defect.
+
+Durable CE failure signal:
+
+`5e7cf502-79df-4b3c-8628-f6e9d44ffe0b`
+
+Failure Continuity Capsule v3:
+
+`a4b69a8a-6f5e-4d4a-9431-33f7c337bfee`
+
+State:
+
+`partial / verified`
+
+The repair changed only the valid diagnosed verifier fixture from recurrence risk `NULL` to the already-established `moderate` classification. The migration and server adapter were not weakened.
+
+Repair commit:
+
+`a073bcd72b60c9c0db466cfba66351d9703176c4`
+
 ## Implementation decision
 
 A new table is justified only for the missing append-only lifecycle history:
@@ -169,7 +239,7 @@ At this provenance checkpoint, exact-head CI has not yet been claimed as passed.
 - production dependency audit;
 - full server regressions.
 
-Broad repository workflows and final freshness/collision checks remain required before review readiness.
+The final accepted candidate must include this provenance update and must rerun the dedicated and broad exact-head gates. Broad repository workflows and final freshness/collision checks remain required before review readiness.
 
 No Production migration has been applied.
 No paid provider call has been made.

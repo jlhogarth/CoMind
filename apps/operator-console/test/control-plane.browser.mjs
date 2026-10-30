@@ -67,10 +67,49 @@ try {
     "https://mail.google.com/mail/u/?authuser=CoMindDevelopment%40comindinc.com",
   );
 
-  const workspaceNavLink = page.getByRole("complementary", { name: "CoMind control plane navigation" })
-    .getByRole("link", { name: "Workspace Mail" });
+  const sidebar = page.getByRole("complementary", { name: "CoMind control plane navigation" });
+
+  const workspaceNavLink = sidebar.getByRole("link", { name: "Workspace Mail" });
   assert.equal(await workspaceNavLink.count(), 1, "Expected Workspace Mail navigation link");
   assert.equal(await workspaceNavLink.getAttribute("href"), "#workspace-mail");
+
+  const threadKeeperNavLink = sidebar.getByRole("link", { name: "ThreadKeeper" });
+  assert.equal(await threadKeeperNavLink.count(), 1, "Expected ThreadKeeper navigation link");
+  assert.equal(await threadKeeperNavLink.getAttribute("href"), "#threadkeeper");
+
+  const threadKeeperHeading = page.getByRole("heading", { name: "ThreadKeeper", exact: true });
+  assert.equal(await threadKeeperHeading.count(), 1, "Expected ThreadKeeper visibility panel");
+  assert.equal(await page.getByText("C4 Operational", { exact: true }).count(), 2);
+  assert.equal(await page.getByText("Production=false", { exact: true }).count(), 1);
+  assert.equal(await page.getByText("JRN-20261028-0001", { exact: true }).count(), 1);
+
+  const c4Closure = page.getByRole("link", { name: /C4 final closure/ });
+  assert.equal(await c4Closure.count(), 1, "Expected canonical C4 closure link");
+  assert.equal(
+    await c4Closure.getAttribute("href"),
+    "https://github.com/jlhogarth/CoMind/blob/main/docs/provenance/2026-10-28-tk-007-c4-final-closure.md",
+  );
+
+  const expansionClosure = page.getByRole("link", { name: /Expansion closure/ });
+  assert.equal(await expansionClosure.count(), 1, "Expected expansion closure link");
+  assert.equal(
+    await expansionClosure.getAttribute("href"),
+    "https://github.com/jlhogarth/CoMind/blob/main/docs/architecture/threadkeeper-capability-expansion-closure.md",
+  );
+
+  const closurePr = page.getByRole("link", { name: /Closure PR #337/ });
+  assert.equal(await closurePr.count(), 1, "Expected ThreadKeeper closure PR link");
+  assert.equal(await closurePr.getAttribute("href"), "https://github.com/jlhogarth/CoMind/pull/337");
+
+  for (const code of ["TK-008", "TK-009", "TK-010", "TK-011", "TK-012"]) {
+    assert.equal(await page.getByText(code, { exact: true }).count(), 1, `Expected ${code} capability link`);
+  }
+
+  assert.equal(
+    await page.getByText(/Visibility only\. No ThreadKeeper state mutation/, { exact: false }).count(),
+    1,
+    "Expected explicit ThreadKeeper authority boundary",
+  );
 
   assert.equal(await page.getByText("No mailbox API access is used by this panel.", { exact: true }).count(), 1);
   assert.equal(await page.getByText("Two governed domains", { exact: true }).count(), 1);
@@ -84,7 +123,6 @@ try {
   assert.equal(await page.getByText("Not activated by HUD-001", { exact: true }).count(), 0);
   assert.equal(await page.getByText("HUD-001 branch implementation", { exact: true }).count(), 0);
 
-  const sidebar = page.getByRole("complementary", { name: "CoMind control plane navigation" });
   assert.equal(await sidebar.getByRole("link", { name: /Monitoring/ }).count(), 1);
   assert.equal(await sidebar.getByRole("link", { name: /RuleBook HUD/ }).count(), 1);
 
@@ -93,7 +131,7 @@ try {
     await page.screenshot({ path: process.env.CONTROL_PLANE_BROWSER_SCREENSHOT, fullPage: true });
   }
 
-  console.log("PASS Control Plane browser: Workspace Mail, truthful deployed Development/Test state, wired destinations, governance labels, and responsive shell rendered.");
+  console.log("PASS Control Plane browser: Workspace Mail, ThreadKeeper visibility, truthful deployed Development/Test state, canonical links, wired destinations, governance labels, and responsive shell rendered.");
 } finally {
   await browser?.close();
   server.kill("SIGTERM");

@@ -191,7 +191,7 @@ CE-004 was reconciled on the same branch with both histories preserved. Reconcil
 
 Post-reconciliation compare against `ca6e64179fd60ccdc54087af01abd8b5a4014e16` was zero commits behind and exactly seven additive CE-004 files.
 
-The pre-reconciliation green matrix remains predecessor evidence only. Final acceptance must run on the reconciled head.
+The pre-reconciliation green matrix remains predecessor evidence only. Final acceptance must run on a head containing this reconciliation.
 
 ## Supabase Test proof
 
@@ -261,18 +261,16 @@ The new event table is RLS enabled and forced.
 
 No browser/Data API role receives direct write privileges. `service_role` is limited to read access and execution of the constrained writer. Direct event INSERT/UPDATE/DELETE remains unavailable to `service_role`.
 
-## Acceptance state
+## Acceptance evidence before final provenance wording correction
 
-The reconciled final candidate is:
+Reconciled candidate `6005ab3ca275ee21d12bad72496398f32f2300af` passed:
 
-`6005ab3ca275ee21d12bad72496398f32f2300af`
-
-Dedicated CE-004 exact-head run `41045807589` passed both jobs:
+Dedicated CE-004 exact-head run `41045807589`:
 
 - PostgreSQL 17 substrate, migration, and full lifecycle verifier;
 - dependency audit, TypeScript build, focused adapter tests, and full server regression suite.
 
-Generic CI run `41045807680` passed all jobs, including:
+Generic CI run `41045807680`:
 
 - ordinary server build/tests/audit;
 - devcontainer runtime;
@@ -300,8 +298,10 @@ Additional reconciled-head workflows passed:
 - Live Foundry Stage 1, LF-2, and LF-3 readiness;
 - bounded Foundry Test one-shot local handoff.
 
-At this checkpoint, current `main` remains `ca6e64179fd60ccdc54087af01abd8b5a4014e16` and no second freshness drift has occurred.
+Current `main` remained `ca6e64179fd60ccdc54087af01abd8b5a4014e16` through that matrix.
 
-No Production migration has been applied.
+This provenance wording correction changes documentation only and therefore requires a final exact-head matrix before review readiness. It does not alter schema, runtime, tests, privileges, or Test database state.
+
+No Production migration has been applied. The CE-004 migration was applied only to canonical Supabase Test.
 No paid provider call has been made.
 No merge has been performed.

@@ -13,7 +13,7 @@ Implement the approved Continuous Excellence Missingness Scan as a deterministic
 
 ## Authoritative starting state
 
-The lane was leased from fresh `main` at:
+The lane was initially leased from fresh `main` at:
 
 `e6e8cd50365542110218c790623a5bde833a353e`
 
@@ -22,6 +22,29 @@ That commit is the merged CE-002 Recovery and Reorientation Protocol baseline fr
 The controlling issue is:
 
 https://github.com/jlhogarth/CoMind/issues/364
+
+## Freshness reconciliation before PR
+
+While CE-003 implementation was in progress, HOME-001 merged and `main` advanced to:
+
+`73c69419535b6901f84b158f8a1dff7c242b1244`
+
+The HOME-001 merge message explicitly records an information-architecture/source-authority contract with no Console UI, database schema, authentication, deployment-policy, or Production activation change.
+
+A compare from current `main` to the CE-003 branch showed:
+
+- branch behind by 11 commits before reconciliation;
+- exactly six CE-003 changed files;
+- every CE-003 changed file additive;
+- no overlap with the accepted HOME-001 paths.
+
+The same CE-003 branch was re-anchored through merge-style commit:
+
+`eefff8be0791294d2e74fe1599d0739871180811`
+
+Its first parent is current `main` `73c69419535b6901f84b158f8a1dff7c242b1244`; its second parent preserves the full pre-reconciliation CE-003 history at `56eaf72c5cab7ab11f7195edb70649a073b48b22`.
+
+Post-reconciliation compare reports `behind_by=0` and still only the six CE-003 additive files. No force rewrite was used.
 
 ## Reuse analysis
 

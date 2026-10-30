@@ -1,0 +1,236 @@
+name: VE Lifecycle Test Acceptance
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/ve-lifecycle-test-acceptance.yml'
+      - 'server/src/ve-lifecycle-coordinator.ts'
+      - 'server/test/ve-lifecycle-coordinator.test.mjs'
+      - 'server/test/support/ve-lifecycle-live-harness.mjs'
+      - 'server/test/integration/ve-lifecycle-test-execution.e2e.mjs'
+      - 'server/test/integration/ve-lifecycle-issue369-acceptance.e2e.mjs'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Exact lifecycle action
+        required: true
+        type: choice
+        options:
+          - activate
+          - suspend
+          - retire
+      profile_id:
+        description: Exact Foundry profile UUID
+        required: true
+        type: string
+      requested_by_actor_id:
+        description: Exact requesting actor UUID
+        required: true
+        type: string
+      authorization_decision_id:
+        description: Existing approved lifecycle authorization decision UUID
+        required: true
+        type: string
+      reason:
+        description: Acceptance reason
+        required: true
+        type: string
+      idempotency_key:
+        description: Unique lifecycle idempotency key
+        required: true
+        type: string
+      expected_from_state:
+        description: Expected starting lifecycle state
+        required: true
+        type: choice
+        options:
+          - draft
+          - active
+          - suspended
+      expected_to_state:
+        description: Expected successful ending lifecycle state
+        required: false
+        type: choice
+        options:
+          - active
+          - suspended
+          - retired
+      expected_error_code:
+        description: Optional expected governed rejection code
+        required: false
+        type: string
+      require_no_external_resources:
+        description: Refuse any profile whose actor has provider resources
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ve-lifecycle-test-acceptance-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    name: Lifecycle harness contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install exact server dependencies
+        working-directory: server
+        run: npm ci
+      - name: Audit production dependencies
+        working-directory: server
+        run: npm audit --omit=dev --audit-level=high
+      - name: Build server
+        working-directory: server
+        run: npm run build
+      - name: Check harness syntax
+        working-directory: server
+        run: |
+          node --check test/support/ve-lifecycle-live-harness.mjs
+          node --check test/integration/ve-lifecycle-test-execution.e2e.mjs
+          node --check test/integration/ve-lifecycle-issue369-acceptance.e2e.mjs
+      - name: Re-run lifecycle coordinator contract tests
+        working-directory: server
+        run: node --test test/ve-lifecycle-coordinator.test.mjs
+
+  issue369-live-acceptance:
+    name: Issue 369 live Test proof
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.head_ref == 'issue-369-ve-lifecycle-test-harness' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.repository_owner == 'jlhogarth' &&
+      github.actor == 'jlhogarth'
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install exact server dependencies
+        working-directory: server
+        run: npm ci
+      - name: Build server
+        working-directory: server
+        run: npm run build
+      - name: Install and verify Supabase database CA
+        shell: bash
+        run: |
+          set -euo pipefail
+          ca_path="$RUNNER_TEMP/supabase-prod-ca-2021.crt"
+          curl --fail --silent --show-error --location \
+            --proto '=https' --tlsv1.2 \
+            https://supabase-downloads.s3-ap-southeast-1.amazonaws.com/prod/ssl/prod-ca-2021.crt \
+            --output "$ca_path"
+          expected='807025AD50D4ED219D2C9C7D299C004F824EB00CF7F65AFEF607D07B72E6CAFA'
+          actual="$(openssl x509 -in "$ca_path" -noout -fingerprint -sha256 \
+            | cut -d= -f2 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+          test "$actual" = "$expected"
+          echo "NODE_EXTRA_CA_CERTS=$ca_path" >> "$GITHUB_ENV"
+      - name: Execute expired denial and fresh positive proof
+        working-directory: server
+        env:
+          SUPABASE_SESSION_DATABASE_URL: ${{ secrets.SUPABASE_SESSION_DATABASE_URL }}
+        run: node test/integration/ve-lifecycle-issue369-acceptance.e2e.mjs
+      - name: Preserve lifecycle acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ve-life-002-issue369-evidence-${{ github.run_id }}
+          path: server/artifacts/ve-lifecycle-issue369-acceptance.json
+          if-no-files-found: error
+          retention-days: 30
+
+  manual-live-acceptance:
+    name: Manual governed lifecycle Test execution
+    if: github.event_name == 'workflow_dispatch'
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact workflow ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install exact server dependencies
+        working-directory: server
+        run: npm ci
+      - name: Build server
+        working-directory: server
+        run: npm run build
+      - name: Install and verify Supabase database CA
+        shell: bash
+        run: |
+          set -euo pipefail
+          ca_path="$RUNNER_TEMP/supabase-prod-ca-2021.crt"
+          curl --fail --silent --show-error --location \
+            --proto '=https' --tlsv1.2 \
+            https://supabase-downloads.s3-ap-southeast-1.amazonaws.com/prod/ssl/prod-ca-2021.crt \
+            --output "$ca_path"
+          expected='807025AD50D4ED219D2C9C7D299C004F824EB00CF7F65AFEF607D07B72E6CAFA'
+          actual="$(openssl x509 -in "$ca_path" -noout -fingerprint -sha256 \
+            | cut -d= -f2 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+          test "$actual" = "$expected"
+          echo "NODE_EXTRA_CA_CERTS=$ca_path" >> "$GITHUB_ENV"
+      - name: Execute exact authorized lifecycle transition
+        working-directory: server
+        env:
+          SUPABASE_SESSION_DATABASE_URL: ${{ secrets.SUPABASE_SESSION_DATABASE_URL }}
+          VE_LIFECYCLE_ACTION: ${{ inputs.action }}
+          VE_LIFECYCLE_PROFILE_ID: ${{ inputs.profile_id }}
+          VE_LIFECYCLE_REQUESTED_BY_ACTOR_ID: ${{ inputs.requested_by_actor_id }}
+          VE_LIFECYCLE_AUTHORIZATION_DECISION_ID: ${{ inputs.authorization_decision_id }}
+          VE_LIFECYCLE_REASON: ${{ inputs.reason }}
+          VE_LIFECYCLE_IDEMPOTENCY_KEY: ${{ inputs.idempotency_key }}
+          VE_LIFECYCLE_EXPECTED_FROM_STATE: ${{ inputs.expected_from_state }}
+          VE_LIFECYCLE_EXPECTED_TO_STATE: ${{ inputs.expected_to_state }}
+          VE_LIFECYCLE_EXPECTED_ERROR_CODE: ${{ inputs.expected_error_code }}
+          VE_LIFECYCLE_REQUIRE_NO_EXTERNAL_RESOURCES: ${{ inputs.require_no_external_resources }}
+          VE_LIFECYCLE_ARTIFACT: artifacts/ve-lifecycle-manual-${{ github.run_id }}.json
+        run: node test/integration/ve-lifecycle-test-execution.e2e.mjs
+      - name: Preserve lifecycle evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ve-lifecycle-manual-evidence-${{ github.run_id }}
+          path: server/artifacts/ve-lifecycle-manual-${{ github.run_id }}.json
+          if-no-files-found: error
+          retention-days: 30

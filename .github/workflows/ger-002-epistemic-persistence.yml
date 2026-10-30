@@ -75,26 +75,23 @@ jobs:
             -f db/migrations/verify_20261030133633_ger_002_epistemic_case_persistence_contract.sql
 
       - name: Install server dependencies
-        run: |
-          cd server
-          npm ci
+        working-directory: server
+        run: npm ci
 
       - name: Audit production dependencies
-        run: |
-          cd server
-          npm audit --omit=dev --audit-level=high
+        working-directory: server
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Typecheck and build
-        run: |
-          cd server
-          npm run build
+        working-directory: server
+        run: npm run build
 
       - name: Run deterministic GER policy tests
-        run: |
-          cd server
-          node --test test/ger.test.mjs
+        working-directory: server
+        run: node --test test/ger.test.mjs
 
       - name: Run GER persistence integration proof
-        run: |
-          cd server
-          node --test test/ger-persistence.integration.test.mjs
+        working-directory: server
+        env:
+          GER_PERSISTENCE_INTEGRATION: '1'
+        run: node --test test/ger-persistence.integration.test.mjs

@@ -3,6 +3,7 @@
 Status: Implementation candidate, Test-only
 Issue: https://github.com/jlhogarth/CoMind/issues/408
 Predecessor: HAI-008 Issue #397 / PR #401
+Canonical Drive document: https://docs.google.com/document/d/1fJ2tQz8_jBBCUGHjxT90GdSVg4TV-HPv51s4W-14t6o/edit
 Production activation: false
 Real participant collection: false
 Paid provider execution: false

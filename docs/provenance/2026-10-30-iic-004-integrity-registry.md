@@ -34,13 +34,15 @@ Before repository write:
 
 ## No Placeholder collision and repair
 
-The first exact-head PR run failed the existing No Placeholder Policy because the NPH definition itself used the explanatory token `TODO-bound`. The policy scanner correctly treats `TODO` as an unresolved development marker and does not infer semantic context.
+The first exact-head PR run failed the existing No Placeholder Policy because the NPH definition itself used an explanatory form of the reserved unfinished-work marker followed by `-bound`. The policy scanner correctly treats that reserved marker as unresolved development work and does not infer semantic context.
 
 The gate was not weakened and no exclusion was added. The definition was reworded to `unfinished-marker-bound behavior`.
 
+A second exact-head run failed because the first provenance explanation reproduced the reserved marker literally while documenting the failure. The evidence was retained again without reproducing the forbidden token. This demonstrates that governance documentation is intentionally subject to the same hard gate as implementation artifacts.
+
 During the repair, the registry was also simplified so the three implemented controls and 21 definition-only controls occupy separate structural collections. The validator was adapted to the compact schema and now additionally requires exactly 24 unique cataloged controls. The adversarial suite increased to 10 tests.
 
-The failed exact-head run remains development evidence and a fresh exact-head run is required after repair.
+Both failed exact-head runs remain development evidence. Only a fresh exact-head run after this repair can satisfy acceptance.
 
 ## Storage decision
 

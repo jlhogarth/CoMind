@@ -50,6 +50,29 @@ try {
   assert.ok((await approvalLinks.count()) >= 1, "Expected at least one approvals link");
   assert.equal(await approvalLinks.first().getAttribute("href"), "https://approvals.comindinc.com");
 
+  const workspaceMailHeading = page.getByRole("heading", { name: "Workspace Mail" });
+  assert.equal(await workspaceMailHeading.count(), 1, "Expected Workspace Mail quick-access panel");
+
+  const founderInbox = page.getByRole("link", { name: "Open JLHogarth@comindinc.com inbox" });
+  assert.equal(await founderInbox.count(), 1, "Expected founder Workspace mailbox link");
+  assert.equal(
+    await founderInbox.getAttribute("href"),
+    "https://mail.google.com/mail/u/?authuser=JLHogarth%40comindinc.com",
+  );
+
+  const developmentInbox = page.getByRole("link", { name: "Open CoMindDevelopment@comindinc.com inbox" });
+  assert.equal(await developmentInbox.count(), 1, "Expected CoMind Development mailbox link");
+  assert.equal(
+    await developmentInbox.getAttribute("href"),
+    "https://mail.google.com/mail/u/?authuser=CoMindDevelopment%40comindinc.com",
+  );
+
+  const workspaceNavLink = page.getByRole("complementary", { name: "CoMind control plane navigation" })
+    .getByRole("link", { name: "Workspace Mail" });
+  assert.equal(await workspaceNavLink.count(), 1, "Expected Workspace Mail navigation link");
+  assert.equal(await workspaceNavLink.getAttribute("href"), "#workspace-mail");
+
+  assert.equal(await page.getByText("No mailbox API access is used by this panel.", { exact: true }).count(), 1);
   assert.equal(await page.getByText("Two governed domains", { exact: true }).count(), 1);
   assert.equal(await page.getByText("No paid call triggered by this page", { exact: true }).count(), 1);
   assert.equal(await page.getByText("Production deployment", { exact: true }).count(), 1);
@@ -64,7 +87,7 @@ try {
     await page.screenshot({ path: process.env.CONTROL_PLANE_BROWSER_SCREENSHOT, fullPage: true });
   }
 
-  console.log("PASS Control Plane browser: branded landing page, wired destinations, governance labels, and responsive shell rendered.");
+  console.log("PASS Control Plane browser: branded landing page, Workspace Mail quick access, wired destinations, governance labels, and responsive shell rendered.");
 } finally {
   await browser?.close();
   server.kill("SIGTERM");

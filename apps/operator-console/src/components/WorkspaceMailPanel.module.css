@@ -1,0 +1,262 @@
+.panel {
+  margin-top: 12px;
+  padding: 18px;
+  border: 1px solid rgba(77, 142, 187, 0.28);
+  border-radius: 15px;
+  background:
+    radial-gradient(circle at 88% 18%, rgba(66, 206, 255, 0.11), transparent 32%),
+    linear-gradient(180deg, rgba(10, 31, 50, 0.92), rgba(8, 24, 39, 0.94));
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.02);
+  scroll-margin-top: 84px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.headingGroup {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+}
+
+.headingIcon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(82, 197, 255, 0.36);
+  border-radius: 10px;
+  color: #67dcff;
+  background: rgba(21, 74, 109, 0.4);
+}
+
+.eyebrow {
+  margin: 0 0 3px;
+  color: #64d9ff;
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.headingGroup h2 {
+  margin: 0;
+  color: #f3f9ff;
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.description {
+  max-width: 720px;
+  margin: 5px 0 0;
+  color: #95aabd;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.privacyBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid rgba(84, 225, 177, 0.28);
+  border-radius: 999px;
+  color: #86e5c1;
+  background: rgba(18, 78, 66, 0.32);
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.mailboxGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.mailboxCard {
+  display: grid;
+  gap: 11px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid rgba(82, 151, 197, 0.26);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(19, 49, 74, 0.75), rgba(11, 32, 51, 0.86));
+}
+
+.mailboxIdentity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.mailIcon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border-radius: 9px;
+  color: #7de4ff;
+  background: rgba(42, 126, 175, 0.24);
+}
+
+.mailboxIdentity strong {
+  display: block;
+  color: #f0f7fd;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.address {
+  display: block;
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+  color: #7fcde8;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.mailboxCard p {
+  margin: 0;
+  color: #91a5b7;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.openInbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: fit-content;
+  min-height: 40px;
+  padding: 0 13px;
+  border: 1px solid rgba(83, 208, 255, 0.46);
+  border-radius: 9px;
+  color: #eaf8ff;
+  text-decoration: none;
+  background: linear-gradient(180deg, rgba(29, 111, 164, 0.66), rgba(21, 73, 111, 0.78));
+  font-size: 12px;
+  font-weight: 800;
+  transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.openInbox:hover,
+.openInbox:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(94, 221, 255, 0.82);
+  box-shadow: 0 0 24px rgba(48, 180, 255, 0.12);
+  outline: none;
+}
+
+.footerLinks {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(78, 139, 180, 0.2);
+}
+
+.footerLinks a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 36px;
+  color: #80dfff;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.footerLinks a:hover,
+.footerLinks a:focus-visible {
+  color: #dff8ff;
+  outline: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.footerLinks span {
+  margin-left: auto;
+  color: #7890a4;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+@media (max-width: 760px) {
+  .panel {
+    padding: 15px;
+  }
+
+  .header {
+    display: grid;
+  }
+
+  .privacyBadge {
+    width: fit-content;
+    min-height: 40px;
+  }
+
+  .mailboxGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .headingGroup h2 {
+    font-size: 20px;
+  }
+
+  .description,
+  .mailboxCard p,
+  .address,
+  .footerLinks a,
+  .footerLinks span {
+    font-size: 14px;
+  }
+
+  .mailboxIdentity strong {
+    font-size: 15px;
+  }
+
+  .openInbox {
+    min-height: 44px;
+    font-size: 14px;
+  }
+
+  .footerLinks {
+    display: grid;
+    align-items: stretch;
+  }
+
+  .footerLinks a {
+    min-height: 44px;
+  }
+
+  .footerLinks span {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 900px) and (max-height: 500px) {
+  .openInbox,
+  .footerLinks a {
+    min-height: 44px;
+    font-size: 13px;
+  }
+
+  .privacyBadge {
+    min-height: 44px;
+  }
+}

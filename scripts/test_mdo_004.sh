@@ -32,11 +32,11 @@ done
 for pass in 1 2; do
   printf 'MDO-004 migration pass %s\n' "${pass}"
   psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
-    -f "${repository_root}/db/migrations/20261030_025_mdo_004_governed_plan_disposition.sql"
+    -f "${repository_root}/db/migrations/20261030_026_mdo_004_governed_plan_disposition.sql"
 done
 
 verification_output="$(psql "${DATABASE_URL}" -X -q -At -F '|' -v ON_ERROR_STOP=1 \
-  -f "${repository_root}/db/migrations/verify_20261030_025_mdo_004_governed_plan_disposition.sql")"
+  -f "${repository_root}/db/migrations/verify_20261030_026_mdo_004_governed_plan_disposition.sql")"
 if [[ "${verification_output%%|*}" != "pass" ]]; then
   echo "MDO-004 structural verification failed: ${verification_output}" >&2
   exit 1
@@ -44,7 +44,7 @@ fi
 printf 'MDO-004 structural verification passed: %s\n' "${verification_output}"
 
 behavior_output="$(psql "${DATABASE_URL}" -X -q -At -F '|' -v ON_ERROR_STOP=1 \
-  -f "${repository_root}/db/migrations/verify_20261030_025_mdo_004_behavior.sql")"
+  -f "${repository_root}/db/migrations/verify_20261030_026_mdo_004_behavior.sql")"
 if [[ "${behavior_output%%|*}" != "pass" ]]; then
   echo "MDO-004 behavior verification failed: ${behavior_output}" >&2
   exit 1

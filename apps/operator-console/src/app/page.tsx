@@ -58,11 +58,11 @@ const serviceCards = [
 ];
 
 const infrastructureRows = [
-  ["Operator Console", "HUD-001 branch implementation"],
-  ["Activity HUD", "Existing bounded read-only route"],
-  ["RuleBook HUD", "Existing governed control-health route"],
-  ["Approval Portal", "External single-use approval service"],
-  ["Production deployment", "Not activated by HUD-001"],
+  ["Operator Console", "Live at console.comindinc.com"],
+  ["Activity HUD", "Bounded read-only route"],
+  ["RuleBook HUD", "Governed control-health route"],
+  ["Approval Portal", "External governed approval service"],
+  ["Deployment perimeter", "Cloudflare Access + origin proxy + Vercel protection"],
 ];
 
 function ExternalAwareLink({
@@ -119,11 +119,11 @@ export default function Home() {
           <div className={styles.sideFooterTop}>
             <CoMindMark className={styles.logoWrap} compact />
             <div>
-              <strong>CoMind HUD-001</strong>
-              <span>Infrastructure intelligence starting surface</span>
+              <strong>CoMind Control Plane</strong>
+              <span>Governed Development/Test operator surface</span>
             </div>
           </div>
-          <div className={styles.sideState}><i aria-hidden="true" /> Reversible development lane</div>
+          <div className={styles.sideState}><i aria-hidden="true" /> Live deployment · Development/Test controls</div>
         </div>
       </aside>
 
@@ -131,10 +131,10 @@ export default function Home() {
         <header className={styles.topbar}>
           <div className={styles.search} aria-label="Current control plane scope">
             <Network size={15} aria-hidden="true" />
-            <span>Operator Console / HUD-001 / read-only landing surface</span>
-            <kbd>T1</kbd>
+            <span>Operator Console / governed Development-Test surface</span>
+            <kbd>DEV/TEST</kbd>
           </div>
-          <div className={styles.topStatus}><span className={styles.stateDot} aria-hidden="true" /> Production activation excluded</div>
+          <div className={styles.topStatus}><span className={styles.stateDot} aria-hidden="true" /> Live behind governed access perimeter</div>
         </header>
 
         <div className={styles.content}>
@@ -165,7 +165,7 @@ export default function Home() {
               <Sparkles size={18} color="#4fd8ff" aria-hidden="true" />
               <div>
                 <h2 id="quick-actions-heading">Quick Actions</h2>
-                <p>Only wired, bounded destinations are enabled in HUD-001.</p>
+                <p>Only wired, bounded destinations are enabled from the Control Plane.</p>
               </div>
             </div>
             <div className={styles.quickGrid}>
@@ -191,9 +191,9 @@ export default function Home() {
 
             <article className={styles.card}>
               <div className={styles.cardHeader}><span className={styles.cardIcon}><FolderGit2 size={17} color="#63d8ff" /> <strong>Development</strong></span></div>
-              <div className={styles.metricValue}>T1</div>
-              <div className={styles.metricLabel}>HUD-001 is reversible application development on a feature branch.</div>
-              <div className={styles.metricMeta}>Production activation excluded</div>
+              <div className={styles.metricValue}>Dev/Test</div>
+              <div className={styles.metricLabel}>The Console is deployed for governed evaluation while application behavior remains under active development.</div>
+              <div className={styles.metricMeta}>Security perimeter active · application posture remains Development/Test</div>
             </article>
 
             <article className={styles.card}>
@@ -252,9 +252,9 @@ export default function Home() {
               <CoMindMark className={styles.logoWrap} compact />
               <div>
                 <strong>Build. Monitor. Govern. Together.</strong>
-                <p>HUD-001 is the landing surface. Live provider telemetry and governed administrative actions can be layered on without replacing the shell.</p>
+                <p>The Control Plane shell is deployed. Live provider telemetry and governed administrative actions can be layered on without replacing it.</p>
               </div>
-              <a href="https://github.com/jlhogarth/CoMind/issues/291" target="_blank" rel="noreferrer">HUD-001 issue <ExternalLink size={11} /></a>
+              <a href="https://github.com/jlhogarth/CoMind/issues/291" target="_blank" rel="noreferrer">Control Plane foundation <ExternalLink size={11} /></a>
             </aside>
           </section>
         </div>

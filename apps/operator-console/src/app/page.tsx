@@ -13,6 +13,7 @@ import {
   FolderGit2,
   Gauge,
   Github,
+  GitBranch,
   Globe2,
   HardDrive,
   LayoutDashboard,
@@ -26,6 +27,7 @@ import {
 } from "lucide-react";
 
 import { CoMindMark } from "../components/CoMindMark";
+import { ThreadKeeperPanel } from "../components/ThreadKeeperPanel";
 import { WorkspaceMailPanel } from "../components/WorkspaceMailPanel";
 import styles from "./control-plane.module.css";
 
@@ -35,6 +37,7 @@ const navItems = [
   { label: "RuleBook HUD", href: "/rulebook", icon: ShieldCheck },
   { label: "Approvals", href: "https://approvals.comindinc.com", icon: CheckCircle2, external: true },
   { label: "Cloudflare", href: "https://dash.cloudflare.com", icon: Cloud, external: true },
+  { label: "ThreadKeeper", href: "#threadkeeper", icon: GitBranch },
   { label: "Workspace Mail", href: "#workspace-mail", icon: Mail },
   { label: "Documentation", href: "https://github.com/jlhogarth/CoMind/tree/main/docs", icon: BookOpen, external: true },
   { label: "Google Drive", href: "https://drive.google.com", icon: HardDrive, external: true },
@@ -93,7 +96,7 @@ export default function Home() {
         </a>
 
         <nav className={styles.nav}>
-          {navItems.slice(0, 6).map(({ label, href, icon: Icon, active, external }) => (
+          {navItems.slice(0, 7).map(({ label, href, icon: Icon, active, external }) => (
             <ExternalAwareLink
               key={label}
               href={href}
@@ -106,7 +109,7 @@ export default function Home() {
             </ExternalAwareLink>
           ))}
           <div className={styles.navDivider} aria-hidden="true" />
-          {navItems.slice(6).map(({ label, href, icon: Icon, external }) => (
+          {navItems.slice(7).map(({ label, href, icon: Icon, external }) => (
             <ExternalAwareLink key={label} href={href} external={external} className={styles.navExternal}>
               <Icon size={17} aria-hidden="true" />
               <span>{label}</span>
@@ -180,6 +183,7 @@ export default function Home() {
           </section>
 
           <WorkspaceMailPanel />
+          <ThreadKeeperPanel />
 
           <section className={styles.grid} aria-label="CoMind control plane overview">
             <article className={styles.card}>

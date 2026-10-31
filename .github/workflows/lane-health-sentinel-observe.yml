@@ -1,0 +1,75 @@
+name: Lane Health Sentinel Observe
+
+on:
+  pull_request:
+    branches: ["main"]
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to observe
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+jobs:
+  observe:
+    name: Observe exact-head lane health
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PR_NUMBER: ${{ github.event_name == 'pull_request' && github.event.pull_request.number || inputs.pr_number }}
+    steps:
+      - name: Check out observer candidate
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Collect read-only GitHub lane health evidence
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >-
+          node scripts/lane_health_github.mjs
+          --repository "${GITHUB_REPOSITORY}"
+          --pr "${PR_NUMBER}"
+          --policy .github/lane-health-sentinel.json
+          --output artifacts/lane-health.json
+
+      - name: Write operator summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { readFile, appendFile } from 'node:fs/promises';
+          const snapshot = JSON.parse(await readFile('artifacts/lane-health.json', 'utf8'));
+          const lines = [
+            '# Lane Health Sentinel',
+            '',
+            `- PR: [#${snapshot.prNumber}](${snapshot.prUrl})`,
+            `- Exact head: \`${snapshot.exactHeadSha}\``,
+            `- Lane state: \`${snapshot.laneSummary.state}\``,
+            `- Severity: \`${snapshot.laneSummary.severity}\``,
+            `- Attention required: \`${snapshot.laneSummary.attentionRequired}\``,
+            `- Governed workflows observed: \`${snapshot.workflowResults.length}\``,
+            `- Suppression signals: \`${snapshot.suppressionSignals.length}\``,
+            `- Authority: \`${snapshot.authorityBoundary}\``,
+            '',
+            'This workflow is read-only. It does not comment, rerun, merge, modify branches, or remediate failures.',
+          ];
+          await appendFile(process.env.GITHUB_STEP_SUMMARY, `${lines.join('\n')}\n`, 'utf8');
+          NODE
+
+      - name: Upload lane health snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: lane-health-snapshot
+          path: artifacts/lane-health.json
+          if-no-files-found: error
+          retention-days: 14

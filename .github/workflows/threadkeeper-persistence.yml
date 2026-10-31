@@ -1,0 +1,75 @@
+name: TK-004 ThreadKeeper Persistence
+
+on:
+  pull_request:
+    paths:
+      - 'server/src/threadkeeper/**'
+      - 'server/src/continuity/**'
+      - 'server/src/db.ts'
+      - 'server/test/threadkeeper-*.test.mjs'
+      - 'server/test/threadkeeper-*.integration.test.mjs'
+      - 'db/migrations/20261026_008_threadkeeper_persistence.sql'
+      - 'db/migrations/20261026_009_threadkeeper_scope_integrity.sql'
+      - 'db/migrations/20261026_010_threadkeeper_fk_indexes.sql'
+      - 'db/migrations/verify_20261026_008_threadkeeper_persistence.sql'
+      - 'db/migrations/verify_20261026_009_threadkeeper_scope_integrity.sql'
+      - 'db/migrations/verify_20261026_010_threadkeeper_fk_indexes.sql'
+      - 'scripts/test_threadkeeper_persistence.sh'
+      - 'docs/architecture/threadkeeper-*.md'
+      - 'docs/maintenance-control/tk-*.md'
+      - '.github/workflows/threadkeeper-persistence.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'server/src/threadkeeper/**'
+      - 'server/src/continuity/**'
+      - 'server/src/db.ts'
+      - 'server/test/threadkeeper-*.test.mjs'
+      - 'server/test/threadkeeper-*.integration.test.mjs'
+      - 'db/migrations/20261026_008_threadkeeper_persistence.sql'
+      - 'db/migrations/20261026_009_threadkeeper_scope_integrity.sql'
+      - 'db/migrations/20261026_010_threadkeeper_fk_indexes.sql'
+      - 'db/migrations/verify_20261026_008_threadkeeper_persistence.sql'
+      - 'db/migrations/verify_20261026_009_threadkeeper_scope_integrity.sql'
+      - 'db/migrations/verify_20261026_010_threadkeeper_fk_indexes.sql'
+      - 'scripts/test_threadkeeper_persistence.sh'
+      - 'docs/architecture/threadkeeper-*.md'
+      - 'docs/maintenance-control/tk-*.md'
+      - '.github/workflows/threadkeeper-persistence.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  threadkeeper-isolated-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.6-pg17-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+      THREADKEEPER_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      THREADKEEPER_BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+      - name: Verify ThreadKeeper migration, repository, security, lineage, case lifecycle, and competitive handoffs
+        run: bash scripts/test_threadkeeper_persistence.sh

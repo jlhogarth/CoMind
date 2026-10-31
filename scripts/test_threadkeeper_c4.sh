@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+: "${DATABASE_URL:?DATABASE_URL required for isolated ThreadKeeper C4 verification}"
+
+DATABASE_URL="${DATABASE_URL}" python3 - <<'PY'
+import os, sys
+from urllib.parse import urlparse
+p=urlparse(os.environ['DATABASE_URL'])
+if p.scheme not in ('postgres','postgresql') or p.hostname not in ('localhost','127.0.0.1','::1','db') or p.path != '/comind_ci':
+    print('Refusing ThreadKeeper C4 isolated verification outside local comind_ci.', file=sys.stderr)
+    raise SystemExit(2)
+PY
+
+node "${root}/scripts/threadkeeper_c4_matrix.mjs"
+
+# The C3 compatibility regression now bootstraps and verifies the current
+# ThreadKeeper runtime schema before exercising current repository code.
+bash "${root}/scripts/test_threadkeeper_c3.sh"
+
+(
+  cd "${root}/server"
+  node --test test/threadkeeper-c4-evidence.test.mjs
+
+  THREADKEEPER_C4_DB_TEST=1 \
+  node --test test/threadkeeper-c4-runtime-role.test.mjs
+
+  THREADKEEPER_C4_DB_TEST=1 \
+  THREADKEEPER_C4_RUN_ID=isolated \
+  THREADKEEPER_C4_BASE_TIME=2026-10-27T21:00:00Z \
+  THREADKEEPER_C4_ENVIRONMENT=isolated \
+  node --test test/threadkeeper-c4-operational.integration.test.mjs
+)
+
+echo 'TK-007 isolated evidence-gate, operational, least-privilege, authority, failure, recovery, and observability proof: PASS'

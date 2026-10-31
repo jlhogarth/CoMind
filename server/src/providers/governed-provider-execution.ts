@@ -6,6 +6,10 @@ import {
   assertProviderInputTokenPreflight,
   preflightProviderInputTokens,
 } from './provider-execution-envelope.js';
+import {
+  RequiredRulebookExecutionPreflight,
+  runRequiredRulebookExecutionPreflight,
+} from './rulebook-execution-preflight.js';
 
 export interface ProviderExposureQuote {
   readonly provider: string;
@@ -13,6 +17,8 @@ export interface ProviderExposureQuote {
   readonly maximum_exposure_usd: number | null;
   readonly currency: string;
   readonly failure_reason: string | null;
+  readonly max_input_tokens?: number | null;
+  readonly max_output_tokens?: number | null;
 }
 
 export interface ProviderExposureQuoter<
@@ -49,6 +55,47 @@ export interface GovernedProviderBudgetAuthority {
   ): Promise<GovernedProviderReservation>;
 }
 
+export interface GovernedPaidExecutionAdmission {
+  readonly execution_id: string;
+  readonly execution_status: string;
+  readonly idempotent: boolean;
+}
+
+export interface GovernedPaidExecutionAdmissionRequest<
+  TRequest extends object,
+  TQuote extends ProviderExposureQuote = ProviderExposureQuote,
+> {
+  readonly envelope: ProviderExecutionEnvelope<TRequest>;
+  readonly operation_name: string;
+  readonly input_token_preflight: ProviderInputTokenPreflight;
+  readonly exposure_quote: TQuote;
+  readonly reservation: {
+    readonly reservation_id: string;
+    readonly idempotency_key: string;
+    readonly reservation_status: string;
+  };
+  readonly requested_tool_calls: number;
+}
+
+export interface GovernedPaidExecutionFailureRequest {
+  readonly execution_id: string;
+  readonly failure_code: string;
+  readonly failure_report: string;
+}
+
+export interface GovernedPaidExecutionLedger {
+  admitProviderExecution<
+    TRequest extends object,
+    TQuote extends ProviderExposureQuote = ProviderExposureQuote,
+  >(
+    request: GovernedPaidExecutionAdmissionRequest<TRequest, TQuote>
+  ): Promise<GovernedPaidExecutionAdmission>;
+
+  recordProviderExecutionFailure(
+    request: GovernedPaidExecutionFailureRequest
+  ): Promise<GovernedPaidExecutionAdmission>;
+}
+
 export interface GovernedProviderExecutionReceipt<
   TQuote extends ProviderExposureQuote = ProviderExposureQuote,
 > {
@@ -63,6 +110,11 @@ export interface GovernedProviderExecutionReceipt<
     readonly reservation_id: string;
     readonly idempotency_key: string;
     readonly reservation_status: string;
+    readonly idempotent: boolean;
+  };
+  readonly paid_execution?: {
+    readonly execution_id: string;
+    readonly execution_status: string;
     readonly idempotent: boolean;
   };
 }
@@ -81,9 +133,12 @@ export interface GovernedProviderExecutionInput<
   TQuote extends ProviderExposureQuote = ProviderExposureQuote,
 > {
   readonly envelope: ProviderExecutionEnvelope<TRequest>;
+  readonly rulebook: RequiredRulebookExecutionPreflight;
   readonly inputTokenCounter: ProviderInputTokenCounter<TRequest>;
   readonly exposureQuoter: ProviderExposureQuoter<TRequest, TQuote>;
   readonly budgetAuthority: GovernedProviderBudgetAuthority;
+  readonly paidExecutionLedger?: GovernedPaidExecutionLedger;
+  readonly requestedToolCalls?: number;
   readonly operationName: string;
   readonly execute: (envelope: ProviderExecutionEnvelope<TRequest>) => Promise<TResponse>;
 }
@@ -97,6 +152,10 @@ function requiredText(value: string, field: string) {
 
 function validMonetaryExposure(value: number | null): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0;
+}
+
+function validRequestedToolCalls(value: number) {
+  return Number.isSafeInteger(value) && value >= 0;
 }
 
 export function providerExecutionReservationIdempotencyKey(
@@ -165,6 +224,33 @@ function assertReservation(
   }
 }
 
+function assertPaidExecutionAdmission(
+  admission: GovernedPaidExecutionAdmission
+): GovernedPaidExecutionAdmission {
+  requiredText(admission.execution_id, 'paid execution id');
+  requiredText(admission.execution_status, 'paid execution status');
+  if (typeof admission.idempotent !== 'boolean') {
+    throw new Error('Paid execution admission returned an ambiguous idempotency result');
+  }
+  if (admission.idempotent) {
+    throw new Error(
+      `Paid execution ${admission.execution_id} already exists; recovery must reconcile the existing attempt before any provider call`
+    );
+  }
+  if (admission.execution_status !== 'running') {
+    throw new Error(
+      `Paid execution ${admission.execution_id} was not admitted into running state`
+    );
+  }
+  return admission;
+}
+
+function providerFailureReport(error: unknown) {
+  const name = error instanceof Error && error.name ? error.name : 'Error';
+  const message = error instanceof Error ? error.message : String(error);
+  return `Provider execution failed after paid-access admission. ${name}: ${message}`.slice(0, 4096);
+}
+
 function frozenReceipt<TQuote extends ProviderExposureQuote>(
   envelope: ProviderExecutionEnvelope<object>,
   operationName: string,
@@ -174,7 +260,8 @@ function frozenReceipt<TQuote extends ProviderExposureQuote>(
   reservation: GovernedProviderReservation & {
     reservation_id: string;
     reservation_status: string;
-  }
+  },
+  paidExecution?: GovernedPaidExecutionAdmission
 ): GovernedProviderExecutionReceipt<TQuote> {
   return Object.freeze({
     schema_version: 1 as const,
@@ -190,6 +277,15 @@ function frozenReceipt<TQuote extends ProviderExposureQuote>(
       reservation_status: reservation.reservation_status,
       idempotent: reservation.idempotent,
     }),
+    ...(paidExecution
+      ? {
+          paid_execution: Object.freeze({
+            execution_id: paidExecution.execution_id,
+            execution_status: paidExecution.execution_status,
+            idempotent: paidExecution.idempotent,
+          }),
+        }
+      : {}),
   });
 }
 
@@ -204,6 +300,13 @@ export async function executeGovernedProviderExecution<
   assertProviderExecutionEnvelopeIntegrity(envelope);
   assertGovernedRetryAuthority(envelope);
   requiredText(input.operationName, 'operationName');
+  const requestedToolCalls = input.requestedToolCalls ?? 0;
+  if (!validRequestedToolCalls(requestedToolCalls)) {
+    throw new Error('requestedToolCalls must be a non-negative safe integer');
+  }
+
+  await runRequiredRulebookExecutionPreflight(input.rulebook);
+  assertProviderExecutionEnvelopeIntegrity(envelope);
 
   const preflight = await preflightProviderInputTokens(envelope, input.inputTokenCounter);
   assertProviderInputTokenPreflight(envelope, preflight);
@@ -227,17 +330,53 @@ export async function executeGovernedProviderExecution<
   assertProviderInputTokenPreflight(envelope, preflight);
   assertReservation(reservation);
 
+  let paidExecution: GovernedPaidExecutionAdmission | undefined;
+  if (input.paidExecutionLedger) {
+    paidExecution = assertPaidExecutionAdmission(
+      await input.paidExecutionLedger.admitProviderExecution({
+        envelope,
+        operation_name: input.operationName,
+        input_token_preflight: preflight,
+        exposure_quote: quote,
+        reservation: {
+          reservation_id: reservation.reservation_id,
+          idempotency_key: idempotencyKey,
+          reservation_status: reservation.reservation_status,
+        },
+        requested_tool_calls: requestedToolCalls,
+      })
+    );
+  }
+
   const receipt = frozenReceipt(
     envelope,
     input.operationName,
     preflight,
     quote,
     idempotencyKey,
-    reservation
+    reservation,
+    paidExecution
   );
 
   assertProviderExecutionEnvelopeIntegrity(envelope);
-  const response = await input.execute(envelope);
-
-  return Object.freeze({ response, receipt });
+  try {
+    const response = await input.execute(envelope);
+    return Object.freeze({ response, receipt });
+  } catch (providerError) {
+    if (paidExecution && input.paidExecutionLedger) {
+      try {
+        await input.paidExecutionLedger.recordProviderExecutionFailure({
+          execution_id: paidExecution.execution_id,
+          failure_code: 'provider_call_failed',
+          failure_report: providerFailureReport(providerError),
+        });
+      } catch (ledgerError) {
+        throw new AggregateError(
+          [providerError, ledgerError],
+          'Provider execution failed and paid-execution failure persistence also failed'
+        );
+      }
+    }
+    throw providerError;
+  }
 }

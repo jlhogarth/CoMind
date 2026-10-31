@@ -2,10 +2,15 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 import "./globals.css";
+import "./cux-002.css";
+import "./activity-operational.css";
 
 export const metadata: Metadata = {
-  title: "CoMind Operator Console",
-  description: "Governed relational operations console for CoMind",
+  title: {
+    default: "CoMind Control Plane",
+    template: "%s | CoMind",
+  },
+  description: "Governed CoMind infrastructure, monitoring, operations, and evidence console",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {

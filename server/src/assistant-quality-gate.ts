@@ -1,8 +1,10 @@
 import {
   AssistantProvider,
   AssistantResponse,
+  AssistantResponseObserver,
   AssistantResponseRequest,
   ConversationMessage,
+  withAssistantObservationStage,
 } from './assistant.js';
 
 export type AnswerRiskLevel = 'low' | 'high';
@@ -46,13 +48,16 @@ export interface QualityVerifier {
 
 export interface QualityRepairer {
   readonly name: string;
-  repair(input: {
-    conversationId: string;
-    messages: ConversationMessage[];
-    draft: AssistantResponse;
-    critique: string;
-    issueCategories: QualityIssueCategory[];
-  }): Promise<AssistantResponse>;
+  repair(
+    input: {
+      conversationId: string;
+      messages: ConversationMessage[];
+      draft: AssistantResponse;
+      critique: string;
+      issueCategories: QualityIssueCategory[];
+    },
+    observer?: AssistantResponseObserver
+  ): Promise<AssistantResponse>;
 }
 
 export interface MeteredQualityGateOptions {
@@ -205,8 +210,14 @@ export class MeteredQualityGateProvider implements AssistantProvider {
     return this.draftProvider.name;
   }
 
-  async generateResponse(request: AssistantResponseRequest): Promise<AssistantResponse> {
-    const draft = await this.draftProvider.generateResponse(request);
+  async generateResponse(
+    request: AssistantResponseRequest,
+    observer?: AssistantResponseObserver
+  ): Promise<AssistantResponse> {
+    const draft = await this.draftProvider.generateResponse(
+      request,
+      withAssistantObservationStage(observer, 'draft')
+    );
     const risk = classifyAnswerRisk(request);
     const draftPass = passTelemetry('draft', draft.metadata, this.draftProvider.name);
 
@@ -287,13 +298,16 @@ export class MeteredQualityGateProvider implements AssistantProvider {
     }
 
     if (verification.verdict === 'revise') {
-      const repaired = await this.repairer.repair({
-        conversationId: request.conversationId,
-        messages: request.messages,
-        draft,
-        critique: critique ?? 'Verifier requested revision without a critique.',
-        issueCategories,
-      });
+      const repaired = await this.repairer.repair(
+        {
+          conversationId: request.conversationId,
+          messages: request.messages,
+          draft,
+          critique: critique ?? 'Verifier requested revision without a critique.',
+          issueCategories,
+        },
+        withAssistantObservationStage(observer, 'repair')
+      );
       const repairPass = passTelemetry('repair', repaired.metadata, this.repairer.name);
       return {
         content: repaired.content,

@@ -1,0 +1,62 @@
+name: Implementation Integrity
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: implementation-integrity-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  iic-enforce:
+    name: NDT enforcement with NFS and NMC shadow review
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate enforcement contract
+        run: python scripts/check_integrity_enforcement_contract.py .
+
+      - name: Run integrity engine regression tests
+        run: python scripts/test_check_implementation_integrity.py
+
+      - name: Run integrity enforcement adversarial tests
+        run: python scripts/test_integrity_enforcement_contract.py
+
+      - name: Run NMC-001 detector tests
+        run: python scripts/test_check_magic_configuration.py
+
+      - name: Enforce NDT-001 and report NFS candidates
+        run: python scripts/check_implementation_integrity.py . --mode enforce --format json --output integrity-findings.json
+
+      - name: Run NMC-001 in shadow mode
+        run: python scripts/check_magic_configuration.py . --output nmc-findings.json
+
+      - name: Render findings in job log
+        if: always()
+        run: |
+          cat integrity-findings.json
+          cat nmc-findings.json
+
+      - name: Preserve exact-head integrity evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iic-findings-${{ github.sha }}
+          path: |
+            integrity-findings.json
+            nmc-findings.json
+          if-no-files-found: error
+          retention-days: 14

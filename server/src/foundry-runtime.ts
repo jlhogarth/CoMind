@@ -102,13 +102,28 @@ export function authorityAllows(ceiling: FoundryAuthorityLevel, requested: Found
   return AUTHORITY_RANK[requested] <= AUTHORITY_RANK[ceiling];
 }
 
-export function grantScopeAllows(scope: unknown, targetRef: string | null): boolean {
+export function grantScopeAllows(
+  scope: unknown,
+  targetRef: string | null,
+  synthetic = false
+): boolean {
   if (scope === null || typeof scope !== 'object' || Array.isArray(scope)) {
     return false;
   }
   const record = scope as Record<string, unknown>;
   const keys = Object.keys(record);
-  if (keys.some((key) => key !== 'target_refs')) {
+  if (keys.some((key) => !['target_refs', 'max_tasks', 'synthetic_only'].includes(key))) {
+    return false;
+  }
+  if (Object.prototype.hasOwnProperty.call(record, 'max_tasks')
+    && (!Number.isSafeInteger(record.max_tasks) || (record.max_tasks as number) < 1)) {
+    return false;
+  }
+  if (Object.prototype.hasOwnProperty.call(record, 'synthetic_only')
+    && typeof record.synthetic_only !== 'boolean') {
+    return false;
+  }
+  if (record.synthetic_only === true && !synthetic) {
     return false;
   }
   if (!Object.prototype.hasOwnProperty.call(record, 'target_refs')) {
@@ -291,6 +306,76 @@ function validateAdapterResult(result: FoundryAdapterResult): Required<Pick<Foun
   return { status: result.status, summary, resultRef, errorCode };
 }
 
+
+export async function persistFoundryTerminalResultAtomic(
+  queryFn: QueryFunction,
+  executionContextId: string,
+  adapterOperationId: string,
+  result: FoundryAdapterResult
+): Promise<{ adapterOperationResultId: string; executionOutcomeId: string }> {
+  const governed = validateAdapterResult(result);
+  const resultFingerprint = sha256Fingerprint({
+    adapter_operation_id: adapterOperationId,
+    terminal_status: governed.status,
+    result_ref: governed.resultRef,
+    error_code: governed.errorCode,
+    summary: governed.summary,
+  });
+
+  const persisted = await queryFn<{
+    adapter_operation_result_id: string;
+    execution_outcome_id: string;
+  }>(
+    `WITH adapter_result AS (
+       INSERT INTO comind.cm_foundry_adapter_operation_result (
+         adapter_operation_id, terminal_status, result_ref,
+         result_fingerprint, error_code, summary
+       ) VALUES (
+         $1::uuid, $2::text, $3::text,
+         $4::text, $5::text, $6::text
+       )
+       RETURNING adapter_operation_result_id
+     ), execution_outcome AS (
+       INSERT INTO comind.cm_foundry_execution_outcome (
+         execution_context_id, adapter_operation_result_id,
+         terminal_status, error_code, summary
+       )
+       SELECT $7::uuid, ar.adapter_operation_result_id,
+              $2::text, $5::text, $6::text
+       FROM adapter_result AS ar
+       RETURNING execution_outcome_id, adapter_operation_result_id
+     )
+     SELECT ar.adapter_operation_result_id::text,
+            eo.execution_outcome_id::text
+     FROM adapter_result AS ar
+     JOIN execution_outcome AS eo
+       ON eo.adapter_operation_result_id = ar.adapter_operation_result_id`,
+    [
+      adapterOperationId,
+      governed.status,
+      governed.resultRef,
+      resultFingerprint,
+      governed.errorCode,
+      governed.summary,
+      executionContextId,
+    ]
+  );
+
+  if (persisted.rows.length !== 1) {
+    throw new FoundryRuntimeError(
+      'terminal_persistence_failed',
+      'Adapter result and execution outcome were not persisted atomically',
+      executionContextId,
+      adapterOperationId
+    );
+  }
+
+  return {
+    adapterOperationResultId: persisted.rows[0].adapter_operation_result_id,
+    executionOutcomeId: persisted.rows[0].execution_outcome_id,
+  };
+}
+
 function assertExecutionRequest(request: FoundryExecutionRequest): void {
   requiredText(request.profileId, 'profileId');
   requiredText(request.capabilityCode, 'capabilityCode');
@@ -391,10 +476,26 @@ export class FoundryRuntimeOrchestrator {
       if (!authorityAllows(candidate.authority_ceiling, request.authorityLevel)) {
         return false;
       }
-      return grantScopeAllows(candidate.scope, targetRef);
+      return grantScopeAllows(candidate.scope, targetRef, input.synthetic === true);
     });
     if (!grant) {
       throw new FoundryRuntimeError('grant_not_valid', 'No active scoped capability grant authorizes this execution');
+    }
+    const grantScope = grant.scope as Record<string, unknown>;
+    if (typeof grantScope.max_tasks === 'number') {
+      const consumed = await this.queryFn<{ task_count: number }>(
+        `SELECT count(*)::int AS task_count
+         FROM comind.cm_foundry_execution_context
+         WHERE profile_id = $1::uuid
+           AND capability_id = $2::uuid
+           AND project_id IS NOT DISTINCT FROM $3::uuid
+           AND environment = $4::text
+           AND context->>'target_ref' IS NOT DISTINCT FROM $5::text`,
+        [request.profileId, authority.capability_id, request.projectId ?? null, request.environment, targetRef]
+      );
+      if (Number(consumed.rows[0]?.task_count ?? 0) >= grantScope.max_tasks) {
+        throw new FoundryRuntimeError('grant_task_limit_exceeded', 'Capability grant task limit has been consumed');
+      }
     }
 
     const authorizationResult = await this.queryFn<AuthorizationRow>(
@@ -699,62 +800,14 @@ export class FoundryRuntimeOrchestrator {
     adapterOperationId: string,
     result: ReturnType<typeof validateAdapterResult>
   ): Promise<{ adapterOperationResultId: string; executionOutcomeId: string }> {
-    const resultFingerprint = sha256Fingerprint({
-      adapter_operation_id: adapterOperationId,
-      terminal_status: result.status,
-      result_ref: result.resultRef,
-      error_code: result.errorCode,
-      summary: result.summary,
-    });
-
-    const operationResult = await this.queryFn<IdRow>(
-      `INSERT INTO comind.cm_foundry_adapter_operation_result (
-         adapter_operation_id, terminal_status, result_ref,
-         result_fingerprint, error_code, summary
-       ) VALUES (
-         $1::uuid, $2::text, $3::text,
-         $4::text, $5::text, $6::text
-       )
-       RETURNING adapter_operation_result_id::text AS id`,
-      [
-        adapterOperationId,
-        result.status,
-        result.resultRef,
-        resultFingerprint,
-        result.errorCode,
-        result.summary,
-      ]
+    return persistFoundryTerminalResultAtomic(
+      this.queryFn,
+      executionContextId,
+      adapterOperationId,
+      result
     );
-    if (operationResult.rows.length !== 1) {
-      throw new FoundryRuntimeError('adapter_result_persistence_failed', 'Adapter result was not persisted uniquely', executionContextId, adapterOperationId);
-    }
-    const adapterOperationResultId = operationResult.rows[0].id;
-
-    const executionOutcome = await this.queryFn<IdRow>(
-      `INSERT INTO comind.cm_foundry_execution_outcome (
-         execution_context_id, adapter_operation_result_id,
-         terminal_status, error_code, summary
-       ) VALUES (
-         $1::uuid, $2::uuid, $3::text, $4::text, $5::text
-       )
-       RETURNING execution_outcome_id::text AS id`,
-      [
-        executionContextId,
-        adapterOperationResultId,
-        result.status,
-        result.errorCode,
-        result.summary,
-      ]
-    );
-    if (executionOutcome.rows.length !== 1) {
-      throw new FoundryRuntimeError('execution_outcome_persistence_failed', 'Execution outcome was not persisted uniquely', executionContextId, adapterOperationId);
-    }
-
-    return {
-      adapterOperationResultId,
-      executionOutcomeId: executionOutcome.rows[0].id,
-    };
   }
+
 }
 
 export interface FoundryDeliberationEventInput {

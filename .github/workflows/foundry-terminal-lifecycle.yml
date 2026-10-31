@@ -1,0 +1,50 @@
+name: Foundry Terminal Lifecycle
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    paths:
+      - '.github/workflows/foundry-terminal-lifecycle.yml'
+      - 'db/migrations/**'
+      - 'db/sql/v2/**'
+      - 'scripts/test_foundry_agent_substrate.sh'
+      - 'scripts/test_foundry_terminal_lifecycle.sh'
+      - 'server/src/foundry-runtime.ts'
+      - 'server/src/foundry-lifecycle.ts'
+      - 'server/test/integration/foundry-terminal-lifecycle.e2e.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  terminal-lifecycle:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.6-pg17-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+      - name: Verify terminal lifecycle reconciliation
+        run: bash ./scripts/test_foundry_terminal_lifecycle.sh

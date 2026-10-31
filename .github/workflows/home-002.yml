@@ -1,0 +1,50 @@
+name: HOME-002 Governed Now Composer
+
+on:
+  pull_request:
+    paths:
+      - "apps/operator-console/src/lib/home/**"
+      - "apps/operator-console/src/lib/activity-hud/server.ts"
+      - "apps/operator-console/src/app/api/activity/route.ts"
+      - "apps/operator-console/src/app/api/home/now/**"
+      - "apps/operator-console/test/home-now-*.test.ts"
+      - "config/comind-home-information-architecture.v1.json"
+      - "scripts/validate_comind_home_ia.py"
+      - "docs/architecture/HOME-002-now-read-model.md"
+      - "docs/provenance/2026-10-30-home-002-now-composer.md"
+      - ".github/workflows/home-002.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+
+      - name: Validate accepted HOME-001 architecture contract
+        run: python3 scripts/validate_comind_home_ia.py
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install locked Operator Console dependencies
+        working-directory: apps/operator-console
+        run: npm ci
+
+      - name: Run Operator Console unit tests
+        working-directory: apps/operator-console
+        run: npm test
+
+      - name: Typecheck Operator Console
+        working-directory: apps/operator-console
+        run: npm run typecheck
+
+      - name: Build Operator Console
+        working-directory: apps/operator-console
+        run: npm run build

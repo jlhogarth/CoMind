@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto';
 
-export const CHATGPT_ARCHIVE_PARSER_VERSION = 'chatgpt-export-v0.1.0';
+export const CHATGPT_ARCHIVE_PARSER_VERSION = 'chatgpt-export-v0.4.0';
 export const CHATGPT_ARCHIVE_SCHEMA_VERSION = 'comind-archive-v1';
 
 export type IntegrityStatus = 'PASS' | 'WARN' | 'FAIL';
-export type ParserSeverity = 'WARNING' | 'ERROR';
+export type ParserSeverity = 'INFO' | 'WARNING' | 'ERROR';
 
 export interface ParserEvent {
   severity: ParserSeverity;
@@ -45,6 +45,7 @@ export interface NodeObservation {
 export interface ConversationAnalysis {
   sourceConversationId: string | null;
   title: string | null;
+  currentNodeId: string | null;
   sourceCreatedAt: unknown;
   sourceUpdatedAt: unknown;
   createdAt: string | null;
@@ -136,9 +137,70 @@ function makeEvent(
   };
 }
 
+function recordUnknownFields(
+  events: ParserEvent[],
+  value: Record<string, unknown>,
+  knownKeys: ReadonlySet<string>,
+  eventCode: string,
+  detail: string,
+  ids: {
+    sourceConversationId?: string | null;
+    sourceNodeId?: string | null;
+    sourceMessageId?: string | null;
+  } = {}
+): void {
+  const fields = Object.keys(value).filter((key) => !knownKeys.has(key)).sort();
+  if (fields.length === 0) return;
+  events.push(makeEvent('INFO', eventCode, detail, { fields }, ids));
+}
+
 function normalizeChildren(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter((item): item is string => typeof item === 'string');
+}
+
+function duplicateStrings(values: string[]): string[] {
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+  for (const value of values) {
+    if (seen.has(value)) duplicates.add(value);
+    seen.add(value);
+  }
+  return [...duplicates].sort();
+}
+
+function findParentCycles(nodes: NodeObservation[]): string[][] {
+  const byId = new Map(nodes.map((node) => [node.sourceNodeId, node]));
+  const completed = new Set<string>();
+  const cycles: string[][] = [];
+  const cycleKeys = new Set<string>();
+
+  for (const start of nodes) {
+    if (completed.has(start.sourceNodeId)) continue;
+    const path: string[] = [];
+    const localIndex = new Map<string, number>();
+    let currentId: string | null = start.sourceNodeId;
+
+    while (currentId && byId.has(currentId) && !completed.has(currentId)) {
+      const repeatedAt = localIndex.get(currentId);
+      if (repeatedAt !== undefined) {
+        const cycle = path.slice(repeatedAt);
+        const canonical = [...cycle].sort().join('|');
+        if (!cycleKeys.has(canonical)) {
+          cycleKeys.add(canonical);
+          cycles.push(cycle);
+        }
+        break;
+      }
+      localIndex.set(currentId, path.length);
+      path.push(currentId);
+      currentId = byId.get(currentId)?.parentSourceNodeId ?? null;
+    }
+
+    path.forEach((nodeId) => completed.add(nodeId));
+  }
+
+  return cycles;
 }
 
 function collectAttachmentReferences(
@@ -147,21 +209,30 @@ function collectAttachmentReferences(
   message: Record<string, unknown>
 ): AttachmentReference[] {
   const found: AttachmentReference[] = [];
-  const seen = new Set<string>();
+  const byReference = new Map<string, number>();
   const referenceKeys = new Set(['file_id', 'asset_pointer', 'attachment_id']);
 
   const add = (kind: string, reference: string, metadata: Record<string, unknown>) => {
-    const referenceHash = sha256Canonical({ kind, reference, metadata });
-    if (seen.has(referenceHash)) return;
-    seen.add(referenceHash);
-    found.push({
+    const normalizedReference = reference.trim();
+    if (!normalizedReference) return;
+    const candidate: AttachmentReference = {
       sourceNodeId: nodeId,
       sourceMessageId: messageId,
       referenceKind: kind,
-      sourceReference: reference,
+      sourceReference: normalizedReference,
       sourceMetadata: metadata,
-      referenceHash,
-    });
+      referenceHash: sha256Canonical({ kind, reference: normalizedReference, metadata }),
+    };
+    const existingIndex = byReference.get(normalizedReference);
+    if (existingIndex === undefined) {
+      byReference.set(normalizedReference, found.length);
+      found.push(candidate);
+      return;
+    }
+    const existing = found[existingIndex]!;
+    if (Object.keys(metadata).length > Object.keys(existing.sourceMetadata).length) {
+      found[existingIndex] = candidate;
+    }
   };
 
   const walk = (value: unknown, path: string) => {
@@ -179,6 +250,7 @@ function collectAttachmentReferences(
             const reference =
               stringOrNull(attachment.file_id) ??
               stringOrNull(attachment.asset_pointer) ??
+              stringOrNull(attachment.attachment_id) ??
               stringOrNull(attachment.id) ??
               `${nextPath}[${index}]`;
             add('attachments', reference, attachment);
@@ -213,17 +285,39 @@ export function analyzeChatGptConversation(value: unknown): ConversationAnalysis
   const rawConversation = value;
   const sourceConversationId = stringOrNull(value.id) ?? stringOrNull(value.conversation_id);
   const title = stringOrNull(value.title);
+  const currentNodeId = stringOrNull(value.current_node);
   const sourceCreatedAt = value.create_time ?? null;
   const sourceUpdatedAt = value.update_time ?? null;
   const createdAt = rawTimestampToIso(sourceCreatedAt);
   const updatedAt = rawTimestampToIso(sourceUpdatedAt);
   const events: ParserEvent[] = [];
 
+  recordUnknownFields(
+    events,
+    value,
+    new Set(['id', 'conversation_id', 'title', 'create_time', 'update_time', 'current_node', 'mapping']),
+    'SCHEMA_DRIFT_CONVERSATION_FIELDS',
+    'Conversation contains source fields outside the currently normalized structural contract.',
+    { sourceConversationId }
+  );
+
   if (!sourceConversationId) {
     events.push(
       makeEvent('ERROR', 'MISSING_CONVERSATION_ID', 'Conversation has no usable source identifier.', {
         rawSourceHash: sha256Canonical(value),
       })
+    );
+  }
+
+  if (value.current_node !== undefined && value.current_node !== null && !currentNodeId) {
+    events.push(
+      makeEvent(
+        'ERROR',
+        'INVALID_CURRENT_NODE',
+        'Conversation current_node is present but is not a usable string identifier.',
+        { currentNode: value.current_node },
+        { sourceConversationId }
+      )
     );
   }
 
@@ -243,6 +337,7 @@ export function analyzeChatGptConversation(value: unknown): ConversationAnalysis
   const nodes: NodeObservation[] = [];
   const attachments: AttachmentReference[] = [];
   const messageIds = new Set<string>();
+  const nodesWithExplicitChildren = new Set<string>();
 
   if (mapping) {
     for (const [nodeId, rawNodeValue] of Object.entries(mapping)) {
@@ -260,16 +355,63 @@ export function analyzeChatGptConversation(value: unknown): ConversationAnalysis
       }
 
       const rawNode = rawNodeValue;
+      recordUnknownFields(
+        events,
+        rawNode,
+        new Set(['id', 'parent', 'children', 'message']),
+        'SCHEMA_DRIFT_NODE_FIELDS',
+        'Mapping node contains source fields outside the currently normalized node contract.',
+        { sourceConversationId, sourceNodeId: nodeId }
+      );
+
+      const embeddedNodeId = stringOrNull(rawNode.id);
+      if (embeddedNodeId && embeddedNodeId !== nodeId) {
+        events.push(
+          makeEvent(
+            'ERROR',
+            'MAPPING_NODE_ID_MISMATCH',
+            'Mapping key and embedded node id do not match.',
+            { mappingKey: nodeId, embeddedNodeId },
+            { sourceConversationId, sourceNodeId: nodeId }
+          )
+        );
+      }
+
       const parentSourceNodeId = stringOrNull(rawNode.parent);
+      const hasExplicitChildren = Object.prototype.hasOwnProperty.call(rawNode, 'children');
+      if (hasExplicitChildren) nodesWithExplicitChildren.add(nodeId);
       const rawChildren = rawNode.children;
       const childSourceNodeIds = normalizeChildren(rawChildren);
-      if (rawChildren !== undefined && !Array.isArray(rawChildren)) {
+      if (hasExplicitChildren && !Array.isArray(rawChildren)) {
         events.push(
           makeEvent(
             'ERROR',
             'INVALID_CHILDREN_SHAPE',
             'Node children field is present but is not an array.',
             { rawChildren },
+            { sourceConversationId, sourceNodeId: nodeId }
+          )
+        );
+      }
+      if (Array.isArray(rawChildren) && rawChildren.some((child) => typeof child !== 'string')) {
+        events.push(
+          makeEvent(
+            'ERROR',
+            'INVALID_CHILD_REFERENCE_TYPE',
+            'Node children array contains a non-string child reference.',
+            { rawChildren },
+            { sourceConversationId, sourceNodeId: nodeId }
+          )
+        );
+      }
+      const duplicateChildren = duplicateStrings(childSourceNodeIds);
+      if (duplicateChildren.length > 0) {
+        events.push(
+          makeEvent(
+            'ERROR',
+            'DUPLICATE_CHILD_REFERENCE',
+            'Node children list contains duplicate child references.',
+            { duplicateChildren },
             { sourceConversationId, sourceNodeId: nodeId }
           )
         );
@@ -283,6 +425,47 @@ export function analyzeChatGptConversation(value: unknown): ConversationAnalysis
       const sourceMessageUpdatedAt = message?.update_time ?? null;
       const content = message && isRecord(message.content) ? message.content : null;
       const contentType = content ? stringOrNull(content.content_type) : null;
+
+      if (message) {
+        recordUnknownFields(
+          events,
+          message,
+          new Set(['id', 'author', 'create_time', 'update_time', 'content', 'status', 'end_turn', 'weight', 'metadata', 'recipient', 'channel']),
+          'SCHEMA_DRIFT_MESSAGE_FIELDS',
+          'Message contains source fields outside the currently normalized message contract.',
+          { sourceConversationId, sourceNodeId: nodeId, sourceMessageId }
+        );
+        if (author) {
+          recordUnknownFields(
+            events,
+            author,
+            new Set(['role', 'name', 'metadata']),
+            'SCHEMA_DRIFT_AUTHOR_FIELDS',
+            'Message author contains source fields outside the currently normalized author contract.',
+            { sourceConversationId, sourceNodeId: nodeId, sourceMessageId }
+          );
+        }
+        if (content) {
+          recordUnknownFields(
+            events,
+            content,
+            new Set(['content_type', 'parts']),
+            'SCHEMA_DRIFT_CONTENT_FIELDS',
+            'Message content contains source fields outside the currently normalized content contract.',
+            { sourceConversationId, sourceNodeId: nodeId, sourceMessageId }
+          );
+        }
+        if (isRecord(message.metadata)) {
+          recordUnknownFields(
+            events,
+            message.metadata,
+            new Set(['attachments', 'citations', 'content_references', 'model_slug', 'default_model_slug', 'finish_details', 'message_type', 'request_id', 'parent_id']),
+            'SCHEMA_DRIFT_MESSAGE_METADATA_FIELDS',
+            'Message metadata contains keys not yet modeled by the archive normalizer.',
+            { sourceConversationId, sourceNodeId: nodeId, sourceMessageId }
+          );
+        }
+      }
 
       if (message && !sourceMessageId) {
         events.push(
@@ -371,6 +554,53 @@ export function analyzeChatGptConversation(value: unknown): ConversationAnalysis
   }
 
   const nodeIds = new Set(nodes.map((node) => node.sourceNodeId));
+  const nodesById = new Map(nodes.map((node) => [node.sourceNodeId, node]));
+
+  let derivedEdgeCount = 0;
+  const derivedParentIds = new Set<string>();
+  for (const node of nodes) {
+    if (!node.parentSourceNodeId) continue;
+    const parent = nodesById.get(node.parentSourceNodeId);
+    if (!parent || nodesWithExplicitChildren.has(parent.sourceNodeId)) continue;
+    if (!parent.childSourceNodeIds.includes(node.sourceNodeId)) {
+      parent.childSourceNodeIds.push(node.sourceNodeId);
+      derivedEdgeCount += 1;
+      derivedParentIds.add(parent.sourceNodeId);
+    }
+  }
+  for (const parentId of derivedParentIds) {
+    nodesById.get(parentId)?.childSourceNodeIds.sort((a, b) => a.localeCompare(b));
+  }
+
+  const nodesWithoutExplicitChildren = nodes.length - nodesWithExplicitChildren.size;
+  if (nodesWithoutExplicitChildren > 0) {
+    events.push(
+      makeEvent(
+        'INFO',
+        'TOPOLOGY_CHILDREN_DERIVED_FROM_PARENT_LINKS',
+        'Some mapping nodes omit children arrays; normalized child edges were derived from preserved parent links without modifying raw source evidence.',
+        {
+          nodesWithoutExplicitChildren,
+          derivedParentCount: derivedParentIds.size,
+          derivedEdgeCount,
+        },
+        { sourceConversationId }
+      )
+    );
+  }
+
+  if (currentNodeId && !nodeIds.has(currentNodeId)) {
+    events.push(
+      makeEvent(
+        'ERROR',
+        'MISSING_CURRENT_NODE',
+        'Conversation current_node does not exist in the preserved mapping.',
+        { currentNodeId },
+        { sourceConversationId, sourceNodeId: currentNodeId }
+      )
+    );
+  }
+
   for (const node of nodes) {
     if (node.parentSourceNodeId && !nodeIds.has(node.parentSourceNodeId)) {
       events.push(
@@ -387,14 +617,29 @@ export function analyzeChatGptConversation(value: unknown): ConversationAnalysis
         )
       );
     }
-    for (const child of node.childSourceNodeIds) {
-      if (!nodeIds.has(child)) {
+    for (const childId of node.childSourceNodeIds) {
+      const child = nodesById.get(childId);
+      if (!child) {
         events.push(
           makeEvent(
             'ERROR',
             'MISSING_CHILD_NODE',
             'Node references a child that does not exist in the conversation mapping.',
-            { childSourceNodeId: child },
+            { childSourceNodeId: childId },
+            {
+              sourceConversationId,
+              sourceNodeId: node.sourceNodeId,
+              sourceMessageId: node.sourceMessageId,
+            }
+          )
+        );
+      } else if (child.parentSourceNodeId !== node.sourceNodeId) {
+        events.push(
+          makeEvent(
+            'ERROR',
+            'ASYMMETRIC_TOPOLOGY',
+            'Parent children list is not mirrored by the child parent link.',
+            { childSourceNodeId: childId, childParentSourceNodeId: child.parentSourceNodeId },
             {
               sourceConversationId,
               sourceNodeId: node.sourceNodeId,
@@ -408,7 +653,7 @@ export function analyzeChatGptConversation(value: unknown): ConversationAnalysis
 
   for (const node of nodes) {
     if (!node.parentSourceNodeId) continue;
-    const parent = nodes.find((candidate) => candidate.sourceNodeId === node.parentSourceNodeId);
+    const parent = nodesById.get(node.parentSourceNodeId);
     if (parent && !parent.childSourceNodeIds.includes(node.sourceNodeId)) {
       events.push(
         makeEvent(
@@ -426,10 +671,23 @@ export function analyzeChatGptConversation(value: unknown): ConversationAnalysis
     }
   }
 
+  for (const cycle of findParentCycles(nodes)) {
+    events.push(
+      makeEvent(
+        'ERROR',
+        'GRAPH_CYCLE_DETECTED',
+        'Conversation mapping contains a parent cycle and cannot be treated as an acyclic conversation graph.',
+        { cycle },
+        { sourceConversationId, sourceNodeId: cycle[0] ?? null }
+      )
+    );
+  }
+
   const topologyHash = topologyFingerprint(nodes);
   const normalizedHash = sha256Canonical({
     sourceConversationId,
     title,
+    currentNodeId,
     sourceCreatedAt,
     sourceUpdatedAt,
     topologyHash,
@@ -449,6 +707,7 @@ export function analyzeChatGptConversation(value: unknown): ConversationAnalysis
   return {
     sourceConversationId,
     title,
+    currentNodeId,
     sourceCreatedAt,
     sourceUpdatedAt,
     createdAt,

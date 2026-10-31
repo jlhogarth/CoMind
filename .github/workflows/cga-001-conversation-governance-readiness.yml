@@ -1,0 +1,88 @@
+name: CGA-001 Conversation Governance Readiness
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/cga-001-conversation-governance-readiness.yml'
+      - 'db/sql/20261029_cga_001_conversation_scope_reconciliation.sql'
+      - 'db/test/bootstrap_cga_001_conversation_scope.sql'
+      - 'db/verification/20261029_cga_001_conversation_scope_verification.sql'
+      - 'scripts/test_cga_001_conversation_scope.sh'
+      - 'server/src/c11-trust-boundary.ts'
+      - 'server/src/routes/conversations.ts'
+      - 'server/test/c11-trust-boundary.test.mjs'
+      - 'server/test/conversation-scope-route.test.mjs'
+      - 'docs/provenance/2026-10-29-cga-001-conversation-scope-c11.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  database-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+      - name: Verify bounded scope reconciliation
+        run: bash ./scripts/test_cga_001_conversation_scope.sh
+
+  server-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+      - name: Use Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Build and verify C11 and scoped creation
+        working-directory: server
+        run: |
+          npm ci
+          npm run build
+          node --test test/c11-trust-boundary.test.mjs test/conversation-scope-route.test.mjs

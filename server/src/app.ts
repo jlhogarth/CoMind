@@ -6,6 +6,10 @@ import multipart from '@fastify/multipart';
 import { env } from './env.js';
 import { AssistantProvider } from './assistant.js';
 import { createConfiguredAssistantProvider } from './assistant-provider.js';
+import {
+  persistOpenAIProviderAcquisitionEvent,
+  type ProviderAcquisitionWriter,
+} from './conversation-acquisition-store.js';
 import { createCheckpointScheduler } from './continuity/scheduler.js';
 import { registerConversationRoutes } from './routes/conversations.js';
 import { registerIngestRoutes } from './routes/ingest.js';
@@ -18,6 +22,7 @@ import { registerChecklistRoutes } from './routes/checklist.js';
 import { registerAssistantRoutes } from './routes/assistant.js';
 import { registerMemoryRoutes } from './routes/memory.js';
 import { registerChatRoutes } from './routes/chat.js';
+import { registerGovernanceRoutes } from './routes/governance.js';
 import {
   closePool,
   ConversationLockRunner,
@@ -34,6 +39,7 @@ type AppDependencies = {
   assistantProvider: AssistantProvider | null;
   assistantMaxHistoryMessages: number;
   conversationLock: ConversationLockRunner;
+  providerAcquisitionWriter: ProviderAcquisitionWriter;
   checkpointingEnabled: boolean;
 };
 
@@ -44,6 +50,7 @@ const defaultDependencies: AppDependencies = {
   assistantProvider: createConfiguredAssistantProvider(),
   assistantMaxHistoryMessages: env.ASSISTANT_MAX_HISTORY_MESSAGES,
   conversationLock: withConversationLock,
+  providerAcquisitionWriter: persistOpenAIProviderAcquisitionEvent,
   checkpointingEnabled: env.ACP_CHECKPOINTS_ENABLED,
 };
 
@@ -122,11 +129,13 @@ export async function buildApp(overrides: Partial<AppDependencies> = {}) {
     dependencies.query,
     dependencies.assistantProvider,
     dependencies.assistantMaxHistoryMessages,
-    dependencies.conversationLock
+    dependencies.conversationLock,
+    dependencies.providerAcquisitionWriter
   );
   registerMemoryRoutes(app, dependencies.query, dependencies.conversationLock);
   registerAdminRoutes(app);
   registerChatRoutes(app);
+  registerGovernanceRoutes(app, dependencies.query);
 
   app.get('/', async () => ({ ok: true }));
   app.get('/health', async () => ({ ok: true, service: 'comind-api' }));

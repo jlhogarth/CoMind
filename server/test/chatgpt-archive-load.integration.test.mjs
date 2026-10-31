@@ -21,9 +21,13 @@ if (process.env.CHATGPT_ARCHIVE_DB_TEST !== '1') {
 
   const conversationCount = 100;
   const messagesPerConversation = 20;
+  const shardCount = 4;
+  const conversationsPerShard = conversationCount / shardCount;
   const physicalAssetCount = 10;
   const distinctAttachmentReferenceCount = 10;
-  const attachmentReferenceObservationCount = 20;
+  // Each attachment-bearing message carries one logical source reference. The parser
+  // must not double-count the same file_id when recursive inspection sees it again.
+  const attachmentReferenceObservationCount = distinctAttachmentReferenceCount;
 
   function makeConversation(index) {
     const conversationId = `pit0-conversation-${String(index).padStart(4, '0')}`;
@@ -84,6 +88,7 @@ if (process.env.CHATGPT_ARCHIVE_DB_TEST !== '1') {
       title: `PIT-0 synthetic conversation ${index}`,
       create_time: baseTime,
       update_time: baseTime + messagesPerConversation,
+      current_node: previousNodeId,
       mapping,
     };
   }
@@ -91,7 +96,16 @@ if (process.env.CHATGPT_ARCHIVE_DB_TEST !== '1') {
   async function makeLoadFixture() {
     const root = await mkdtemp(path.join(tmpdir(), 'comind-chatgpt-pit0-load-'));
     const conversations = Array.from({ length: conversationCount }, (_, index) => makeConversation(index));
-    await writeFile(path.join(root, 'conversations.json'), JSON.stringify(conversations), 'utf8');
+
+    for (let shardIndex = 0; shardIndex < shardCount; shardIndex += 1) {
+      const start = shardIndex * conversationsPerShard;
+      const end = start + conversationsPerShard;
+      await writeFile(
+        path.join(root, `conversations-${String(shardIndex).padStart(3, '0')}.json`),
+        JSON.stringify(conversations.slice(start, end)),
+        'utf8'
+      );
+    }
 
     for (let index = 0; index < physicalAssetCount; index += 1) {
       await writeFile(
@@ -103,7 +117,7 @@ if (process.env.CHATGPT_ARCHIVE_DB_TEST !== '1') {
     return root;
   }
 
-  test('PIT-0 synthetic corpus reconciles under constrained archive database role', async () => {
+  test('PIT-0 sharded synthetic corpus reconciles under constrained archive database role', async () => {
     const root = await makeLoadFixture();
     try {
       const started = performance.now();
@@ -122,6 +136,18 @@ if (process.env.CHATGPT_ARCHIVE_DB_TEST !== '1') {
         assets: physicalAssetCount,
       });
       assert.equal(receipt.status, 'PASS');
+
+      const sourceFiles = await query(
+        `SELECT source_path
+         FROM comind.cm_archive_source_file
+         WHERE source_archive_id = $1 AND file_role = 'conversation_json'
+         ORDER BY source_path`,
+        [result.sourceArchiveId]
+      );
+      assert.deepEqual(
+        sourceFiles.rows.map((row) => row.source_path),
+        ['conversations-000.json', 'conversations-001.json', 'conversations-002.json', 'conversations-003.json']
+      );
 
       const counts = await query(
         `SELECT
@@ -155,6 +181,8 @@ if (process.env.CHATGPT_ARCHIVE_DB_TEST !== '1') {
           evidenceState: 'synthetic-isolated-development-only',
           conversationCount,
           messagesPerConversation,
+          shardCount,
+          conversationsPerShard,
           sourceMessageCount: conversationCount * messagesPerConversation,
           sourceNodeCount: conversationCount * (messagesPerConversation + 1),
           physicalAssetCount,

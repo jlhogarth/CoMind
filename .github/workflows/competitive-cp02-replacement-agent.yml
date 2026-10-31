@@ -1,0 +1,144 @@
+name: CP-02 Replacement-Agent Execution Proof
+
+on:
+  pull_request:
+    paths:
+      - 'server/src/continuity/**'
+      - 'server/src/threadkeeper/**'
+      - 'server/src/foundry-runtime.ts'
+      - 'server/src/foundry-lifecycle.ts'
+      - 'server/src/providers/ollama-foundry-adapter.ts'
+      - 'server/test/support/competitive-live-continuity.mjs'
+      - 'server/test/integration/competitive-cp02-replacement-agent.e2e.mjs'
+      - '.github/workflows/competitive-cp02-replacement-agent.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cp02-replacement-agent-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  replacement-agent-proof:
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'competitive-execution-proofs-253'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.6-pg17-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      ollama:
+        image: ollama/ollama:0.40.8
+        env:
+          OLLAMA_NO_CLOUD: '1'
+          OLLAMA_NUM_PARALLEL: '1'
+          OLLAMA_MAX_QUEUE: '1'
+        ports:
+          - 11434:11434
+        options: >-
+          --health-cmd "ollama list >/dev/null 2>&1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+      SUPABASE_SESSION_DATABASE_URL: ${{ secrets.SUPABASE_SESSION_DATABASE_URL }}
+      OLLAMA_BASE_URL: http://127.0.0.1:11434
+      OLLAMA_MODEL: qwen3:0.6b
+      CP02_ARTIFACT: artifacts/cp02-replacement-agent-evidence.json
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+
+      - name: Require exact Test pooled database secret
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${SUPABASE_SESSION_DATABASE_URL:-}" ]]; then
+            echo "::error title=Missing pooled database secret::SUPABASE_SESSION_DATABASE_URL is not configured."
+            exit 1
+          fi
+
+      - name: Install and verify Supabase database CA
+        shell: bash
+        run: |
+          set -euo pipefail
+          ca_path="$RUNNER_TEMP/supabase-prod-ca-2021.crt"
+          curl --fail --silent --show-error --location \
+            --proto '=https' --tlsv1.2 \
+            https://supabase-downloads.s3-ap-southeast-1.amazonaws.com/prod/ssl/prod-ca-2021.crt \
+            --output "$ca_path"
+          expected='807025AD50D4ED219D2C9C7D299C004F824EB00CF7F65AFEF607D07B72E6CAFA'
+          actual="$(openssl x509 -in "$ca_path" -noout -fingerprint -sha256 \
+            | cut -d= -f2 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+          if [ "$actual" != "$expected" ]; then
+            echo "Supabase CA fingerprint mismatch. Refusing database connection." >&2
+            exit 1
+          fi
+          echo "NODE_EXTRA_CA_CERTS=$ca_path" >> "$GITHUB_ENV"
+
+      - name: Pull bounded local model
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:11434/api/version >/dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              echo "Local Ollama server did not become ready." >&2
+              exit 1
+            fi
+            sleep 2
+          done
+          curl --fail --silent --show-error --max-time 900 \
+            -H 'Content-Type: application/json' \
+            -d '{"model":"qwen3:0.6b","stream":false}' \
+            http://127.0.0.1:11434/api/pull
+
+      - name: Verify isolated Foundry substrate
+        run: bash ./scripts/test_foundry_runtime_orchestration.sh
+
+      - name: Install and verify isolated work lease kernel
+        run: bash ./scripts/test_foundry_work_lease_kernel.sh
+
+      - name: Build server
+        working-directory: server
+        run: |
+          npm ci
+          npm run build
+
+      - name: Execute predecessor-to-replacement handoff
+        working-directory: server
+        run: node test/integration/competitive-cp02-replacement-agent.e2e.mjs
+
+      - name: Preserve CP-02 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cp02-replacement-agent-evidence
+          path: server/artifacts/cp02-replacement-agent-evidence.json
+          if-no-files-found: warn
+          retention-days: 30

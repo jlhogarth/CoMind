@@ -1,0 +1,42 @@
+name: CGA-002 Governed Assistant Canary
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/cga-002-governed-assistant-canary.yml'
+      - 'server/src/providers/governed-openai-assistant.ts'
+      - 'server/test/governed-openai-assistant.test.mjs'
+      - 'docs/provenance/2026-10-29-cga-002-governed-assistant-canary.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  broker-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+      - name: Use Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Build and verify governed assistant broker ordering
+        working-directory: server
+        run: |
+          npm ci
+          npm run build
+          node --test test/governed-openai-assistant.test.mjs

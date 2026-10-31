@@ -1,0 +1,123 @@
+name: Console usability
+
+on:
+  pull_request:
+    paths:
+      - "apps/operator-console/**"
+      - "server/src/providers/console-usability-foundry-adapter.ts"
+      - "server/test/console-usability-foundry-adapter.test.mjs"
+      - "server/scripts/run-cux-001-test-agent.mjs"
+      - "scripts/provision_cux_001_test_agent.sql"
+      - "config/console-usability-auditor.v1.json"
+      - "docs/provenance/**cux-001**"
+      - ".github/workflows/console-usability.yml"
+      - ".github/workflows/cux-001-test-agent-one-shot.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  foundry-adapter-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Build server
+        run: npm run build
+      - name: Check governed CUX dispatch script syntax
+        run: node --check scripts/run-cux-001-test-agent.mjs
+      - name: Run server tests
+        run: npm test
+
+  chromium-baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/operator-console
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/operator-console/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm test
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run CUX Chromium desktop and mobile review
+        run: npm run usability-test
+        env:
+          CUX_BROWSERS: chromium
+          CUX_REQUIRED_BROWSERS: chromium
+          CUX_FAIL_ON: blocker
+          CUX_REPORT_PATH: test-results/cux-001/console-usability-report.json
+          CUX_SCREENSHOT_DIR: test-results/cux-001/screenshots
+      - name: Upload CUX evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cux-001-chromium-${{ github.sha }}
+          path: apps/operator-console/test-results/cux-001
+          if-no-files-found: error
+          retention-days: 14
+
+  firefox-webkit-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: apps/operator-console
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/operator-console/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm test
+      - name: Install Firefox and WebKit
+        run: npx playwright install --with-deps firefox webkit
+      - name: Run CUX Firefox and WebKit desktop and mobile review
+        run: npm run usability-test
+        env:
+          CUX_BROWSERS: firefox,webkit
+          CUX_REQUIRED_BROWSERS: firefox,webkit
+          CUX_FAIL_ON: blocker
+          CUX_REPORT_PATH: test-results/cux-001/console-usability-report.json
+          CUX_SCREENSHOT_DIR: test-results/cux-001/screenshots
+      - name: Upload CUX evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cux-001-firefox-webkit-${{ github.sha }}
+          path: apps/operator-console/test-results/cux-001
+          if-no-files-found: error
+          retention-days: 14

@@ -36,9 +36,31 @@ jobs:
         run: test -z "$(git status --porcelain -- package-lock.json)"
       - name: Install locked dependencies
         run: npm ci
+      - name: Audit dependencies for high or critical vulnerabilities
+        run: npm audit --audit-level=high
       - name: Test
         run: npm test
       - name: Typecheck
         run: npm run typecheck
+      - name: Install Chromium for browser acceptance
+        run: npx playwright install --with-deps chromium
+      - name: Test Control Plane landing page in Chromium
+        run: node test/control-plane.browser.mjs
+        env:
+          CONTROL_PLANE_BROWSER_SCREENSHOT: artifacts/control-plane-browser.png
+      - name: Test Activity HUD pagination and filters in Chromium
+        run: npm run browser-test
+        env:
+          ACTIVITY_HUD_BROWSER_SCREENSHOT: artifacts/activity-hud-browser.png
+      - name: Upload Operator Console browser screenshots
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: operator-console-browser-acceptance
+          path: |
+            apps/operator-console/artifacts/control-plane-browser.png
+            apps/operator-console/artifacts/activity-hud-browser.png
+          if-no-files-found: error
+          retention-days: 7
       - name: Build
         run: npm run build

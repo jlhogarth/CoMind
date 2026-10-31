@@ -1,0 +1,116 @@
+name: DRULE-002 Successor Control Plane
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/drule-002-successor-control-plane.yml'
+      - 'db/migrations/20261028_003_drule_002_successor_control_plane.sql'
+      - 'db/migrations/20261028_004_drule_002_successor_control_plane_hardening.sql'
+      - 'db/sql/20261028_drule_002_successor_control_seed.sql'
+      - 'db/sql/20261028_drule_002_successor_control_test_runtime.sql'
+      - 'db/sql/20261028_drule_002_successor_control_acceptance.sql'
+      - 'db/sql/20261029_drule_provider_egress_integration_seed.sql'
+      - 'db/verification/20261028_drule_002_successor_control_plane_verification.sql'
+      - 'db/verification/20261028_drule_002_successor_control_plane_hardening_verification.sql'
+      - 'db/verification/20261028_drule_002_successor_control_acceptance_verification.sql'
+      - 'db/verification/20261029_drule_provider_egress_integration_verification.sql'
+      - 'scripts/test_drule_002_successor_control_plane.sh'
+      - 'server/src/routes/governance.ts'
+      - 'server/src/providers/rulebook-execution-preflight.ts'
+      - 'server/src/providers/governed-provider-execution.ts'
+      - 'server/src/providers/openai-execution.ts'
+      - 'server/src/app.ts'
+      - 'server/test/governance-preflight.test.mjs'
+      - 'server/test/rulebook-execution-preflight.test.mjs'
+      - 'server/test/governed-provider-execution.test.mjs'
+      - 'server/test/governed-provider-paid-ledger.test.mjs'
+      - 'server/test/governed-provider-replay.test.mjs'
+      - 'server/test/integration/governed-provider-execution.test.mjs'
+      - 'server/test/integration/cint-paid-provider-runtime-bridge.test.mjs'
+      - 'server/test/support/rulebook-execution-preflight.mjs'
+      - 'apps/operator-console/src/app/rulebook/page.tsx'
+      - 'apps/operator-console/src/lib/rulebook-hud/**'
+      - 'apps/operator-console/test/rulebook-hud-model.test.ts'
+      - 'apps/operator-console/src/app/page.tsx'
+      - 'docs/governance/rulebook-control-plane.md'
+      - 'docs/provenance/2026-10-28-drule-002-successor-deficiency-remediation.md'
+      - 'docs/provenance/2026-10-29-drule-provider-egress-preflight-adoption.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  control-plane-sql:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+    steps:
+      - name: Checkout exact workflow head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+      - name: Verify successor control plane
+        run: bash ./scripts/test_drule_002_successor_control_plane.sh
+
+  runtime-and-hud:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact workflow head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+      - name: Use Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Build and test governance runtime
+        working-directory: server
+        run: |
+          npm ci
+          npm run build
+          npm test
+      - name: Typecheck and test RuleBook HUD
+        working-directory: apps/operator-console
+        run: |
+          npm ci
+          npm run typecheck
+          npm test

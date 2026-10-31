@@ -180,7 +180,8 @@ BEGIN
   LOOP
     IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = v_role) THEN
       IF has_function_privilege(v_role, 'comind.cm_reject_archive_evidence_mutation()', 'EXECUTE')
-         OR has_function_privilege(v_role, 'comind.cm_guard_archive_import_finalization()', 'EXECUTE') THEN
+         OR has_function_privilege(v_role, 'comind.cm_guard_archive_import_finalization()', 'EXECUTE')
+         OR has_function_privilege(v_role, 'comind.cm_guard_archive_import_lineage()', 'EXECUTE') THEN
         RAISE EXCEPTION 'Role % can directly execute archive trigger helper functions', v_role;
       END IF;
     END IF;
@@ -221,20 +222,23 @@ BEGIN
   INSERT INTO comind.cm_archive_import (
     source_archive_id,
     parser_version,
-    schema_version
+    schema_version,
+    attempt_number
   ) VALUES (
     v_archive_id,
     'security-fixture-v1',
-    'security-fixture-v1'
+    'security-fixture-v1',
+    1
   )
-  ON CONFLICT (source_archive_id, parser_version, schema_version) DO NOTHING;
+  ON CONFLICT (source_archive_id, parser_version, schema_version, attempt_number) DO NOTHING;
 
   SELECT import_id, status
   INTO v_import_id, v_status
   FROM comind.cm_archive_import
   WHERE source_archive_id = v_archive_id
     AND parser_version = 'security-fixture-v1'
-    AND schema_version = 'security-fixture-v1';
+    AND schema_version = 'security-fixture-v1'
+    AND attempt_number = 1;
 
   IF v_import_id IS NULL THEN
     RAISE EXCEPTION 'Constrained archive role could not establish import identity';

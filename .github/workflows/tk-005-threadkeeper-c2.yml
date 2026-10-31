@@ -1,0 +1,66 @@
+name: TK-005 ThreadKeeper C2 Evidence Gate
+
+on:
+  pull_request:
+    paths:
+      - 'config/threadkeeper-c2-evidence.v1.json'
+      - 'config/governed-evidence-bindings.v1.json'
+      - 'scripts/threadkeeper_c2_matrix.mjs'
+      - 'scripts/governed_evidence_verifier.mjs'
+      - 'server/src/threadkeeper/**'
+      - 'server/test/threadkeeper-*.test.mjs'
+      - 'server/test/threadkeeper-*.integration.test.mjs'
+      - 'db/migrations/*threadkeeper*'
+      - 'docs/architecture/threadkeeper-*.md'
+      - 'docs/provenance/*threadkeeper*'
+      - '.github/workflows/tk-005-threadkeeper-c2.yml'
+      - '.github/workflows/threadkeeper-persistence.yml'
+      - 'config/maintenance-control.v1.json'
+  push:
+    branches: [main]
+    paths:
+      - 'config/threadkeeper-c2-evidence.v1.json'
+      - 'config/governed-evidence-bindings.v1.json'
+      - 'scripts/threadkeeper_c2_matrix.mjs'
+      - 'scripts/governed_evidence_verifier.mjs'
+      - 'server/src/threadkeeper/**'
+      - 'server/test/threadkeeper-*.test.mjs'
+      - 'server/test/threadkeeper-*.integration.test.mjs'
+      - 'db/migrations/*threadkeeper*'
+      - 'docs/architecture/threadkeeper-*.md'
+      - 'docs/provenance/*threadkeeper*'
+      - '.github/workflows/tk-005-threadkeeper-c2.yml'
+      - '.github/workflows/threadkeeper-persistence.yml'
+      - 'config/maintenance-control.v1.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: tk-005-threadkeeper-c2-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  c2-evidence-contract:
+    name: c2-evidence-contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact head with history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validate ThreadKeeper C2 evidence matrix and external bindings
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/threadkeeper_c2_matrix.mjs --verify-git --verify-github
+      - name: Prove fail-closed evidence contract
+        run: node --test server/test/threadkeeper-c2-evidence.test.mjs
+      - name: Prove external evidence references fail closed
+        run: node --test server/test/threadkeeper-evidence-reference-verifier.test.mjs

@@ -29,6 +29,7 @@ interface AppendMessageResultRow {
   content: string | null;
   created_at: string | null;
   meta: Record<string, unknown> | null;
+  capture_event_id: string | null;
 }
 
 export function registerConversationRoutes(
@@ -63,15 +64,24 @@ export function registerConversationRoutes(
 
     const { title, project_id } = parsed.data;
     const { rows } = await queryFn<any>(
-      `INSERT INTO comind.cm_conversation (project_id, source, title)
-       VALUES (
-         COALESCE($1::uuid, (SELECT project_id FROM comind.cm_project WHERE slug='comind' LIMIT 1)),
-         'live',
-         $2
+      `WITH selected_project AS (
+         SELECT project_id, org_id
+         FROM comind.cm_project
+         WHERE project_id = COALESCE(
+           $1::uuid,
+           (SELECT project_id FROM comind.cm_project WHERE slug='comind' LIMIT 1)
+         )
+           AND org_id IS NOT NULL
        )
-       RETURNING conv_id, project_id, source, title, created_at`,
+       INSERT INTO comind.cm_conversation (org_id, project_id, source, title)
+       SELECT org_id, project_id, 'live', $2
+       FROM selected_project
+       RETURNING conv_id, org_id, project_id, source, title, created_at`,
       [project_id ?? null, title]
     );
+    if (!rows[0]) {
+      return reply.code(409).send({ error: 'Conversation project scope could not be resolved' });
+    }
     return reply.code(201).send(rows[0]);
   });
 
@@ -101,6 +111,23 @@ export function registerConversationRoutes(
            FROM conversation_state
            WHERE generation_active=false
            RETURNING msg_id, conv_id, role, content, created_at, meta
+         ), captured AS (
+           SELECT comind.cm_record_conversation_capture_event(
+             p_conv_id => inserted.conv_id,
+             p_event_type => CASE inserted.role
+               WHEN 'user' THEN 'user_message_observed'
+               WHEN 'assistant' THEN 'assistant_message_observed'
+               WHEN 'system' THEN 'system_message_observed'
+               ELSE 'tool_message_observed'
+             END,
+             p_role => inserted.role,
+             p_content_delta => inserted.content,
+             p_msg_id => inserted.msg_id,
+             p_source_system => 'comind_server',
+             p_source_event_ref => 'message:' || inserted.msg_id::text || ':observed',
+             p_raw_payload => jsonb_build_object('capture_path', 'conversation_append_route')
+           ) AS capture_event_id
+           FROM inserted
          )
          SELECT
            state.generation_active,
@@ -109,9 +136,11 @@ export function registerConversationRoutes(
            inserted.role,
            inserted.content,
            inserted.created_at,
-           inserted.meta
+           inserted.meta,
+           captured.capture_event_id
          FROM conversation_state AS state
-         LEFT JOIN inserted ON TRUE`,
+         LEFT JOIN inserted ON TRUE
+         LEFT JOIN captured ON TRUE`,
         [id, role, content]
       );
       return rows[0] ?? null;
@@ -123,7 +152,7 @@ export function registerConversationRoutes(
     if (!locked.value) {
       return reply.code(404).send({ error: 'Conversation not found' });
     }
-    if (locked.value.generation_active || !locked.value.msg_id) {
+    if (locked.value.generation_active || !locked.value.msg_id || !locked.value.capture_event_id) {
       return reply.code(409).send({ error: 'Conversation is generating an assistant response' });
     }
     return reply.code(201).send({

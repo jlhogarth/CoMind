@@ -39,6 +39,19 @@ psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
   -f "${repository_root}/db/migrations/20261009_009_foundry_work_lease_kernel.sql"
 
 psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
+  -f "${repository_root}/db/migrations/20261021_011_foundry_work_lease_rpc_acl_hardening.sql"
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
+  -f "${repository_root}/db/migrations/20261021_012_foundry_work_lease_rpc_search_path_hardening.sql"
+
+# Reapply the additive hardening migrations to prove restart-safe execution.
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
+  -f "${repository_root}/db/migrations/20261021_011_foundry_work_lease_rpc_acl_hardening.sql"
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
+  -f "${repository_root}/db/migrations/20261021_012_foundry_work_lease_rpc_search_path_hardening.sql"
+
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
+  -f "${repository_root}/db/migrations/verify_20261021_011_012_foundry_work_lease_rpc_hardening.sql"
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 \
   -f "${repository_root}/db/migrations/verify_20261009_009_foundry_work_lease_kernel.sql"
 
 (

@@ -8,7 +8,7 @@ const MessageSchema = z.object({
   create_time: z.number().nullable().optional(),
   content: z.object({
     content_type: z.string().optional(),
-    parts: z.array(z.union([z.string(), z.record(z.any())])).optional()
+    parts: z.array(z.union([z.string(), z.record(z.string(), z.any())])).optional()
   }).optional()
 });
 
@@ -17,7 +17,7 @@ const ConversationSchema = z.object({
   title: z.string().nullable().optional(),
   create_time: z.number().nullable().optional(),
   update_time: z.number().nullable().optional(),
-  mapping: z.record(z.object({ message: MessageSchema.nullable().optional() })).optional(),
+  mapping: z.record(z.string(), z.object({ message: MessageSchema.nullable().optional() })).optional(),
   messages: z.array(MessageSchema).optional()
 });
 

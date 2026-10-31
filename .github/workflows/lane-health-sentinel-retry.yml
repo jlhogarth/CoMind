@@ -1,0 +1,139 @@
+name: Lane Health Sentinel Retry
+
+on:
+  workflow_run:
+    workflows:
+      - Lane Health Sentinel Background
+    types: [completed]
+
+permissions:
+  actions: write
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: lane-health-retry
+  cancel-in-progress: false
+
+jobs:
+  retry:
+    name: Evaluate one-shot transient workflow retry
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out trusted default branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Download exact background evidence artifact
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          BACKGROUND_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/background
+
+          curl --fail --silent --show-error \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/actions/runs/${BACKGROUND_RUN_ID}/artifacts?per_page=100" \
+            > artifacts/background-artifacts.json
+
+          archive_url="$(node --input-type=module <<'NODE'
+          import { readFile } from 'node:fs/promises';
+          const payload = JSON.parse(await readFile('artifacts/background-artifacts.json', 'utf8'));
+          const matches = (payload.artifacts || []).filter((artifact) => artifact.name === 'lane-health-background' && !artifact.expired);
+          if (matches.length !== 1) {
+            throw new Error(`Expected exactly one live lane-health-background artifact, found ${matches.length}.`);
+          }
+          process.stdout.write(matches[0].archive_download_url);
+          NODE
+          )"
+
+          curl --fail --silent --show-error --location \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "${archive_url}" \
+            --output artifacts/lane-health-background.zip
+
+          unzip -q artifacts/lane-health-background.zip -d artifacts/background
+          test -f artifacts/background/lane-health-background.json
+
+      - name: Review structured transient signal evidence
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          node scripts/lane_health_transient_signal.mjs \
+            --repository "${GITHUB_REPOSITORY}" \
+            --bundle artifacts/background/lane-health-background.json \
+            --output artifacts/background/lane-health-background-enriched.json
+
+      - name: Evaluate and request at most one retry
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          node scripts/lane_health_retry.mjs \
+            --repository "${GITHUB_REPOSITORY}" \
+            --bundle artifacts/background/lane-health-background-enriched.json \
+            --policy .github/lane-health-sentinel.json \
+            --output artifacts/lane-health-retry.json
+
+      - name: Write retry summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { readFile, appendFile } from 'node:fs/promises';
+          const result = JSON.parse(await readFile('artifacts/lane-health-retry.json', 'utf8'));
+          const lines = [
+            '# Lane Health Sentinel Retry',
+            '',
+            `- Candidates: \`${result.candidateCount}\``,
+            `- Rerun requested: \`${result.rerunRequested}\``,
+            `- Authority: \`${result.authorityBoundary}\``,
+            '',
+            'One-shot transient rerun authority only. No comment, merge, branch write, deployment, database, secret-management, or paid-resource authority is present.',
+          ];
+          for (const outcome of result.outcomes) {
+            lines.push(
+              '',
+              `## PR #${outcome.prNumber} / ${outcome.workflow}`,
+              `- Exact head: \`${outcome.exactHeadSha}\``,
+              `- Original run: ${outcome.runUrl}`,
+              `- Action: \`${outcome.action}\``,
+              `- Reason: ${outcome.retryReason || outcome.reason || 'none'}`
+            );
+            if (outcome.structuredTransientSignal?.classification) {
+              lines.push(
+                `- Structured transient: \`${outcome.structuredTransientSignal.classification}\` / exit \`${outcome.structuredTransientSignal.exitCode}\``
+              );
+            }
+            if (outcome.retryAttemptUrl) lines.push(`- Retry attempt: ${outcome.retryAttemptUrl}`);
+          }
+          await appendFile(process.env.GITHUB_STEP_SUMMARY, `${lines.join('\n')}\n`, 'utf8');
+          NODE
+
+      - name: Upload retry evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: lane-health-retry
+          path: |
+            artifacts/lane-health-retry.json
+            artifacts/background/lane-health-background-enriched.json
+          if-no-files-found: error
+          retention-days: 14

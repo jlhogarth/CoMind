@@ -29,12 +29,29 @@ test('Foundry canonical JSON and request fingerprints are key-order stable', () 
   assert.match(sha256Fingerprint({ a: 1 }), /^[0-9a-f]{64}$/);
 });
 
-test('Foundry grant scope accepts only the bounded target_refs contract', () => {
+test('Foundry grant scope accepts bounded target, task limit, and synthetic-only fields', () => {
   assert.equal(grantScopeAllows({}, 'jlhogarth/CoMind'), true);
   assert.equal(
     grantScopeAllows({ target_refs: ['jlhogarth/CoMind'] }, 'jlhogarth/CoMind'),
     true
   );
+  assert.equal(
+    grantScopeAllows(
+      { max_tasks: 1, synthetic_only: true, target_refs: ['jlhogarth/CoMind'] },
+      'jlhogarth/CoMind',
+      true
+    ),
+    true
+  );
+  assert.equal(
+    grantScopeAllows(
+      { max_tasks: 1, synthetic_only: true, target_refs: ['jlhogarth/CoMind'] },
+      'jlhogarth/CoMind'
+    ),
+    false
+  );
+  assert.equal(grantScopeAllows({ max_tasks: 0 }, 'jlhogarth/CoMind'), false);
+  assert.equal(grantScopeAllows({ synthetic_only: 'yes' }, 'jlhogarth/CoMind', true), false);
   assert.equal(
     grantScopeAllows({ target_refs: ['jlhogarth/Other'] }, 'jlhogarth/CoMind'),
     false

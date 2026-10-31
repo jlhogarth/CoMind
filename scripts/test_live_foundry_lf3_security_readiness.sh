@@ -27,16 +27,34 @@ python3 "${repository_root}/scripts/verify_live_foundry_lf3_manifest.py"
 # Reproduce the accepted LF-2 governed substrate without migration 007.
 bash "${repository_root}/scripts/test_live_foundry_lf2_agent_substrate.sh"
 
-# The current canonical base contains the Issue #78 conversation fast-path table
-# cm_assistant_generation and already removes the old broad conversation/document
-# policies. It also already carries fixed search paths on the seven functions that
-# remain mutable in live Supabase. Canonical set_current_actor is SECURITY DEFINER,
-# while accepted live is SECURITY INVOKER. The accepted live initial build predates
-# those repository-only changes. Normalize only this disposable database back to
-# the exact accepted live LF-2 pre-007 shape so migration 007 is tested against
-# what would actually be deployed.
+# The current canonical base contains later conversation-continuity structures
+# that did not exist in the accepted LF-2 pre-007 deployment shape. This test is
+# intentionally historical: migration 007 must be evaluated against the exact
+# security surface it originally transformed, not against unrelated tables added
+# by later modules. Remove only those disposable CFR-era structures here.
+#
+# The current canonical base also contains the Issue #78 conversation fast-path
+# table cm_assistant_generation and already removes the old broad conversation/
+# document policies. It also already carries fixed search paths on the seven
+# functions that remain mutable in live Supabase. Canonical set_current_actor is
+# SECURITY DEFINER, while accepted live is SECURITY INVOKER. Normalize only this
+# disposable database back to the exact accepted live LF-2 pre-007 shape so
+# migration 007 is tested against what would actually have been deployed.
 psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 <<'SQL'
+DROP TABLE IF EXISTS comind.cm_conversation_promotion_candidate CASCADE;
+DROP TABLE IF EXISTS comind.cm_conversation_derivation CASCADE;
+DROP TABLE IF EXISTS comind.cm_conversation_derivation_run CASCADE;
+DROP TABLE IF EXISTS comind.cm_conversation_prune_manifest CASCADE;
+DROP TABLE IF EXISTS comind.cm_conversation_promotion_evaluation CASCADE;
+DROP TABLE IF EXISTS comind.cm_conversation_recovery_checkpoint CASCADE;
+DROP TABLE IF EXISTS comind.cm_conversation_capture_event CASCADE;
+DROP TABLE IF EXISTS comind.cm_conversation_capture_cursor CASCADE;
 DROP TABLE IF EXISTS comind.cm_assistant_generation CASCADE;
+DROP TABLE IF EXISTS comind.cm_learning_path_item;
+DROP TABLE IF EXISTS comind.cm_learning_path;
+DROP TABLE IF EXISTS comind.cm_research_intake_event;
+DROP TABLE IF EXISTS comind.cm_research_intake;
+DROP TABLE IF EXISTS comind.cm_research_intake_source;
 
 DROP POLICY IF EXISTS conv_modify_own ON comind.cm_conversation;
 DROP POLICY IF EXISTS conv_select_all ON comind.cm_conversation;

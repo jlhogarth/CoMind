@@ -1,5 +1,6 @@
 import { AssistantResponseRequest, ConversationMessage } from '../assistant.js';
 import {
+  GovernedPaidExecutionLedger,
   GovernedProviderBudgetAuthority,
   GovernedProviderExecutionResult,
   executeGovernedProviderExecution,
@@ -13,6 +14,10 @@ import {
   assertProviderInputTokenPreflight,
   createProviderExecutionEnvelope,
 } from './provider-execution-envelope.js';
+import {
+  RulebookExecutionGovernanceContext,
+  RulebookExecutionPreflightEvaluator,
+} from './rulebook-execution-preflight.js';
 import {
   OpenAIProcessingMode,
   OpenAIProviderExposureQuote,
@@ -34,6 +39,10 @@ export interface OpenAIResponseCreateRequest {
   max_output_tokens: number;
 }
 
+export type OpenAIResponseStreamingCreateRequest = OpenAIResponseCreateRequest & {
+  stream: true;
+};
+
 export interface OpenAIExecutionOptions {
   model: string;
   processingMode: OpenAIProcessingMode;
@@ -45,11 +54,20 @@ export interface OpenAIExecutionOptions {
   maxRetries: number;
 }
 
+export interface OpenAIRulebookExecutionPreflight {
+  readonly evaluator: RulebookExecutionPreflightEvaluator;
+  readonly governance: RulebookExecutionGovernanceContext;
+}
+
 export type OpenAIProviderExecutionEnvelope =
   ProviderExecutionEnvelope<OpenAIResponseCreateRequest>;
 
 export interface OpenAIResponseCreateClient<TResponse> {
   create(request: OpenAIResponseCreateRequest): Promise<TResponse>;
+}
+
+export interface OpenAIResponseStreamingClient<TStream> {
+  create(request: OpenAIResponseStreamingCreateRequest): Promise<TStream>;
 }
 
 export interface OpenAIInputTokenCountRequest {
@@ -120,6 +138,17 @@ export function executeOpenAIProviderExecutionEnvelope<TResponse>(
   return responses.create(envelope.request);
 }
 
+export function executeOpenAIProviderStreamingEnvelope<TStream>(
+  responses: OpenAIResponseStreamingClient<TStream>,
+  envelope: OpenAIProviderExecutionEnvelope
+) {
+  assertProviderExecutionEnvelopeIntegrity(envelope);
+  return responses.create({
+    ...envelope.request,
+    stream: true,
+  });
+}
+
 export function quoteOpenAIExecutionEnvelopeExposure(
   envelope: OpenAIProviderExecutionEnvelope,
   preflight: ProviderInputTokenPreflight
@@ -145,22 +174,67 @@ export function quoteOpenAIExecutionEnvelopeExposure(
   return quote;
 }
 
+function openAIRulebookBinding(action: string) {
+  return Object.freeze({
+    destination_key: 'OPENAI-API',
+    region: 'provider-managed',
+    action,
+  });
+}
+
 export function executeGovernedOpenAIProviderExecutionEnvelope<TResponse>(
   responses: OpenAIResponseCreateClient<TResponse>,
   envelope: OpenAIProviderExecutionEnvelope,
   inputTokenCounter: ProviderInputTokenCounter<OpenAIResponseCreateRequest>,
-  budgetAuthority: GovernedProviderBudgetAuthority
+  budgetAuthority: GovernedProviderBudgetAuthority,
+  paidExecutionLedger: GovernedPaidExecutionLedger | undefined,
+  rulebook: OpenAIRulebookExecutionPreflight
 ): Promise<GovernedProviderExecutionResult<TResponse, OpenAIProviderExposureQuote>> {
   return executeGovernedProviderExecution({
     envelope,
+    rulebook: {
+      evaluator: rulebook.evaluator,
+      governance: rulebook.governance,
+      binding: openAIRulebookBinding('responses.create'),
+    },
     inputTokenCounter,
     exposureQuoter: {
       quoteExposure: quoteOpenAIExecutionEnvelopeExposure,
     },
     budgetAuthority,
+    paidExecutionLedger,
+    requestedToolCalls: 0,
     operationName: 'responses.create',
     execute: (executionEnvelope) =>
       executeOpenAIProviderExecutionEnvelope(responses, executionEnvelope),
+  });
+}
+
+export function executeGovernedOpenAIProviderStreamingEnvelope<TStream>(
+  responses: OpenAIResponseStreamingClient<TStream>,
+  envelope: OpenAIProviderExecutionEnvelope,
+  inputTokenCounter: ProviderInputTokenCounter<OpenAIResponseCreateRequest>,
+  budgetAuthority: GovernedProviderBudgetAuthority,
+  paidExecutionLedger: GovernedPaidExecutionLedger | undefined,
+  rulebook: OpenAIRulebookExecutionPreflight
+): Promise<GovernedProviderExecutionResult<TStream, OpenAIProviderExposureQuote>> {
+  return executeGovernedProviderExecution({
+    envelope,
+    rulebook: {
+      evaluator: rulebook.evaluator,
+      governance: rulebook.governance,
+      binding: openAIRulebookBinding('responses.create.stream'),
+    },
+    inputTokenCounter,
+    exposureQuoter: {
+      quoteExposure: quoteOpenAIExecutionEnvelopeExposure,
+    },
+    budgetAuthority,
+    paidExecutionLedger,
+    requestedToolCalls: 0,
+    operationName: 'responses.create',
+    execute: (executionEnvelope) =>
+      executeOpenAIProviderStreamingEnvelope(responses, executionEnvelope),
   });
 }
 

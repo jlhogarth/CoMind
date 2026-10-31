@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import {
   AssistantProvider,
   AssistantResponse,
+  AssistantResponseObserver,
   AssistantResponseRequest,
 } from '../assistant.js';
 import { GovernedProviderExecutionReceipt } from './governed-provider-execution.js';
@@ -11,8 +12,10 @@ import {
   OpenAIInputTokensClient,
   OpenAIProviderExecutionEnvelope,
   OpenAIResponseCreateRequest,
+  OpenAIResponseStreamingCreateRequest,
   buildOpenAIProviderExecutionEnvelope,
   executeOpenAIProviderExecutionEnvelope,
+  executeOpenAIProviderStreamingEnvelope,
 } from './openai-execution.js';
 import {
   OpenAIProviderExposureQuote,
@@ -29,6 +32,7 @@ export interface OpenAIResponseLike {
   id: string;
   model?: string;
   output_text?: string;
+  status?: string;
   usage?: {
     input_tokens?: number;
     prompt_tokens?: number;
@@ -50,7 +54,25 @@ export interface OpenAIResponseLike {
   } | null;
 }
 
+export interface OpenAIResponseStreamEventLike {
+  type: string;
+  sequence_number?: number;
+  delta?: string;
+  text?: string;
+  response?: OpenAIResponseLike;
+  response_id?: string;
+  error?: unknown;
+  item_id?: string;
+  output_index?: number;
+  content_index?: number;
+  summary_index?: number;
+  [key: string]: unknown;
+}
+
+export interface OpenAIResponseStreamLike extends AsyncIterable<OpenAIResponseStreamEventLike> {}
+
 export interface OpenAIResponsesClient {
+  create(request: OpenAIResponseStreamingCreateRequest): Promise<OpenAIResponseStreamLike>;
   create(request: OpenAIResponseCreateRequest): Promise<OpenAIResponseLike>;
 }
 
@@ -168,7 +190,8 @@ function failedCallMetadata(
 function failedResponseMetadata(
   response: OpenAIResponseLike,
   envelope: OpenAIProviderExecutionEnvelope,
-  durationMs: number
+  durationMs: number,
+  errorCode = 'openai_empty_output'
 ): Record<string, unknown> {
   const usage = usageMetadata(response.usage);
   const rawProviderUsage = sanitizeRawUsage(response.usage);
@@ -179,9 +202,9 @@ function failedResponseMetadata(
     model: responseModel,
     endpoint: 'responses.create',
     response_id: response.id,
-    status: 'failed',
+    status: response.status ?? 'failed',
     duration_ms: durationMs,
-    error_code: 'openai_empty_output',
+    error_code: errorCode,
     retry_attempt: null,
     ...executionMetadata(envelope),
     cost: usageCostMetadata(responseModel, thisProcessingMode(envelope), usage),
@@ -194,17 +217,67 @@ function thisProcessingMode(envelope: OpenAIProviderExecutionEnvelope) {
   return envelope.processing_mode as OpenAIAssistantProviderOptions['processingMode'];
 }
 
+function existingProviderMetadata(error: unknown) {
+  if (!error || typeof error !== 'object') return undefined;
+  const metadata = (error as Record<string, unknown>).providerMetadata;
+  return metadata && typeof metadata === 'object'
+    ? metadata as Record<string, unknown>
+    : undefined;
+}
+
 function attachProviderMetadata(error: unknown, metadata: Record<string, unknown>) {
-  if (error && typeof error === 'object') {
+  if (error && typeof error === 'object' && !existingProviderMetadata(error)) {
     (error as Record<string, unknown>).providerMetadata = metadata;
   }
 }
 
+function providerError(message: string, code: string) {
+  const error = new Error(message) as Error & { code?: string };
+  error.code = code;
+  return error;
+}
+
 function emptyOutputError() {
-  const error = new Error('OpenAI response did not contain assistant text') as Error & {
-    code?: string;
-  };
-  error.code = 'openai_empty_output';
+  return providerError('OpenAI response did not contain assistant text', 'openai_empty_output');
+}
+
+function streamTerminalError(
+  response: OpenAIResponseLike,
+  envelope: OpenAIProviderExecutionEnvelope,
+  durationMs: number,
+  eventType: string
+) {
+  const code = eventType === 'response.incomplete'
+    ? 'openai_stream_incomplete'
+    : 'openai_stream_failed';
+  const error = providerError(`OpenAI stream terminated with ${eventType}`, code);
+  attachProviderMetadata(
+    error,
+    failedResponseMetadata(response, envelope, durationMs, code)
+  );
+  return error;
+}
+
+function incompleteStreamError(
+  envelope: OpenAIProviderExecutionEnvelope,
+  durationMs: number,
+  responseId: string | null
+) {
+  const error = providerError(
+    'OpenAI stream ended before a completed response event',
+    'openai_stream_incomplete'
+  );
+  attachProviderMetadata(error, {
+    provider: 'openai',
+    model: envelope.requested_model,
+    endpoint: 'responses.create',
+    status: 'incomplete',
+    duration_ms: durationMs,
+    error_code: 'openai_stream_incomplete',
+    ...(responseId ? { response_id: responseId } : {}),
+    ...executionMetadata(envelope),
+    retry_attempt: null,
+  });
   return error;
 }
 
@@ -233,25 +306,175 @@ export function openAIProviderSuccessMetadata(
   };
 }
 
+function streamEventPayload(event: OpenAIResponseStreamEventLike): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(event).filter(([, value]) => value !== undefined)
+  );
+}
+
+function streamEventMetadata(event: OpenAIResponseStreamEventLike): Record<string, unknown> {
+  return {
+    ...(event.item_id ? { item_id: event.item_id } : {}),
+    ...(typeof event.output_index === 'number' ? { output_index: event.output_index } : {}),
+    ...(typeof event.content_index === 'number' ? { content_index: event.content_index } : {}),
+    ...(typeof event.summary_index === 'number' ? { summary_index: event.summary_index } : {}),
+  };
+}
+
 export class OpenAIAssistantProvider implements AssistantProvider {
   readonly name = 'openai';
 
   constructor(
     private readonly responses: OpenAIResponsesClient,
-    private readonly options: OpenAIAssistantProviderOptions
+    private readonly options: OpenAIAssistantProviderOptions,
+    private readonly streamingObservationsEnabled = false
   ) {}
 
-  async generateResponse(request: AssistantResponseRequest): Promise<AssistantResponse> {
+  private async generateStreamingResponse(
+    request: AssistantResponseRequest,
+    observer: AssistantResponseObserver
+  ): Promise<AssistantResponse> {
+    const envelope = buildOpenAIProviderExecutionEnvelope(request, this.options);
+    const startedAt = Date.now();
+    let stream: OpenAIResponseStreamLike;
+
+    try {
+      stream = await executeOpenAIProviderStreamingEnvelope(
+        {
+          create: (providerRequest) => this.responses.create(providerRequest),
+        },
+        envelope
+      );
+    } catch (error) {
+      attachProviderMetadata(error, failedCallMetadata(error, envelope, Date.now() - startedAt));
+      throw error;
+    }
+
+    let content = '';
+    let responseId: string | null = null;
+    let completedResponse: OpenAIResponseLike | null = null;
+
+    try {
+      for await (const event of stream) {
+        const eventResponseId = event.response?.id
+          ?? (typeof event.response_id === 'string' ? event.response_id : null);
+        if (eventResponseId) responseId = eventResponseId;
+
+        await observer.onProviderEvent?.({
+          provider: 'openai',
+          providerEndpoint: 'responses.create',
+          providerEventType: event.type,
+          stage: observer.stage,
+          observedAt: new Date().toISOString(),
+          ...(typeof event.sequence_number === 'number'
+            ? { providerSequenceNumber: event.sequence_number }
+            : {}),
+          ...(responseId ? { providerResponseId: responseId } : {}),
+          payload: streamEventPayload(event),
+          metadata: streamEventMetadata(event),
+        });
+
+        if (event.type === 'response.output_text.delta') {
+          if (typeof event.delta !== 'string' || event.delta.length === 0) continue;
+          content += event.delta;
+          await observer.onTextDelta({
+            delta: event.delta,
+            stage: observer.stage,
+            providerEventType: event.type,
+            ...(typeof event.sequence_number === 'number'
+              ? { providerSequenceNumber: event.sequence_number }
+              : {}),
+            ...(responseId ? { providerResponseId: responseId } : {}),
+            metadata: {
+              ...(event.item_id ? { item_id: event.item_id } : {}),
+              ...(typeof event.output_index === 'number'
+                ? { output_index: event.output_index }
+                : {}),
+              ...(typeof event.content_index === 'number'
+                ? { content_index: event.content_index }
+                : {}),
+            },
+          });
+          continue;
+        }
+
+        if (event.type === 'response.completed' && event.response) {
+          completedResponse = event.response;
+          responseId = event.response.id;
+          continue;
+        }
+
+        if (
+          (event.type === 'response.failed' || event.type === 'response.incomplete')
+          && event.response
+        ) {
+          throw streamTerminalError(
+            event.response,
+            envelope,
+            Date.now() - startedAt,
+            event.type
+          );
+        }
+
+        if (event.type === 'error') {
+          const error = providerError('OpenAI stream emitted an error event', 'openai_stream_error');
+          attachProviderMetadata(error, {
+            ...failedCallMetadata(event.error, envelope, Date.now() - startedAt),
+            ...(responseId ? { response_id: responseId } : {}),
+            error_code: 'openai_stream_error',
+          });
+          throw error;
+        }
+      }
+    } catch (error) {
+      attachProviderMetadata(error, failedCallMetadata(error, envelope, Date.now() - startedAt));
+      throw error;
+    }
+
+    if (!completedResponse) {
+      throw incompleteStreamError(envelope, Date.now() - startedAt, responseId);
+    }
+
+    const finalContent = content.trim();
+    if (!finalContent) {
+      const error = emptyOutputError();
+      attachProviderMetadata(
+        error,
+        failedResponseMetadata(completedResponse, envelope, Date.now() - startedAt)
+      );
+      throw error;
+    }
+
+    return {
+      content: finalContent,
+      metadata: openAIProviderSuccessMetadata(
+        completedResponse,
+        envelope,
+        Date.now() - startedAt
+      ),
+    };
+  }
+
+  async generateResponse(
+    request: AssistantResponseRequest,
+    observer?: AssistantResponseObserver
+  ): Promise<AssistantResponse> {
+    if (observer && this.streamingObservationsEnabled) {
+      return this.generateStreamingResponse(request, observer);
+    }
+
     const envelope = buildOpenAIProviderExecutionEnvelope(request, this.options);
     const startedAt = Date.now();
     let response: OpenAIResponseLike;
     try {
-      response = await executeOpenAIProviderExecutionEnvelope(this.responses, envelope);
-    } catch (error) {
-      attachProviderMetadata(
-        error,
-        failedCallMetadata(error, envelope, Date.now() - startedAt)
+      response = await executeOpenAIProviderExecutionEnvelope(
+        {
+          create: (providerRequest) => this.responses.create(providerRequest),
+        },
+        envelope
       );
+    } catch (error) {
+      attachProviderMetadata(error, failedCallMetadata(error, envelope, Date.now() - startedAt));
       throw error;
     }
 
@@ -283,7 +506,8 @@ export function createOpenAIAssistantProvider(
   const client = new OpenAI(openAIClientOptions(apiKey, options));
   return new OpenAIAssistantProvider(
     client.responses as unknown as OpenAIResponsesClient,
-    options
+    options,
+    true
   );
 }
 

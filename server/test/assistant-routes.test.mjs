@@ -12,6 +12,7 @@ const userMessageId = '55555555-5555-4555-8555-555555555558';
 const assistantMessageId = '55555555-5555-4555-8555-555555555559';
 const generationId = '66666666-6666-4666-8666-666666666669';
 const claimToken = '77777777-7777-4777-8777-777777777779';
+const terminalCaptureEventId = '88888888-8888-4888-8888-888888888889';
 
 async function withApp({ query, assistantProvider, assistantMaxHistoryMessages }, run) {
   const app = await buildApp({
@@ -70,14 +71,20 @@ function createFastPathQuery({
           generation_id: generationId,
           claim_token: claimToken,
           user_msg_id: userMessageId,
+          capture_event_id: '99999999-9999-4999-8999-999999999999',
         }],
       };
     }
     if (text.includes('WITH ranked AS')) {
       return { rows: memoryRows };
     }
-    if (text.includes("SET status='failed'")) {
-      return { rows: [{ generation_id: generationId }] };
+    if (text.includes('WITH terminalized AS (') && text.includes('SET status=$3')) {
+      return {
+        rows: [{
+          generation_id: generationId,
+          capture_event_id: terminalCaptureEventId,
+        }],
+      };
     }
     if (text.includes('WITH inserted AS (') && text.includes("SET status='completed'")) {
       const metadata = JSON.parse(params[3]);
@@ -213,7 +220,7 @@ test('assistant generation uses a durable claim, preserves metadata, and exposes
       output_tokens: 4,
       total_tokens: 16,
     });
-    assert.equal(persistedMetadata.conversation_fast_path.strategy, 'durable_generation_claim_v1');
+    assert.equal(persistedMetadata.conversation_fast_path.strategy, 'durable_generation_claim_cfr_v2');
     assert.equal(persistedMetadata.conversation_fast_path.history_limit, 40);
     assert.equal(persistedMetadata.conversation_fast_path.history_message_count, 3);
     assert.ok(persistedMetadata.conversation_fast_path.claim_ms >= 0);
@@ -346,9 +353,15 @@ test('assistant provider failure marks the durable claim failed and allows expli
     assert.deepEqual(response.json(), { error: 'Assistant provider request failed' });
     assert.doesNotMatch(response.body, /secret-bearing/);
 
-    const failedClaim = calls.find((call) => call.text.includes("SET status='failed'"));
+    const failedClaim = calls.find(
+      (call) => call.text.includes('WITH terminalized AS (') && call.text.includes('SET status=$3')
+    );
     assert.ok(failedClaim);
-    assert.deepEqual(failedClaim.params, [generationId, claimToken]);
+    assert.deepEqual(failedClaim.params.slice(0, 3), [generationId, claimToken, 'failed']);
+    const failureEvidence = JSON.parse(failedClaim.params[3]);
+    assert.equal(failureEvidence.observed_delta_count, 0);
+    assert.equal(failureEvidence.captured_delta_count, 0);
+    assert.equal(failureEvidence.reason, 'provider_failure');
     assert.equal(calls.some((call) => call.text.includes('WITH inserted AS (')), false);
   });
 });

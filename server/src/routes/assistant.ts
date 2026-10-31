@@ -1,6 +1,17 @@
 import { performance } from 'node:perf_hooks';
 import { FastifyInstance } from 'fastify';
-import { AssistantProvider, ConversationMessage, ConversationRole } from '../assistant.js';
+import {
+  AssistantProvider,
+  AssistantProviderEvent,
+  AssistantResponseObserver,
+  AssistantTextDelta,
+  ConversationMessage,
+  ConversationRole,
+} from '../assistant.js';
+import {
+  persistOpenAIProviderAcquisitionEvent,
+  type ProviderAcquisitionWriter,
+} from '../conversation-acquisition-store.js';
 import {
   ConversationLockRunner,
   QueryFunction,
@@ -34,6 +45,7 @@ interface GenerationClaimRow {
   generation_id: string;
   claim_token: string;
   user_msg_id: string;
+  capture_event_id: string;
 }
 
 function toConversationMessage(row: { role: string; content: string }): ConversationMessage {
@@ -120,12 +132,23 @@ function setServerTiming(
   if (parts.length > 0) reply.header('Server-Timing', parts.join(', '));
 }
 
+function captureSourceEventRef(
+  generationId: string,
+  event: AssistantTextDelta,
+  localSequence: number
+) {
+  const responseIdentity = event.providerResponseId ?? generationId;
+  const providerSequence = event.providerSequenceNumber ?? localSequence;
+  return `provider:${responseIdentity}:${event.stage}:${providerSequence}`;
+}
+
 export function registerAssistantRoutes(
   app: FastifyInstance,
   queryFn: QueryFunction = query,
   assistantProvider: AssistantProvider | null = null,
   maxHistoryMessages = 40,
-  conversationLock: ConversationLockRunner = withConversationLock
+  conversationLock: ConversationLockRunner = withConversationLock,
+  providerAcquisitionWriter: ProviderAcquisitionWriter = persistOpenAIProviderAcquisitionEvent
 ) {
   app.get('/api/assistant/status', async () => ({
     enabled: assistantProvider !== null,
@@ -204,11 +227,54 @@ export function registerAssistantRoutes(
         );
 
         const claim = await lockedQuery<GenerationClaimRow>(
-          `INSERT INTO comind.cm_assistant_generation (conv_id, user_msg_id)
-           VALUES ($1, $2)
-           ON CONFLICT DO NOTHING
-           RETURNING generation_id, claim_token, user_msg_id`,
-          [id, turn.user_msg_id]
+          `WITH user_source AS (
+             SELECT msg_id, conv_id, role, content
+             FROM comind.cm_message
+             WHERE msg_id=$2::uuid
+               AND conv_id=$1::uuid
+               AND role='user'
+           ), user_captured AS (
+             SELECT comind.cm_record_conversation_capture_event(
+               p_conv_id => user_source.conv_id,
+               p_event_type => 'user_message_observed',
+               p_role => 'user',
+               p_content_delta => user_source.content,
+               p_msg_id => user_source.msg_id,
+               p_source_system => 'comind_server',
+               p_source_event_ref => 'message:' || user_source.msg_id::text || ':observed',
+               p_raw_payload => jsonb_build_object('capture_path', 'assistant_claim_backfill')
+             ) AS capture_event_id
+             FROM user_source
+           ), inserted AS (
+             INSERT INTO comind.cm_assistant_generation (
+               conv_id, user_msg_id, provider, metadata
+             )
+             SELECT $1::uuid, $2::uuid, $3, jsonb_build_object('capture_path', 'assistant_route')
+             FROM user_captured
+             ON CONFLICT DO NOTHING
+             RETURNING generation_id, claim_token, user_msg_id
+           ), generation_captured AS (
+             SELECT
+               inserted.generation_id,
+               inserted.claim_token,
+               inserted.user_msg_id,
+               comind.cm_record_conversation_capture_event(
+                 p_conv_id => $1::uuid,
+                 p_event_type => 'assistant_generation_started',
+                 p_role => 'assistant',
+                 p_generation_id => inserted.generation_id,
+                 p_source_system => 'comind_server',
+                 p_source_event_ref => 'generation:' || inserted.generation_id::text || ':started',
+                 p_raw_payload => jsonb_build_object(
+                   'capture_path', 'assistant_route',
+                   'provider', $3
+                 )
+               ) AS capture_event_id
+             FROM inserted
+           )
+           SELECT generation_id, claim_token, user_msg_id, capture_event_id
+           FROM generation_captured`,
+          [id, turn.user_msg_id, assistantProvider.name]
         );
         if (!claim.rows[0]) {
           return { kind: 'busy' as const };
@@ -270,29 +336,135 @@ export function registerAssistantRoutes(
       }
       const memoryMs = elapsedMilliseconds(memoryStartedAt);
 
+      let observedDeltaCount = 0;
+      let capturedDeltaCount = 0;
+      let localDeltaSequence = 0;
+      let localProviderEventSequence = 0;
+      const observer: AssistantResponseObserver = {
+        stage: 'direct',
+        async onProviderEvent(event: AssistantProviderEvent) {
+          localProviderEventSequence += 1;
+          await providerAcquisitionWriter({
+            conversationId: id, generationId: claim.generation_id,
+            localSequence: localProviderEventSequence, event,
+          });
+        },
+        async onTextDelta(event) {
+          observedDeltaCount += 1;
+          localDeltaSequence += 1;
+          const sourceEventRef = captureSourceEventRef(
+            claim.generation_id,
+            event,
+            localDeltaSequence
+          );
+          await queryFn(
+            `SELECT comind.cm_record_conversation_capture_event(
+               p_conv_id => $1::uuid,
+               p_event_type => 'assistant_delta',
+               p_role => 'assistant',
+               p_content_delta => $2,
+               p_generation_id => $3::uuid,
+               p_source_system => $4,
+               p_source_event_ref => $5,
+               p_raw_payload => $6::jsonb
+             ) AS capture_event_id`,
+            [
+              id,
+              event.delta,
+              claim.generation_id,
+              assistantProvider.name,
+              sourceEventRef,
+              JSON.stringify({
+                quality_stage: event.stage,
+                provider_event_type: event.providerEventType ?? null,
+                provider_sequence_number: event.providerSequenceNumber ?? null,
+                provider_response_id: event.providerResponseId ?? null,
+                provider_metadata: event.metadata ?? {},
+              }),
+            ]
+          );
+          capturedDeltaCount += 1;
+        },
+      };
+
       const providerStartedAt = performance.now();
       let generated;
       try {
-        generated = await assistantProvider.generateResponse({
-          conversationId: id,
-          messages: providerMessages,
-        });
+        generated = await assistantProvider.generateResponse(
+          {
+            conversationId: id,
+            messages: providerMessages,
+          },
+          observer
+        );
       } catch (error) {
         const providerMs = elapsedMilliseconds(providerStartedAt);
-        const failedClaim = await queryFn(
-          `UPDATE comind.cm_assistant_generation
-           SET status='failed', failed_at=now(), failure_code='provider_failure'
-           WHERE generation_id=$1::uuid
-             AND claim_token=$2::uuid
-             AND status='active'
-           RETURNING generation_id`,
-          [claim.generation_id, claim.claim_token]
-        );
+        const interrupted = observedDeltaCount > 0;
+        let terminalized = false;
+        try {
+          const terminal = await queryFn<{ generation_id: string; capture_event_id: string }>(
+            `WITH terminalized AS (
+               UPDATE comind.cm_assistant_generation
+               SET status=$3,
+                   last_activity_at=now(),
+                   interrupted_at=CASE WHEN $3='interrupted' THEN now() ELSE NULL END,
+                   failed_at=CASE WHEN $3='failed' THEN now() ELSE NULL END,
+                   interruption_reason=CASE WHEN $3='interrupted' THEN 'provider_stream_interrupted' ELSE NULL END,
+                   failure_code=CASE WHEN $3='failed' THEN 'provider_failure' ELSE NULL END
+               WHERE generation_id=$1::uuid
+                 AND claim_token=$2::uuid
+                 AND status='active'
+               RETURNING generation_id, conv_id
+             ), captured AS (
+               SELECT
+                 terminalized.generation_id,
+                 comind.cm_record_conversation_capture_event(
+                   p_conv_id => terminalized.conv_id,
+                   p_event_type => CASE WHEN $3='interrupted'
+                     THEN 'assistant_generation_interrupted'
+                     ELSE 'assistant_generation_failed'
+                   END,
+                   p_role => 'assistant',
+                   p_generation_id => terminalized.generation_id,
+                   p_source_system => 'comind_server',
+                   p_source_event_ref => 'generation:' || terminalized.generation_id::text || ':' || $3,
+                   p_raw_payload => $4::jsonb
+                 ) AS capture_event_id
+               FROM terminalized
+             )
+             SELECT generation_id, capture_event_id FROM captured`,
+            [
+              claim.generation_id,
+              claim.claim_token,
+              interrupted ? 'interrupted' : 'failed',
+              JSON.stringify({
+                observed_delta_count: observedDeltaCount,
+                captured_delta_count: capturedDeltaCount,
+                reason: interrupted ? 'provider_stream_interrupted' : 'provider_failure',
+                diagnostics: providerFailureDiagnostics(error),
+              }),
+            ]
+          );
+          terminalized = terminal.rows.length === 1;
+        } catch (terminalError) {
+          req.log.error(
+            {
+              conversationId: id,
+              generationId: claim.generation_id,
+              ...providerFailureDiagnostics(terminalError),
+            },
+            'Assistant generation could not be terminalized after provider failure'
+          );
+        }
+
         req.log.warn(
           {
             conversationId: id,
             provider: assistantProvider.name,
-            claimReleased: failedClaim.rows.length === 1,
+            generationState: interrupted ? 'interrupted' : 'failed',
+            claimReleased: terminalized,
+            observedDeltaCount,
+            capturedDeltaCount,
             timings: { claimMs, memoryMs, providerMs },
             ...providerFailureDiagnostics(error),
           },
@@ -306,8 +478,13 @@ export function registerAssistantRoutes(
       const metadata = {
         ...(generated.metadata ?? { provider: assistantProvider.name }),
         ...(memoryRetrievalMetadata ? { memory_retrieval: memoryRetrievalMetadata } : {}),
+        conversational_continuity: {
+          generation_id: claim.generation_id,
+          observed_delta_count: observedDeltaCount,
+          captured_delta_count: capturedDeltaCount,
+        },
         conversation_fast_path: {
-          strategy: 'durable_generation_claim_v1',
+          strategy: 'durable_generation_claim_cfr_v2',
           history_limit: maxHistoryMessages,
           history_message_count: history.length,
           claim_ms: claimMs,
@@ -330,12 +507,31 @@ export function registerAssistantRoutes(
            UPDATE comind.cm_assistant_generation AS g
            SET status='completed',
                assistant_msg_id=inserted.msg_id,
-               completed_at=now()
+               completed_at=now(),
+               last_activity_at=now()
            FROM inserted
            WHERE g.generation_id=$1::uuid
              AND g.claim_token=$2::uuid
              AND g.status='active'
-           RETURNING g.generation_id
+           RETURNING g.generation_id, g.conv_id
+         ), captured AS (
+           SELECT comind.cm_record_conversation_capture_event(
+             p_conv_id => completed.conv_id,
+             p_event_type => 'assistant_generation_completed',
+             p_role => 'assistant',
+             p_content_delta => inserted.content,
+             p_generation_id => completed.generation_id,
+             p_msg_id => inserted.msg_id,
+             p_source_system => 'comind_server',
+             p_source_event_ref => 'generation:' || completed.generation_id::text || ':completed',
+             p_raw_payload => jsonb_build_object(
+               'observed_delta_count', $5::int,
+               'captured_delta_count', $6::int,
+               'canonical_completion', true
+             )
+           ) AS capture_event_id
+           FROM completed
+           JOIN inserted ON TRUE
          )
          SELECT inserted.msg_id,
                 inserted.conv_id,
@@ -344,12 +540,15 @@ export function registerAssistantRoutes(
                 inserted.created_at,
                 inserted.meta
          FROM inserted
-         JOIN completed ON TRUE`,
+         JOIN completed ON TRUE
+         JOIN captured ON TRUE`,
         [
           claim.generation_id,
           claim.claim_token,
           generated.content,
           JSON.stringify(metadata),
+          observedDeltaCount,
+          capturedDeltaCount,
         ]
       );
       const persistenceMs = elapsedMilliseconds(persistenceStartedAt);
@@ -373,9 +572,11 @@ export function registerAssistantRoutes(
           generationId: claim.generation_id,
           historyMessageCount: history.length,
           historyLimit: maxHistoryMessages,
+          observedDeltaCount,
+          capturedDeltaCount,
           timings: { claimMs, memoryMs, providerMs, persistenceMs },
         },
-        'Assistant conversation fast path completed'
+        'Assistant conversation fast path completed with CFR capture'
       );
       setServerTiming(reply, { claimMs, memoryMs, providerMs, persistenceMs });
       return reply.code(201).send(persisted.rows[0]);

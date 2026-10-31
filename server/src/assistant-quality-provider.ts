@@ -1,4 +1,8 @@
-import { AssistantProvider, ConversationMessage } from './assistant.js';
+import {
+  AssistantProvider,
+  AssistantResponseObserver,
+  ConversationMessage,
+} from './assistant.js';
 import {
   QualityIssueCategory,
   QualityRepairer,
@@ -121,31 +125,37 @@ export class ProviderBackedQualityRepairer implements QualityRepairer {
     return this.provider.name;
   }
 
-  async repair(input: {
-    conversationId: string;
-    messages: ConversationMessage[];
-    draft: { content: string; metadata?: Record<string, unknown> };
-    critique: string;
-    issueCategories: QualityIssueCategory[];
-  }) {
-    return this.provider.generateResponse({
-      conversationId: input.conversationId,
-      messages: [
-        {
-          role: 'system',
-          content:
-            'You are the CoMind answer repair pass. Produce only the corrected final answer. Address the verifier critique and issue categories using the supplied conversation. Do not mention the verification workflow unless the user explicitly asked about it.',
-        },
-        {
-          role: 'user',
-          content: JSON.stringify({
-            conversation: conversationPayload(input.messages),
-            draft: input.draft.content,
-            critique: input.critique,
-            issue_categories: input.issueCategories,
-          }),
-        },
-      ],
-    });
+  async repair(
+    input: {
+      conversationId: string;
+      messages: ConversationMessage[];
+      draft: { content: string; metadata?: Record<string, unknown> };
+      critique: string;
+      issueCategories: QualityIssueCategory[];
+    },
+    observer?: AssistantResponseObserver
+  ) {
+    return this.provider.generateResponse(
+      {
+        conversationId: input.conversationId,
+        messages: [
+          {
+            role: 'system',
+            content:
+              'You are the CoMind answer repair pass. Produce only the corrected final answer. Address the verifier critique and issue categories using the supplied conversation. Do not mention the verification workflow unless the user explicitly asked about it.',
+          },
+          {
+            role: 'user',
+            content: JSON.stringify({
+              conversation: conversationPayload(input.messages),
+              draft: input.draft.content,
+              critique: input.critique,
+              issue_categories: input.issueCategories,
+            }),
+          },
+        ],
+      },
+      observer
+    );
   }
 }

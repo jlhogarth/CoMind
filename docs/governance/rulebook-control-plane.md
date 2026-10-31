@@ -21,6 +21,7 @@ The control plane centralizes classification, retrieval authority, retention and
 6. Separate control capability from product integration. Product lanes must call the common preflight rather than reimplement its policy.
 7. Preserve Test and production boundaries. Test activation does not authorize production activation.
 8. Preserve historical archaeology independently from current successor adequacy.
+9. Treat integration brokers and connected applications as execution substrates. Connection state never creates authority, and credential custody must remain outside RuleBook evidence.
 
 ## Control families
 
@@ -164,6 +165,32 @@ The job makes no external HTTP call and performs no paid provider action.
 
 The HUD refreshes every 30 seconds, supports health and original-disposition filters, and exports only the visible status projection.
 
+## Governed integration gateway
+
+The CoMind Integration Gateway provides a governed path for external application and developer-tool execution. CIG-001 currently uses Composio for managed GitHub and Supabase connections. The gateway does not replace RuleBook, L4A, provider-native permissions, or platform confirmation requirements.
+
+Before a consequential gateway action, the acting lane must resolve current CoMind authority and evaluate the applicable structured controls. At minimum, external actions should consider:
+
+1. `DRULE-C11` for untrusted input, secret requests, authority escalation, side effects, and required human approval;
+2. `DRULE-C17` for tenant and project scope;
+3. `DRULE-C13` for governed outbound destination and purpose when external transfer or provider execution occurs;
+4. `DRULE-C04` for credential lifecycle metadata without placing raw credentials in governance evidence;
+5. `DRULE-C27` for minimization of durable logs and evidence.
+
+The integration provider may hold and refresh OAuth credentials according to its connection model. CoMind stores only the metadata needed for governance and operations, such as provider, toolkit, account or resource scope when safe, connection state, verification time, authority basis, action provenance, and result. Raw access tokens, refresh tokens, authorization headers, passwords, API keys, client secrets, service-role keys, and equivalent material are prohibited from RuleBook context and RunBook evidence.
+
+Connection health uses explicit operational states. `ACTIVE` means a connection is presently usable. `AUTH_REQUIRED`, `SCOPE_REQUIRED`, `EXPIRED`, `HUMAN_CONFIRMATION_REQUIRED`, and `BLOCKED` are checkpoint states. They do not authorize bypass or credential substitution. When a connection blocks one operation, the lane should preserve the exact blocker and continue dependency-independent authorized work when possible.
+
+### ChatGPT plugin boundary
+
+The ChatGPT-hosted Composio plugin executes outside the CoMind server runtime, so CoMind cannot technically intercept that plugin call with the server-side RuleBook preflight. During this path, the acting lane must apply the same authority and control checks procedurally and preserve durable evidence. This is an explicit enforcement boundary, not an exemption.
+
+### CoMind runtime boundary
+
+A CoMind-hosted agent, Virtual Employee, application service, or orchestrator that invokes Composio or another integration broker must call the common RuleBook operational preflight before the consequential provider action. The runtime must fail closed on missing authority, malformed control context, `deny`, `review` without required human approval, unavailable preflight, or a platform-required confirmation.
+
+CIG-001 connection verification and canonicalization evidence is recorded under GitHub issue #414 and the `CIG-001` Durable RunBook work item. Production remains unchanged.
+
 ## Governed provider adoption
 
 The first product-path adoption of the common preflight is the governed provider-execution broker. Before that broker may count input tokens, quote cost exposure, reserve budget, admit a paid execution, or call a provider, it must receive `allow` decisions from:
@@ -192,7 +219,7 @@ Evidence for the first provider-broker adoption is recorded in `docs/provenance/
 
 ## Integration contract
 
-A product lane resolves its use of one of these control families by registering governed assets/destinations/keys/obligations as needed and calling the common preflight before the consequential action. It should not clone the decision logic into a second policy implementation.
+A product lane resolves its use of one of these control families by registering governed assets/destinations/keys/obligations as needed and calling the common preflight before the consequential action. It should not clone the decision logic into a second policy implementation. External integration gateways follow the same rule: the broker supplies execution capability, while CoMind supplies authority and governance.
 
 Existing product code is not silently rewritten by this remediation milestone. Adoption is explicit so that each owning lane can prove its own end-to-end enforcement without hidden cross-lane changes.
 

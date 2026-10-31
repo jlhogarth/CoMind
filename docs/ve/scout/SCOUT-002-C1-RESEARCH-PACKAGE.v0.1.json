@@ -1,0 +1,88 @@
+{
+  "schema_version": "comind.ve.research-package.v0.1",
+  "package_id": "SCOUT-002",
+  "package_version": "0.1",
+  "status": "candidate",
+  "issue": 409,
+  "authoritative_predecessor": {
+    "control_id": "SCOUT-001",
+    "issue": 395,
+    "merged_pr": 398,
+    "actor_handle": "agent.scout",
+    "role_code": "emerging_technology_research_analyst",
+    "required_lifecycle_before_activation": "draft",
+    "authority_floor": "C0",
+    "authority_ceiling": "C1"
+  },
+  "capabilities": [
+    {
+      "capability_code": "research.evidence.synthesize",
+      "description": "Synthesize a bounded supplied evidence packet into an evidence-grounded research work product for governed human review.",
+      "action": "synthesize_evidence",
+      "target_kind": "research_assignment",
+      "max_authority": "C1",
+      "risk_class": "low",
+      "cost_bearing": false,
+      "adapter": "ollama_local",
+      "runtime_policy": {
+        "provider": "ollama_local",
+        "model": "qwen3:0.6b",
+        "local_http_only": true,
+        "paid_provider_allowed": false,
+        "network_discovery_allowed": false,
+        "production_target_allowed": false,
+        "external_provider_mutation_allowed": false
+      },
+      "initial_grant_policy": {
+        "environment": "isolated",
+        "authority_ceiling": "C1",
+        "target_refs": [
+          "scout-r001:ve-standards-operational-readiness"
+        ],
+        "max_tasks": 1,
+        "delegation_allowed": false,
+        "expiry_required": true,
+        "revocable": true,
+        "live_grant_created_by_sc002": false
+      }
+    }
+  ],
+  "learning_path_policy_ref": "docs/ve/scout/SCOUT-002-LEARNING-PATH-ACTIVATION-POLICY.v0.1.json",
+  "evidence_contract_ref": "docs/ve/scout/SCOUT-002-RESEARCH-EVIDENCE-CONTRACT.v0.1.json",
+  "first_assignment_ref": "docs/ve/scout/SCOUT-R001-VE-STANDARDS-OPERATIONAL-READINESS.v0.1.json",
+  "activation_boundaries": {
+    "capability_registration_is_activation": false,
+    "curriculum_activation_is_ve_activation": false,
+    "curriculum_completion_is_ve_activation": false,
+    "capability_grant_is_ve_activation": false,
+    "ve_activation_requires_fresh_lifecycle_authorization": true,
+    "sc002_activates_scout": false,
+    "sc002_creates_live_capability_grant": false
+  },
+  "prohibited_authority": [
+    "production_mutation",
+    "paid_provider_execution",
+    "open_web_discovery",
+    "google_resource_mutation",
+    "github_write",
+    "supabase_operational_write",
+    "external_email_send",
+    "cloudflare_access",
+    "delegation",
+    "virtual_employee_creation",
+    "self_authority_escalation",
+    "autonomous_developmental_mutation"
+  ],
+  "acceptance_requirements": {
+    "one_capability_only": true,
+    "exact_target_required": true,
+    "one_task_initial_ceiling": true,
+    "zero_cost_required": true,
+    "isolated_only": true,
+    "live_scout_must_remain_draft": true,
+    "live_scout_active_grants_must_remain_zero": true,
+    "synthetic_runtime_proof_required": true,
+    "exact_head_ci_required": true,
+    "final_freshness_check_required": true
+  }
+}

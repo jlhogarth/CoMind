@@ -1,0 +1,83 @@
+name: CBE-001 Playwright Bootstrap
+
+on:
+  pull_request:
+    paths:
+      - 'server/src/browser-executor/**'
+      - 'server/test/browser-executor-*'
+      - 'server/scripts/cbe-codespace-*.mjs'
+      - 'server/package.json'
+      - 'server/package-lock.json'
+      - '.devcontainer/**'
+      - 'scripts/cbe_codespace_browser.sh'
+      - 'scripts/verify_devcontainer_contract.mjs'
+      - '.github/workflows/cbe-001-playwright-bootstrap.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  playwright-bootstrap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install committed server dependencies
+        working-directory: server
+        run: npm ci
+      - name: Verify pinned Playwright dependency
+        working-directory: server
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const declared = require('./package.json').devDependencies.playwright;
+          const installed = require('./node_modules/playwright/package.json').version;
+          if (declared !== installed) throw new Error(`Playwright mismatch: declared ${declared}, installed ${installed}`);
+          console.log(JSON.stringify({ status: 'ok', playwright: installed, node: process.version }));
+          NODE
+      - name: Validate Codespaces interactive browser harness
+        run: |
+          set -euo pipefail
+          bash -n scripts/cbe_codespace_browser.sh
+          node --check server/scripts/cbe-codespace-session.mjs
+          node --check server/scripts/cbe-codespace-proof.mjs
+          node scripts/verify_devcontainer_contract.mjs
+      - name: Install Chromium and system dependencies
+        working-directory: server
+        run: npx playwright install --with-deps chromium
+      - name: Build and run CBE unit tests
+        working-directory: server
+        run: |
+          npm run build
+          node --test test/browser-executor-policy.test.mjs test/browser-executor-worker.test.mjs
+      - name: Exercise governed CBE against Playwright
+        working-directory: server
+        run: |
+          set -euo pipefail
+          mkdir -p ../artifacts/cbe-001-playwright-bootstrap
+          node test/browser-executor-worker.integration.mjs | tee ../artifacts/cbe-001-playwright-bootstrap/playwright-public-evidence.json
+      - name: Exercise governed CBE against public GitHub
+        working-directory: server
+        env:
+          CBE_TARGET_URL: https://github.com/jlhogarth/CoMind
+          CBE_EXPECT_TITLE: GitHub
+        run: |
+          set -euo pipefail
+          node test/browser-executor-worker.integration.mjs | tee ../artifacts/cbe-001-playwright-bootstrap/github-public-evidence.json
+      - name: Stage dependency and execution evidence
+        run: |
+          cp server/package.json server/package-lock.json artifacts/cbe-001-playwright-bootstrap/
+          node -e "const p=require('./server/node_modules/playwright/package.json'); require('fs').writeFileSync('artifacts/cbe-001-playwright-bootstrap/playwright-version.txt', p.version+'\n')"
+      - name: Upload CBE evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: cbe-001-playwright-bootstrap
+          path: artifacts/cbe-001-playwright-bootstrap
+          if-no-files-found: error
+          retention-days: 7

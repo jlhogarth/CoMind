@@ -17,6 +17,11 @@
     "@fastify/cors": "^11.3.0",
     "@fastify/multipart": "^10.1.1",
     "@fastify/swagger": "^9.8.1",
+    "@temporalio/activity": "1.25.0",
+    "@temporalio/client": "1.25.0",
+    "@temporalio/common": "1.25.0",
+    "@temporalio/worker": "1.25.0",
+    "@temporalio/workflow": "1.25.0",
     "dotenv": "^16.4.5",
     "fastify": "^5.12.4",
     "openai": "7.28.0",
@@ -26,6 +31,7 @@
   "devDependencies": {
     "@types/node": "^24.0.0",
     "@types/pg": "^8.23.1",
+    "playwright": "1.64.1",
     "tsx": "^4.23.13",
     "typescript": "^5.4.5"
   }

@@ -6,8 +6,15 @@
   "remoteUser": "node",
   "updateRemoteUserUID": true,
   "forwardPorts": [
-    3000
+    3000,
+    6080
   ],
+  "portsAttributes": {
+    "6080": {
+      "label": "CBE interactive browser",
+      "onAutoForward": "notify"
+    }
+  },
   "postCreateCommand": "cd server && npm ci && cd .. && bash scripts/bootstrap_dev_runtime.sh",
   "shutdownAction": "stopCompose",
   "customizations": {

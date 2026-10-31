@@ -13,10 +13,12 @@ import {
   FolderGit2,
   Gauge,
   Github,
+  GitBranch,
   Globe2,
   HardDrive,
   LayoutDashboard,
   LockKeyhole,
+  Mail,
   Network,
   ServerCog,
   ShieldCheck,
@@ -25,14 +27,19 @@ import {
 } from "lucide-react";
 
 import { CoMindMark } from "../components/CoMindMark";
+import { ThreadKeeperPanel } from "../components/ThreadKeeperPanel";
+import { WorkspaceMailPanel } from "../components/WorkspaceMailPanel";
 import styles from "./control-plane.module.css";
 
 const navItems = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard, active: true },
   { label: "Monitoring", href: "/activity", icon: Activity },
   { label: "RuleBook HUD", href: "/rulebook", icon: ShieldCheck },
+  { label: "Integration Gateway", href: "/integrations", icon: Network },
   { label: "Approvals", href: "https://approvals.comindinc.com", icon: CheckCircle2, external: true },
   { label: "Cloudflare", href: "https://dash.cloudflare.com", icon: Cloud, external: true },
+  { label: "ThreadKeeper", href: "#threadkeeper", icon: GitBranch },
+  { label: "Workspace Mail", href: "#workspace-mail", icon: Mail },
   { label: "Documentation", href: "https://github.com/jlhogarth/CoMind/tree/main/docs", icon: BookOpen, external: true },
   { label: "Google Drive", href: "https://drive.google.com", icon: HardDrive, external: true },
   { label: "GitHub", href: "https://github.com/jlhogarth/CoMind", icon: Github, external: true },
@@ -40,6 +47,7 @@ const navItems = [
 
 const quickActions = [
   { label: "Open Activity HUD", href: "/activity", icon: Gauge },
+  { label: "Open Integration Gateway", href: "/integrations", icon: Network },
   { label: "Review Approvals", href: "https://approvals.comindinc.com", icon: CheckCircle2, external: true },
   { label: "View Infrastructure", href: "https://dash.cloudflare.com", icon: ServerCog, external: true },
   { label: "Open Documentation", href: "https://github.com/jlhogarth/CoMind/tree/main/docs", icon: BookOpen, external: true },
@@ -50,16 +58,18 @@ const serviceCards = [
   { title: "Supabase", detail: "Governed relational state and evidence", state: "Test project bound", icon: Database, source: "RLS remains authoritative" },
   { title: "Google Workspace", detail: "Identity, mail, Drive and planning", state: "DNS integrated", icon: Workflow, source: "CoMindInc.com" },
   { title: "GitHub", detail: "Source, issues, PRs and CI evidence", state: "Repository connected", icon: Github, source: "jlhogarth/CoMind" },
+  { title: "Composio", detail: "Governed integration and managed OAuth substrate", state: "CIG-001 verified", icon: Network, source: "GitHub + Supabase proof" },
   { title: "Domain Security", detail: "CoMindInc.com and CoMindForge.com", state: "Two governed domains", icon: Globe2, source: "Cloudflare Registrar" },
   { title: "Evidence", detail: "Acceptance requires executed verification", state: "Evidence-first", icon: FileCheck2, source: "AGENTS.md policy" },
 ];
 
 const infrastructureRows = [
-  ["Operator Console", "HUD-001 branch implementation"],
-  ["Activity HUD", "Existing bounded read-only route"],
-  ["RuleBook HUD", "Existing governed control-health route"],
-  ["Approval Portal", "External single-use approval service"],
-  ["Production deployment", "Not activated by HUD-001"],
+  ["Operator Console", "Live at console.comindinc.com"],
+  ["Activity HUD", "Bounded read-only route"],
+  ["RuleBook HUD", "Governed control-health route"],
+  ["Integration Gateway", "CIG-001 governed process route"],
+  ["Approval Portal", "External governed approval service"],
+  ["Deployment perimeter", "Cloudflare Access + origin proxy + Vercel protection"],
 ];
 
 function ExternalAwareLink({
@@ -90,7 +100,7 @@ export default function Home() {
         </a>
 
         <nav className={styles.nav}>
-          {navItems.slice(0, 5).map(({ label, href, icon: Icon, active, external }) => (
+          {navItems.slice(0, 8).map(({ label, href, icon: Icon, active, external }) => (
             <ExternalAwareLink
               key={label}
               href={href}
@@ -103,7 +113,7 @@ export default function Home() {
             </ExternalAwareLink>
           ))}
           <div className={styles.navDivider} aria-hidden="true" />
-          {navItems.slice(5).map(({ label, href, icon: Icon, external }) => (
+          {navItems.slice(8).map(({ label, href, icon: Icon, external }) => (
             <ExternalAwareLink key={label} href={href} external={external} className={styles.navExternal}>
               <Icon size={17} aria-hidden="true" />
               <span>{label}</span>
@@ -116,11 +126,11 @@ export default function Home() {
           <div className={styles.sideFooterTop}>
             <CoMindMark className={styles.logoWrap} compact />
             <div>
-              <strong>CoMind HUD-001</strong>
-              <span>Infrastructure intelligence starting surface</span>
+              <strong>CoMind Control Plane</strong>
+              <span>Governed Development/Test operator surface</span>
             </div>
           </div>
-          <div className={styles.sideState}><i aria-hidden="true" /> Reversible development lane</div>
+          <div className={styles.sideState}><i aria-hidden="true" /> Live deployment · Development/Test controls</div>
         </div>
       </aside>
 
@@ -128,10 +138,10 @@ export default function Home() {
         <header className={styles.topbar}>
           <div className={styles.search} aria-label="Current control plane scope">
             <Network size={15} aria-hidden="true" />
-            <span>Operator Console / HUD-001 / read-only landing surface</span>
-            <kbd>T1</kbd>
+            <span>Operator Console / governed Development-Test surface</span>
+            <kbd>DEV/TEST</kbd>
           </div>
-          <div className={styles.topStatus}><span className={styles.stateDot} aria-hidden="true" /> Production activation excluded</div>
+          <div className={styles.topStatus}><span className={styles.stateDot} aria-hidden="true" /> Live behind governed access perimeter</div>
         </header>
 
         <div className={styles.content}>
@@ -162,7 +172,7 @@ export default function Home() {
               <Sparkles size={18} color="#4fd8ff" aria-hidden="true" />
               <div>
                 <h2 id="quick-actions-heading">Quick Actions</h2>
-                <p>Only wired, bounded destinations are enabled in HUD-001.</p>
+                <p>Only wired, bounded destinations are enabled from the Control Plane.</p>
               </div>
             </div>
             <div className={styles.quickGrid}>
@@ -176,19 +186,22 @@ export default function Home() {
             </div>
           </section>
 
+          <WorkspaceMailPanel />
+          <ThreadKeeperPanel />
+
           <section className={styles.grid} aria-label="CoMind control plane overview">
             <article className={styles.card}>
               <div className={styles.cardHeader}><span className={styles.cardIcon}><Gauge size={17} color="#55e3bb" /> <strong>System Surface</strong></span></div>
               <div className={styles.metricValue}>2 HUDs</div>
-              <div className={styles.metricLabel}>Activity and RuleBook routes are already implemented.</div>
+              <div className={styles.metricLabel}>Activity, RuleBook, and Integration Gateway routes are already implemented.</div>
               <div className={styles.metricMeta}>Bounded read-only visibility</div>
             </article>
 
             <article className={styles.card}>
               <div className={styles.cardHeader}><span className={styles.cardIcon}><FolderGit2 size={17} color="#63d8ff" /> <strong>Development</strong></span></div>
-              <div className={styles.metricValue}>T1</div>
-              <div className={styles.metricLabel}>HUD-001 is reversible application development on a feature branch.</div>
-              <div className={styles.metricMeta}>Production activation excluded</div>
+              <div className={styles.metricValue}>Dev/Test</div>
+              <div className={styles.metricLabel}>The Console is deployed for governed evaluation while application behavior remains under active development.</div>
+              <div className={styles.metricMeta}>Security perimeter active · application posture remains Development/Test</div>
             </article>
 
             <article className={styles.card}>
@@ -247,9 +260,9 @@ export default function Home() {
               <CoMindMark className={styles.logoWrap} compact />
               <div>
                 <strong>Build. Monitor. Govern. Together.</strong>
-                <p>HUD-001 is the landing surface. Live provider telemetry and governed administrative actions can be layered on without replacing the shell.</p>
+                <p>The Control Plane shell is deployed. Live provider telemetry and governed administrative actions can be layered on without replacing it.</p>
               </div>
-              <a href="https://github.com/jlhogarth/CoMind/issues/291" target="_blank" rel="noreferrer">HUD-001 issue <ExternalLink size={11} /></a>
+              <a href="https://github.com/jlhogarth/CoMind/issues/291" target="_blank" rel="noreferrer">Control Plane foundation <ExternalLink size={11} /></a>
             </aside>
           </section>
         </div>

@@ -1,0 +1,164 @@
+name: MDO-004 Governed Plan Disposition
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/mdo-004.yml'
+      - 'db/migrations/20261030_026_mdo_004_governed_plan_disposition.sql'
+      - 'db/migrations/verify_20261030_026_mdo_004_governed_plan_disposition.sql'
+      - 'db/migrations/verify_20261030_026_mdo_004_behavior.sql'
+      - 'scripts/test_mdo_004.sh'
+      - 'server/src/mdo-plan-disposition.ts'
+      - 'server/test/mdo-plan-disposition.test.mjs'
+      - 'server/test/integration/mdo-plan-disposition-live.e2e.mjs'
+      - 'docs/provenance/2026-10-30-mdo-004-plan-disposition.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mdo-004-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  server-contract:
+    name: MDO-004 server contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify exact checked-out head
+        working-directory: .
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install exact dependencies
+        run: npm ci
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - name: Build server
+        run: npm run build
+      - name: Prove deterministic MDO-004 service contract
+        run: node --test test/mdo-plan-disposition.test.mjs
+      - name: Re-run accepted MDO runtime contracts
+        run: node --test test/mdo-planning-runtime.test.mjs test/mdo-planning-context-bounds.test.mjs
+
+  postgres-contract:
+    name: MDO-004 isolated PostgreSQL lifecycle proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.6-pg17-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+      - name: Prove MDO-004 schema and lifecycle contract
+        run: bash ./scripts/test_mdo_004.sh
+
+  live-test-acceptance:
+    name: MDO-004 persistent Supabase Test disposition proof
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.head_ref == 'mdo-004-governed-plan-disposition' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.repository_owner == 'jlhogarth' &&
+      github.actor == 'jlhogarth'
+    needs: [server-contract, postgres-contract]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      MDO004_TEST_ARTIFACT: artifacts/mdo-004-test-acceptance.json
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install exact server dependencies
+        working-directory: server
+        run: npm ci
+      - name: Build server
+        working-directory: server
+        run: npm run build
+      - name: Install and verify Supabase database CA
+        shell: bash
+        run: |
+          set -euo pipefail
+          ca_path="$RUNNER_TEMP/supabase-prod-ca-2021.crt"
+          curl --fail --silent --show-error --location \
+            --proto '=https' --tlsv1.2 \
+            https://supabase-downloads.s3-ap-southeast-1.amazonaws.com/prod/ssl/prod-ca-2021.crt \
+            --output "$ca_path"
+          expected='807025AD50D4ED219D2C9C7D299C004F824EB00CF7F65AFEF607D07B72E6CAFA'
+          actual="$(openssl x509 -in "$ca_path" -noout -fingerprint -sha256 \
+            | cut -d= -f2 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+          test "$actual" = "$expected"
+          echo "NODE_EXTRA_CA_CERTS=$ca_path" >> "$GITHUB_ENV"
+      - name: Execute persistent governed plan disposition acceptance
+        working-directory: server
+        env:
+          SUPABASE_SESSION_DATABASE_URL: ${{ secrets.SUPABASE_SESSION_DATABASE_URL }}
+        run: node --test --test-concurrency=1 test/integration/mdo-plan-disposition-live.e2e.mjs
+      - name: Preserve MDO-004 acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mdo-004-test-acceptance-${{ github.run_id }}
+          path: server/artifacts/mdo-004-test-acceptance.json
+          if-no-files-found: error
+          retention-days: 30

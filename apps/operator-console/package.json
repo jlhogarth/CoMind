@@ -11,7 +11,8 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test test/**/*.test.ts",
-    "browser-test": "node test/activity-hud.browser.mjs"
+    "browser-test": "node test/activity-hud-operational.browser.mjs",
+    "usability-test": "node test/console-usability.browser.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.75.0",

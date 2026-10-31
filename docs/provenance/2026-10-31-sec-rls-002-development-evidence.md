@@ -43,8 +43,26 @@ The dedicated isolated PostgreSQL 17 proof:
 6. verifies `anon` and `authenticated` no longer have SELECT;
 7. verifies privileged owner readback still works.
 
-Connected Test mutation is permitted only after exact-head repository proof and a fresh collision check. Post-change readback must independently verify RLS, grants, policies, and continued canonical evidence access. Production remains excluded.
+## Connected Test acceptance
+
+After the dedicated exact-head `SEC-RLS-002 Development Evidence RLS` workflow passed and a fresh collision read found no competing shared-Test mutation claimant, the bounded migration was applied to canonical Supabase Test.
+
+Supabase migration ledger:
+
+- version `20261031111456`
+- name `sec_rls_002_development_evidence_hardening`
+
+Independent post-change catalog readback proved for all three target relations:
+
+- `relrowsecurity = true`;
+- `relforcerowsecurity = false`;
+- owner remains `postgres`;
+- policy count is exactly zero;
+- `anon` SELECT is false;
+- `authenticated` SELECT is false.
+
+Privileged readback remained functional and preserved the existing evidence rows: 13 artifacts, 43 external references, and 40 journal entries at acceptance readback. No evidence contents were rewritten or deleted.
 
 ## Recovery
 
-If connected Test validation exposes a legitimate non-BYPASSRLS consumer, stop rather than adding a broad policy. Reconcile that consumer's identity and minimum required operations in a successor hardening decision. Repository rollback is a normal revert; connected database rollback requires an explicit evidence-backed policy decision because disabling RLS would weaken the accepted security posture.
+If a legitimate non-BYPASSRLS consumer is later demonstrated, do not add a broad policy. Reconcile that consumer's identity and minimum required operations in a successor hardening decision. Repository rollback is a normal revert; connected database rollback requires an explicit evidence-backed policy decision because disabling RLS would weaken the accepted security posture.

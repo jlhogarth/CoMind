@@ -1,5 +1,3 @@
-'use strict';
-
 const LIVENESS = Object.freeze({
   ACTIVE: 'ACTIVE',
   WAITING: 'WAITING',
@@ -76,9 +74,6 @@ function classifyLane(lane, now = new Date()) {
   if (lane.blocked === true) {
     return requireBoundedReason(lane, LIVENESS.BLOCKED) || { state: LIVENESS.BLOCKED, level: AED_LEVEL.MONITOR, reason: 'named dependency block' };
   }
-  if (!lane.owner && lane.actionable === true) {
-    return { state: LIVENESS.ABANDONED, level: AED_LEVEL.RECOVER, reason: 'actionable lane has no owner or lease' };
-  }
 
   const progressAt = latestProgressAt(lane.events);
   const deadline = lane.expectedProgressBy ? Date.parse(lane.expectedProgressBy) : NaN;
@@ -93,6 +88,10 @@ function classifyLane(lane, now = new Date()) {
     };
   }
 
+  if (!lane.owner && lane.actionable === true) {
+    return { state: LIVENESS.ABANDONED, level: AED_LEVEL.RECOVER, reason: 'actionable lane has no owner or lease', lastProgressAt: progressAt };
+  }
+
   return { state: LIVENESS.ACTIVE, level: AED_LEVEL.MONITOR, reason: 'within expected progress window', lastProgressAt: progressAt };
 }
 
@@ -104,4 +103,13 @@ function clearForShock(input) {
   return { clear: failed.length === 0, failed };
 }
 
-module.exports = { LIVENESS, AED_LEVEL, NON_PROGRESS_TYPES, PROGRESS_TYPES, isProgressEvent, latestProgressAt, classifyLane, clearForShock };
+export {
+  LIVENESS,
+  AED_LEVEL,
+  NON_PROGRESS_TYPES,
+  PROGRESS_TYPES,
+  isProgressEvent,
+  latestProgressAt,
+  classifyLane,
+  clearForShock,
+};

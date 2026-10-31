@@ -1,8 +1,6 @@
-'use strict';
-
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const { projectLiveness, eligibleForDispatch, claimLane, planRecovery, verifySemanticProgress } = require('../lib/l4a-semantic-progress');
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { projectLiveness, eligibleForDispatch, claimLane, planRecovery, verifySemanticProgress } from '../lib/l4a-semantic-progress.js';
 
 const NOW = new Date('2026-10-31T01:30:00Z');
 const progress = (at) => ({ type: 'implementation_commit', at, verified: true });

@@ -1,8 +1,6 @@
-'use strict';
-
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const { LIVENESS, AED_LEVEL, isProgressEvent, latestProgressAt, classifyLane, clearForShock } = require('../lib/aed-liveness');
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { LIVENESS, AED_LEVEL, isProgressEvent, latestProgressAt, classifyLane, clearForShock } from '../lib/aed-liveness.js';
 
 const NOW = new Date('2026-10-30T23:45:00Z');
 

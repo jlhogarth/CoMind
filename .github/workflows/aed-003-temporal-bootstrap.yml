@@ -1,0 +1,128 @@
+name: AED-003 Temporal Bootstrap
+
+on:
+  pull_request:
+    paths:
+      - 'server/lib/aed-adaptive-liveness.js'
+      - 'server/src/aed/temporal/**'
+      - 'server/scripts/aed-003-temporal-proof.mjs'
+      - 'server/test/aed-adaptive-liveness.test.mjs'
+      - 'server/test/aed-temporal-contract.test.mjs'
+      - 'server/package.json'
+      - 'server/package-lock.json'
+      - 'docs/architecture/AED-003-*'
+      - 'docs/provenance/*aed-003*'
+      - '.github/workflows/aed-003-temporal-bootstrap.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  temporal-bootstrap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Generate npm lock state from pinned manifest
+        working-directory: server
+        run: npm install --package-lock-only --ignore-scripts
+
+      - name: Install generated dependency state
+        working-directory: server
+        run: npm ci
+
+      - name: Verify coherent Temporal SDK pins
+        working-directory: server
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const manifest = require('./package.json');
+          const names = [
+            '@temporalio/activity',
+            '@temporalio/client',
+            '@temporalio/worker',
+            '@temporalio/workflow',
+          ];
+          for (const name of names) {
+            const declared = manifest.dependencies[name];
+            const installed = require(`./node_modules/${name}/package.json`).version;
+            if (declared !== '1.24.0' || installed !== declared) {
+              throw new Error(`${name} mismatch: declared=${declared} installed=${installed}`);
+            }
+          }
+          console.log(JSON.stringify({ status: 'ok', temporalSdk: '1.24.0', node: process.version }));
+          NODE
+
+      - name: Build and run deterministic tests
+        working-directory: server
+        run: |
+          npm run build
+          npm test
+
+      - name: Install pinned Temporal CLI
+        run: |
+          set -euo pipefail
+          curl -fsSLo "$RUNNER_TEMP/temporal.tar.gz" \
+            https://github.com/temporalio/cli/releases/download/v1.9.1/temporal_cli_1.9.1_linux_amd64.tar.gz
+          echo "09a0326a51db84d02735e53542b9ebd8c4758daf47482a9ab0abce15844e60d5  $RUNNER_TEMP/temporal.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/temporal.tar.gz" -C "$RUNNER_TEMP"
+          chmod +x "$RUNNER_TEMP/temporal"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
+      - name: Start isolated Temporal development service
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/aed-003-temporal
+          temporal server start-dev \
+            --headless \
+            --port 7233 \
+            --db-filename "$RUNNER_TEMP/aed-003-temporal.db" \
+            > artifacts/aed-003-temporal/temporal-server.log 2>&1 &
+          echo $! > "$RUNNER_TEMP/aed-003-temporal.pid"
+          for attempt in $(seq 1 100); do
+            if (echo > /dev/tcp/127.0.0.1/7233) >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 0.1
+          done
+          cat artifacts/aed-003-temporal/temporal-server.log
+          exit 1
+
+      - name: Run unattended durable recovery proof
+        working-directory: server
+        env:
+          TEMPORAL_ADDRESS: 127.0.0.1:7233
+          TEMPORAL_NAMESPACE: default
+          AED003_ARTIFACT_DIR: ../artifacts/aed-003-temporal
+        run: node scripts/aed-003-temporal-proof.mjs
+
+      - name: Stage dependency and runtime evidence
+        run: |
+          set -euo pipefail
+          cp server/package.json server/package-lock.json artifacts/aed-003-temporal/
+          temporal --version > artifacts/aed-003-temporal/temporal-cli-version.txt
+          printf '%s\n' '1.24.0' > artifacts/aed-003-temporal/temporal-sdk-version.txt
+
+      - name: Stop isolated Temporal development service
+        if: always()
+        run: |
+          if [[ -f "$RUNNER_TEMP/aed-003-temporal.pid" ]]; then
+            kill "$(cat "$RUNNER_TEMP/aed-003-temporal.pid")" >/dev/null 2>&1 || true
+          fi
+
+      - name: Upload AED-003 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aed-003-temporal-bootstrap
+          path: artifacts/aed-003-temporal
+          if-no-files-found: error
+          retention-days: 7

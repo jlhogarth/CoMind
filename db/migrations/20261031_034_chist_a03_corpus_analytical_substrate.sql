@@ -46,7 +46,9 @@ CREATE INDEX IF NOT EXISTS ix_cm_corpus_analytical_observation_run_kind ON comin
 CREATE INDEX IF NOT EXISTS ix_cm_corpus_analytical_observation_concept ON comind.cm_corpus_analytical_observation(concept_key,related_concept_key) WHERE concept_key IS NOT NULL;
 
 CREATE OR REPLACE FUNCTION comind.cm_reject_corpus_analytical_mutation() RETURNS trigger
-LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'CHIST-A03 analytical evidence is append-only'; END $$;
+LANGUAGE plpgsql
+SET search_path = pg_catalog, comind
+AS $$ BEGIN RAISE EXCEPTION 'CHIST-A03 analytical evidence is append-only'; END $$;
 
 DROP TRIGGER IF EXISTS trg_cm_corpus_analytical_run_immutable ON comind.cm_corpus_analytical_run;
 CREATE TRIGGER trg_cm_corpus_analytical_run_immutable BEFORE UPDATE OR DELETE ON comind.cm_corpus_analytical_run FOR EACH ROW EXECUTE FUNCTION comind.cm_reject_corpus_analytical_mutation();
@@ -54,7 +56,9 @@ DROP TRIGGER IF EXISTS trg_cm_corpus_analytical_observation_immutable ON comind.
 CREATE TRIGGER trg_cm_corpus_analytical_observation_immutable BEFORE UPDATE OR DELETE ON comind.cm_corpus_analytical_observation FOR EACH ROW EXECUTE FUNCTION comind.cm_reject_corpus_analytical_mutation();
 
 CREATE OR REPLACE FUNCTION comind.cm_guard_corpus_analytical_run_insert() RETURNS trigger
-LANGUAGE plpgsql AS $$
+LANGUAGE plpgsql
+SET search_path = pg_catalog, comind
+AS $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM comind.cm_conversation_history_baseline b WHERE b.baseline_id=NEW.baseline_id AND b.import_id=NEW.import_id) THEN
     RAISE EXCEPTION 'Corpus analytics requires an exact certified Conversation History baseline/import pair';

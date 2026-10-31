@@ -1,6 +1,4 @@
-'use strict';
-
-const LIFECYCLE = Object.freeze({
+export const LIFECYCLE = Object.freeze({
   CREATED: 'CREATED',
   QUEUED: 'QUEUED',
   RUNNING: 'RUNNING',
@@ -11,9 +9,14 @@ const LIFECYCLE = Object.freeze({
   STALLED: 'STALLED'
 });
 
-const WAKE = Object.freeze({ EVENT: 'event', TIMER: 'durable_timer', POLL: 'adaptive_poll', NONE: 'none' });
+export const WAKE = Object.freeze({
+  EVENT: 'event',
+  TIMER: 'durable_timer',
+  POLL: 'adaptive_poll',
+  NONE: 'none'
+});
 
-function percentile(values, p) {
+export function percentile(values, p) {
   const xs = (values || []).filter(Number.isFinite).sort((a, b) => a - b);
   if (!xs.length) return null;
   const i = (xs.length - 1) * p;
@@ -23,7 +26,7 @@ function percentile(values, p) {
   return xs[lo] + (xs[hi] - xs[lo]) * (i - lo);
 }
 
-function summarizeDurations(samples) {
+export function summarizeDurations(samples) {
   const values = (samples || []).filter(Number.isFinite).filter((v) => v >= 0);
   return {
     samples: values.length,
@@ -35,7 +38,7 @@ function summarizeDurations(samples) {
   };
 }
 
-function chooseTimingModel(history = {}) {
+export function chooseTimingModel(history = {}) {
   const levels = [
     ['job', history.job],
     ['family', history.family],
@@ -46,23 +49,56 @@ function chooseTimingModel(history = {}) {
     const stats = summarizeDurations(samples);
     if (stats.samples >= 5) return { source, ...stats };
   }
-  const fallbackMs = Number.isFinite(history.fallbackMs) && history.fallbackMs > 0 ? history.fallbackMs : 300000;
-  return { source: 'conservative_static', samples: 0, p50: fallbackMs * 0.5, p75: fallbackMs * 0.75, p90: fallbackMs * 0.9, p95: fallbackMs, p99: fallbackMs * 1.25 };
+  const fallbackMs = Number.isFinite(history.fallbackMs) && history.fallbackMs > 0
+    ? history.fallbackMs
+    : 300000;
+  return {
+    source: 'conservative_static',
+    samples: 0,
+    p50: fallbackMs * 0.5,
+    p75: fallbackMs * 0.75,
+    p90: fallbackMs * 0.9,
+    p95: fallbackMs,
+    p99: fallbackMs * 1.25
+  };
 }
 
-function adaptiveWakePlan(input) {
+export function adaptiveWakePlan(input) {
   const nowMs = Date.parse(input.now);
   const enteredMs = Date.parse(input.stateEnteredAt);
-  if (!Number.isFinite(nowMs) || !Number.isFinite(enteredMs)) throw new Error('valid now and stateEnteredAt are required');
+  if (!Number.isFinite(nowMs) || !Number.isFinite(enteredMs)) {
+    throw new Error('valid now and stateEnteredAt are required');
+  }
   const elapsedMs = Math.max(0, nowMs - enteredMs);
   const state = input.state;
 
   if (state === LIFECYCLE.BOUNDED_WAIT) {
-    if (!input.wakeAt && !input.eventExpected) throw new Error('BOUNDED_WAIT requires wakeAt or eventExpected');
-    return { state, wake: input.wakeAt ? WAKE.TIMER : WAKE.EVENT, wakeAt: input.wakeAt || null, reason: 'bounded wait uses explicit wake condition' };
+    if (!input.wakeAt && !input.eventExpected) {
+      throw new Error('BOUNDED_WAIT requires wakeAt or eventExpected');
+    }
+    return {
+      state,
+      wake: input.wakeAt ? WAKE.TIMER : WAKE.EVENT,
+      wakeAt: input.wakeAt || null,
+      reason: 'bounded wait uses explicit wake condition'
+    };
   }
-  if (state === LIFECYCLE.BLOCKED_HUMAN) return { state, wake: WAKE.EVENT, wakeAt: null, reason: 'human block wakes on authority/state event' };
-  if (state === LIFECYCLE.STALLED || state === LIFECYCLE.OVERDUE) return { state, wake: WAKE.TIMER, wakeAt: input.now, reason: 'abnormal state requires immediate AED diagnosis' };
+  if (state === LIFECYCLE.BLOCKED_HUMAN) {
+    return {
+      state,
+      wake: WAKE.EVENT,
+      wakeAt: null,
+      reason: 'human block wakes on authority/state event'
+    };
+  }
+  if (state === LIFECYCLE.STALLED || state === LIFECYCLE.OVERDUE) {
+    return {
+      state,
+      wake: WAKE.TIMER,
+      wakeAt: input.now,
+      reason: 'abnormal state requires immediate AED diagnosis'
+    };
+  }
 
   const model = chooseTimingModel(input.history);
   const p50 = model.p50;
@@ -94,8 +130,8 @@ function adaptiveWakePlan(input) {
     band,
     model,
     diagnosticTrigger: band === 'diagnose',
-    reason: input.eventExpected ? 'event preferred with durable timer fallback' : 'durable timer derived from lifecycle timing evidence'
+    reason: input.eventExpected
+      ? 'event preferred with durable timer fallback'
+      : 'durable timer derived from lifecycle timing evidence'
   };
 }
-
-module.exports = { LIFECYCLE, WAKE, percentile, summarizeDurations, chooseTimingModel, adaptiveWakePlan };

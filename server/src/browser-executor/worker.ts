@@ -34,7 +34,6 @@ export interface BrowserDriver {
 export type PlaywrightDriverOptions = {
   headless?: boolean;
   persistentContextDir?: string;
-  extraHTTPHeaders?: Record<string, string>;
 };
 
 export type BrowserExecutionResult = {
@@ -108,21 +107,15 @@ export function createPlaywrightDriver(options: PlaywrightDriverOptions = {}): B
   let browser: Browser | null = null;
   let context: BrowserContext | null = null;
   const headless = options.headless ?? true;
-  const contextOptions = options.extraHTTPHeaders
-    ? { extraHTTPHeaders: options.extraHTTPHeaders }
-    : {};
 
   async function ensureContext(): Promise<BrowserContext> {
     if (context) return context;
     if (options.persistentContextDir) {
-      context = await chromium.launchPersistentContext(options.persistentContextDir, {
-        headless,
-        ...contextOptions,
-      });
+      context = await chromium.launchPersistentContext(options.persistentContextDir, { headless });
       return context;
     }
     browser = await chromium.launch({ headless });
-    context = await browser.newContext(contextOptions);
+    context = await browser.newContext();
     return context;
   }
 

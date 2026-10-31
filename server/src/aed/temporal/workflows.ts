@@ -45,6 +45,8 @@ export async function aed003LaneController(
     externalWake = wake;
   });
 
+  const externalWakeReason = (): string => externalWake?.reason ?? 'external event received';
+
   const addTransition = async (
     type: LaneTransition['type'],
     detail: string,
@@ -75,7 +77,7 @@ export async function aed003LaneController(
   await addTransition(
     'wake',
     eventArrived
-      ? `external event: ${(externalWake as ExternalWake).reason}`
+      ? `external event: ${externalWakeReason()}`
       : 'adaptive durable timer elapsed',
     wakeCause
   );

@@ -51,11 +51,4 @@ if ! git status --short -- "${evidence_relative}" | grep -q .; then
   exit 5
 fi
 
-git add "${evidence_relative}"
-git \
-  -c user.name="${GIT_COMMITTER_NAME:-CoMind CBE Test}" \
-  -c user.email="${GIT_COMMITTER_EMAIL:-83435038+jlhogarth@users.noreply.github.com}" \
-  commit -m "CBE-001: record Codespaces runtime proof"
-git push origin "HEAD:${target_branch}"
-
-echo "CBE Codespaces runtime proof completed and pushed through the Codespaces credential helper."
+echo "CBE Codespaces runtime proof completed. Evidence is ready for Codespaces export."

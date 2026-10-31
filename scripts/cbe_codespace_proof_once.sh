@@ -22,9 +22,6 @@ if [[ "${current_branch}" != "${target_branch}" ]]; then
   exit 3
 fi
 
-git -C "${repository_root}" fetch origin "${target_branch}"
-git -C "${repository_root}" merge --ff-only "origin/${target_branch}"
-
 if [[ -s "${evidence_path}" ]]; then
   echo "CBE Codespaces runtime proof already exists."
   exit 0
@@ -32,11 +29,11 @@ fi
 
 export CBE_PROFILE_DIR="${CBE_PROFILE_DIR:-/workspaces/.comind-cbe-profile}"
 export CBE_PROOF_OUTPUT="${proof_file}"
+export PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/ms-playwright}"
 rm -f "${proof_file}"
 
 cd "${repository_root}/server"
 npm ci
-npx playwright install --with-deps chromium
 npm run build
 node scripts/cbe-codespace-runtime-proof.mjs
 
@@ -45,21 +42,13 @@ if [[ ! -s "${proof_file}" ]]; then
   exit 4
 fi
 
-cd "${repository_root}"
-git fetch origin "${target_branch}"
-git merge --ff-only "origin/${target_branch}"
+cp "${proof_file}" "${evidence_path}"
+chmod 644 "${evidence_path}"
 
-if [[ -s "${evidence_path}" ]]; then
-  echo "CBE Codespaces runtime proof was already recorded by another worker."
-  exit 0
+cd "${repository_root}"
+if ! git status --short -- "${evidence_relative}" | grep -q .; then
+  echo "CBE evidence file was not detected as a workspace change." >&2
+  exit 5
 fi
 
-cp "${proof_file}" "${evidence_path}"
-git add "${evidence_relative}"
-git \
-  -c user.name="CoMind CBE Test" \
-  -c user.email="83435038+jlhogarth@users.noreply.github.com" \
-  commit -m "CBE-001: record Codespaces runtime proof"
-git push origin "HEAD:${target_branch}"
-
-echo "CBE Codespaces runtime proof completed and pushed."
+echo "CBE Codespaces runtime proof completed. Evidence is ready for Codespaces export."

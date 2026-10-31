@@ -74,9 +74,6 @@ function classifyLane(lane, now = new Date()) {
   if (lane.blocked === true) {
     return requireBoundedReason(lane, LIVENESS.BLOCKED) || { state: LIVENESS.BLOCKED, level: AED_LEVEL.MONITOR, reason: 'named dependency block' };
   }
-  if (!lane.owner && lane.actionable === true) {
-    return { state: LIVENESS.ABANDONED, level: AED_LEVEL.RECOVER, reason: 'actionable lane has no owner or lease' };
-  }
 
   const progressAt = latestProgressAt(lane.events);
   const deadline = lane.expectedProgressBy ? Date.parse(lane.expectedProgressBy) : NaN;
@@ -89,6 +86,10 @@ function classifyLane(lane, now = new Date()) {
       reason: 'expected progress deadline passed without a bounded wait/block',
       lastProgressAt: progressAt
     };
+  }
+
+  if (!lane.owner && lane.actionable === true) {
+    return { state: LIVENESS.ABANDONED, level: AED_LEVEL.RECOVER, reason: 'actionable lane has no owner or lease', lastProgressAt: progressAt };
   }
 
   return { state: LIVENESS.ACTIVE, level: AED_LEVEL.MONITOR, reason: 'within expected progress window', lastProgressAt: progressAt };

@@ -16,6 +16,7 @@
     }
   },
   "postCreateCommand": "cd server && npm ci && cd .. && bash scripts/bootstrap_dev_runtime.sh",
+  "postStartCommand": "bash scripts/cbe_codespace_autostart.sh",
   "shutdownAction": "stopCompose",
   "customizations": {
     "vscode": {

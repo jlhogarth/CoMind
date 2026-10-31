@@ -35,6 +35,12 @@ jobs:
         working-directory: server
         run: npm install --package-lock-only --ignore-scripts
 
+      - name: Preserve generated dependency evidence
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/aed-003-temporal
+          cp server/package.json server/package-lock.json artifacts/aed-003-temporal/
+
       - name: Install generated dependency state
         working-directory: server
         run: npm ci
@@ -80,7 +86,6 @@ jobs:
       - name: Start isolated Temporal development service
         run: |
           set -euo pipefail
-          mkdir -p artifacts/aed-003-temporal
           temporal server start-dev \
             --headless \
             --port 7233 \
@@ -104,11 +109,12 @@ jobs:
           AED003_ARTIFACT_DIR: ../artifacts/aed-003-temporal
         run: node scripts/aed-003-temporal-proof.mjs
 
-      - name: Stage dependency and runtime evidence
+      - name: Stage runtime version evidence
+        if: always()
         run: |
-          set -euo pipefail
-          cp server/package.json server/package-lock.json artifacts/aed-003-temporal/
-          temporal --version > artifacts/aed-003-temporal/temporal-cli-version.txt
+          if command -v temporal >/dev/null 2>&1; then
+            temporal --version > artifacts/aed-003-temporal/temporal-cli-version.txt
+          fi
           printf '%s\n' '1.24.0' > artifacts/aed-003-temporal/temporal-sdk-version.txt
 
       - name: Stop isolated Temporal development service

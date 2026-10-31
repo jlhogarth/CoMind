@@ -51,7 +51,7 @@ test('normalizes only stable chatgpt.com conversation URLs', () => {
     normalizeChatgptConversationUrl(`${conversationUrl}?utm_source=test#fragment`),
     conversationUrl
   );
-  assert.equal(normalizeChatgptConversationUrl('https://example.com/c/123'), null);
+  assert.equal(normalizeChatgptConversationUrl('https://openai.com/c/123'), null);
   assert.equal(normalizeChatgptConversationUrl('http://chatgpt.com/c/123'), null);
   assert.equal(normalizeChatgptConversationUrl('https://chatgpt.com/'), null);
 });
@@ -80,7 +80,7 @@ test('rejects consequential handoff without CLEAR approval', () => {
 test('rejects unsupported host and malformed handoff', () => {
   assert.deepEqual(
     evaluateChatgptHandoffJob(
-      job({ targetUrl: 'https://example.com/c/123', registeredConversationUrl: 'https://example.com/c/123' }),
+      job({ targetUrl: 'https://openai.com/c/123', registeredConversationUrl: 'https://openai.com/c/123' }),
       policy
     ),
     { allowed: false, reason: 'invalid_target_conversation' }

@@ -1,5 +1,3 @@
-'use strict';
-
 const LIVENESS = Object.freeze({
   ACTIVE: 'ACTIVE',
   WAITING: 'WAITING',
@@ -104,4 +102,13 @@ function clearForShock(input) {
   return { clear: failed.length === 0, failed };
 }
 
-module.exports = { LIVENESS, AED_LEVEL, NON_PROGRESS_TYPES, PROGRESS_TYPES, isProgressEvent, latestProgressAt, classifyLane, clearForShock };
+export {
+  LIVENESS,
+  AED_LEVEL,
+  NON_PROGRESS_TYPES,
+  PROGRESS_TYPES,
+  isProgressEvent,
+  latestProgressAt,
+  classifyLane,
+  clearForShock,
+};

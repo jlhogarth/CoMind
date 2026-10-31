@@ -308,7 +308,7 @@ hybrid="$(PGPASSWORD=history-test-password psql -h localhost -U chist_history_lo
 SET ROLE comind_conversation_history_reader;
 SELECT source_node_id,coalesce(lexical_rank::text,''),coalesce(semantic_rank::text,''),round(fused_score,10)::text
 FROM comind.cm_search_conversation_history_hybrid(
-  '${corpus_id}'::uuid,'${profile_id}'::uuid,'fencing epoch','[0,1,0]'::extensions.vector,3,2,'hybrid_rrf','rrf-v1'
+  '${corpus_id}'::uuid,'${profile_id}'::uuid,'fencing epoch','[0,1,0]'::extensions.vector,3,3,'hybrid_rrf','rrf-v1'
 );
 SQL
 )"

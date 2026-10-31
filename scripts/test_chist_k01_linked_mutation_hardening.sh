@@ -14,6 +14,13 @@ psql() {
 }
 export -f psql
 
+# Establish the accepted Conversation History roles before applying the
+# least-privilege pgvector type-visibility repair. The complete K01 acceptance
+# reruns this prerequisite chain idempotently immediately afterward.
+bash "${root}/scripts/test_chist_a02_deployment_reconciliation.sh"
+psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 \
+  -f "${root}/db/migrations/20261031_002_chist_k01_pgvector_type_visibility.sql"
+
 # Prove the complete K01 behavior first.
 bash "${root}/scripts/test_chist_k01_hybrid_rag.sh"
 

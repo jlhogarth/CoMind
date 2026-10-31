@@ -1,0 +1,104 @@
+name: SEC-RLS-002 Development Evidence RLS
+
+on:
+  pull_request:
+    paths:
+      - 'db/migrations/20261031_001_sec_rls_002_development_evidence_hardening.sql'
+      - '.github/workflows/sec-rls-002-development-evidence.yml'
+      - 'docs/provenance/2026-10-31-sec-rls-002-development-evidence.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-bookworm
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGPASSWORD: postgres
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGDATABASE: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create isolated canonical-shape fixture
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE anon NOLOGIN;
+          CREATE ROLE authenticated NOLOGIN;
+          CREATE SCHEMA comind_development;
+          CREATE TABLE comind_development.entity (entity_id uuid PRIMARY KEY);
+          CREATE TABLE comind_development.artifact (
+            entity_id uuid PRIMARY KEY REFERENCES comind_development.entity(entity_id),
+            artifact_type text NOT NULL,
+            canonical_uri text NOT NULL,
+            captured_at timestamptz NOT NULL DEFAULT now(),
+            artifact_payload jsonb NOT NULL DEFAULT '{}'::jsonb
+          );
+          CREATE TABLE comind_development.external_reference (
+            reference_id uuid PRIMARY KEY,
+            entity_id uuid NOT NULL REFERENCES comind_development.entity(entity_id),
+            reference_type text NOT NULL,
+            created_at timestamptz NOT NULL DEFAULT now(),
+            metadata jsonb NOT NULL DEFAULT '{}'::jsonb
+          );
+          CREATE TABLE comind_development.journal_entry (
+            entity_id uuid PRIMARY KEY REFERENCES comind_development.entity(entity_id),
+            occurred_at timestamptz NOT NULL DEFAULT now(),
+            recorded_at timestamptz NOT NULL DEFAULT now(),
+            entry_type text NOT NULL,
+            event_payload jsonb NOT NULL DEFAULT '{}'::jsonb
+          );
+          GRANT USAGE ON SCHEMA comind_development TO anon, authenticated;
+          GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA comind_development TO anon, authenticated;
+          INSERT INTO comind_development.entity(entity_id) VALUES ('00000000-0000-0000-0000-000000000001');
+          INSERT INTO comind_development.artifact(entity_id, artifact_type, canonical_uri)
+          VALUES ('00000000-0000-0000-0000-000000000001','test','test://fixture');
+          SQL
+      - name: Apply SEC-RLS-002 twice
+        run: |
+          psql -v ON_ERROR_STOP=1 -f db/migrations/20261031_001_sec_rls_002_development_evidence_hardening.sql
+          psql -v ON_ERROR_STOP=1 -f db/migrations/20261031_001_sec_rls_002_development_evidence_hardening.sql
+      - name: Verify fail-closed RLS and privileged continuity
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $verify$
+          DECLARE
+            target_table text;
+            rls_enabled boolean;
+            policy_count integer;
+          BEGIN
+            FOREACH target_table IN ARRAY ARRAY['artifact','external_reference','journal_entry'] LOOP
+              SELECT c.relrowsecurity INTO rls_enabled
+              FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+              WHERE n.nspname='comind_development' AND c.relname=target_table;
+              IF rls_enabled IS DISTINCT FROM true THEN
+                RAISE EXCEPTION 'RLS not enabled on %', target_table;
+              END IF;
+              SELECT count(*) INTO policy_count FROM pg_policies
+              WHERE schemaname='comind_development' AND tablename=target_table;
+              IF policy_count <> 0 THEN
+                RAISE EXCEPTION 'unexpected policy on %', target_table;
+              END IF;
+              IF has_table_privilege('anon', format('comind_development.%I',target_table), 'SELECT')
+                 OR has_table_privilege('authenticated', format('comind_development.%I',target_table), 'SELECT') THEN
+                RAISE EXCEPTION 'ordinary role retained SELECT on %', target_table;
+              END IF;
+            END LOOP;
+          END
+          $verify$;
+          SELECT count(*) AS privileged_readback FROM comind_development.artifact;
+          SQL

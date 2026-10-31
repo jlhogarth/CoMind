@@ -1,7 +1,7 @@
 # CoMind Development Environment Contract
 
-**Version:** 1.1  
-**Effective:** October 30, 2026  
+**Version:** 1.2  
+**Effective:** October 31, 2026  
 **Status:** Standing Founder-Assistant Development Operating Agreement  
 **Canonical source:** `jlhogarth/CoMind/docs/governance/COMIND-DEVELOPMENT-ENVIRONMENT-CONTRACT.md`  
 **Google Drive mirror:** https://docs.google.com/document/d/1L8PkOMdPg2sopn9kx7RLmZlJRxrNLUtI2g57GgH5mKg/edit  
@@ -34,6 +34,32 @@ This contract never authorizes silent weakening of security, governance, financi
 - Preserve evidence of failures, repairs, rejected approaches, important decisions, and acceptance results rather than presenting only a sanitized successful history.
 - Do not weaken security, governance, authority boundaries, or evidence requirements merely to make an implementation easier.
 - Do not activate Production unless Production activation is explicitly authorized under the applicable CoMind gates.
+
+## Decision-Complete and No-Idle Continuation
+
+Joseph explicitly authorized this operating amendment on October 31, 2026 as part of L4A-MP-004.
+
+When a Development Lane has already resolved the next action as authorized, dependency-valid, safe, reversible, within scope, non-Production, and executable through an available governed tool or execution surface, the lane must execute that action. Merely describing, recommending, proposing, or asking routine permission for that action is not a valid stopping condition.
+
+Human visibility is required, but visibility is not a permission ritual. The lane should inform Joseph of material work while continuing within existing authority.
+
+A Development Lane may remain idle only when at least one of the following is true:
+
+- it is in a bounded wait with a concrete wake condition;
+- an external execution is actively running and the lane is awaiting its result or evidence;
+- a dependency is explicitly blocked and the blocker and responsible owner or wake condition are identified;
+- an L4A mandatory human stop boundary has been reached;
+- a platform-enforced confirmation, authentication, or authorization boundary has been reached;
+- the required execution substrate or actuator is unavailable and that unavailability is stated explicitly;
+- no dependency-valid next action can yet be determined without inventing facts or authority.
+
+A status report, recommendation, next-step proposal, or controller heartbeat does not count as semantic progress when the lane has authority and capability to perform the next action itself.
+
+After a milestone or unit of work reaches its acceptance boundary, the lane must automatically continue to the next known dependency-valid authorized unit of work unless a valid idle condition above applies. The lane must not wait for Joseph to repeat `Proceed`, `continue`, or an equivalent prompt solely to resume already-authorized work.
+
+When an execution surface cannot be invoked autonomously, the lane must distinguish that limitation from a governance decision. It must record the smallest exact missing actuator or substrate rather than claiming that work was dispatched or that a dormant conversation was awakened.
+
+This section does not expand L4A authority. Every existing Production, security, financial, legal, credential, publication, irreversible-operation, and human-authorization gate remains in force.
 
 ## L4A Bounded Autonomous Development Authority
 
@@ -140,7 +166,7 @@ When a milestone is complete, report clearly:
 4. whether the Development Lane has reached a natural terminus;
 5. the recommended next steps.
 
-Then proceed according to the authorized sequence unless a new approval or decision is required.
+Then proceed according to the authorized sequence unless a new approval or decision is required. Under the Decision-Complete and No-Idle Continuation rule, reporting the next step does not replace executing it when the lane already has authority and an available governed execution surface.
 
 ## Per-Lane Invocation Template
 
@@ -159,13 +185,15 @@ Every CoMind or related software-development conversation should automatically i
 
 Phrases such as **“Proceed,” “continue,” “pick this up,” “complete this lane,”** or a direct request to work on a CoMind development issue should be interpreted as invoking this contract unless Joseph explicitly overrides part of it.
 
+A new conversational turn is not required merely because a Development Lane completed one reversible authorized action. If another dependency-valid authorized action is known and executable, the lane continues under the same contract.
+
 The full canonical GitHub contract is authoritative over summaries, copied prompts, memory excerpts, or Drive mirrors.
 
 ## Memory Summary Pointer
 
 The durable ChatGPT Memory summary pointer should read:
 
-> **Standing CoMind Development Environment Contract:** In every conversation involving CoMind or related software-development work, automatically apply the canonical CoMind Development Environment Contract. Treat it as the default development operating agreement unless Joseph explicitly overrides a provision. This includes L4A bounded autonomy when durably granted, canonical-contract freshness checks, governed integration-gateway use, managed credential custody, meaningful progress updates, decision/rationale visibility, collision and freshness checks, reuse-before-reinvention, evidence preservation, governed paid-provider approvals with in-chat request text and approval-page links, Production separation, infrastructure discipline, verification before closure, and next-step proposals. Canonical source: `jlhogarth/CoMind/docs/governance/COMIND-DEVELOPMENT-ENVIRONMENT-CONTRACT.md`. The canonical full contract is authoritative over any abbreviated memory summary.
+> **Standing CoMind Development Environment Contract:** In every conversation involving CoMind or related software-development work, automatically apply the canonical CoMind Development Environment Contract. Treat it as the default development operating agreement unless Joseph explicitly overrides a provision. This includes L4A bounded autonomy when durably granted, canonical-contract freshness checks, decision-complete no-idle continuation, governed integration-gateway use, managed credential custody, meaningful progress updates, decision/rationale visibility, collision and freshness checks, reuse-before-reinvention, evidence preservation, governed paid-provider approvals with in-chat request text and approval-page links, Production separation, infrastructure discipline, verification before closure, and automatic dependency-valid continuation until a real bounded wait or human/platform stop is reached. Canonical source: `jlhogarth/CoMind/docs/governance/COMIND-DEVELOPMENT-ENVIRONMENT-CONTRACT.md`. The canonical full contract is authoritative over any abbreviated memory summary.
 
 The Memory summary is an invocation pointer, not the authoritative copy of this contract.
 
@@ -173,6 +201,8 @@ The Memory summary is an invocation pointer, not the authoritative copy of this 
 
 This contract may be revised only with Joseph's explicit approval. Material changes require a new version or an explicit recorded amendment. No agent, Development Lane, automation, or provider may silently weaken or replace this contract.
 
+Version 1.2 incorporates Joseph's explicit October 31, 2026 authorization for Decision-Complete and No-Idle Continuation under L4A-MP-004. It strengthens execution continuity without expanding any mandatory human stop boundary.
+
 ---
 
-End of CoMind Development Environment Contract v1.1.
+End of CoMind Development Environment Contract v1.2.

@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "proof": "CBE-001 GitHub Codespaces runtime browser proof",
+  "capturedAt": "2026-10-31T08:12:17.093Z",
+  "codespaceName": "cbe-001-export-proof-6p6r7xq7g4gf4xx4",
+  "runtime": "github-codespaces",
+  "authenticationRequired": false,
+  "result": {
+    "status": "succeeded",
+    "reason": "completed",
+    "recoverable": false,
+    "evidence": {
+      "jobId": "420d6399-d3ba-4635-8c05-f634e1430ee5",
+      "caller": "cbe-001-codespaces-runtime-test",
+      "targetUrl": "https://github.com/jlhogarth/CoMind",
+      "actions": [
+        "navigate",
+        "read",
+        "screenshot"
+      ],
+      "expectedResult": {
+        "requireOkResponse": true,
+        "finalHost": "github.com",
+        "titleIncludes": "GitHub"
+      },
+      "authorityRef": "L4A-CBE-001-Test",
+      "lease": {
+        "taskId": "729f3d7c-1f00-4f65-8bf4-c314db5134b5",
+        "fencingEpoch": 1,
+        "workerInstanceId": "cbe-001-codespaces-runtime-worker"
+      },
+      "startedAt": "2026-10-31T08:12:12.658Z",
+      "response": {
+        "finalUrl": "https://github.com/jlhogarth/CoMind",
+        "title": "GitHub - jlhogarth/CoMind: Memory-augmented AI infrastructure for persistent cognition, governed reasoning, digital twin continuity, and human-centered intelligent systems. · GitHub",
+        "statusCode": 200,
+        "ok": true,
+        "screenshot": {
+          "sha256": "99e915ed149dfd111afd639980e15c994a9eea2da46defff6014e641738bc8fe",
+          "byteLength": 82807
+        }
+      },
+      "completedAt": "2026-10-31T08:12:17.093Z"
+    }
+  }
+}

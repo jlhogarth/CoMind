@@ -35,30 +35,34 @@ CBE does not create a second work ownership system. The worker verifies its pres
 - The Codespaces forwarded noVNC port must remain Private.
 
 ## Verified automated acceptance evidence
-Current verified branch head before the interactive harness commit: `7e5140d60506c2ba7dc1e52e89a9ed974ddf3b33`.
+Current verified branch head with authenticated-browser harness: `a9d339395739636b23ab98d15c5b4e00ac24cbfb`.
 
 Dedicated CBE workflow:
-- Workflow run: `41181475534`.
+- Workflow run: `41182017463` (run #14).
 - Result: success.
-- Artifact ID: `13034822777`.
-- Artifact digest: `sha256:149bf6145097df1f085ce2606e5622c1ecb731bd642b1aa09819814c2ff6138e`.
+- Artifact ID: `13035432250`.
+- Artifact digest: `sha256:95d85c1897f7734d63fa3c9721ac512d4733ff385078a6787cc3a37cee473244`.
 - Node 24 setup: success.
 - Committed dependency installation: success.
 - Playwright 1.64.1 pin verification: success.
+- Codespaces interactive browser harness validation: success.
 - Chromium and system dependency installation: success.
 - CBE build and unit tests: success.
-- Governed navigation to `https://playwright.dev/`: success, HTTP 200.
-- Governed navigation to `https://github.com/jlhogarth/CoMind`: success, HTTP 200.
+- Governed navigation to `https://playwright.dev/`: success.
+- Governed navigation to `https://github.com/jlhogarth/CoMind`: success.
 - Bounded screenshot evidence: success.
 - Evidence artifact upload: success.
 
-The emitted browser evidence was inspected for lease tokens, cookies, authorization material, passwords, MFA material, browser storage state, query strings, fragments, and token-like URL material. None of those values appeared in the bounded evidence.
+The emitted browser evidence from the prior equivalent browser proof was inspected for lease tokens, cookies, authorization material, passwords, MFA material, browser storage state, query strings, fragments, and token-like URL material. None of those values appeared in the bounded evidence. Run #14 executes the same governed public-browser proof plus the new authenticated harness validation.
 
 General repository CI:
-- CI run: `41181475399`.
+- CI run: `41182017420` (run #1452).
 - Result: success.
-- Devcontainer runtime verification: success.
-- No Placeholder Policy run: `41181475442`, success.
+- Devcontainer contract validation: success.
+- Devcontainer image build and runtime verification: success.
+- Development runtime browser verification: success.
+- No Placeholder Policy run: `41182017472`, success.
+- Implementation Integrity run: `41182017400`, success.
 
 ## Authenticated Codespaces proof harness
 The remaining acceptance item is intentionally interactive because CI must not hold or simulate Joseph's GitHub credentials or MFA state.

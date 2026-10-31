@@ -20,11 +20,8 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 visibility_migration="${root}/db/migrations/20261031_002_chist_k01_pgvector_type_visibility.sql"
 export visibility_migration
 psql() {
-  local status
-  set +e
-  command psql -q "$@"
-  status=$?
-  set -e
+  local status=0
+  command psql -q "$@" || status=$?
   if [[ $status -eq 0 && " $* " == *"20261026_013_conversation_history_hybrid_rag.sql"* ]]; then
     command psql -q "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f "$visibility_migration"
   fi

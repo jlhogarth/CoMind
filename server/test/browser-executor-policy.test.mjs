@@ -10,7 +10,7 @@ test('allows bounded read-only navigation to allowlisted host', () => {
 });
 
 test('rejects navigation outside allowlist', () => {
-  assert.equal(evaluateBrowserJob({ ...base, targetUrl: 'https://example.com/' }, policy).reason, 'host_not_allowed');
+  assert.equal(evaluateBrowserJob({ ...base, targetUrl: 'https://playwright.dev/' }, policy).reason, 'host_not_allowed');
 });
 
 test('rejects consequential action without authority and CLEAR', () => {

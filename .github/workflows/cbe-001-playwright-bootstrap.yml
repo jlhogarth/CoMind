@@ -5,8 +5,12 @@ on:
     paths:
       - 'server/src/browser-executor/**'
       - 'server/test/browser-executor-*'
+      - 'server/scripts/cbe-codespace-*.mjs'
       - 'server/package.json'
       - 'server/package-lock.json'
+      - '.devcontainer/**'
+      - 'scripts/cbe_codespace_browser.sh'
+      - 'scripts/verify_devcontainer_contract.mjs'
       - '.github/workflows/cbe-001-playwright-bootstrap.yml'
   workflow_dispatch:
 
@@ -37,6 +41,13 @@ jobs:
           if (declared !== installed) throw new Error(`Playwright mismatch: declared ${declared}, installed ${installed}`);
           console.log(JSON.stringify({ status: 'ok', playwright: installed, node: process.version }));
           NODE
+      - name: Validate Codespaces interactive browser harness
+        run: |
+          set -euo pipefail
+          bash -n scripts/cbe_codespace_browser.sh
+          node --check server/scripts/cbe-codespace-session.mjs
+          node --check server/scripts/cbe-codespace-proof.mjs
+          node scripts/verify_devcontainer_contract.mjs
       - name: Install Chromium and system dependencies
         working-directory: server
         run: npx playwright install --with-deps chromium

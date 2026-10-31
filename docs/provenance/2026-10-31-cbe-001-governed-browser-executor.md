@@ -10,10 +10,10 @@ Production change: false
 Adopt Playwright with Chromium as the initial self-hosted browser execution substrate for CoMind. Keep CoMind governance authoritative above the browser layer.
 
 ## Verified dependency bootstrap
-- Successful GitHub Actions bootstrap run: `41179679454`.
-- Generated artifact: `cbe-001-playwright-bootstrap`.
-- Artifact ID: `13034382737`.
-- Artifact digest: `sha256:7b5d137857cd415b473282583321ed80a646e2536b8d90bbf1bf2fef5928e38d`.
+- Initial successful GitHub Actions bootstrap run: `41179679454`.
+- Initial generated artifact: `cbe-001-playwright-bootstrap`.
+- Initial artifact ID: `13034382737`.
+- Initial artifact digest: `sha256:7b5d137857cd415b473282583321ed80a646e2536b8d90bbf1bf2fef5928e38d`.
 - Resolved Playwright version: `1.64.1`.
 - Generated `package.json` and `package-lock.json` were ingested into the CBE branch.
 - The original no-placeholder failure was traced to a deterministic test using a reserved example network hostname. The test now uses `playwright.dev` as a real disallowed host.
@@ -30,6 +30,53 @@ CBE does not create a second work ownership system. The worker verifies its pres
 - Lease tokens and credential-like evidence keys are redacted.
 - URL query and fragment data are stripped from canonical evidence.
 - Persistent Chromium storage is isolated from emitted evidence.
+- Authenticated browser profiles are prohibited from repository paths.
+- The interactive VNC listener binds only to localhost inside the Codespace.
+- The Codespaces forwarded noVNC port must remain Private.
+
+## Verified automated acceptance evidence
+Current verified branch head before the interactive harness commit: `7e5140d60506c2ba7dc1e52e89a9ed974ddf3b33`.
+
+Dedicated CBE workflow:
+- Workflow run: `41181475534`.
+- Result: success.
+- Artifact ID: `13034822777`.
+- Artifact digest: `sha256:149bf6145097df1f085ce2606e5622c1ecb731bd642b1aa09819814c2ff6138e`.
+- Node 24 setup: success.
+- Committed dependency installation: success.
+- Playwright 1.64.1 pin verification: success.
+- Chromium and system dependency installation: success.
+- CBE build and unit tests: success.
+- Governed navigation to `https://playwright.dev/`: success, HTTP 200.
+- Governed navigation to `https://github.com/jlhogarth/CoMind`: success, HTTP 200.
+- Bounded screenshot evidence: success.
+- Evidence artifact upload: success.
+
+The emitted browser evidence was inspected for lease tokens, cookies, authorization material, passwords, MFA material, browser storage state, query strings, fragments, and token-like URL material. None of those values appeared in the bounded evidence.
+
+General repository CI:
+- CI run: `41181475399`.
+- Result: success.
+- Devcontainer runtime verification: success.
+- No Placeholder Policy run: `41181475442`, success.
+
+## Authenticated Codespaces proof harness
+The remaining acceptance item is intentionally interactive because CI must not hold or simulate Joseph's GitHub credentials or MFA state.
+
+The branch provides `scripts/cbe_codespace_browser.sh`, which:
+1. Uses an authenticated Chromium profile outside the repository.
+2. Installs the pinned Chromium browser for the current Playwright dependency.
+3. Starts an Xvfb display and Openbox window manager.
+4. Starts `x11vnc` on localhost only.
+5. Starts noVNC through `websockify` on localhost port 6080.
+6. Opens `https://github.com/codespaces` in a visible Playwright persistent context.
+7. Waits for human authentication without printing the GitHub username or credential material.
+8. Closes the visible session after authentication is detected.
+9. Reuses the same persistent profile through the governed CBE worker in headless mode.
+10. Requires the final URL to remain on GitHub under `/codespaces` and rejects a sign-in redirect.
+11. Emits only bounded CBE evidence.
+
+The Codespaces devcontainer forwards port 6080 and labels it `CBE interactive browser`. GitHub Codespaces forwards ports privately by default, and private forwarded ports require GitHub authentication by the codespace creator. Port 6080 must not be changed to organization or public visibility for this proof.
 
 ## External research
 Accessed 2026-10-31.
@@ -43,21 +90,30 @@ Accessed 2026-10-31.
 3. Playwright package metadata in the Microsoft repository
    - URL: https://github.com/microsoft/playwright/blob/main/packages/playwright/package.json
    - Material finding: the package declares Apache-2.0 licensing and Node.js engine support beginning at Node 20.
+4. GitHub Codespaces security documentation
+   - URL: https://docs.github.com/en/codespaces/reference/security-in-github-codespaces
+   - Material finding: forwarded ports are private by default and private forwarded ports are accessible only to the codespace creator after GitHub authentication.
+5. GitHub Codespaces port forwarding documentation
+   - URL: https://docs.github.com/en/codespaces/developing-in-a-codespace/forwarding-ports-in-your-codespace
+   - Material finding: devcontainer configuration can forward and label ports, and private is the default visibility.
+6. Debian bookworm `x11-utils`
+   - URL: https://packages.debian.org/bookworm/x11-utils
+   - Material finding: the package includes `xdpyinfo`, used to verify readiness of the isolated X display.
+7. Debian bookworm noVNC package
+   - URL: https://packages.debian.org/bookworm/novnc
+   - Material finding: noVNC is available as a Debian package for the Codespaces base environment.
+8. Debian bookworm x11vnc package
+   - URL: https://packages.debian.org/bookworm/x11vnc
+   - Material finding: x11vnc is available as a Debian package for local VNC exposure of the isolated display.
+9. noVNC advanced usage
+   - URL: https://github.com/novnc/noVNC/wiki/Advanced-usage
+   - Material finding: noVNC uses WebSockets and can be served through `websockify` to a VNC target.
 
 ## Associated capture architecture
 Playwright remains the browser control plane. A later CFR-002 slice can attach Chrome DevTools Protocol as an observation plane for Network, SSE, and WebSocket capture, with raw append-only archival followed by secret scrubbing, normalization, reconciliation, and drift detection. CDP is a backup and forensic observation path, not a replacement authority plane.
 
-## Acceptance evidence target
-The branch workflow must prove:
-1. Pinned Playwright on Node 24.
-2. Deterministic policy and worker lifecycle tests.
-3. Allowlisted real Chromium navigation with bounded evidence.
-4. Pre-execution rejection of disallowed navigation.
-5. Explicit recoverable interruption semantics.
-6. No credential or lease-token material in emitted evidence.
-7. Governed public GitHub navigation through the CBE worker.
-
-The authenticated GitHub/Codespaces proof remains an interactive Test step because CI does not possess a human-authenticated browser profile. It must not be simulated or satisfied by storing credentials in repository or workflow state.
+## Acceptance status
+Automated CBE-001 acceptance items are verified. The only remaining item is the human-authenticated GitHub/Codespaces proof through the private Codespaces browser surface. It must not be simulated or satisfied by storing credentials in repository, workflow, logs, or canonical evidence.
 
 ## Resume condition
-After CBE-001 acceptance, return to AED-002 Temporal durable liveness work using CBE where browser execution materially removes the prior dependency.
+After the authenticated Codespaces proof succeeds, CBE-001 can be closed under the existing non-Production L4A authority and AED-002 Temporal durable liveness work can resume using CBE where browser execution materially removes the prior dependency.

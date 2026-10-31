@@ -25,10 +25,14 @@ assert.equal(devcontainer.workspaceFolder, '/workspaces/CoMind');
 assert.equal(devcontainer.remoteUser, 'node');
 assert.equal(devcontainer.updateRemoteUserUID, true);
 assert.ok(devcontainer.forwardPorts?.includes(3000), 'port 3000 must be forwarded');
+assert.ok(devcontainer.forwardPorts?.includes(6080), 'private CBE browser port 6080 must be forwarded');
+assert.equal(devcontainer.portsAttributes?.['6080']?.label, 'CBE interactive browser');
 assert.equal(devcontainer.postCreateCommand, expectedPostCreate);
 
 assert.match(dockerfile, /^FROM mcr\.microsoft\.com\/devcontainers\/javascript-node:24$/m);
-assert.match(dockerfile, /postgresql-client/);
+for (const packageName of ['postgresql-client', 'xvfb', 'x11vnc', 'novnc', 'websockify', 'openbox']) {
+  assert.match(dockerfile, new RegExp(`\\b${packageName}\\b`), `${packageName} must be installed`);
+}
 
 assert.match(compose, /image:\s*pgvector\/pgvector:0\.8\.6-pg17-bookworm/);
 assert.match(compose, /DATABASE_URL:\s*postgresql:\/\/postgres:postgres@db:5432\/comind_runtime/);

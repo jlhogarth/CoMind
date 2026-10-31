@@ -1,0 +1,10 @@
+{
+  "name": "CoMind CBE proof",
+  "image": "mcr.microsoft.com/playwright:v1.64.1-noble",
+  "remoteUser": "root",
+  "containerEnv": {
+    "PLAYWRIGHT_BROWSERS_PATH": "/ms-playwright"
+  },
+  "postCreateCommand": "bash scripts/cbe_codespace_proof_once.sh",
+  "shutdownAction": "stopContainer"
+}

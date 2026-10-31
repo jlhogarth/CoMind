@@ -1,0 +1,73 @@
+name: CBE-001 Playwright Bootstrap
+
+on:
+  pull_request:
+    paths:
+      - 'server/src/browser-executor/**'
+      - 'server/test/browser-executor-*.mjs'
+      - '.github/workflows/cbe-001-playwright-bootstrap.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  playwright-bootstrap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install existing server dependencies
+        working-directory: server
+        run: npm ci
+      - name: Resolve and install stable Playwright with package-manager lock generation
+        working-directory: server
+        run: |
+          set -euo pipefail
+          version="$(npm view playwright version)"
+          printf 'Resolved Playwright stable version: %s\n' "$version"
+          npm install --save-dev --save-exact "playwright@${version}"
+          npm ls playwright
+      - name: Install Chromium and system dependencies
+        working-directory: server
+        run: npx playwright install --with-deps chromium
+      - name: Build and run CBE policy tests
+        working-directory: server
+        run: |
+          npm run build
+          node --test test/browser-executor-policy.test.mjs
+      - name: Exercise real Chromium navigation
+        working-directory: server
+        run: |
+          node --input-type=module <<'NODE'
+          import { chromium } from 'playwright';
+          const browser = await chromium.launch({ headless: true });
+          try {
+            const context = await browser.newContext();
+            const page = await context.newPage();
+            const response = await page.goto('https://playwright.dev/', { waitUntil: 'domcontentloaded', timeout: 30000 });
+            if (!response?.ok()) throw new Error(`navigation failed: ${response?.status()}`);
+            const title = await page.title();
+            if (!title.toLowerCase().includes('playwright')) throw new Error(`unexpected title: ${title}`);
+            console.log(JSON.stringify({ status: 'ok', engine: 'chromium', target: 'playwright.dev', title }));
+          } finally {
+            await browser.close();
+          }
+          NODE
+      - name: Stage package-manager generated dependency evidence
+        run: |
+          mkdir -p artifacts/cbe-001-playwright-bootstrap
+          cp server/package.json server/package-lock.json artifacts/cbe-001-playwright-bootstrap/
+          node -e "const p=require('./server/node_modules/playwright/package.json'); require('fs').writeFileSync('artifacts/cbe-001-playwright-bootstrap/playwright-version.txt', p.version+'\n')"
+      - name: Upload generated dependency evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: cbe-001-playwright-bootstrap
+          path: artifacts/cbe-001-playwright-bootstrap
+          if-no-files-found: error
+          retention-days: 7

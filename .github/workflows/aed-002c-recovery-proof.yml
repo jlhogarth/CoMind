@@ -13,6 +13,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: aed-002c-recovery-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   recovery-proof:
     runs-on: ubuntu-latest

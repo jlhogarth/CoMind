@@ -1,5 +1,3 @@
-'use strict';
-
 const LIFECYCLE = Object.freeze({
   CREATED: 'CREATED',
   QUEUED: 'QUEUED',
@@ -98,4 +96,4 @@ function adaptiveWakePlan(input) {
   };
 }
 
-module.exports = { LIFECYCLE, WAKE, percentile, summarizeDurations, chooseTimingModel, adaptiveWakePlan };
+export { LIFECYCLE, WAKE, percentile, summarizeDurations, chooseTimingModel, adaptiveWakePlan };

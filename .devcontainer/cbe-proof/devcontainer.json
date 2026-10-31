@@ -1,0 +1,7 @@
+{
+  "name": "CoMind CBE proof",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-24-bookworm",
+  "remoteUser": "node",
+  "postCreateCommand": "bash scripts/cbe_codespace_proof_once.sh",
+  "shutdownAction": "stopContainer"
+}

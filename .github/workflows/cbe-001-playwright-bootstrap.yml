@@ -65,7 +65,7 @@ jobs:
       - name: Exercise governed CBE against public GitHub
         working-directory: server
         env:
-          CBE_TARGET_URL: https://github.com/jlhogarth/CoMind
+          CBE_TARGET_URL: https://github.com/github/gitignore
           CBE_EXPECT_TITLE: GitHub
         run: |
           set -euo pipefail

@@ -28,9 +28,9 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Resolve committed Temporal dependency set
+      - name: Install exact committed dependency set
         working-directory: server
-        run: npm install
+        run: npm ci
 
       - name: Verify exact Temporal SDK versions
         working-directory: server

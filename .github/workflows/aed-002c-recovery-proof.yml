@@ -1,0 +1,98 @@
+name: AED-002C CLEAR Recovery Proof
+
+on:
+  pull_request:
+    paths:
+      - 'server/lib/aed-liveness.js'
+      - 'server/lib/l4a-semantic-progress.js'
+      - 'server/src/aed-temporal/**'
+      - 'server/test/aed-002c-recovery.integration.mjs'
+      - '.github/workflows/aed-002c-recovery-proof.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  recovery-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d comind_ci"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/comind_ci
+      TEMPORAL_ADDRESS: 127.0.0.1:7233
+      TEMPORAL_NAMESPACE: default
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Install exact committed dependency set
+        working-directory: server
+        run: npm ci
+
+      - name: Build server
+        working-directory: server
+        run: npm run build
+
+      - name: Establish canonical isolated Foundry lease substrate
+        run: bash scripts/test_foundry_work_lease_kernel.sh
+
+      - name: Start pinned Temporal development service
+        run: |
+          set -euo pipefail
+          docker run --detach --rm \
+            --name aed-002c-temporal \
+            --publish 7233:7233 \
+            temporalio/temporal:1.9.1 \
+            server start-dev --ip 0.0.0.0 --headless
+          for attempt in $(seq 1 60); do
+            if bash -c 'echo > /dev/tcp/127.0.0.1/7233' 2>/dev/null; then exit 0; fi
+            if ! docker inspect aed-002c-temporal >/dev/null 2>&1; then
+              docker logs aed-002c-temporal || true
+              exit 1
+            fi
+            sleep 0.5
+          done
+          docker logs aed-002c-temporal || true
+          exit 1
+
+      - name: Execute unattended CLEAR, fencing, recovery, and verification proof
+        working-directory: server
+        run: |
+          set -euo pipefail
+          mkdir -p ../artifacts/aed-002c
+          node test/aed-002c-recovery.integration.mjs | tee ../artifacts/aed-002c/recovery-proof.json
+
+      - name: Upload bounded AED-002C evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aed-002c-recovery-proof
+          path: artifacts/aed-002c
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Stop Temporal development service
+        if: always()
+        run: docker rm --force aed-002c-temporal >/dev/null 2>&1 || true

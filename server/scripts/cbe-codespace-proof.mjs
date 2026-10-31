@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createPlaywrightDriver, executeBrowserJob } from '../dist/browser-executor/worker.js';
 
@@ -52,4 +53,17 @@ assert.equal(final.hostname, 'github.com');
 assert.ok(final.pathname.startsWith('/codespaces'), `unexpected final path: ${final.pathname}`);
 assert.equal(title.toLowerCase().includes('sign in'), false, 'authenticated proof was redirected to sign in');
 
-console.log(JSON.stringify(result));
+const record = {
+  schemaVersion: 1,
+  proof: 'CBE-001 authenticated Codespaces browser proof',
+  capturedAt: new Date().toISOString(),
+  codespaceName: process.env.CODESPACE_NAME?.trim() || null,
+  result,
+};
+const serialized = `${JSON.stringify(record, null, 2)}\n`;
+const proofOutput = process.env.CBE_PROOF_OUTPUT?.trim();
+if (proofOutput) {
+  await writeFile(proofOutput, serialized, { mode: 0o600 });
+}
+
+console.log(JSON.stringify(record));

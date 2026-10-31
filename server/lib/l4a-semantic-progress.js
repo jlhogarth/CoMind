@@ -1,6 +1,4 @@
-'use strict';
-
-const { LIVENESS, AED_LEVEL, classifyLane, clearForShock, latestProgressAt } = require('./aed-liveness');
+import { LIVENESS, AED_LEVEL, classifyLane, clearForShock, latestProgressAt } from './aed-liveness.js';
 
 const TERMINAL = new Set(['done', 'closed', 'cancelled', 'completed']);
 
@@ -88,4 +86,11 @@ function verifySemanticProgress(before, after) {
   return { advanced: !beforeAt || Date.parse(afterAt) > Date.parse(beforeAt), beforeAt, afterAt };
 }
 
-module.exports = { normalizeWorkItem, projectLiveness, eligibleForDispatch, claimLane, planRecovery, verifySemanticProgress };
+export {
+  normalizeWorkItem,
+  projectLiveness,
+  eligibleForDispatch,
+  claimLane,
+  planRecovery,
+  verifySemanticProgress,
+};

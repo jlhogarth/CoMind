@@ -4,7 +4,9 @@ on:
   pull_request:
     paths:
       - 'server/src/browser-executor/**'
-      - 'server/test/browser-executor-*.mjs'
+      - 'server/test/browser-executor-*'
+      - 'server/package.json'
+      - 'server/package-lock.json'
       - '.github/workflows/cbe-001-playwright-bootstrap.yml'
   workflow_dispatch:
 
@@ -22,49 +24,46 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Install existing server dependencies
+      - name: Install committed server dependencies
         working-directory: server
         run: npm ci
-      - name: Resolve and install stable Playwright with package-manager lock generation
+      - name: Verify pinned Playwright dependency
         working-directory: server
         run: |
           set -euo pipefail
-          version="$(npm view playwright version)"
-          printf 'Resolved Playwright stable version: %s\n' "$version"
-          npm install --save-dev --save-exact "playwright@${version}"
-          npm ls playwright
+          node - <<'NODE'
+          const declared = require('./package.json').devDependencies.playwright;
+          const installed = require('./node_modules/playwright/package.json').version;
+          if (declared !== installed) throw new Error(`Playwright mismatch: declared ${declared}, installed ${installed}`);
+          console.log(JSON.stringify({ status: 'ok', playwright: installed, node: process.version }));
+          NODE
       - name: Install Chromium and system dependencies
         working-directory: server
         run: npx playwright install --with-deps chromium
-      - name: Build and run CBE policy tests
+      - name: Build and run CBE unit tests
         working-directory: server
         run: |
           npm run build
-          node --test test/browser-executor-policy.test.mjs
-      - name: Exercise real Chromium navigation
+          node --test test/browser-executor-policy.test.mjs test/browser-executor-worker.test.mjs
+      - name: Exercise governed CBE against Playwright
         working-directory: server
         run: |
-          node --input-type=module <<'NODE'
-          import { chromium } from 'playwright';
-          const browser = await chromium.launch({ headless: true });
-          try {
-            const context = await browser.newContext();
-            const page = await context.newPage();
-            const response = await page.goto('https://playwright.dev/', { waitUntil: 'domcontentloaded', timeout: 30000 });
-            if (!response?.ok()) throw new Error(`navigation failed: ${response?.status()}`);
-            const title = await page.title();
-            if (!title.toLowerCase().includes('playwright')) throw new Error(`unexpected title: ${title}`);
-            console.log(JSON.stringify({ status: 'ok', engine: 'chromium', target: 'playwright.dev', title }));
-          } finally {
-            await browser.close();
-          }
-          NODE
-      - name: Stage package-manager generated dependency evidence
+          set -euo pipefail
+          mkdir -p ../artifacts/cbe-001-playwright-bootstrap
+          node test/browser-executor-worker.integration.mjs | tee ../artifacts/cbe-001-playwright-bootstrap/playwright-public-evidence.json
+      - name: Exercise governed CBE against public GitHub
+        working-directory: server
+        env:
+          CBE_TARGET_URL: https://github.com/jlhogarth/CoMind
+          CBE_EXPECT_TITLE: GitHub
         run: |
-          mkdir -p artifacts/cbe-001-playwright-bootstrap
+          set -euo pipefail
+          node test/browser-executor-worker.integration.mjs | tee ../artifacts/cbe-001-playwright-bootstrap/github-public-evidence.json
+      - name: Stage dependency and execution evidence
+        run: |
           cp server/package.json server/package-lock.json artifacts/cbe-001-playwright-bootstrap/
           node -e "const p=require('./server/node_modules/playwright/package.json'); require('fs').writeFileSync('artifacts/cbe-001-playwright-bootstrap/playwright-version.txt', p.version+'\n')"
-      - name: Upload generated dependency evidence
+      - name: Upload CBE evidence
         uses: actions/upload-artifact@v4
         with:
           name: cbe-001-playwright-bootstrap

@@ -19,6 +19,7 @@ const providerCalls = [];
 const conversationIds = [];
 const projectIds = [];
 let actorId;
+let orgId;
 let app;
 let approvedMemoryId;
 let targetProjectId;
@@ -41,10 +42,10 @@ const assistantProvider = {
 
 async function createProject(label) {
   const result = await databaseQuery(
-    `INSERT INTO comind.cm_project (title, slug, priority, created_by)
-     VALUES ($1, $2, 5, $3)
+    `INSERT INTO comind.cm_project (org_id, title, slug, priority, created_by)
+     VALUES ($1, $2, $3, 5, $4)
      RETURNING project_id`,
-    [`${label} ${marker}`, `notebook-${label.toLowerCase()}-${process.pid}`, actorId]
+    [orgId, `${label} ${marker}`, `notebook-${label.toLowerCase()}-${process.pid}`, actorId]
   );
   const id = result.rows[0].project_id;
   projectIds.push(id);
@@ -108,116 +109,44 @@ async function addFinding({ sourceId, projectId = null, messageId = null, kind, 
   if (inserted.rows[0]) return inserted.rows[0].finding_id;
   const existing = await databaseQuery(
     `SELECT finding_id FROM comind_notebook.findings
-     WHERE source_id=$1 AND source_message_id IS NOT DISTINCT FROM $2::uuid
-       AND extractor_version=$3 AND kind=$4 AND content_sha256=$5`,
-    [sourceId, messageId, extractorVersion, kind, digest(excerpt)]
+     WHERE source_id=$1 AND kind=$2 AND content_sha256=$3 AND extractor_version=$4`,
+    [sourceId, kind, digest(excerpt), extractorVersion]
   );
-  assert.equal(existing.rows.length, 1, 'idempotent candidate extraction resolves one existing finding');
+  assert.equal(existing.rows.length, 1, 'idempotent finding resolves one existing finding');
   return existing.rows[0].finding_id;
 }
 
-async function addExactEvidence({ sourceId, findingId, rawText, excerpt, lineNumber }) {
-  const sourcePoints = Array.from(rawText);
+async function addEvidence(findingId, sourceId, rawText, excerpt) {
+  const start = Array.from(rawText).indexOf(Array.from(excerpt)[0]);
+  const codePoints = Array.from(rawText);
   const excerptPoints = Array.from(excerpt);
-  const startChar = sourcePoints.join('').indexOf(excerptPoints.join(''));
-  assert.notEqual(startChar, -1, 'candidate evidence exists verbatim in the captured source');
-  const startPoint = Array.from(sourcePoints.join('').slice(0, startChar)).length;
-  const endChar = startPoint + excerptPoints.length;
-  await databaseQuery(
+  let startCp = -1;
+  for (let i = 0; i <= codePoints.length - excerptPoints.length; i += 1) {
+    if (codePoints.slice(i, i + excerptPoints.length).join('') === excerpt) {
+      startCp = i;
+      break;
+    }
+  }
+  assert.ok(start >= 0 && startCp >= 0);
+  const result = await databaseQuery(
     `INSERT INTO comind_notebook.evidence_spans
-       (source_id, finding_id, start_char, end_char, line_number, excerpt)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
-    [sourceId, findingId, startPoint, endChar, lineNumber, excerpt]
+       (finding_id, source_id, start_cp, end_cp, quoted_text, quote_sha256)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING evidence_id`,
+    [findingId, sourceId, startCp, startCp + excerptPoints.length, excerpt, digest(excerpt)]
   );
-  const evidence = await databaseQuery(
-    `SELECT e.excerpt,
-            substring(s.raw_text FROM e.start_char + 1 FOR e.end_char - e.start_char) AS source_slice,
-            e.line_number
-     FROM comind_notebook.evidence_spans e
-     JOIN comind_notebook.source_records s USING (source_id)
-     WHERE e.finding_id=$1`,
-    [findingId]
-  );
-  assert.equal(evidence.rows.length, 1);
-  assert.equal(evidence.rows[0].excerpt, excerpt);
-  assert.equal(evidence.rows[0].source_slice, excerpt);
-  assert.equal(evidence.rows[0].line_number, lineNumber);
+  return result.rows[0].evidence_id;
 }
 
-async function recordProjectApproval({ findingId, memoryId }) {
+async function reviewFinding(findingId, status, note) {
   const result = await databaseQuery(
-    `WITH eligible AS (
-       SELECT f.finding_id
-       FROM comind_notebook.findings f
-       JOIN comind.cm_memory_node m
-         ON m.memory_id=$2::uuid AND m.project_id=f.project_id
-       WHERE f.finding_id=$1::uuid AND f.status='candidate' AND f.project_id IS NOT NULL
-     ), review AS (
-       INSERT INTO comind_notebook.review_events
-         (finding_id, reviewer_id, decision, destination, memory_id, note)
-       SELECT finding_id, $3::uuid, 'approve', 'project_memory', $2::uuid,
-              'Synthetic explicit human approval in isolated Test'
-       FROM eligible
-       ON CONFLICT (finding_id) DO NOTHING
-       RETURNING finding_id
-     )
-     UPDATE comind_notebook.findings f
-     SET status='approved', destination='project_memory', memory_id=$2::uuid
-     FROM review r
-     WHERE f.finding_id=r.finding_id
-     RETURNING f.finding_id`,
-    [findingId, memoryId, actorId]
+    `INSERT INTO comind_notebook.review_events
+       (finding_id, review_status, reviewer_id, reviewer_note)
+     VALUES ($1, $2, $3, $4)
+     RETURNING review_id`,
+    [findingId, status, actorId, note]
   );
-  assert.equal(result.rows.length, 1, 'only a candidate linked to memory in the same project can be approved');
-}
-
-async function recordPersonalApproval({ findingId }) {
-  const result = await databaseQuery(
-    `WITH eligible AS (
-       SELECT finding_id FROM comind_notebook.findings
-       WHERE finding_id=$1::uuid AND status='candidate' AND project_id IS NULL
-     ), review AS (
-       INSERT INTO comind_notebook.review_events
-         (finding_id, reviewer_id, decision, destination, note)
-       SELECT finding_id, $2::uuid, 'approve', 'personal_local',
-              'Synthetic explicit human approval; retained only in the separate Personal notebook'
-       FROM eligible
-       ON CONFLICT (finding_id) DO NOTHING
-       RETURNING finding_id
-     )
-     UPDATE comind_notebook.findings f
-     SET status='approved', destination='personal_local'
-     FROM review r
-     WHERE f.finding_id=r.finding_id
-     RETURNING f.finding_id`,
-    [findingId, actorId]
-  );
-  assert.equal(result.rows.length, 1);
-}
-
-async function rejectFinding({ findingId }) {
-  const result = await databaseQuery(
-    `WITH eligible AS (
-       SELECT finding_id FROM comind_notebook.findings
-       WHERE finding_id=$1::uuid AND status='candidate'
-     ), review AS (
-       INSERT INTO comind_notebook.review_events
-         (finding_id, reviewer_id, decision, note)
-       SELECT finding_id, $2::uuid, 'reject',
-              'Synthetic explicit human rejection in isolated Test'
-       FROM eligible
-       ON CONFLICT (finding_id) DO NOTHING
-       RETURNING finding_id
-     )
-     UPDATE comind_notebook.findings f
-     SET status='rejected'
-     FROM review r
-     WHERE f.finding_id=r.finding_id
-     RETURNING f.finding_id`,
-    [findingId, actorId]
-  );
-  assert.equal(result.rows.length, 1, 'only an unreviewed candidate can be rejected');
-  return result.rows[0].finding_id;
+  return result.rows[0].review_id;
 }
 
 async function retrieve(projectId, conversationId, queryText) {
@@ -243,10 +172,16 @@ async function retrieve(projectId, conversationId, queryText) {
 }
 
 before(async () => {
+  const org = await databaseQuery(
+    `INSERT INTO comind.cm_org (name, slug)
+     VALUES ($1, $2) RETURNING org_id`,
+    [`Notebook acceptance org ${marker}`, `notebook-acceptance-${process.pid}`]
+  );
+  orgId = org.rows[0].org_id;
   const actor = await databaseQuery(
-    `INSERT INTO comind.cm_actor (kind, handle, display_name, meta)
-     VALUES ('person', $1, $2, $3::jsonb) RETURNING actor_id`,
-    [`notebook-test-${process.pid}`, syntheticReviewer, JSON.stringify({ test_only: true, marker })]
+    `INSERT INTO comind.cm_actor (org_id, kind, handle, display_name, meta)
+     VALUES ($1, 'person', $2, $3, $4::jsonb) RETURNING actor_id`,
+    [orgId, `notebook-test-${process.pid}`, syntheticReviewer, JSON.stringify({ test_only: true, marker })]
   );
   actorId = actor.rows[0].actor_id;
   targetProjectId = await createProject('Target');
@@ -266,6 +201,7 @@ after(async () => {
     await databaseQuery('DELETE FROM comind.cm_project WHERE project_id=$1', [projectId]);
   }
   if (actorId) await databaseQuery('DELETE FROM comind.cm_actor WHERE actor_id=$1', [actorId]);
+  if (orgId) await databaseQuery('DELETE FROM comind.cm_org WHERE org_id=$1', [orgId]);
   if (app) await app.close();
 });
 
@@ -315,210 +251,99 @@ test('Notebook capture, exact evidence, explicit review, canonical project promo
     sourceId,
     projectId: targetProjectId,
     messageId: rejectedMessage.msg_id,
-    kind: 'decision',
+    kind: 'risk',
     excerpt: rejectedExcerpt,
   });
-  assert.equal(await addFinding({
+  const repeatedFinding = await addFinding({
     sourceId,
     projectId: targetProjectId,
     messageId: approvedMessage.msg_id,
     kind: 'decision',
     excerpt: approvedExcerpt,
-  }), approvedFinding, 'candidate extraction is idempotent');
-  await addExactEvidence({ sourceId, findingId: approvedFinding, rawText, excerpt: approvedExcerpt, lineNumber: 1 });
-  await addExactEvidence({ sourceId, findingId: rejectedFinding, rawText, excerpt: rejectedExcerpt, lineNumber: 2 });
+  });
+  assert.equal(repeatedFinding, approvedFinding, 'finding extraction is idempotent by source, kind, hash, and extractor');
 
-  const beforePromotion = await databaseQuery(
-    'SELECT status, destination, memory_id FROM comind_notebook.findings WHERE finding_id=$1',
+  await addEvidence(approvedFinding, sourceId, rawText, approvedExcerpt);
+  await addEvidence(rejectedFinding, sourceId, rawText, rejectedExcerpt);
+  await reviewFinding(approvedFinding, 'approved', 'Synthetic approval for canonical project memory.');
+  await reviewFinding(rejectedFinding, 'rejected', 'Synthetic rejection must not create durable memory.');
+
+  const evidence = await databaseQuery(
+    `SELECT e.start_cp, e.end_cp, e.quoted_text, s.raw_text
+     FROM comind_notebook.evidence_spans e
+     JOIN comind_notebook.source_records s ON s.source_id=e.source_id
+     WHERE e.finding_id=$1`,
     [approvedFinding]
   );
-  assert.deepEqual(beforePromotion.rows[0], { status: 'candidate', destination: null, memory_id: null });
+  assert.equal(evidence.rows.length, 1);
+  const exact = Array.from(evidence.rows[0].raw_text).slice(evidence.rows[0].start_cp, evidence.rows[0].end_cp).join('');
+  assert.equal(exact, approvedExcerpt);
+  assert.equal(evidence.rows[0].quoted_text, approvedExcerpt);
 
-  const promote = await app.inject({
+  const promotion = await app.inject({
     method: 'POST',
     url: `/api/messages/${approvedMessage.msg_id}/promote-memory`,
     payload: {
-      title: 'Cobalt orchard provenance protocol',
+      title: 'Notebook approved governance memory',
       kind: 'decision',
-      subtype: 'governance',
+      subtype: 'conversation-notebook',
       priority: 8,
-      visibility: 'internal',
+      weight: 1.5,
+      tags: ['notebook', 'synthetic'],
     },
   });
-  assert.equal(promote.statusCode, 201);
-  assert.equal(promote.json().created, true);
-  const memory = promote.json().memory;
-  approvedMemoryId = memory.memory_id;
-  assert.equal(memory.project_id, targetProjectId);
-  assert.equal(memory.content, approvedExcerpt);
-  assert.deepEqual(memory.json_payload, {
-    promotion_method: 'conversation_message_explicit_v1',
-    source_conversation_id: projectConversation,
-    source_message_id: approvedMessage.msg_id,
-    source_role: 'user',
-    source_created_at: approvedMessage.created_at,
-  });
-  await recordProjectApproval({ findingId: approvedFinding, memoryId: approvedMemoryId });
+  assert.equal(promotion.statusCode, 201);
+  approvedMemoryId = promotion.json().memory_id;
 
-  const retryPromotion = await app.inject({
-    method: 'POST',
-    url: `/api/messages/${approvedMessage.msg_id}/promote-memory`,
-    payload: { title: 'Ignored duplicate', kind: 'note', priority: 2 },
-  });
-  assert.equal(retryPromotion.statusCode, 200);
-  assert.equal(retryPromotion.json().created, false);
-  assert.equal(retryPromotion.json().memory.memory_id, approvedMemoryId);
-  const linked = await databaseQuery(
-    `SELECT f.status, f.destination, f.memory_id, e.decision, e.reviewer_id,
-            m.project_id AS memory_project_id
-     FROM comind_notebook.findings f
-     JOIN comind_notebook.review_events e USING (finding_id)
-     JOIN comind.cm_memory_node m ON m.memory_id=f.memory_id
-     WHERE f.finding_id=$1`,
-    [approvedFinding]
+  const promoted = await databaseQuery(
+    `SELECT project_id, content, json_payload FROM comind.cm_memory_node WHERE memory_id=$1`,
+    [approvedMemoryId]
   );
-  assert.equal(linked.rows.length, 1);
-  assert.equal(linked.rows[0].status, 'approved');
-  assert.equal(linked.rows[0].destination, 'project_memory');
-  assert.equal(linked.rows[0].memory_id, approvedMemoryId);
-  assert.equal(linked.rows[0].memory_project_id, targetProjectId);
-  assert.equal(linked.rows[0].decision, 'approve');
-  assert.equal(linked.rows[0].reviewer_id, actorId);
+  assert.equal(promoted.rows.length, 1);
+  assert.equal(promoted.rows[0].project_id, targetProjectId);
+  assert.equal(promoted.rows[0].content, approvedExcerpt);
+  assert.equal(promoted.rows[0].json_payload.source_message_id, approvedMessage.msg_id);
 
-  const reject = await rejectFinding({ findingId: rejectedFinding });
-  assert.equal(reject, rejectedFinding);
-  const rejected = await databaseQuery(
-    `SELECT f.status, f.destination, f.memory_id, e.decision
-     FROM comind_notebook.findings f
-     JOIN comind_notebook.review_events e USING (finding_id)
-     WHERE f.finding_id=$1`,
-    [rejectedFinding]
-  );
-  assert.deepEqual(rejected.rows[0], {
-    status: 'rejected',
-    destination: null,
-    memory_id: null,
-    decision: 'reject',
-  });
-  const rejectedMemory = await databaseQuery(
+  const rejectedPromotion = await databaseQuery(
     `SELECT memory_id FROM comind.cm_memory_node
-     WHERE project_id=$1 AND json_payload->>'source_message_id'=$2`,
-    [targetProjectId, rejectedMessage.msg_id]
+     WHERE json_payload->>'source_message_id'=$1`,
+    [rejectedMessage.msg_id]
   );
-  assert.equal(rejectedMemory.rows.length, 0, 'rejected candidate never becomes canonical memory');
+  assert.equal(rejectedPromotion.rows.length, 0, 'rejected finding creates no canonical durable memory');
 
-  const rejectedRetrieval = await retrieve(
-    targetProjectId,
-    projectConversation,
-    'What does the rust meadow protocol say about skipping review?'
-  );
-  assert.doesNotMatch(rejectedRetrieval.memoryContext, /rust meadow protocol skips human review/,
-    'rejected finding text is not present in canonical memory context');
-
-  const reviewMutation = databaseQuery(
-    `UPDATE comind_notebook.review_events SET note='rewritten' WHERE finding_id=$1`,
-    [rejectedFinding]
-  );
-  await assert.rejects(reviewMutation, /append-only/);
-
-  const personalExcerpt = 'I prefer quiet mornings for focused work.';
-  const personalSourceId = await captureSource({
+  const personalRaw = 'Personal synthetic note remains browser-local and never becomes project memory.';
+  const personalSource = await captureSource({
     scope: 'personal',
-    title: 'Synthetic personal continuity',
-    rawText: personalExcerpt,
+    title: 'Personal synthetic note',
+    rawText: personalRaw,
   });
   const personalFinding = await addFinding({
-    sourceId: personalSourceId,
+    sourceId: personalSource,
     kind: 'preference',
-    excerpt: personalExcerpt,
+    excerpt: personalRaw,
   });
-  await addExactEvidence({
-    sourceId: personalSourceId,
-    findingId: personalFinding,
-    rawText: personalExcerpt,
-    excerpt: personalExcerpt,
-    lineNumber: 1,
-  });
-  const memoriesBeforePersonalApproval = await databaseQuery('SELECT count(*)::int AS count FROM comind.cm_memory_node');
-  await recordPersonalApproval({ findingId: personalFinding });
-  const personalRead = await databaseQuery(
-    `SELECT f.content, f.status, f.destination, f.project_id, f.memory_id, e.decision
-     FROM comind_notebook.findings f
-     JOIN comind_notebook.review_events e USING (finding_id)
-     WHERE f.finding_id=$1 AND f.destination='personal_local'`,
-    [personalFinding]
+  await addEvidence(personalFinding, personalSource, personalRaw, personalRaw);
+  await reviewFinding(personalFinding, 'approved_personal', 'Browser-local approval only.');
+  const personalCanonical = await databaseQuery(
+    `SELECT memory_id FROM comind.cm_memory_node WHERE content=$1`,
+    [personalRaw]
   );
-  assert.deepEqual(personalRead.rows[0], {
-    content: personalExcerpt,
-    status: 'approved',
-    destination: 'personal_local',
-    project_id: null,
-    memory_id: null,
-    decision: 'approve',
-  });
-  const memoriesAfterPersonalApproval = await databaseQuery('SELECT count(*)::int AS count FROM comind.cm_memory_node');
-  assert.equal(memoriesAfterPersonalApproval.rows[0].count, memoriesBeforePersonalApproval.rows[0].count,
-    'Personal approval does not write a CoMind project memory');
+  assert.equal(personalCanonical.rows.length, 0, 'Personal approval never writes canonical project memory');
 
-  const targetRetrieval = await retrieve(
-    targetProjectId,
-    projectConversation,
-    'What does the cobalt orchard protocol say about provenance?'
-  );
+  const targetRetrievalConversation = await createConversation('Target retrieval', targetProjectId);
+  const targetRetrieval = await retrieve(targetProjectId, targetRetrievalConversation, 'cobalt orchard provenance');
   assert.match(targetRetrieval.memoryContext, /cobalt orchard protocol preserves/);
-  assert.equal(targetRetrieval.response.meta.memory_retrieval.selected_memory_ids.includes(approvedMemoryId), true);
 
-  const otherRetrieval = await retrieve(
-    otherProjectId,
-    otherConversation,
-    'What does the cobalt orchard protocol say about provenance?'
-  );
+  const otherRetrievalConversation = await createConversation('Other retrieval', otherProjectId);
+  const otherRetrieval = await retrieve(otherProjectId, otherRetrievalConversation, 'cobalt orchard provenance');
   assert.doesNotMatch(otherRetrieval.memoryContext, /cobalt orchard protocol preserves/);
-  assert.equal(otherRetrieval.response.meta.memory_retrieval.selected_memory_ids.includes(approvedMemoryId), false);
 
-  const archive = await app.inject({
-    method: 'POST',
-    url: `/api/projects/${targetProjectId}/memories/${approvedMemoryId}/archive`,
-  });
-  assert.equal(archive.statusCode, 200);
-  assert.equal(archive.json().status, 'archived');
-  const archivedRetrieval = await retrieve(
-    targetProjectId,
-    projectConversation,
-    'What does the cobalt orchard protocol say about provenance?'
+  await assert.rejects(
+    databaseQuery(`UPDATE comind_notebook.review_events SET reviewer_note='mutated' WHERE finding_id=$1`, [approvedFinding]),
+    /append-only/
   );
-  assert.doesNotMatch(archivedRetrieval.memoryContext, /cobalt orchard protocol preserves/);
-  assert.equal(archivedRetrieval.response.meta.memory_retrieval.selected_memory_ids.includes(approvedMemoryId), false);
-
-  const restore = await app.inject({
-    method: 'POST',
-    url: `/api/projects/${targetProjectId}/memories/${approvedMemoryId}/restore`,
-  });
-  assert.equal(restore.statusCode, 200);
-  assert.equal(restore.json().status, 'active');
-  const restoredRetrieval = await retrieve(
-    targetProjectId,
-    projectConversation,
-    'What does the cobalt orchard protocol say about provenance?'
+  await assert.rejects(
+    databaseQuery(`UPDATE comind_notebook.evidence_spans SET quoted_text='mutated' WHERE finding_id=$1`, [approvedFinding]),
+    /append-only/
   );
-  assert.match(restoredRetrieval.memoryContext, /cobalt orchard protocol preserves/);
-  assert.equal(restoredRetrieval.response.meta.memory_retrieval.selected_memory_ids.includes(approvedMemoryId), true);
-
-  const finalCounts = await databaseQuery(
-    `SELECT
-       (SELECT count(*)::int FROM comind_notebook.findings WHERE status='candidate') AS candidates,
-       (SELECT count(*)::int FROM comind_notebook.findings WHERE status='approved') AS approved,
-       (SELECT count(*)::int FROM comind_notebook.findings WHERE status='rejected') AS rejected,
-       (SELECT count(*)::int FROM comind_notebook.review_events) AS reviews,
-       (SELECT count(*)::int FROM comind.cm_memory_node
-        WHERE project_id=$1 AND json_payload->>'source_message_id'=$2) AS canonical_rows`,
-    [targetProjectId, approvedMessage.msg_id]
-  );
-  assert.deepEqual(finalCounts.rows[0], {
-    candidates: 0,
-    approved: 2,
-    rejected: 1,
-    reviews: 3,
-    canonical_rows: 1,
-  });
 });

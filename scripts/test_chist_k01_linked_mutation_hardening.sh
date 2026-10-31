@@ -7,21 +7,34 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # psql prints command tags such as "INSERT 0 1" after INSERT ... RETURNING.
 # K01 captures selected fixture identifiers from stdout, so make the acceptance
 # entrypoint quiet at the client layer while preserving row/query output.
-# Exporting the function carries the same deterministic behavior into the
-# child acceptance script without changing database semantics.
+#
+# The canonical K01 acceptance establishes A02 itself and applies migration 013
+# twice: first as a deliberate fail-closed non-empty-store probe, then for the
+# accepted empty-store migration. The least-privilege pgvector visibility repair
+# depends on A02-created roles and therefore must be applied immediately after
+# the successful migration 013 application, before governed role calls begin.
+# Intercepting that exact successful migration application avoids bootstrapping
+# A02 twice against the same deterministic fixture database while keeping the
+# production migration sequence unchanged. Fresh schema application still runs
+# migration 002 after migration 013 in normal migration order.
+visibility_migration="${root}/db/migrations/20261031_002_chist_k01_pgvector_type_visibility.sql"
+export visibility_migration
 psql() {
+  local status
+  set +e
   command psql -q "$@"
+  status=$?
+  set -e
+  if [[ $status -eq 0 && " $* " == *"20261026_013_conversation_history_hybrid_rag.sql"* ]]; then
+    command psql -q "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f "$visibility_migration"
+  fi
+  return $status
 }
 export -f psql
 
-# Establish the accepted Conversation History roles before applying the
-# least-privilege pgvector type-visibility repair. The complete K01 acceptance
-# reruns this prerequisite chain idempotently immediately afterward.
-bash "${root}/scripts/test_chist_a02_deployment_reconciliation.sh"
-psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 \
-  -f "${root}/db/migrations/20261031_002_chist_k01_pgvector_type_visibility.sql"
-
-# Prove the complete K01 behavior first.
+# Prove the complete K01 behavior first. This script establishes the accepted
+# Conversation History/A01/A02 chain exactly once. The psql wrapper above adds
+# the forward pgvector schema-visibility repair at the correct dependency point.
 bash "${root}/scripts/test_chist_k01_hybrid_rag.sh"
 
 # Then apply the forward hardening that preserves normal behavior for generic

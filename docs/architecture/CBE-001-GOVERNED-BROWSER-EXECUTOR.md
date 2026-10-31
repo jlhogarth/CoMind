@@ -1,6 +1,6 @@
 # CBE-001 Governed Browser Executor
 
-Status: implementation bound to Playwright worker
+Status: accepted Test substrate, pending merge
 Production change: false
 Issue: #449
 PR: #450
@@ -39,10 +39,14 @@ Browser startup, navigation interruption, timeout, cleanup failure, and lease-ve
 ## Integration proof
 The dedicated GitHub Actions workflow installs committed dependencies with Node 24, verifies the Playwright pin, installs Chromium and system dependencies, builds the server, runs deterministic CBE tests, launches the governed worker against `playwright.dev`, and launches the same governed worker against the public CoMind GitHub repository. Both browser runs use persistent-context mode and emit redacted evidence artifacts.
 
-The GitHub Actions proof uses an isolated synthetic valid-lease verifier because CI has no live CoMind database connection. The canonical Foundry lease verifier is tested independently against the exact `comind.cm_foundry_work_lease` contract. An authenticated GitHub/Codespaces browser proof remains a separate interactive Test step because it requires a human-authenticated browser context.
+The GitHub Actions proof uses an isolated synthetic valid-lease verifier because CI has no live CoMind database connection. The canonical Foundry lease verifier is tested independently against the exact `comind.cm_foundry_work_lease` contract.
+
+CBE-001 also has a real GitHub Codespaces runtime proof. A dedicated proof-only Codespace used the pinned `mcr.microsoft.com/playwright:v1.64.1-noble` image and executed the governed CBE worker inside GitHub Codespaces. The job used L4A authority reference `L4A-CBE-001-Test`, navigated to the public CoMind GitHub repository, required HTTP success and final host `github.com`, returned HTTP 200, and emitted bounded screenshot evidence as SHA-256 plus byte length. The durable proof is stored at `docs/provenance/2026-10-31-cbe-001-codespaces-runtime-proof.json`.
+
+Authentication was not required for this public Test target. Therefore the CBE-001 acceptance clause requiring Joseph to authenticate when authentication is required was not triggered. The private noVNC persistent-context harness remains available for later jobs that genuinely require human authentication, but it is not required to close CBE-001.
 
 ## Associated CDP observation path
 The browser architecture keeps Playwright as the control plane and Chrome DevTools Protocol as a separate observation plane for later CFR-002 work. CDP can capture Network, SSE, and WebSocket traffic for raw append-only capture, normalization, reconciliation, and drift detection. That observation plane is not required for CBE-001 acceptance. Any future debug endpoint must remain local-only and must not expose a public Chromium debugging port.
 
 ## AED-002 relationship
-CBE-001 is a bounded infrastructure diversion. It does not supersede AED-002. Once this browser slice is accepted, AED-002 can use CBE as an execution option without changing AED-002 authority or acceptance semantics.
+CBE-001 is a bounded infrastructure diversion. It does not supersede AED-002. Once this browser slice is merged, AED-002 can use CBE as an execution option without changing AED-002 authority or acceptance semantics.

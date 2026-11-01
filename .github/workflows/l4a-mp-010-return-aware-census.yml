@@ -1,0 +1,40 @@
+name: L4A-MP-010 Return-Aware Lane Census
+
+on:
+  pull_request:
+    paths:
+      - 'db/migrations/20261101_006_l4a_mp_010_return_aware_census.sql'
+      - 'db/verification/20261101_l4a_mp_010_return_aware_census_verification.sql'
+      - 'scripts/test_l4a_mp_010_return_aware_census.sh'
+      - '.github/workflows/l4a-mp-010-return-aware-census.yml'
+      - 'docs/provenance/2026-11-01-l4a-mp-010-return-aware-census.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  return-aware-census-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install --yes postgresql-client
+      - name: Verify return-aware founder lane census
+        run: bash ./scripts/test_l4a_mp_010_return_aware_census.sh

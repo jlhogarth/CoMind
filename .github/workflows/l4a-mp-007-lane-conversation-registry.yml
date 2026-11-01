@@ -1,0 +1,40 @@
+name: L4A-MP-007 Lane Conversation Registry
+
+on:
+  pull_request:
+    paths:
+      - 'db/migrations/20261101_001_l4a_mp_007_lane_conversation_registry.sql'
+      - 'db/migrations/20261101_002_l4a_mp_007_binding_event_clock.sql'
+      - 'db/verification/20261101_l4a_mp_007_lane_conversation_registry_verification.sql'
+      - 'scripts/test_l4a_mp_007_lane_conversation_registry.sh'
+      - '.github/workflows/l4a-mp-007-lane-conversation-registry.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lane-conversation-registry-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install --yes postgresql-client
+      - name: Verify canonical lane conversation registry
+        run: bash ./scripts/test_l4a_mp_007_lane_conversation_registry.sh

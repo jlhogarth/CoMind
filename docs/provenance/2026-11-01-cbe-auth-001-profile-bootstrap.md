@@ -86,18 +86,18 @@ The handoff TypeScript was transformed using Node's stripTypeScriptTypes in tran
 
 A separate real-browser synthetic DOM check was attempted but could not launch because the local Chromium headless-shell executable is absent. No live ChatGPT interaction occurred.
 
-GitHub check-run 124786642875 on predecessor head cf8f064cf87caed2c2b5550265e9a3f282686a96 reports that the job did not start because recent payments failed or the spending limit needs increasing. This is a provider execution block, not an observed test assertion failure.
+GitHub check-run 124786642875 on predecessor head cf8f064cf87caed2c2b5550265e9a3f282686a96 reports that the job did not start because recent payments failed or the spending limit needs increasing. This was a provider execution block, not an observed test assertion failure. GitHub Actions execution resumed later on 2026-11-01 and exact-head acceptance was restarted.
 
 ## Cross-lane profile serialization, 2026-11-01
 
 The canonical CBE-003 CLI now acquires an exclusive filesystem lock adjacent to the external persistent ChatGPT profile before it opens the database pool or constructs the browser driver. This closes a cross-lane race that the lane-specific Foundry work lease alone could not prevent: two different recovery tasks could each hold valid leases while still targeting the same persistent Chromium profile.
 
-The lock is host and process identified, contains no browser authentication material, and is never written inside the repository. A second actuator fails closed with `conversation_actuator_unavailable` while the profile is owned. A same-host lock may be reclaimed only when its recorded owning process is no longer alive. A lock from another host is never stolen automatically. Release requires the current lock token to match, preventing one process from deleting another process's lock.
+The lock is host and process identified, contains no browser authentication material, and is never written inside the repository. A second actuator fails closed with `conversation_actuator_unavailable` while the profile is owned. Existing locks are never stolen automatically, including locks that appear stale or originate on the same host. This deliberately favors cross-lane safety over automatic stale-lock recovery. Release requires the current lock token to match, preventing one process from deleting another process's lock. A residual lock after abnormal process termination therefore requires a separate governed cleanup decision rather than opportunistic takeover.
 
 Deterministic acceptance now covers:
 
 - second concurrent actuator denied for the same profile;
-- same-host dead-owner lock recovery;
+- existing same-host lock remains fail-closed rather than being reclaimed;
 - different-host lock remains fail-closed;
 - dedicated CBE-AUTH workflow builds the server and runs the profile-lock tests alongside authentication/cleanup tests.
 
@@ -105,4 +105,4 @@ This serialization affects only the shared browser profile actuator. It does not
 
 ### Remaining acceptance and continuation
 
-Keep Issue #489 open until live return acceptance is complete. Resolve GitHub Actions execution availability, run full build and exact-head acceptance, then attach a reachable external authenticated runtime and perform the governed NOTEBOOK-001 return. The exact registered target is held in the private lane registry. Preserve the current branch and PR. Do not mark RETURNED from synthetic tests, a successful bootstrap alone, or message presence alone. Verify material development progress separately after response observation.
+Keep Issue #489 open until live return acceptance is complete. Complete exact-head acceptance, then attach a reachable external authenticated runtime and perform the governed NOTEBOOK-001 return. The exact registered target is held in the private lane registry. Preserve the current branch and PR. Do not mark RETURNED from synthetic tests, a successful bootstrap alone, or message presence alone. Verify material development progress separately after response observation.

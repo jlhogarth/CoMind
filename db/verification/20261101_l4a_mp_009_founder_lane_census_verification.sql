@@ -65,7 +65,8 @@ BEGIN
 
   v_census := comind_pm.lane_continuity_census();
 
-  IF v_census->>'schemaVersion' <> '1' OR (v_census->>'dormantAfterHours')::integer <> 6 THEN
+  IF (v_census->>'schemaVersion')::integer NOT IN (1,2)
+     OR (v_census->>'dormantAfterHours')::integer <> 6 THEN
     RAISE EXCEPTION 'Unexpected census contract: %', v_census;
   END IF;
 

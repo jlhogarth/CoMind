@@ -1,0 +1,40 @@
+name: CBE-003 ChatGPT Handoff Actuator
+
+on:
+  pull_request:
+    paths:
+      - 'server/src/browser-executor/chatgpt-handoff.ts'
+      - 'server/src/browser-executor/chatgpt-handoff-runtime.ts'
+      - 'server/src/browser-executor/chatgpt-handoff-cli.ts'
+      - 'server/src/browser-executor/lease.ts'
+      - 'server/test/chatgpt-handoff.test.mjs'
+      - 'server/test/chatgpt-handoff-runtime.test.mjs'
+      - 'server/scripts/cbe-chatgpt-live-proof.mjs'
+      - 'server/package.json'
+      - '.github/workflows/cbe-003-chatgpt-handoff-actuator.yml'
+      - 'docs/provenance/2026-11-01-cbe-003-chatgpt-handoff-actuator.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  governed-chatgpt-actuator-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Build server
+        run: npm run build
+      - name: Verify ChatGPT handoff engine and MP-006 runtime mapping
+        run: node --test test/chatgpt-handoff.test.mjs test/chatgpt-handoff-runtime.test.mjs

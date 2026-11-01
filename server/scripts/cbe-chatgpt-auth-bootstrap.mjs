@@ -5,6 +5,7 @@ import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stdin as input, stdout as output } from 'node:process';
 import { chromium } from 'playwright';
+import { bootstrapProfile } from './cbe-chatgpt-auth-check.mjs';
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(moduleDir, '../..');
@@ -29,41 +30,21 @@ function profileDirectory() {
 const profileDir = profileDirectory();
 await mkdir(profileDir, { recursive: true, mode: 0o700 });
 
-const context = await chromium.launchPersistentContext(profileDir, {
-  headless: false,
-  viewport: { width: 1440, height: 960 },
-});
-
-const page = context.pages()[0] ?? await context.newPage();
-await page.goto('https://chatgpt.com/', { waitUntil: 'domcontentloaded', timeout: 60_000 });
-
-output.write('\nCoMind CBE ChatGPT authentication bootstrap\n');
-output.write(`Persistent profile: ${profileDir}\n`);
-output.write('Sign into ChatGPT in the opened browser window. Complete any MFA in that browser.\n');
-output.write('Do not copy cookies, tokens, passwords, or storage state into this terminal or repository.\n');
-output.write('When the normal ChatGPT conversation composer is visible, return here and press Enter.\n\n');
-
 const readline = createInterface({ input, output });
 try {
-  await readline.question('Press Enter after ChatGPT sign-in is complete: ');
-
-  const composer = page.locator(
-    'textarea[data-testid="prompt-textarea"], #prompt-textarea, [contenteditable="true"][data-lexical-editor="true"]'
-  ).first();
-
-  const composerVisible = await composer.isVisible().catch(() => false);
-  const currentUrl = page.url();
-  const authenticated = currentUrl.startsWith('https://chatgpt.com/') && composerVisible;
-
-  if (!authenticated) {
-    throw new Error(
-      'Authentication could not be verified. Keep the browser open, complete ChatGPT sign-in, and rerun this bootstrap if necessary.'
-    );
-  }
-
-  output.write('\nAuthentication verified. The external Playwright profile is ready for CBE-003.\n');
-  output.write('No browser authentication material was exported or written to the repository.\n');
+  await bootstrapProfile({
+    chromium,
+    profileDir,
+    async confirm() {
+      output.write('Sign into ChatGPT in the opened browser and complete MFA there.\n');
+      output.write('Do not copy authentication material into the terminal or repository.\n');
+      await readline.question('Press Enter after ChatGPT sign-in is complete: ');
+    },
+    report() {
+      output.write('Signed-in UI verified. External profile preserved; live return remains unverified.\n');
+    },
+  });
 } finally {
   readline.close();
-  await context.close();
 }
+

@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - 'server/scripts/cbe-chatgpt-auth-bootstrap.mjs'
+      - 'server/scripts/cbe-chatgpt-auth-check.mjs'
+      - 'server/test/cbe-chatgpt-auth-bootstrap.test.mjs'
       - 'server/package.json'
       - '.github/workflows/cbe-auth-001-profile-bootstrap.yml'
       - 'docs/provenance/2026-11-01-cbe-auth-001-profile-bootstrap.md'
@@ -32,5 +34,8 @@ jobs:
         run: node --check scripts/cbe-chatgpt-auth-bootstrap.mjs
       - name: Build server regression
         run: npm run build
+      - name: Verify authentication and cleanup failure paths
+        run: node --test test/cbe-chatgpt-auth-bootstrap.test.mjs
       - name: Verify package command
         run: node -e "const p=require('./package.json'); if(p.scripts['cbe:chatgpt-auth-bootstrap']!=='node scripts/cbe-chatgpt-auth-bootstrap.mjs') process.exit(1)"
+

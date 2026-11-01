@@ -88,6 +88,21 @@ A separate real-browser synthetic DOM check was attempted but could not launch b
 
 GitHub check-run 124786642875 on predecessor head cf8f064cf87caed2c2b5550265e9a3f282686a96 reports that the job did not start because recent payments failed or the spending limit needs increasing. This is a provider execution block, not an observed test assertion failure.
 
+## Cross-lane profile serialization, 2026-11-01
+
+The canonical CBE-003 CLI now acquires an exclusive filesystem lock adjacent to the external persistent ChatGPT profile before it opens the database pool or constructs the browser driver. This closes a cross-lane race that the lane-specific Foundry work lease alone could not prevent: two different recovery tasks could each hold valid leases while still targeting the same persistent Chromium profile.
+
+The lock is host and process identified, contains no browser authentication material, and is never written inside the repository. A second actuator fails closed with `conversation_actuator_unavailable` while the profile is owned. A same-host lock may be reclaimed only when its recorded owning process is no longer alive. A lock from another host is never stolen automatically. Release requires the current lock token to match, preventing one process from deleting another process's lock.
+
+Deterministic acceptance now covers:
+
+- second concurrent actuator denied for the same profile;
+- same-host dead-owner lock recovery;
+- different-host lock remains fail-closed;
+- dedicated CBE-AUTH workflow builds the server and runs the profile-lock tests alongside authentication/cleanup tests.
+
+This serialization affects only the shared browser profile actuator. It does not claim or pause unrelated CoMind development lanes, and it does not broaden AED authority.
+
 ### Remaining acceptance and continuation
 
 Keep Issue #489 open until live return acceptance is complete. Resolve GitHub Actions execution availability, run full build and exact-head acceptance, then attach a reachable external authenticated runtime and perform the governed NOTEBOOK-001 return. The exact registered target is held in the private lane registry. Preserve the current branch and PR. Do not mark RETURNED from synthetic tests, a successful bootstrap alone, or message presence alone. Verify material development progress separately after response observation.

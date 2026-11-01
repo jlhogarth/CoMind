@@ -26,7 +26,6 @@ export type ChatgptProfileLockDecision =
 type LockOptions = {
   host?: string;
   pid?: number;
-  isProcessAlive?: (pid: number) => boolean | Promise<boolean>;
   now?: () => Date;
 };
 
@@ -34,15 +33,6 @@ function errorCode(error: unknown): string | undefined {
   if (typeof error !== 'object' || error === null || !('code' in error)) return undefined;
   const code = (error as { code?: unknown }).code;
   return typeof code === 'string' ? code : undefined;
-}
-
-async function defaultProcessAlive(pid: number): Promise<boolean> {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return errorCode(error) !== 'ESRCH';
-  }
 }
 
 function validOwner(value: unknown): value is LockOwner {
@@ -80,65 +70,52 @@ export async function acquireChatgptProfileLock(
   const lockPath = chatgptProfileLockPath(profileDir);
   const host = options.host ?? hostname();
   const pid = options.pid ?? process.pid;
-  const isProcessAlive = options.isProcessAlive ?? defaultProcessAlive;
   const now = options.now ?? (() => new Date());
 
   if (!host.trim() || !Number.isSafeInteger(pid) || pid <= 0) {
     throw new Error('profile lock owner identity is invalid');
   }
 
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    try {
-      await mkdir(lockPath, { mode: 0o700 });
-    } catch (error) {
-      if (errorCode(error) !== 'EEXIST') throw error;
-      const existing = await readOwner(lockPath);
-      if (
-        attempt === 0
-        && existing
-        && existing.host === host
-        && !(await isProcessAlive(existing.pid))
-      ) {
-        await rm(lockPath, { recursive: true, force: true });
-        continue;
-      }
+  try {
+    await mkdir(lockPath, { mode: 0o700 });
+  } catch (error) {
+    if (errorCode(error) === 'EEXIST') {
       return { acquired: false, reason: 'profile_actuator_busy' };
     }
-
-    const token = randomUUID();
-    const owner: LockOwner = {
-      version: 1,
-      host,
-      pid,
-      token,
-      createdAt: now().toISOString(),
-    };
-
-    try {
-      await writeFile(
-        `${lockPath}/${OWNER_FILE}`,
-        `${JSON.stringify(owner)}\n`,
-        { encoding: 'utf8', mode: 0o600, flag: 'wx' }
-      );
-    } catch (error) {
-      await rm(lockPath, { recursive: true, force: true }).catch(() => undefined);
-      throw error;
-    }
-
-    return {
-      acquired: true,
-      handle: {
-        lockPath,
-        async release() {
-          const current = await readOwner(lockPath);
-          if (!current || current.token !== token) {
-            throw new Error('profile_lock_ownership_lost');
-          }
-          await rm(lockPath, { recursive: true, force: false });
-        },
-      },
-    };
+    throw error;
   }
 
-  return { acquired: false, reason: 'profile_actuator_busy' };
+  const token = randomUUID();
+  const owner: LockOwner = {
+    version: 1,
+    host,
+    pid,
+    token,
+    createdAt: now().toISOString(),
+  };
+
+  try {
+    await writeFile(
+      `${lockPath}/${OWNER_FILE}`,
+      `${JSON.stringify(owner)}\n`,
+      { encoding: 'utf8', mode: 0o600, flag: 'wx' }
+    );
+  } catch (error) {
+    await rm(lockPath, { recursive: true, force: true }).catch(() => undefined);
+    throw error;
+  }
+
+  return {
+    acquired: true,
+    handle: {
+      lockPath,
+      async release() {
+        const current = await readOwner(lockPath);
+        if (!current || current.token !== token) {
+          throw new Error('profile_lock_ownership_lost');
+        }
+        await rm(lockPath, { recursive: true, force: false });
+      },
+    },
+  };
 }

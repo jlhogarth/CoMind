@@ -23,7 +23,7 @@ test('visible login control rejects ambiguous UI', async () => {
   assert.equal(await verifyChatgptAuthentication(fixture({ login: true }).page), false);
 });
 test('wrong origin is rejected', async () => {
-  assert.equal(await verifyChatgptAuthentication(fixture({ url: 'https://example.com/' }).page), false);
+  assert.equal(await verifyChatgptAuthentication(fixture({ url: 'https://openai.com/' }).page), false);
 });
 test('signed-in account control and composer are both required', async () => {
   assert.equal(await verifyChatgptAuthentication(fixture().page), true);

@@ -6,10 +6,32 @@ import {
   executeChatgptHandoffJob,
   formatChatgptRecoveryHandoff,
   normalizeChatgptConversationUrl,
+  handoffResponseObserved,
 } from '../dist/browser-executor/chatgpt-handoff.js';
 
 const conversationUrl = 'https://chatgpt.com/c/12345678-1234-1234-1234-123456789abc';
 const policy = { maxTimeoutMs: 60_000, maxMessageChars: 8_000 };
+
+test('response evidence belongs to the recovery turn, including retries', () => {
+  const marker = 'Recovery ID: recovery-001';
+  const original = globalThis.document;
+  const observed = rows => {
+    globalThis.document = { querySelectorAll: () => rows.map(([role, text]) => ({
+      getAttribute: () => role, textContent: text,
+    })) };
+    return handoffResponseObserved(marker);
+  };
+  try {
+    assert.equal(observed([['assistant', 'Earlier response'], ['user', marker]]), false);
+    assert.equal(observed([['user', marker], ['assistant', '   ']]), false);
+    assert.equal(observed([['user', marker], ['user', 'Other request'], ['assistant', 'Unrelated response']]), false);
+    assert.equal(observed([['user', marker], ['assistant', 'Resuming now']]), true);
+    assert.equal(observed([['user', 'Different recovery'], ['assistant', 'Response']]), false);
+  } finally {
+    if (original === undefined) delete globalThis.document;
+    else globalThis.document = original;
+  }
+});
 
 function handoff(overrides = {}) {
   return {
@@ -62,6 +84,7 @@ test('formats a bounded provenance-marked AED recovery handoff', () => {
   assert.match(message, /Recovery ID: recovery-001/);
   assert.match(message, /RECOVERY DATA/);
   assert.match(message, /CoMind Application Development Contract/);
+  assert.match(message, /Proceed autonomously under the CoMind Application Development Contract/);
 });
 
 test('rejects a mismatched registered conversation before browser execution', async () => {
@@ -195,3 +218,4 @@ test('does not report success until response start is observed', async () => {
   assert.equal(result.reason, 'handoff_verification_failed');
   assert.equal(result.recoverable, true);
 });
+

@@ -90,6 +90,24 @@ function normalizeText(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
 }
 
+// Runs in the page. Only a nonempty assistant message following this handoff,
+// before another user turn, establishes response observation.
+export function handoffResponseObserved(recoveryMarker: string): boolean {
+  const messages = Array.from(document.querySelectorAll('[data-message-author-role]'));
+  let handoffIndex = -1;
+  for (let i = 0; i < messages.length; i += 1) {
+    if (messages[i].getAttribute('data-message-author-role') === 'user'
+      && messages[i].textContent?.includes(recoveryMarker)) handoffIndex = i;
+  }
+  if (handoffIndex < 0) return false;
+  for (let i = handoffIndex + 1; i < messages.length; i += 1) {
+    const role = messages[i].getAttribute('data-message-author-role');
+    if (role === 'user') return false;
+    if (role === 'assistant' && messages[i].textContent?.trim()) return true;
+  }
+  return false;
+}
+
 export function normalizeChatgptConversationUrl(value: string): string | null {
   let url: URL;
   try {
@@ -241,6 +259,13 @@ export function createPlaywrightChatgptHandoffDriver(options: PlaywrightChatgptD
         const userMessages = page.locator('[data-message-author-role="user"]');
         const existing = userMessages.filter({ hasText: recoveryMarker }).last();
         if (await existing.count() > 0) {
+          try {
+            await page.waitForFunction(handoffResponseObserved, recoveryMarker, {
+              timeout: Math.min(input.timeoutMs, 30_000),
+            });
+          } catch {
+            throw new ChatgptHandoffError('response_not_observed');
+          }
           return {
             finalUrl,
             posted: false,
@@ -257,7 +282,6 @@ export function createPlaywrightChatgptHandoffDriver(options: PlaywrightChatgptD
           throw new ChatgptHandoffError(signInVisible > 0 ? 'authentication_required' : 'composer_not_found');
         }
 
-        const assistantBefore = await page.locator('[data-message-author-role="assistant"]').count();
         await composer.fill(input.message);
         await composer.press('Enter');
 
@@ -271,9 +295,8 @@ export function createPlaywrightChatgptHandoffDriver(options: PlaywrightChatgptD
         let responseStarted = false;
         try {
           await page.waitForFunction(
-            (before) => document.querySelectorAll('[data-message-author-role="assistant"]').length > before
-              || document.querySelector('button[data-testid="stop-button"]') !== null,
-            assistantBefore,
+            handoffResponseObserved,
+            recoveryMarker,
             { timeout: Math.min(input.timeoutMs, 30_000) }
           );
           responseStarted = true;
@@ -431,3 +454,4 @@ export async function executeChatgptHandoffJob(
     }),
   };
 }
+

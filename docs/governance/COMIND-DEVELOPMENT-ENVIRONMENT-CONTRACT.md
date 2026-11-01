@@ -1,7 +1,7 @@
 # CoMind Development Environment Contract
 
-**Version:** 1.2  
-**Effective:** October 31, 2026  
+**Version:** 1.3  
+**Effective:** November 1, 2026  
 **Status:** Standing Founder-Assistant Development Operating Agreement  
 **Canonical source:** `jlhogarth/CoMind/docs/governance/COMIND-DEVELOPMENT-ENVIRONMENT-CONTRACT.md`  
 **Google Drive mirror:** https://docs.google.com/document/d/1L8PkOMdPg2sopn9kx7RLmZlJRxrNLUtI2g57GgH5mKg/edit  
@@ -11,13 +11,13 @@
 
 This contract defines the default operating agreement for every CoMind or related software-development conversation and Development Lane. It applies automatically unless Joseph explicitly overrides a provision for a specific task or lane.
 
-The objective is to preserve an execution style that combines meaningful autonomy with visible human oversight: proceed within existing authority, keep Joseph informed of consequential work, protect neighboring lanes, preserve evidence, and stop building infrastructure once the intended outcome can be produced reliably.
+The objective is to preserve an execution style that combines meaningful autonomy with visible human oversight: proceed within existing authority, keep Joseph informed of consequential work, protect neighboring lanes, preserve evidence, minimize unnecessary operator friction, and stop building infrastructure once the intended outcome can be produced reliably.
 
 ## Authority and Boundaries
 
 A Development Lane has authority to make the changes reasonably necessary to complete its assigned work successfully, subject to existing CoMind governance, security, Production, financial, and human-authorization boundaries.
 
-The lane may create or modify schemas, code, workflows, automations, documentation, tests, monitoring, HUD/Console components, configuration, and other supporting artifacts when needed. It may use the applications, connectors, plugins, tools, and services available to the conversation where appropriate.
+The lane may create or modify schemas, code, workflows, automations, documentation, tests, monitoring, HUD/Console components, configuration, and other supporting artifacts when needed. It may use the applications, connectors, plugins, tools, browser or computer-use surfaces, and services available to the conversation where appropriate.
 
 Existing CoMind architectural decisions, governance rules, lane boundaries, evidence requirements, and previously granted authority remain in force unless the current task explicitly changes them.
 
@@ -60,6 +60,33 @@ After a milestone or unit of work reaches its acceptance boundary, the lane must
 When an execution surface cannot be invoked autonomously, the lane must distinguish that limitation from a governance decision. It must record the smallest exact missing actuator or substrate rather than claiming that work was dispatched or that a dormant conversation was awakened.
 
 This section does not expand L4A authority. Every existing Production, security, financial, legal, credential, publication, irreversible-operation, and human-authorization gate remains in force.
+
+## Browser-First Terminal Command Rule
+
+Joseph explicitly authorized this standing operating amendment on November 1, 2026 as GOV-DEV-013.
+
+Before asking Joseph to run a terminal command, shell command, CLI command, or equivalent command-line sequence, the acting Development Lane must first attempt to achieve the same authorized objective itself through every reasonably applicable governed execution surface already available to it.
+
+The preferred execution order is:
+
+1. use a direct native connector, repository tool, database tool, governed integration gateway, or application-specific actuator when it can perform the action safely;
+2. use an available browser or computer-use capability, including a governed CBE or Playwright path, to navigate to the relevant application or browser-hosted terminal and attempt the command or equivalent operation directly;
+3. use another already-authorized remote execution surface when available and appropriate;
+4. only then hand the smallest necessary terminal command to Joseph.
+
+If a Codespaces terminal or other browser-hosted terminal is reachable through an available browser or computer-use capability, the lane must attempt to use that capability to execute the command itself before asking Joseph to type, paste, or manually reproduce it.
+
+A terminal-command handoff to Joseph is valid only when at least one of the following is true:
+
+- a platform-enforced authentication, MFA, consent, confirmation, or other human-only interaction is required;
+- the required browser, computer-use, connector, remote execution, or application actuator is unavailable or cannot reach the target execution surface;
+- the platform technically prevents the assistant from entering or executing the command;
+- an existing CoMind human-stop boundary requires Joseph to perform or explicitly authorize the operation;
+- attempting the command through the available assistant-controlled surface would materially weaken security, governance, provenance, or credential handling.
+
+When terminal handoff is unavoidable, the lane must state the exact reason it could not execute the action itself and reduce Joseph's work to the smallest practical human step. Commands should be copy-safe, minimal, and accompanied by the exact success signal Joseph should report back. On mobile-sensitive workflows, especially Codespaces from iPhone, avoid requiring multi-command manual entry when an assistant-controlled execution path can reasonably be used instead.
+
+This rule does not authorize bypassing credentials, MFA, Production gates, financial approvals, destructive-operation gates, legal or corporate approvals, publication gates, or any other mandatory human boundary. It changes execution preference and operator-friction handling only. It does not expand L4A authority.
 
 ## L4A Bounded Autonomous Development Authority
 
@@ -193,7 +220,7 @@ The full canonical GitHub contract is authoritative over summaries, copied promp
 
 The durable ChatGPT Memory summary pointer should read:
 
-> **Standing CoMind Development Environment Contract:** In every conversation involving CoMind or related software-development work, automatically apply the canonical CoMind Development Environment Contract. Treat it as the default development operating agreement unless Joseph explicitly overrides a provision. This includes L4A bounded autonomy when durably granted, canonical-contract freshness checks, decision-complete no-idle continuation, governed integration-gateway use, managed credential custody, meaningful progress updates, decision/rationale visibility, collision and freshness checks, reuse-before-reinvention, evidence preservation, governed paid-provider approvals with in-chat request text and approval-page links, Production separation, infrastructure discipline, verification before closure, and automatic dependency-valid continuation until a real bounded wait or human/platform stop is reached. Canonical source: `jlhogarth/CoMind/docs/governance/COMIND-DEVELOPMENT-ENVIRONMENT-CONTRACT.md`. The canonical full contract is authoritative over any abbreviated memory summary.
+> **Standing CoMind Development Environment Contract:** In every conversation involving CoMind or related software-development work, automatically apply the canonical CoMind Development Environment Contract. Treat it as the default development operating agreement unless Joseph explicitly overrides a provision. This includes L4A bounded autonomy when durably granted, canonical-contract freshness checks, decision-complete no-idle continuation, browser-first execution before terminal-command handoff, governed integration-gateway use, managed credential custody, meaningful progress updates, decision/rationale visibility, collision and freshness checks, reuse-before-reinvention, evidence preservation, governed paid-provider approvals with in-chat request text and approval-page links, Production separation, infrastructure discipline, verification before closure, and automatic dependency-valid continuation until a real bounded wait or human/platform stop is reached. Canonical source: `jlhogarth/CoMind/docs/governance/COMIND-DEVELOPMENT-ENVIRONMENT-CONTRACT.md`. The canonical full contract is authoritative over any abbreviated memory summary.
 
 The Memory summary is an invocation pointer, not the authoritative copy of this contract.
 
@@ -201,8 +228,10 @@ The Memory summary is an invocation pointer, not the authoritative copy of this 
 
 This contract may be revised only with Joseph's explicit approval. Material changes require a new version or an explicit recorded amendment. No agent, Development Lane, automation, or provider may silently weaken or replace this contract.
 
-Version 1.2 incorporates Joseph's explicit October 31, 2026 authorization for Decision-Complete and No-Idle Continuation under L4A-MP-004. It strengthens execution continuity without expanding any mandatory human stop boundary.
+Version 1.2 incorporated Joseph's explicit October 31, 2026 authorization for Decision-Complete and No-Idle Continuation under L4A-MP-004. It strengthened execution continuity without expanding any mandatory human stop boundary.
+
+Version 1.3 incorporates Joseph's explicit November 1, 2026 authorization for GOV-DEV-013, the Browser-First Terminal Command Rule. It requires assistant-controlled execution attempts before terminal-command handoff whenever a governed browser, computer-use, connector, or other authorized actuator can reasonably perform the action. It reduces operator friction without expanding authority or weakening any mandatory human stop boundary.
 
 ---
 
-End of CoMind Development Environment Contract v1.2.
+End of CoMind Development Environment Contract v1.3.

@@ -103,6 +103,10 @@ Deterministic acceptance now covers:
 
 This serialization affects only the shared browser profile actuator. It does not claim or pause unrelated CoMind development lanes, and it does not broaden AED authority.
 
+## Exact-head CI repair
+
+When GitHub Actions execution resumed, the first live exact-head matrix exposed one real repository-policy failure: `server/test/cbe-chatgpt-auth-bootstrap.test.mjs` still used the prohibited `example.com` marker for its wrong-origin fixture. The test was corrected to use the real `openai.com` host. No Placeholder policy was not weakened.
+
 ### Remaining acceptance and continuation
 
 Keep Issue #489 open until live return acceptance is complete. Complete exact-head acceptance, then attach a reachable external authenticated runtime and perform the governed NOTEBOOK-001 return. The exact registered target is held in the private lane registry. Preserve the current branch and PR. Do not mark RETURNED from synthetic tests, a successful bootstrap alone, or message presence alone. Verify material development progress separately after response observation.

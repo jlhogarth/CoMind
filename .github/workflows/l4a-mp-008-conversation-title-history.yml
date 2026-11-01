@@ -1,0 +1,40 @@
+name: L4A-MP-008 Conversation Title History
+
+on:
+  pull_request:
+    paths:
+      - 'db/migrations/20261101_003_l4a_mp_008_conversation_title_history.sql'
+      - 'db/verification/20261101_l4a_mp_008_conversation_title_history_verification.sql'
+      - 'scripts/test_l4a_mp_008_conversation_title_history.sh'
+      - '.github/workflows/l4a-mp-008-conversation-title-history.yml'
+      - 'docs/provenance/2026-11-01-l4a-mp-008-conversation-title-history.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  conversation-title-history-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install --yes postgresql-client
+      - name: Verify conversation title history and automatic registration
+        run: bash ./scripts/test_l4a_mp_008_conversation_title_history.sh

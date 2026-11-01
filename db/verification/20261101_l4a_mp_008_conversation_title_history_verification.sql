@@ -5,7 +5,6 @@ DECLARE
   v_project_id uuid;
   v_work_item_id uuid;
   v_registered jsonb;
-  v_title jsonb;
   v_rename jsonb;
   v_duplicate jsonb;
   v_stale jsonb;
@@ -23,7 +22,7 @@ BEGIN
     work_key, project_id, title, item_type, status, priority, canonical_source, confidence
   ) VALUES (
     'L4A-MP-008-VERIFY-LANE', v_project_id, 'Synthetic conversation title history proof',
-    'lane', 'in_progress', 'high', 'supabase', 'high'
+    'task', 'in_progress', 'high', 'supabase', 'high'
   ) RETURNING id INTO v_work_item_id;
 
   BEGIN

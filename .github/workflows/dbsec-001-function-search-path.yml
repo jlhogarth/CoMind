@@ -1,0 +1,41 @@
+name: DBSEC-001 Function Search Path Hardening
+
+on:
+  pull_request:
+    paths:
+      - 'db/migrations/20261101_005_dbsec_001_function_search_path_hardening.sql'
+      - 'db/test/dbsec_001_search_path_fixture.sql'
+      - 'db/verification/20261101_dbsec_001_function_search_path_verification.sql'
+      - 'scripts/test_dbsec_001_function_search_path.sh'
+      - '.github/workflows/dbsec-001-function-search-path.yml'
+      - 'docs/provenance/2026-11-01-dbsec-001-supabase-security-advisor-audit.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  function-search-path-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install --yes postgresql-client
+      - name: Verify function search path hardening
+        run: bash ./scripts/test_dbsec_001_function_search_path.sh

@@ -105,7 +105,7 @@ This serialization affects only the shared browser profile actuator. It does not
 
 ## Exact-head CI repair
 
-When GitHub Actions execution resumed, the first live exact-head matrix exposed one real repository-policy failure: `server/test/cbe-chatgpt-auth-bootstrap.test.mjs` still used the prohibited `example.com` marker for its wrong-origin fixture. The test was corrected to use the real `openai.com` host. No Placeholder policy was not weakened.
+When GitHub Actions execution resumed, the first live exact-head matrix exposed one real repository-policy failure: `server/test/cbe-chatgpt-auth-bootstrap.test.mjs` still used a prohibited reserved example-domain marker for its wrong-origin fixture. The test was corrected to use the real `openai.com` host. No Placeholder policy was not weakened.
 
 ### Remaining acceptance and continuation
 

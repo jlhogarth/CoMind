@@ -3,6 +3,7 @@ import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Pool } from 'pg';
 import { createPlaywrightChatgptHandoffDriver } from './chatgpt-handoff.js';
+import { acquireChatgptProfileLock, type ChatgptProfileLockHandle } from './chatgpt-profile-lock.js';
 import { createFoundryBrowserLeaseVerifier } from './lease.js';
 import {
   executeGovernedChatgptConversationReturn,
@@ -70,6 +71,7 @@ function writeResult(result: Mp006ConversationReturnResult): void {
 
 async function main(): Promise<void> {
   let pool: Pool | null = null;
+  let profileLock: ChatgptProfileLockHandle | null = null;
   try {
     const input = await readJobInput();
     if (!input.trim()) throw new Error('A ChatGPT handoff job JSON document is required on stdin or as an external file path');
@@ -77,6 +79,17 @@ async function main(): Promise<void> {
     const profileDir = parseProfileDir();
     const headless = parseHeadless(process.env.CBE_HEADLESS);
     const databaseUrl = parseDatabaseUrl();
+
+    const lockDecision = await acquireChatgptProfileLock(profileDir);
+    if (!lockDecision.acquired) {
+      writeResult(unavailableConversationReturn(
+        'conversation_actuator_unavailable',
+        'The persistent ChatGPT browser profile is already owned by another governed actuator process.'
+      ));
+      process.exitCode = 2;
+      return;
+    }
+    profileLock = lockDecision.handle;
 
     pool = new Pool({ connectionString: databaseUrl, max: 2, idleTimeoutMillis: 30_000 });
     const query: QueryFunction = async <Row>(text: string, params?: any[]) => {
@@ -100,6 +113,11 @@ async function main(): Promise<void> {
     process.exitCode = 2;
   } finally {
     if (pool) await pool.end().catch(() => undefined);
+    if (profileLock) {
+      await profileLock.release().catch(() => {
+        process.exitCode = 2;
+      });
+    }
   }
 }
 

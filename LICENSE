@@ -1,0 +1,30 @@
+CoMind Proprietary Rights Reservation
+Version 1.0 | Prepared November 2, 2026
+
+All rights in protectable CoMind-owned material are reserved by the respective
+rights holders. This notice grants no general license to use, reproduce, modify,
+distribute, sublicense, sell, or operate that material as a hosted service.
+Permission must come from a rights holder with authority over the material in
+question, through a separate written authorization identifying its scope.
+
+Public availability is not an open-source license. GitHub platform permissions,
+rights previously validly granted, third-party licenses, and rights or exceptions
+provided by applicable law remain unaffected. This notice does not purport to
+revoke those rights or to restrict material outside the rights holders' control.
+
+No trademark, patent, endorsement, or ownership-transfer permission is granted
+by this notice. No exclusive right in ideas, methods, public-domain material,
+or unprotectable AI-generated expression is asserted by this notice.
+
+Third-party components and adapted material retain their respective licenses
+and notices. See docs/legal/THIRD-PARTY-RIGHTS.md. A separate license applicable
+to a component controls that component; this notice does not relicense it.
+
+The controlled-access agreement in docs/legal/CONTROLLED-ACCESS-AGREEMENT.md
+is a review draft, not an executed agreement or a grant to repository visitors.
+Repository access, a fork, or a contribution alone does not establish assent
+to that agreement. Licensing requests may be directed to the repository
+maintainer jlhogarth through GitHub; do not disclose confidential information
+in public issues. Maintainer status alone does not establish chain of title.
+
+See docs/legal/README.md for scope, review status, and activation requirements.

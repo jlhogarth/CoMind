@@ -32,9 +32,13 @@ function returnStatus(outcome = {}) {
   return outcome.status || outcome.returnStatus || outcome.recoveryStatus || null;
 }
 
-function continuityVerified(state = {}) {
+function continuityVerified(state = {}, recovery = {}) {
   const verified = state.verified === true || state.continuityVerified === true || state.continuity_verified === true;
+  const continuityId = recovery.recoveryId || recovery.recovery_id || state.continuityId || state.continuity_id;
+  const authorityRef = state.authorityRef || state.authority_ref || recovery.authorityRef || recovery.authority_ref;
   return verified
+    && nonEmpty(continuityId)
+    && nonEmpty(authorityRef)
     && nonEmpty(state.workKey || state.work_key)
     && nonEmpty(state.nextAction || state.next_action)
     && nonEmpty(state.verifiedCheckpoint || state.verified_checkpoint);
@@ -112,7 +116,7 @@ function planConversationContinuity(input = {}) {
   }
 
   const state = input.continuityState || input.continuity_state || {};
-  if (!continuityVerified(state)) {
+  if (!continuityVerified(state, recovery)) {
     return Object.freeze({
       status: CONTINUITY_STATUS.CONTINUITY_BLOCKED,
       workKey,

@@ -14,7 +14,8 @@
     "maintenance:audit": "node dist/maintenance-control/cli.js",
     "cbe:chatgpt-auth-bootstrap": "node scripts/cbe-chatgpt-auth-bootstrap.mjs",
     "cbe:chatgpt-handoff": "node dist/browser-executor/chatgpt-handoff-cli.js",
-    "cbe:chatgpt-live-proof": "node scripts/cbe-chatgpt-live-proof.mjs"
+    "cbe:chatgpt-live-proof": "node scripts/cbe-chatgpt-live-proof.mjs",
+    "cbe:railway-acceptance": "node scripts/cbe-railway-acceptance.mjs"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.0",

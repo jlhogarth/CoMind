@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://comind.local/schemas/cbe-railway-acceptance-evidence.schema.json",
+  "title": "CoMind CBE Railway Acceptance Evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "work_key",
+    "runtime",
+    "railway_metrics",
+    "profile_persistence",
+    "serverless",
+    "cost",
+    "decision"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "work_key": { "const": "CBE-HOST-003" },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "endpoint_origin",
+        "started_at",
+        "completed_at",
+        "browser_hold_ms",
+        "container_start_to_health_seconds",
+        "browser_start_seconds",
+        "actions"
+      ],
+      "properties": {
+        "endpoint_origin": { "type": "string", "format": "uri" },
+        "started_at": { "type": "string", "format": "date-time" },
+        "completed_at": { "type": "string", "format": "date-time" },
+        "browser_hold_ms": { "type": "integer", "minimum": 0, "maximum": 60000 },
+        "container_start_to_health_seconds": { "type": "number", "minimum": 0 },
+        "browser_start_seconds": { "type": "number", "minimum": 0 },
+        "actions": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["action", "status", "correlation_id", "duration_ms"],
+            "properties": {
+              "action": { "enum": ["stop_browser", "start_browser"] },
+              "status": { "type": "string", "minLength": 1 },
+              "correlation_id": { "type": "string", "minLength": 1 },
+              "duration_ms": { "type": "integer", "minimum": 0 }
+            }
+          }
+        }
+      }
+    },
+    "railway_metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "service_id",
+        "environment_id",
+        "window_start",
+        "window_end",
+        "server_idle_memory_gb",
+        "browser_start_peak_memory_gb",
+        "browser_steady_memory_gb",
+        "peak_cpu_vcpu",
+        "disk_usage_gb",
+        "network_rx_gb",
+        "network_tx_gb"
+      ],
+      "properties": {
+        "service_id": { "type": "string", "format": "uuid" },
+        "environment_id": { "type": "string", "format": "uuid" },
+        "window_start": { "type": "string", "format": "date-time" },
+        "window_end": { "type": "string", "format": "date-time" },
+        "server_idle_memory_gb": { "type": "number", "minimum": 0 },
+        "browser_start_peak_memory_gb": { "type": "number", "minimum": 0 },
+        "browser_steady_memory_gb": { "type": "number", "minimum": 0 },
+        "peak_cpu_vcpu": { "type": "number", "minimum": 0 },
+        "disk_usage_gb": { "type": "number", "minimum": 0 },
+        "network_rx_gb": { "type": "number", "minimum": 0 },
+        "network_tx_gb": { "type": "number", "minimum": 0 }
+      }
+    },
+    "profile_persistence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["verified", "restart_count", "same_profile_state_verified"],
+      "properties": {
+        "verified": { "type": "boolean" },
+        "restart_count": { "type": "integer", "minimum": 1 },
+        "same_profile_state_verified": { "type": "boolean" }
+      }
+    },
+    "serverless": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evaluated",
+        "sleep_with_browser_closed",
+        "wake_latency_seconds",
+        "behavior_with_browser_open"
+      ],
+      "properties": {
+        "evaluated": { "type": "boolean" },
+        "sleep_with_browser_closed": { "type": ["boolean", "null"] },
+        "wake_latency_seconds": { "type": ["number", "null"], "minimum": 0 },
+        "behavior_with_browser_open": {
+          "enum": ["not_tested", "stays_awake", "sleeps", "indeterminate"]
+        }
+      }
+    },
+    "cost": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bounded_test_cost_usd", "maximum_authorized_test_cost_usd"],
+      "properties": {
+        "bounded_test_cost_usd": { "type": "number", "minimum": 0 },
+        "maximum_authorized_test_cost_usd": { "type": "number", "minimum": 0 }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["free_memory_limit_gb", "free_fit", "recommended_plan", "reason"],
+      "properties": {
+        "free_memory_limit_gb": { "const": 0.5 },
+        "free_fit": { "type": ["boolean", "null"] },
+        "recommended_plan": { "enum": ["free", "hobby", "undetermined"] },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

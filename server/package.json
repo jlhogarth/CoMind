@@ -14,6 +14,7 @@
     "maintenance:audit": "node dist/maintenance-control/cli.js",
     "cbe:chatgpt-auth-bootstrap": "node scripts/cbe-chatgpt-auth-bootstrap.mjs",
     "cbe:chatgpt-handoff": "node dist/browser-executor/chatgpt-handoff-cli.js",
+    "cbe:chatgpt-successor": "node dist/browser-executor/chatgpt-successor-cli.js",
     "cbe:chatgpt-live-proof": "node scripts/cbe-chatgpt-live-proof.mjs"
   },
   "dependencies": {

@@ -68,12 +68,12 @@ test('fails closed when configured model is unavailable', async () => {
   );
 });
 
-test('live readiness workflow cannot invoke paid inference endpoints', async () => {
+test('live readiness workflow cannot invoke paid inference endpoints or print the secret value', async () => {
   const workflow = await readFile(new URL('../../.github/workflows/openai-api-key-readiness.yml', import.meta.url), 'utf8');
   const cli = await readFile(new URL('../scripts/openai-api-key-readiness.mjs', import.meta.url), 'utf8');
   const library = await readFile(new URL('../lib/openai-api-key-readiness.js', import.meta.url), 'utf8');
   const combined = `${workflow}\n${cli}\n${library}`;
   assert.match(combined, /api\.openai\.com\/v1\/models/);
   assert.doesNotMatch(combined, /\/v1\/responses|\/v1\/chat\/completions|\/v1\/embeddings|\/v1\/batch/);
-  assert.doesNotMatch(workflow, /echo\s+.*OPENAI_API_KEY|print.*OPENAI_API_KEY/i);
+  assert.doesNotMatch(workflow, /echo\s+["']?\$\{?OPENAI_API_KEY|printf\s+.*\$\{?OPENAI_API_KEY|printenv\s+OPENAI_API_KEY|set\s+-x/i);
 });

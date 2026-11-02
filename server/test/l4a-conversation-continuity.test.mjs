@@ -78,6 +78,8 @@ test('failed original return becomes successor pending when durable continuity s
   assert.equal(result.successorRequired, true);
   assert.equal(result.capsule.workKey, 'CBE-MOBILE-003');
   assert.equal(result.capsule.headSha, CONTINUITY.headSha);
+  assert.equal(result.capsule.continuityId, RECOVERY.recoveryId);
+  assert.equal(result.capsule.authorityRef, CONTINUITY.authorityRef);
   assert.equal(result.controllerMayContinueImplementation, false);
 });
 
@@ -104,6 +106,30 @@ test('insufficient durable state blocks successor reconstruction rather than inv
   assert.equal(result.status, CONTINUITY_STATUS.CONTINUITY_BLOCKED);
   assert.equal(result.reason, 'continuity_state_insufficient');
   assert.equal(result.controllerMayContinueRecovery, true);
+});
+
+test('missing authority blocks successor reconstruction at the planner boundary', () => {
+  const result = planConversationContinuity({
+    recovery: RECOVERY,
+    originalReturnOutcome: { status: 'RETURN_FAILED' },
+    continuityState: { ...CONTINUITY, authorityRef: '' },
+    successorActuatorAvailable: true,
+  });
+  assert.equal(result.status, CONTINUITY_STATUS.CONTINUITY_BLOCKED);
+  assert.equal(result.reason, 'continuity_state_insufficient');
+  assert.equal(result.controllerMayContinueImplementation, false);
+});
+
+test('missing continuity identity blocks successor reconstruction before browser execution', () => {
+  const { recoveryId, ...recoveryWithoutId } = RECOVERY;
+  const result = planConversationContinuity({
+    recovery: recoveryWithoutId,
+    originalReturnOutcome: { status: 'RETURN_FAILED' },
+    continuityState: { ...CONTINUITY, continuityId: '' },
+    successorActuatorAvailable: true,
+  });
+  assert.equal(result.status, CONTINUITY_STATUS.CONTINUITY_BLOCKED);
+  assert.equal(result.reason, 'continuity_state_insufficient');
 });
 
 test('verified successor activation restores the logical lane and supersedes predecessor', () => {

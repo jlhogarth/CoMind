@@ -215,6 +215,33 @@ function browserFailure(error: unknown): { reason: string; recoverable: boolean 
   return { reason: 'browser_interrupted', recoverable: true };
 }
 
+async function ensureNewChatSurface(page: any, timeoutMs: number): Promise<void> {
+  if (!normalizeChatgptConversationUrl(page.url())) return;
+
+  const candidates = [
+    page.getByRole('link', { name: /new chat/i }).first(),
+    page.getByRole('button', { name: /new chat/i }).first(),
+    page.locator('a[href="/"]').first(),
+  ];
+
+  for (const candidate of candidates) {
+    const count = await candidate.count().catch(() => 0);
+    if (count < 1) continue;
+    try {
+      await candidate.click({ timeout: Math.min(timeoutMs, 5_000) });
+      await page.waitForURL(
+        (url: URL) => normalizeChatgptConversationUrl(url.toString()) === null,
+        { timeout: Math.min(timeoutMs, 10_000) }
+      );
+      if (!normalizeChatgptConversationUrl(page.url())) return;
+    } catch {
+      // Try the next visible new-chat surface without posting anything.
+    }
+  }
+
+  throw new ChatgptSuccessorError('new_chat_surface_not_observed', false);
+}
+
 export function createPlaywrightChatgptSuccessorDriver(
   options: PlaywrightChatgptSuccessorDriverOptions
 ): ChatgptSuccessorDriver {
@@ -238,9 +265,7 @@ export function createPlaywrightChatgptSuccessorDriver(
           timeout: input.timeoutMs,
         });
 
-        if (normalizeChatgptConversationUrl(page.url())) {
-          throw new ChatgptSuccessorError('new_chat_surface_not_observed', false);
-        }
+        await ensureNewChatSurface(page, input.timeoutMs);
 
         const composer = page.locator('#prompt-textarea').first();
         try {

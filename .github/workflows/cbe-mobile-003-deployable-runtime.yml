@@ -1,0 +1,63 @@
+name: CBE deployable runtime
+
+on:
+  pull_request:
+    paths:
+      - 'server/**'
+      - 'scripts/verify_cbe_mobile_003_runtime_contract.mjs'
+      - '.github/workflows/cbe-mobile-003-deployable-runtime.yml'
+      - 'docs/provenance/2026-11-01-cbe-mobile-003-deployable-runtime.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - name: Verify deployment contract
+        run: node scripts/verify_cbe_mobile_003_runtime_contract.mjs
+      - name: Install server dependencies
+        run: npm ci
+        working-directory: server
+      - name: Build server
+        run: npm run build
+        working-directory: server
+
+  container-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build pinned CBE image
+        run: docker build --file server/Dockerfile.cbe --tag comind-cbe:${{ github.sha }} server
+      - name: Run health smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          name=comind-cbe-smoke
+          trap 'docker rm -f "$name" >/dev/null 2>&1 || true' EXIT
+          docker run -d --name "$name" \
+            -e DATABASE_URL=postgresql://cbe:cbe@127.0.0.1:5432/cbe \
+            -e PORT=3000 \
+            -e CBE_HEADLESS=true \
+            comind-cbe:${{ github.sha }}
+          for attempt in $(seq 1 30); do
+            status=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$name")
+            if [[ "$status" == healthy ]]; then
+              exit 0
+            fi
+            if [[ "$status" == unhealthy ]]; then
+              docker logs "$name"
+              exit 1
+            fi
+            sleep 2
+          done
+          docker logs "$name"
+          exit 1

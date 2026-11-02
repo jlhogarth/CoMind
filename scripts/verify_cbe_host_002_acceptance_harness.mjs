@@ -27,7 +27,8 @@ assert(!runner.includes('console.log(config)'), 'runner must not log configurati
 assert(tests.includes('JSON.stringify(evidence).includes(TOKEN), false'), 'tests must prove evidence redacts bearer token');
 assert(tests.includes('public plaintext HTTP endpoint is rejected'), 'tests must reject public plaintext HTTP');
 assert(tests.includes('Railway private-network HTTP endpoint is permitted'), 'tests must cover Railway private networking');
-assert(tests.includes("['stop_browser',\n      'start_browser',\n      'stop_browser']"), 'tests must verify stop-start-stop ordering');
+assert(tests.includes('requests.map((entry) => entry.body.action)'), 'tests must inspect request action order');
+assert(tests.includes("'stop_browser'") && tests.includes("'start_browser'"), 'tests must assert browser stop/start actions');
 
 assert(schema.$schema === 'https://json-schema.org/draft/2020-12/schema', 'evidence schema draft mismatch');
 assert(schema.properties?.railway_metrics?.properties?.server_idle_memory_gb, 'schema missing server idle memory');

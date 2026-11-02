@@ -1,6 +1,9 @@
+FROM node:24.22.1-bookworm-slim AS node24
 FROM mcr.microsoft.com/playwright:v1.64.1-noble
 
-WORKDIR /app
+COPY --from=node24 /usr/local/ /usr/local/
+
+WORKDIR /app/server
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 COPY package.json package-lock.json ./

@@ -1,0 +1,41 @@
+name: CBE-HOST-002 Acceptance Harness
+
+on:
+  pull_request:
+    paths:
+      - 'server/scripts/cbe-railway-acceptance.mjs'
+      - 'server/test/cbe-railway-acceptance.test.mjs'
+      - 'server/package.json'
+      - 'config/cbe_railway_acceptance_evidence_schema.json'
+      - 'docs/CBE-RAILWAY-ACCEPTANCE-RUNBOOK.md'
+      - 'scripts/verify_cbe_host_002_acceptance_harness.mjs'
+      - 'docs/provenance/2026-11-01-cbe-host-002-acceptance-measurement-harness.md'
+      - '.github/workflows/cbe-host-002-acceptance-harness.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  acceptance-harness:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v4
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - name: Install committed server dependencies
+        working-directory: server
+        run: npm ci
+      - name: Build server
+        working-directory: server
+        run: npm run build
+      - name: Verify acceptance harness contract
+        run: node scripts/verify_cbe_host_002_acceptance_harness.mjs
+      - name: Run deterministic acceptance harness tests
+        working-directory: server
+        run: node --test test/cbe-railway-acceptance.test.mjs

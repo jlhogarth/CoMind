@@ -1,0 +1,41 @@
+name: CR-001 Governed Compute Router
+
+on:
+  pull_request:
+    paths:
+      - 'server/src/compute-router.ts'
+      - 'server/test/compute-router.test.mjs'
+      - 'docs/architecture/cr-001-governed-compute-router.md'
+      - '.github/workflows/cr-001-compute-router.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cr-001-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compute-router-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - name: Install committed dependencies
+        working-directory: server
+        run: npm ci
+      - name: Build server
+        working-directory: server
+        run: npm run build
+      - name: Verify deterministic compute routing
+        working-directory: server
+        run: node --test test/compute-router.test.mjs

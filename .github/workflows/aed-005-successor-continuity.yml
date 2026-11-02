@@ -1,0 +1,44 @@
+name: AED-005 Successor Conversation Continuity
+
+on:
+  pull_request:
+    paths:
+      - 'server/lib/l4a-conversation-continuity.js'
+      - 'server/src/browser-executor/chatgpt-successor.ts'
+      - 'server/src/browser-executor/chatgpt-successor-runtime.ts'
+      - 'server/test/l4a-conversation-continuity.test.mjs'
+      - 'server/test/chatgpt-successor.test.mjs'
+      - 'server/test/chatgpt-successor-runtime.test.mjs'
+      - 'docs/architecture/aed-005-successor-conversation-continuity.md'
+      - 'docs/provenance/2026-11-01-aed-005-successor-conversation-continuity.md'
+      - '.github/workflows/aed-005-successor-continuity.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  successor-continuity-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install committed server dependencies
+        working-directory: server
+        run: npm ci
+      - name: Build server
+        working-directory: server
+        run: npm run build
+      - name: Verify successor continuity planner and actuator
+        working-directory: server
+        run: |
+          set -euo pipefail
+          node --test \
+            test/l4a-conversation-continuity.test.mjs \
+            test/chatgpt-successor.test.mjs \
+            test/chatgpt-successor-runtime.test.mjs

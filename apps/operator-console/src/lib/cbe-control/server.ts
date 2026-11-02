@@ -58,7 +58,7 @@ export async function readCbeControlStatus() {
   const management = await readManagementPlaneSnapshot();
   const config = getCbeControlRuntimeConfig();
   return buildCbeControlStatus(management, {
-    configured: Boolean(config.endpoint),
+    configured: Boolean(config.endpoint && config.token),
     endpointOrigin: safeEndpointOrigin(config.endpoint),
   });
 }
@@ -69,7 +69,7 @@ export async function dispatchCbeControlAction(
 ): Promise<CbeControlDispatchResult> {
   const request: CbeControlRequest = parseCbeControlRequest(input);
   const config = getCbeControlRuntimeConfig(deps.env);
-  if (!config.endpoint) throw new CbeControlUnavailableError("configuration", "No CBE execution-plane adapter is configured.");
+  if (!config.endpoint || !config.token) throw new CbeControlUnavailableError("configuration", "CBE execution-plane endpoint and bearer capability must both be configured.");
   const fetchImpl = deps.fetchImpl ?? fetch;
   let response: Response;
   try {

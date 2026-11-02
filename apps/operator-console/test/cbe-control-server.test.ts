@@ -4,8 +4,9 @@ import { dispatchCbeControlAction, getCbeControlRuntimeConfig } from "../src/lib
 
 const validRequest = { action: "start_browser" };
 
-function env(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+function env(overrides: Partial<NodeJS.ProcessEnv> = {}): NodeJS.ProcessEnv {
   return {
+    NODE_ENV: "test",
     COMIND_CBE_CONTROL_ENDPOINT: "https://cbe.example.test/api/cbe-control",
     COMIND_CBE_CONTROL_TOKEN: "test-capability-token-that-is-not-returned",
     ...overrides,

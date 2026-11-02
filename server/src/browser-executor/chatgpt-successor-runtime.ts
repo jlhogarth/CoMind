@@ -22,6 +22,7 @@ const capsuleSchema = z.strictObject({
   branch: boundedText.optional(),
   pullRequest: boundedText.optional(),
   headSha: boundedText.optional(),
+  predecessorBindingEventId: uuid,
   predecessorRefSha256: sha256Hex.optional(),
   provenanceRefs: z.array(boundedText).max(12).optional(),
 });

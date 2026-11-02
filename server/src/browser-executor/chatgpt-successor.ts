@@ -15,6 +15,7 @@ export type ChatgptSuccessorContinuityCapsule = {
   branch?: string;
   pullRequest?: string;
   headSha?: string;
+  predecessorBindingEventId: string;
   predecessorRefSha256?: string;
   provenanceRefs?: string[];
 };
@@ -72,6 +73,7 @@ export type ChatgptSuccessorDependencies = {
 const NEW_CHAT_URL = 'https://chatgpt.com/';
 const MAX_FIELD_CHARS = 1000;
 const SHA256_HEX = /^[a-f0-9]{64}$/i;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 class ChatgptSuccessorError extends Error {
   constructor(readonly code: string, readonly recoverable = true) {
@@ -109,11 +111,13 @@ function capsuleValid(capsule: ChatgptSuccessorContinuityCapsule, policy: Chatgp
     capsule.verifiedCheckpoint,
     capsule.nextAction,
     capsule.authorityRef,
+    capsule.predecessorBindingEventId,
   ];
   if (required.some((value) => !bounded(value))) return false;
   const optional = [capsule.issue, capsule.branch, capsule.pullRequest, capsule.headSha]
     .filter((value) => value !== undefined);
   if (!optional.every((value) => bounded(value))) return false;
+  if (!UUID.test(capsule.predecessorBindingEventId)) return false;
   if (capsule.predecessorRefSha256 !== undefined && !SHA256_HEX.test(capsule.predecessorRefSha256)) return false;
   if (capsule.provenanceRefs !== undefined) {
     if (!Array.isArray(capsule.provenanceRefs) || capsule.provenanceRefs.length > policy.maxProvenanceRefs) return false;
@@ -134,6 +138,7 @@ export function formatChatgptSuccessorContinuity(capsule: ChatgptSuccessorContin
     ...(capsule.branch ? { branch: normalizeText(capsule.branch) } : {}),
     ...(capsule.pullRequest ? { pull_request: normalizeText(capsule.pullRequest) } : {}),
     ...(capsule.headSha ? { head_sha: normalizeText(capsule.headSha) } : {}),
+    predecessor_binding_event_id: capsule.predecessorBindingEventId.toLowerCase(),
     ...(capsule.predecessorRefSha256 ? { predecessor_ref_sha256: capsule.predecessorRefSha256.toLowerCase() } : {}),
     ...(capsule.provenanceRefs?.length ? { provenance_refs: capsule.provenanceRefs.map(normalizeText) } : {}),
   };
@@ -189,6 +194,7 @@ function baseEvidence(job: ChatgptSuccessorJob, startedAt: string): Record<strin
     laneId: job.capsule?.laneId ?? null,
     workKey: job.capsule?.workKey ?? null,
     authorityRef: job.authorityRef ?? null,
+    predecessorBindingEventId: job.capsule?.predecessorBindingEventId ?? null,
     predecessorRefSha256: job.capsule?.predecessorRefSha256 ?? null,
     lease: {
       taskId: job.lease?.taskId ?? null,

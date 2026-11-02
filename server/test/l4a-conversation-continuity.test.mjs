@@ -27,6 +27,7 @@ const CONTINUITY = Object.freeze({
   branch: 'aed-005-successor-conversation-continuity',
   pullRequest: '#501',
   headSha: '1fbe1196900ab6510a03866f4ee2ed3a84cff0f4',
+  predecessorBindingEventId: '11111111-1111-4111-8111-111111111111',
   predecessorRefSha256: 'a'.repeat(64),
   provenanceRefs: ['runbook:CBE-MOBILE-003', 'github:1fbe1196'],
 });
@@ -80,6 +81,7 @@ test('failed original return becomes successor pending when durable continuity s
   assert.equal(result.capsule.headSha, CONTINUITY.headSha);
   assert.equal(result.capsule.continuityId, RECOVERY.recoveryId);
   assert.equal(result.capsule.authorityRef, CONTINUITY.authorityRef);
+  assert.equal(result.capsule.predecessorBindingEventId, CONTINUITY.predecessorBindingEventId);
   assert.equal(result.controllerMayContinueImplementation, false);
 });
 
@@ -126,6 +128,17 @@ test('missing continuity identity blocks successor reconstruction before browser
     recovery: recoveryWithoutId,
     originalReturnOutcome: { status: 'RETURN_FAILED' },
     continuityState: { ...CONTINUITY, continuityId: '' },
+    successorActuatorAvailable: true,
+  });
+  assert.equal(result.status, CONTINUITY_STATUS.CONTINUITY_BLOCKED);
+  assert.equal(result.reason, 'continuity_state_insufficient');
+});
+
+test('missing predecessor binding identity blocks successor reconstruction before browser execution', () => {
+  const result = planConversationContinuity({
+    recovery: RECOVERY,
+    originalReturnOutcome: { status: 'RETURN_FAILED' },
+    continuityState: { ...CONTINUITY, predecessorBindingEventId: '' },
     successorActuatorAvailable: true,
   });
   assert.equal(result.status, CONTINUITY_STATUS.CONTINUITY_BLOCKED);

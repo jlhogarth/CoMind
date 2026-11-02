@@ -35,6 +35,7 @@ function job(overrides = {}) {
       issue: '#504',
       branch: 'aed-005-successor-conversation-continuity',
       headSha: '1fbe1196900ab6510a03866f4ee2ed3a84cff0f4',
+      predecessorBindingEventId: '11111111-1111-4111-8111-111111111111',
       predecessorRefSha256: 'b'.repeat(64),
       provenanceRefs: ['runbook:aed-005'],
     },

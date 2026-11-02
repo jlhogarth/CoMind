@@ -36,9 +36,11 @@ function continuityVerified(state = {}, recovery = {}) {
   const verified = state.verified === true || state.continuityVerified === true || state.continuity_verified === true;
   const continuityId = recovery.recoveryId || recovery.recovery_id || state.continuityId || state.continuity_id;
   const authorityRef = state.authorityRef || state.authority_ref || recovery.authorityRef || recovery.authority_ref;
+  const predecessorBindingEventId = state.predecessorBindingEventId || state.predecessor_binding_event_id;
   return verified
     && nonEmpty(continuityId)
     && nonEmpty(authorityRef)
+    && nonEmpty(predecessorBindingEventId)
     && nonEmpty(state.workKey || state.work_key)
     && nonEmpty(state.nextAction || state.next_action)
     && nonEmpty(state.verifiedCheckpoint || state.verified_checkpoint);
@@ -56,6 +58,7 @@ function buildSuccessorCapsule(recovery = {}, state = {}) {
     branch: state.branch || recovery.branch || null,
     pullRequest: state.pullRequest || state.pull_request || recovery.pullRequest || recovery.pull_request || null,
     headSha: state.headSha || state.head_sha || recovery.headSha || recovery.head_sha || null,
+    predecessorBindingEventId: state.predecessorBindingEventId || state.predecessor_binding_event_id || null,
     predecessorRefSha256: state.predecessorRefSha256 || state.predecessor_ref_sha256 || null,
     provenanceRefs: Array.isArray(state.provenanceRefs || state.provenance_refs)
       ? Object.freeze([...(state.provenanceRefs || state.provenance_refs)])

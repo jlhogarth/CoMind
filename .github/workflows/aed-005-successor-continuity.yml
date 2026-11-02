@@ -7,9 +7,11 @@ on:
       - 'server/src/browser-executor/chatgpt-successor.ts'
       - 'server/src/browser-executor/chatgpt-successor-runtime.ts'
       - 'server/src/browser-executor/chatgpt-successor-cli.ts'
+      - 'server/src/browser-executor/chatgpt-successor-registry.ts'
       - 'server/test/l4a-conversation-continuity.test.mjs'
       - 'server/test/chatgpt-successor.test.mjs'
       - 'server/test/chatgpt-successor-runtime.test.mjs'
+      - 'server/test/chatgpt-successor-registry.test.mjs'
       - 'server/package.json'
       - 'docs/architecture/aed-005-successor-conversation-continuity.md'
       - 'docs/provenance/2026-11-01-aed-005-successor-conversation-continuity.md'
@@ -43,4 +45,5 @@ jobs:
           node --test \
             test/l4a-conversation-continuity.test.mjs \
             test/chatgpt-successor.test.mjs \
-            test/chatgpt-successor-runtime.test.mjs
+            test/chatgpt-successor-runtime.test.mjs \
+            test/chatgpt-successor-registry.test.mjs

@@ -58,3 +58,21 @@ and verify subsequent semantic lane progress. The mobile retry-repair action
 remains explicitly unsupported. No task was dispatched or conversation awakened.
 Rollback is described in the architecture record. Live registry changes after
 preflight remain a documented concurrency limitation, not a claim of atomic return.
+
+## Continuation-message refinement
+
+Joseph requested an explanatory continuation prompt followed by a live Work Chat
+authorization/handoff test. The formatter now explains AED's limited recovery role,
+preserves the originating lane, requires reconciliation against current repository,
+RunBook and authority, distinguishes evidence from new permission, asks for a
+concrete action in the same turn, and requires an exact blocker when action is
+unavailable. Delivery, response and subsequent progress remain distinct acceptance
+stages. The existing strict job schema and message-size ceiling remain unchanged.
+The server build and the same 64-test suite pass after the prompt change.
+
+For the first live receiving-side test, use an explicit outer instruction limiting
+continuation to one read-only verification and stop. This avoids an open-ended
+implementation run. A browser-assisted Work Chat test verifies only the receiving
+surface and prompt behavior; it does not replace the full canonical CBE lease,
+profile and controller acceptance test. At browser inspection, ChatGPT displayed
+Log in and no authenticated account; no test message was sent.

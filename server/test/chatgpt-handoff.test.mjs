@@ -85,6 +85,11 @@ test('formats a bounded provenance-marked AED recovery handoff', () => {
   assert.match(message, /RECOVERY DATA/);
   assert.match(message, /CoMind Application Development Contract/);
   assert.match(message, /Proceed autonomously under the CoMind Application Development Contract/);
+  assert.match(message, /First reconcile the supplied checkpoint/);
+  assert.match(message, /not new permission/);
+  assert.match(message, /execute that action in this turn/);
+  assert.match(message, /If blocked, report the exact blocker/);
+  assert.match(message, /separate acceptance stages/);
 });
 
 test('rejects a mismatched registered conversation before browser execution', async () => {

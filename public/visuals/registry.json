@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "1.0",
+  "governance": {
+    "visualCompanionRule": "VISUAL-001",
+    "assetOrganizationRule": "VISUAL-002"
+  },
+  "concepts": [
+    {"id":"pulse","displayName":"Pulse","path":"/visuals/concepts/pulse/","status":"provisional","iconSource":"lucide:activity"},
+    {"id":"throttle","displayName":"Throttle","path":"/visuals/concepts/throttle/","status":"provisional","iconSource":"lucide:gauge"},
+    {"id":"ai-gas-pedal","displayName":"AI Gas Pedal","path":"/visuals/concepts/ai-gas-pedal/","status":"provisional","iconSource":"lucide:circle-gauge"},
+    {"id":"compute-fit","displayName":"Compute Fit","path":"/visuals/concepts/compute-fit/","status":"provisional","iconSource":"lucide:badge-check"},
+    {"id":"decision-compression","displayName":"Decision Compression","path":"/visuals/concepts/decision-compression/","status":"provisional","iconSource":"lucide:minimize-2"},
+    {"id":"user-compute-policy","displayName":"User Compute Policy","path":"/visuals/concepts/user-compute-policy/","status":"provisional","iconSource":"lucide:sliders-horizontal"},
+    {"id":"context-sufficiency","displayName":"Context Sufficiency","path":"/visuals/concepts/context-sufficiency/","status":"provisional","iconSource":"lucide:scan-search"},
+    {"id":"verification-gate","displayName":"Verification Gate","path":"/visuals/concepts/verification-gate/","status":"provisional","iconSource":"lucide:shield-check"}
+  ]
+}

@@ -155,6 +155,7 @@ test('verified successor activation restores the logical lane and supersedes pre
   const result = finalizeSuccessorContinuity(plan, {
     status: 'succeeded',
     reason: 'successor_active',
+    registry: { promoted: true, bindingEventId: '22222222-2222-4222-8222-222222222222', supersedesEventId: CONTINUITY.predecessorBindingEventId },
     recoverable: false,
     successorConversationUrl: 'https://chatgpt.com/c/12345678-1234-1234-1234-123456789abc',
   });
@@ -185,3 +186,30 @@ test('recoverable successor failure remains successor required instead of return
   assert.equal(result.controllerMayContinueImplementation, false);
   assert.equal(result.predecessorSuperseded, false);
 });
+
+for (const [label, registry] of [
+  ['missing registry receipt', undefined],
+  ['failed promotion', { promoted: false }],
+  ['missing binding identity', { promoted: true, supersedesEventId: CONTINUITY.predecessorBindingEventId }],
+  ['different predecessor', { promoted: true, bindingEventId: '22222222-2222-4222-8222-222222222222', supersedesEventId: '33333333-3333-4333-8333-333333333333' }],
+]) {
+  test(`browser success cannot restore continuity with ${label}`, () => {
+    const plan = planConversationContinuity({
+      recovery: RECOVERY,
+      originalReturnOutcome: { status: 'RETURN_FAILED' },
+      continuityState: CONTINUITY,
+      successorActuatorAvailable: true,
+    });
+    const result = finalizeSuccessorContinuity(plan, {
+      status: 'succeeded',
+      successorConversationUrl: 'https://chatgpt.com/c/55555555-5555-4555-8555-555555555555',
+      registry,
+    });
+    assert.equal(result.status, CONTINUITY_STATUS.CONTINUITY_BLOCKED);
+    assert.equal(result.reason, 'successor_registry_unverified');
+    assert.equal(result.predecessorSuperseded, false);
+    assert.equal(result.controllerMayContinueImplementation, false);
+    assert.equal(result.controllerMayRetryContinuity, false);
+    assert.equal(founderVisibleContinuityReport(result).laneContinuityRestored, false);
+  });
+}

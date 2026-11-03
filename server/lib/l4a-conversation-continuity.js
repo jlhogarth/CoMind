@@ -16,6 +16,7 @@ const CONTINUITY_REASON_EXPLANATIONS = Object.freeze({
   successor_actuator_unavailable: 'The original conversation could not be resumed and no governed successor-conversation actuator is currently available.',
   successor_required: 'The original conversation did not resume, but authoritative durable state is sufficient for successor reconstruction.',
   successor_creation_failed: 'The governed successor-conversation actuator failed before a successor conversation could be verified.',
+  successor_registry_unverified: 'The successor browser response was observed, but canonical registry promotion has not been verified. Reconcile the existing successor before retrying creation.',
   successor_active: 'A successor conversation was created, reconstructed from authoritative durable state, and response generation was observed.',
 });
 
@@ -171,7 +172,28 @@ function planConversationContinuity(input = {}) {
 function finalizeSuccessorContinuity(plan, successorResult = {}) {
   if (!plan || plan.status !== CONTINUITY_STATUS.SUCCESSOR_PENDING) return plan;
 
-  if (successorResult.status === 'succeeded' && nonEmpty(successorResult.successorConversationUrl)) {
+  const browserSucceeded = successorResult.status === 'succeeded'
+    && nonEmpty(successorResult.successorConversationUrl);
+  const registry = successorResult.registry;
+  const registryVerified = registry?.promoted === true
+    && nonEmpty(registry.bindingEventId)
+    && registry.supersedesEventId === plan.capsule?.predecessorBindingEventId;
+
+  if (browserSucceeded && !registryVerified) {
+    return Object.freeze({
+      ...plan,
+      status: CONTINUITY_STATUS.CONTINUITY_BLOCKED,
+      reason: 'successor_registry_unverified',
+      why: explainContinuityReason('successor_registry_unverified'),
+      recoveryOwnershipReleased: true,
+      controllerMayContinueRecovery: false,
+      controllerMayContinueImplementation: false,
+      controllerMayRetryContinuity: false,
+      predecessorSuperseded: false,
+    });
+  }
+
+  if (browserSucceeded && registryVerified) {
     return Object.freeze({
       ...plan,
       status: CONTINUITY_STATUS.SUCCESSOR_ACTIVE,

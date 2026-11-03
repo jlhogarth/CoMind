@@ -74,7 +74,7 @@ The actuator then:
 6. returns the stable successor binding to the caller;
 7. writes only the SHA-256 of that binding to redacted evidence.
 
-The predecessor may be marked superseded only after those verification steps succeed.
+The predecessor may be marked superseded only after those verification steps succeed and canonical registry promotion returns a binding event tied to the expected predecessor. The continuity finalizer requires that promotion receipt. Browser success without it produces `CONTINUITY_BLOCKED` with `successor_registry_unverified`; reconcile the existing successor before attempting another creation.
 
 ## Authority and ownership
 

@@ -61,6 +61,7 @@ function assertHeartbeatSeparation(result) {
 const connection = await Connection.connect({ address });
 const client = new Client({ connection, namespace });
 let worker = await startAedTemporalWorker({ address, namespace, taskQueue });
+function observe(event) { console.log(`AED_EVENT ${JSON.stringify(event)}`); }
 
 try {
   const signalPlan = planFor({ eventExpected: true, fallbackMs: 5_000 });
@@ -70,6 +71,7 @@ try {
     args: [inputFor('aed-002b-signal', signalPlan)],
   });
   await waitUntilWaiting(signalHandle);
+  observe({ case: 'external_signal', workflow_id: signalHandle.workflowId, state: 'waiting' });
   const signalEvent = {
     eventId: randomUUID(),
     observedAt: '2026-10-31T08:00:01.000Z',
@@ -80,6 +82,8 @@ try {
   assert.equal(signalResult.wakeSource, 'event');
   assert.equal(signalResult.externalWake.eventId, signalEvent.eventId);
   assertHeartbeatSeparation(signalResult);
+  observe({ case: 'external_signal', workflow_id: signalHandle.workflowId,
+    state: 'completed', wake_source: signalResult.wakeSource });
 
   const timerPlan = planFor({ eventExpected: false, fallbackMs: 1_000 });
   const timerHandle = await client.workflow.start('aedLivenessWorkflow', {
@@ -91,6 +95,8 @@ try {
   assert.equal(timerResult.wakeSource, 'durable_timer');
   assert.equal(timerResult.externalWake, null);
   assertHeartbeatSeparation(timerResult);
+  observe({ case: 'durable_timer', workflow_id: timerHandle.workflowId,
+    state: 'completed', wake_source: timerResult.wakeSource });
 
   const replayPlan = planFor({ eventExpected: true, fallbackMs: 10_000 });
   const replayHandle = await client.workflow.start('aedLivenessWorkflow', {
@@ -100,9 +106,15 @@ try {
   });
   const beforeRestart = await waitUntilWaiting(replayHandle);
   const firstExecutionRunId = replayHandle.firstExecutionRunId;
+  observe({ case: 'worker_restart', workflow_id: replayHandle.workflowId,
+    run_id: firstExecutionRunId, state: 'waiting', checkpoint: semanticLastProgressAt });
 
   await worker.shutdown();
+  observe({ case: 'worker_restart', workflow_id: replayHandle.workflowId,
+    state: 'worker_stopped' });
   worker = await startAedTemporalWorker({ address, namespace, taskQueue });
+  observe({ case: 'worker_restart', workflow_id: replayHandle.workflowId,
+    state: 'worker_restarted' });
 
   const afterRestart = await waitUntilWaiting(replayHandle);
   assert.deepEqual(afterRestart, beforeRestart);
@@ -118,6 +130,8 @@ try {
   assert.equal(replayResult.wakeSource, 'event');
   assert.equal(replayResult.externalWake.eventId, replayEvent.eventId);
   assertHeartbeatSeparation(replayResult);
+  observe({ case: 'worker_restart', workflow_id: replayHandle.workflowId,
+    run_id: firstExecutionRunId, state: 'completed', wake_source: replayResult.wakeSource });
 
   console.log(JSON.stringify({
     schemaVersion: 1,

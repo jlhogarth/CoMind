@@ -1,5 +1,9 @@
 # CoMind
 
+## Proprietary rights
+
+Public visibility does not grant a general reuse license. See the [rights-reservation notice](LICENSE) and [IP protection package](docs/legal/README.md). Third-party licenses and existing lawful rights remain unaffected. The controlled-access agreement is a review draft and requires a separately executed authorization.
+
 CoMind is a memory-augmented AI platform for persistent cognition, governed reasoning, conversation history, provenance, and human-centered digital twin development.
 
 This repository contains the first recoverable CoMind backend application build, the PostgreSQL schema source, GitHub Actions checks, implementation documentation, and the first minimal browser chat surface.

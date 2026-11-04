@@ -24,6 +24,7 @@ import { registerMemoryRoutes } from './routes/memory.js';
 import { registerChatRoutes } from './routes/chat.js';
 import { registerGovernanceRoutes } from './routes/governance.js';
 import { registerCbeControlRoutes } from './routes/cbe-control.js';
+import { createStagedRecoveryExecutor } from './cbe-control/recovery-executor.js';
 import { createCbeControlExecutor, type CbeControlExecutor } from './cbe-control/executor.js';
 import {
   closePool,
@@ -59,6 +60,9 @@ const defaultDependencies: AppDependencies = {
     profileDir: env.CBE_PROFILE_DIR,
     headless: env.CBE_HEADLESS,
     humanAuthUrl: env.CBE_HUMAN_AUTH_URL,
+    recoveryExecutor: env.CBE_HANDOFF_JOB_FILE && env.CBE_PROFILE_DIR
+      ? createStagedRecoveryExecutor({ query, jobFile: env.CBE_HANDOFF_JOB_FILE, profileDir: env.CBE_PROFILE_DIR, headless: env.CBE_HEADLESS })
+      : null,
   }),
 };
 

@@ -1,4 +1,5 @@
 name: AED-002C CLEAR Recovery Proof
+# AED-007 monitored isolated acceptance, no external provider calls.
 
 on:
   pull_request:

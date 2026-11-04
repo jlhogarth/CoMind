@@ -4,12 +4,30 @@ import argparse
 import hashlib
 import json
 import os
+import signal
 import selectors
 import subprocess
 import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+
+EVENT_FIELDS = frozenset({"lane", "workflow_id", "run_id", "case", "state", "wake_source",
+                          "outcome", "checkpoint", "next_action", "fencing_epoch",
+                          "progress_at", "attempt", "reason", "provider", "cost_usd",
+                          "maximum_usd", "approval_reference", "evidence_reference"})
+
+
+def parse_event(line):
+    if not line.startswith("AED_EVENT "):
+        return None
+    value = json.loads(line[len("AED_EVENT "):])
+    if not isinstance(value, dict) or value.keys() - EVENT_FIELDS:
+        raise ValueError("AED event contains unknown fields")
+    if any(not isinstance(v, (str, int, float, type(None))) or isinstance(v, bool)
+           for v in value.values()):
+        raise ValueError("AED event field has unsupported value")
+    return value
 
 
 def run(command, output, timeout):
@@ -41,11 +59,11 @@ def run(command, output, timeout):
         selector.register(process.stdout, selectors.EVENT_READ)
         while True:
             if time.monotonic() - started > timeout:
-                process.terminate()
+                os.killpg(process.pid, signal.SIGTERM)
                 try:
                     process.wait(timeout=3)
                 except subprocess.TimeoutExpired:
-                    process.kill()
+                    os.killpg(process.pid, signal.SIGKILL)
                     process.wait()
                 record("timeout", returncode=process.returncode)
                 return 124
@@ -55,6 +73,12 @@ def run(command, output, timeout):
                     # Retain hashes and bounded sizes, never raw output or credentials.
                     data = line.encode("utf-8")
                     record("output", bytes=len(data), sha256=hashlib.sha256(data).hexdigest())
+                    try:
+                        event = parse_event(line)
+                        if event is not None:
+                            record("aed_event", **event)
+                    except ValueError:
+                        record("invalid_event", sha256=hashlib.sha256(data).hexdigest())
                 else:
                     selector.unregister(key.fileobj)
             if process.poll() is not None and not selector.get_map():

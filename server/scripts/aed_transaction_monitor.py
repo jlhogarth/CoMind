@@ -15,7 +15,8 @@ from pathlib import Path
 EVENT_FIELDS = frozenset({"lane", "workflow_id", "run_id", "case", "state", "wake_source",
                           "outcome", "checkpoint", "next_action", "fencing_epoch",
                           "progress_at", "attempt", "reason", "provider", "cost_usd",
-                          "step_id", "operation", "input_bytes", "output_bytes",
+                          "step_id", "parent_step_id", "operation", "phase", "source", "destination",
+                          "input_bytes", "output_bytes",
                           "input_tokens", "output_tokens", "work_allowance_before",
                           "work_allowance_after", "work_allowance_unit", "usage_source",
                           "maximum_usd", "approval_reference", "evidence_reference"})
@@ -38,6 +39,10 @@ def parse_event(line):
             import math
             if type(value[name]) not in (int, float) or not math.isfinite(value[name]) or value[name] < 0:
                 raise ValueError(f"{name} must be finite and nonnegative")
+    if "phase" in value and value["phase"] not in ("start", "end", "error"):
+        raise ValueError("invalid FlowOps phase")
+    if "phase" in value and (not value.get("step_id") or not value.get("operation")):
+        raise ValueError("FlowOps phase requires step_id and operation")
     if "cost_usd" in value and value.get("usage_source") not in ("provider_receipt", "account_meter"):
         raise ValueError("cost_usd requires a provider receipt or account meter")
     return value
@@ -50,6 +55,8 @@ def run(command, output, timeout):
     started = time.monotonic()
     execution = hashlib.sha256(os.urandom(32)).hexdigest()[:24]
     sequence = 0
+    active_steps = {}
+    totals = {"output_bytes": 0, "flow_input_bytes": 0, "flow_output_bytes": 0}
     with output.open("x", encoding="utf-8") as evidence:
         def record(kind, **fields):
             nonlocal sequence
@@ -78,24 +85,38 @@ def run(command, output, timeout):
                 except subprocess.TimeoutExpired:
                     os.killpg(process.pid, signal.SIGKILL)
                     process.wait()
-                record("timeout", returncode=process.returncode)
+                record("timeout", returncode=process.returncode, active_steps=sorted(active_steps), totals=totals)
                 return 124
             for key, _ in selector.select(timeout=0.25):
                 line = key.fileobj.readline()
                 if line:
                     # Retain hashes and bounded sizes, never raw output or credentials.
                     data = line.encode("utf-8")
+                    totals["output_bytes"] += len(data)
                     record("output", bytes=len(data), sha256=hashlib.sha256(data).hexdigest())
                     try:
                         event = parse_event(line)
                         if event is not None:
+                            if event.get("phase"):
+                                step_id = event["step_id"]
+                                if event["phase"] == "start":
+                                    if step_id in active_steps:
+                                        raise ValueError("duplicate FlowOps step start")
+                                    active_steps[step_id] = (time.monotonic(), event["operation"])
+                                else:
+                                    prior = active_steps.pop(step_id, None)
+                                    if prior is None or prior[1] != event["operation"]:
+                                        raise ValueError("FlowOps step end without matching start")
+                                    event["duration_ms"] = round((time.monotonic() - prior[0]) * 1000)
+                                    totals["flow_input_bytes"] += event.get("input_bytes", 0)
+                                    totals["flow_output_bytes"] += event.get("output_bytes", 0)
                             record("aed_event", **event)
                     except ValueError:
                         record("invalid_event", sha256=hashlib.sha256(data).hexdigest())
                 else:
                     selector.unregister(key.fileobj)
             if process.poll() is not None and not selector.get_map():
-                record("exited", returncode=process.returncode)
+                record("exited", returncode=process.returncode, active_steps=sorted(active_steps), totals=totals)
                 return process.returncode
 
 

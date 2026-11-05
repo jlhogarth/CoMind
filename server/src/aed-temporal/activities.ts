@@ -105,7 +105,7 @@ export async function observeLiveTestProgress(input: { sourceRef: string }): Pro
   const pool = new Pool({ connectionString: isolatedDatabaseUrl(), max: 1 });
   try {
     const result = await pool.query<{ progress_at: Date | null }>(
-      `SELECT max(occurred_at) AS progress_at FROM comind_pm.pm_events
+      `SELECT max(created_at) AS progress_at FROM comind_pm.pm_events
        WHERE source_ref=$1 AND event_type='action' AND summary='AED-007 workload progress'`,
       [input.sourceRef]
     );
@@ -115,19 +115,19 @@ export async function observeLiveTestProgress(input: { sourceRef: string }): Pro
   }
 }
 
-export async function continueLiveTestWorkload(input: { sourceRef: string; taskId: string }): Promise<string> {
+export async function continueLiveTestWorkload(input: { sourceRef: string; taskId: string; projectId: string }): Promise<string> {
   const pool = new Pool({ connectionString: isolatedDatabaseUrl(), max: 1 });
   try {
     const task = await pool.query<{ status: string }>(
       `SELECT status FROM comind.cm_task WHERE task_id=$1::uuid`, [input.taskId]
     );
     if (task.rows[0]?.status !== 'in_progress') throw new Error('recovery task state not verified');
-    const result = await pool.query<{ occurred_at: Date }>(
-      `INSERT INTO comind_pm.pm_events (event_type,actor,actor_type,source_system,source_ref,summary,consequential)
-       VALUES ('action','aed-007-controller','system','github',$1,'AED-007 continuation action',false)
-       RETURNING occurred_at`, [input.sourceRef]
+    const result = await pool.query<{ created_at: Date }>(
+      `INSERT INTO comind_pm.pm_events (project_id,event_type,actor,actor_type,source_system,source_ref,summary,consequential)
+       VALUES ($1,'action','aed-007-controller','system','github',$2,'AED-007 continuation action',false)
+       RETURNING created_at`, [input.projectId, input.sourceRef]
     );
-    return result.rows[0].occurred_at.toISOString();
+    return result.rows[0].created_at.toISOString();
   } finally {
     await pool.end();
   }

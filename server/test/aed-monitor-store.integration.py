@@ -13,7 +13,8 @@ assert url.endswith("/comind_ci"), "refusing non-isolated database"
 migration = root / "db/migrations/20261104_001_aed_007_monitoring.sql"
 store = root / "server/scripts/aed_monitor_store.py"
 files = [root / "artifacts/aed-002c/recovery-transactions.jsonl",
-         root / "artifacts/aed-002c/temporal-transactions.jsonl"]
+         root / "artifacts/aed-002c/temporal-transactions.jsonl",
+         root / "artifacts/aed-002c/live-transactions.jsonl"]
 
 for _ in range(2):
     subprocess.run(["psql", url, "-X", "-v", "ON_ERROR_STOP=1", "-f", str(migration)], check=True,

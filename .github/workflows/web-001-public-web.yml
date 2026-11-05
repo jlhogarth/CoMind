@@ -52,7 +52,7 @@ jobs:
           test -s /tmp/web001-site.css
       - name: Install browser for visual verification
         run: |
-          npm install --no-save playwright@1.58.2
+          npm install --no-save playwright@1.58.2 axe-core@4.10.3
           npx playwright install --with-deps chromium
       - name: Browser viewport and keyboard checks
         run: |

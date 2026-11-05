@@ -15,6 +15,9 @@ from pathlib import Path
 EVENT_FIELDS = frozenset({"lane", "workflow_id", "run_id", "case", "state", "wake_source",
                           "outcome", "checkpoint", "next_action", "fencing_epoch",
                           "progress_at", "attempt", "reason", "provider", "cost_usd",
+                          "step_id", "operation", "input_bytes", "output_bytes",
+                          "input_tokens", "output_tokens", "work_allowance_before",
+                          "work_allowance_after", "work_allowance_unit", "usage_source",
                           "maximum_usd", "approval_reference", "evidence_reference"})
 
 
@@ -27,6 +30,16 @@ def parse_event(line):
     if any(not isinstance(v, (str, int, float, type(None))) or isinstance(v, bool)
            for v in value.values()):
         raise ValueError("AED event field has unsupported value")
+    for name in ("input_bytes", "output_bytes", "input_tokens", "output_tokens"):
+        if name in value and (type(value[name]) is not int or value[name] < 0):
+            raise ValueError(f"{name} must be a nonnegative integer")
+    for name in ("cost_usd", "work_allowance_before", "work_allowance_after"):
+        if name in value and value[name] is not None:
+            import math
+            if type(value[name]) not in (int, float) or not math.isfinite(value[name]) or value[name] < 0:
+                raise ValueError(f"{name} must be finite and nonnegative")
+    if "cost_usd" in value and value.get("usage_source") not in ("provider_receipt", "account_meter"):
+        raise ValueError("cost_usd requires a provider receipt or account meter")
     return value
 
 

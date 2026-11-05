@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[2]
@@ -29,4 +30,15 @@ for path in files:
         [sys.executable, str(store), "readback", first["execution_id"]], text=True))
     assert readback["event_count"] == first["event_count"] == readback["stored_events"]
     assert readback["source_sha256"] == first["source_sha256"]
+    with tempfile.TemporaryDirectory() as directory:
+        altered = Path(directory) / "altered.jsonl"
+        rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+        rows[0]["kind"] = "altered_preflight"
+        altered.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
+        rejected = subprocess.run([sys.executable, str(store), "ingest", str(altered)],
+                                  text=True, capture_output=True)
+        assert rejected.returncode != 0 and "conflicting AED execution replay" in rejected.stderr
+        after = json.loads(subprocess.check_output(
+            [sys.executable, str(store), "readback", first["execution_id"]], text=True))
+        assert after == readback
     print(json.dumps(readback, sort_keys=True))

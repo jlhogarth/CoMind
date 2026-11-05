@@ -21,6 +21,7 @@ try {
       styles: [...document.styleSheets].map(s => s.href),
       reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
       background: getComputedStyle(document.body).backgroundColor,
+      backgroundImage: getComputedStyle(document.body).backgroundImage,
     }));
     await page.keyboard.press('Tab');
     const focus = await page.evaluate(() => document.activeElement?.textContent?.trim());
@@ -29,7 +30,7 @@ try {
     assert.deepEqual(state.missingTargets, []);
     assert.equal(state.reducedMotion, true);
     assert.ok(state.styles.some(s => s.endsWith('/brand/comind-brand.css')));
-    assert.ok(state.background !== 'rgba(0, 0, 0, 0)');
+    assert.ok(state.background !== 'rgba(0, 0, 0, 0)' || state.backgroundImage !== 'none');
     assert.deepEqual(failures, []);
     console.log(JSON.stringify({ name, width, height, state, firstFocus: focus, failures }));
     await page.close();

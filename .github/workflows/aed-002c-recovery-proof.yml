@@ -72,7 +72,9 @@ jobs:
         run: bash scripts/test_foundry_work_lease_kernel.sh
 
       - name: Establish isolated RunBook progress ledger
-        run: psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f db/migrations/20261006_001_comind_pm_ledger.sql
+        run: |
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f db/migrations/20261006_001_comind_pm_ledger.sql
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f db/migrations/20261016_001_durable_runbook_foundation.sql
 
       - name: Start pinned Temporal development service
         run: |

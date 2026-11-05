@@ -31,7 +31,7 @@ export const liveAcceptanceStatusQuery = defineQuery<{
 }>('liveAcceptanceStatus');
 
 export async function aedLiveAcceptanceWorkflow(input: {
-  sourceRef: string; taskId: string; controller: string;
+  sourceRef: string; taskId: string; projectId: string; controller: string;
   observationIntervalMs: number; stallThresholdMs: number;
   safety: AedRecoveryWorkflowInput['safety'];
 }): Promise<{ outcome: string; healthyObservations: number; lastProgressAt: string; continuedAt: string }> {
@@ -59,7 +59,8 @@ export async function aedLiveAcceptanceWorkflow(input: {
       });
       if (recovered.outcome !== 'RECOVERED' || recovered.verification?.advanced !== true)
         throw new Error('AED recovery did not verify semantic progress');
-      const continuedAt = await continueLiveTestWorkload({ sourceRef: input.sourceRef, taskId: input.taskId });
+      const continuedAt = await continueLiveTestWorkload({ sourceRef: input.sourceRef, taskId: input.taskId,
+        projectId: input.projectId });
       return { outcome: recovered.outcome, healthyObservations, lastProgressAt, continuedAt };
     }
     if (lastProgressAt) healthyObservations += 1;

@@ -32,13 +32,13 @@ jobs:
           assert.match(html,/href="#main"/);
           assert.match(html,/prefers-reduced-motion|site.css/);
           for(const id of ['research','expertise','founder','labs']) assert.match(html,new RegExp('id="'+id+'"'));
-          for(const path of ['brand/comind-brand.css','brand/tokens.css','brand/layout.css','brand/motion.css','brand/experience.css','site.css']) assert.ok(existsSync(base+path),path);
+          for(const path of ['brand/comind-brand.css','brand/tokens.css','brand/layout.css','brand/motion.css','brand/experience.css','brand/mode-native.css','site.css']) assert.ok(existsSync(base+path),path);
           assert.ok(!html.includes('service_role'));
           console.log('WEB-001 static content and asset checks passed');
           NODE
       - name: Verify BRAND-001 CSS copied without modification
         run: |
-          for f in comind-brand.css tokens.css layout.css motion.css experience.css; do cmp "brand/$f" "apps/public-web/public/brand/$f"; done
+          for f in comind-brand.css tokens.css layout.css motion.css experience.css mode-native.css; do cmp "brand/$f" "apps/public-web/public/brand/$f"; done
       - name: Verify local HTTP serving
         run: |
           python3 -m http.server 8765 --directory apps/public-web/public >/tmp/web001-http.log 2>&1 &

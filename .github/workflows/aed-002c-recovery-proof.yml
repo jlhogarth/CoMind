@@ -100,7 +100,7 @@ jobs:
           mkdir -p ../artifacts/aed-002c
           python scripts/aed_transaction_monitor.py --output ../artifacts/aed-002c/recovery-transactions.jsonl --timeout 180 -- bash -o pipefail -c 'node test/aed-002c-recovery.integration.mjs | tee ../artifacts/aed-002c/recovery-proof.jsonl'
           python scripts/aed_transaction_monitor.py --output ../artifacts/aed-002c/temporal-transactions.jsonl --timeout 180 -- bash -o pipefail -c 'node test/aed-temporal-runtime.integration.mjs | tee ../artifacts/aed-002c/temporal-proof.jsonl'
-          python scripts/aed_transaction_monitor.py --output ../artifacts/aed-002c/live-transactions.jsonl --timeout 180 -- bash -o pipefail -c 'node test/aed-live-acceptance.integration.mjs | tee ../artifacts/aed-002c/live-proof.jsonl'
+          python scripts/aed_transaction_monitor.py --output ../artifacts/aed-002c/live-transactions.jsonl --timeout 180 -- bash -o pipefail -c 'node test/aed-live-acceptance.integration.mjs 2>&1 | tee ../artifacts/aed-002c/live-proof.jsonl'
 
       - name: Persist and independently query AED monitoring evidence
         env:

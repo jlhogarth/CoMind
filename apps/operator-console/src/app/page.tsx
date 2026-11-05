@@ -35,6 +35,7 @@ import styles from "./control-plane.module.css";
 const navItems = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard, active: true },
   { label: "Monitoring", href: "/activity", icon: Activity },
+  { label: "AED evidence", href: "/aed", icon: FileCheck2 },
   { label: "CBE Mobile Control", href: "/cbe-control", icon: Smartphone },
   { label: "RuleBook HUD", href: "/rulebook", icon: ShieldCheck },
   { label: "Integration Gateway", href: "/integrations", icon: Network },

@@ -1,4 +1,4 @@
-import { condition, defineQuery, defineSignal, proxyActivities, setHandler } from '@temporalio/workflow';
+import { condition, defineQuery, defineSignal, proxyActivities, setHandler, sleep } from '@temporalio/workflow';
 import type * as activities from './activities.js';
 import type {
   AedExternalWake,
@@ -21,6 +21,51 @@ const { assessRecovery, executeFencedRecovery, verifyRecoveryProgress } = proxyA
   startToCloseTimeout: '20s',
   retry: { maximumAttempts: 1 },
 });
+
+const { observeLiveTestProgress, continueLiveTestWorkload } = proxyActivities<typeof activities>({
+  startToCloseTimeout: '10s', retry: { maximumAttempts: 1 },
+});
+
+export const liveAcceptanceStatusQuery = defineQuery<{
+  healthyObservations: number; recoveryTriggered: boolean; lastProgressAt: string | null;
+}>('liveAcceptanceStatus');
+
+export async function aedLiveAcceptanceWorkflow(input: {
+  sourceRef: string; taskId: string; controller: string;
+  observationIntervalMs: number; stallThresholdMs: number;
+  safety: AedRecoveryWorkflowInput['safety'];
+}): Promise<{ outcome: string; healthyObservations: number; lastProgressAt: string; continuedAt: string }> {
+  if (input.observationIntervalMs < 10 || input.stallThresholdMs <= input.observationIntervalMs)
+    throw new Error('invalid measured liveness timing');
+  let healthyObservations = 0;
+  let recoveryTriggered = false;
+  let lastProgressAt: string | null = null;
+  setHandler(liveAcceptanceStatusQuery, () => ({ healthyObservations, recoveryTriggered, lastProgressAt }));
+  for (;;) {
+    const observed = await observeLiveTestProgress({ sourceRef: input.sourceRef });
+    if (observed && (!lastProgressAt || observed > lastProgressAt)) lastProgressAt = observed;
+    const now = Date.now();
+    if (lastProgressAt && now - Date.parse(lastProgressAt) >= input.stallThresholdMs) {
+      recoveryTriggered = true;
+      const recovered = await aedRecoveryWorkflow({
+        caseId: input.sourceRef, taskId: input.taskId, controller: input.controller,
+        now: new Date(now).toISOString(), recoveryProgressAt: new Date(now + 1).toISOString(),
+        mode: 'recover', safety: input.safety,
+        lane: { workKey: input.sourceRef, status: 'in_progress', actionable: true,
+          dependenciesValid: true, expectedProgressBy: new Date(Date.parse(lastProgressAt) + input.stallThresholdMs).toISOString(),
+          nextAction: 'resume bounded synthetic Test task',
+          events: [{ type: 'implementation_commit', at: lastProgressAt, verified: true }],
+          productionChange: false, josephActionRequired: false },
+      });
+      if (recovered.outcome !== 'RECOVERED' || recovered.verification?.advanced !== true)
+        throw new Error('AED recovery did not verify semantic progress');
+      const continuedAt = await continueLiveTestWorkload({ sourceRef: input.sourceRef, taskId: input.taskId });
+      return { outcome: recovered.outcome, healthyObservations, lastProgressAt, continuedAt };
+    }
+    if (lastProgressAt) healthyObservations += 1;
+    await sleep(input.observationIntervalMs);
+  }
+}
 
 export const externalWakeSignal = defineSignal<[AedExternalWake]>('externalWake');
 export const aedStatusQuery = defineQuery<{

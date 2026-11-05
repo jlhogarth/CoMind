@@ -131,6 +131,12 @@ try {
     await page.screenshot({ path: process.env.CONTROL_PLANE_BROWSER_SCREENSHOT, fullPage: true });
   }
 
+  const aedNav = sidebar.getByRole("link", { name: "AED evidence" });
+  assert.equal(await aedNav.getAttribute("href"), "/aed");
+  await aedNav.click();
+  await page.getByRole("heading", { name: "AED monitoring evidence" }).waitFor();
+  await page.getByRole("button", { name: "Send sign-in link" }).waitFor();
+
   console.log("PASS Control Plane browser: Workspace Mail, ThreadKeeper visibility, truthful deployed Development/Test state, canonical links, wired destinations, governance labels, and responsive shell rendered.");
 } finally {
   await browser?.close();

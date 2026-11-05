@@ -1,0 +1,143 @@
+/*
+  Native presentation-mode controls for resilient local and embedded HTML previews.
+  Mode switching does not depend on JavaScript.
+*/
+
+.cm-mode-radio {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.cm-mode-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--cm-space-2);
+}
+
+.cm-mode-form .cm-mode-readout {
+  display: none;
+}
+
+.cm-mode-form:has(#cm-mode-calm:checked) .cm-mode-readout--calm,
+.cm-mode-form:has(#cm-mode-operational:checked) .cm-mode-readout--operational,
+.cm-mode-form:has(#cm-mode-cinematic:checked) .cm-mode-readout--cinematic {
+  display: inline-flex;
+}
+
+.cm-mode-form:has(#cm-mode-calm:checked) label[for="cm-mode-calm"],
+.cm-mode-form:has(#cm-mode-operational:checked) label[for="cm-mode-operational"],
+.cm-mode-form:has(#cm-mode-cinematic:checked) label[for="cm-mode-cinematic"] {
+  color: var(--cm-text-strong);
+  background: var(--cm-accent-soft);
+  box-shadow: inset 0 0 0 1px var(--cm-accent-border);
+}
+
+body:has(#cm-mode-calm:checked) {
+  --cm-experience-field-opacity: 0.24;
+  --cm-experience-grid-opacity: 0.055;
+  --cm-experience-core-scale: 0.84;
+  --cm-experience-core-peak-scale: 0.86;
+  --cm-experience-ambient-duration: 52s;
+  --cm-experience-orbit-duration: 72s;
+  --cm-experience-orbit-secondary-duration: 96s;
+  --cm-experience-sweep-duration: 3.4s;
+  --cm-experience-glow-radius: 22px;
+}
+
+body:has(#cm-mode-operational:checked) {
+  --cm-experience-field-opacity: 0.66;
+  --cm-experience-grid-opacity: 0.18;
+  --cm-experience-core-scale: 1;
+  --cm-experience-core-peak-scale: 1.025;
+  --cm-experience-ambient-duration: 20s;
+  --cm-experience-orbit-duration: 24s;
+  --cm-experience-orbit-secondary-duration: 34s;
+  --cm-experience-sweep-duration: 1.5s;
+  --cm-experience-glow-radius: 54px;
+}
+
+body:has(#cm-mode-cinematic:checked) {
+  --cm-experience-field-opacity: 1;
+  --cm-experience-grid-opacity: 0.42;
+  --cm-experience-core-scale: 1.19;
+  --cm-experience-core-peak-scale: 1.235;
+  --cm-experience-ambient-duration: 8s;
+  --cm-experience-orbit-duration: 10s;
+  --cm-experience-orbit-secondary-duration: 14s;
+  --cm-experience-sweep-duration: 0.72s;
+  --cm-experience-glow-radius: 104px;
+}
+
+body:has(#cm-mode-calm:checked) .cm-orbit--two,
+body:has(#cm-mode-calm:checked) .cm-stream--two {
+  opacity: 0;
+}
+
+body:has(#cm-mode-calm:checked) .cm-orbit,
+body:has(#cm-mode-calm:checked) .cm-stream {
+  opacity: 0.16;
+}
+
+body:has(#cm-mode-calm:checked) .cm-core {
+  filter: saturate(0.68) brightness(0.86);
+  box-shadow:
+    inset 0 0 34px rgba(255, 255, 255, 0.014),
+    0 0 24px var(--cm-accent-glow),
+    0 20px 52px rgba(0, 0, 0, 0.36);
+}
+
+body:has(#cm-mode-calm:checked) .cm-experience-stage {
+  gap: clamp(1.5rem, 4vw, 3rem);
+}
+
+body:has(#cm-mode-operational:checked) .cm-orbit--two {
+  opacity: 0.38;
+}
+
+body:has(#cm-mode-operational:checked) .cm-stream--two {
+  opacity: 0.28;
+}
+
+body:has(#cm-mode-cinematic:checked) .cm-experience-stage {
+  gap: clamp(3rem, 8vw, 8rem);
+}
+
+body:has(#cm-mode-cinematic:checked) .cm-core {
+  filter: saturate(1.22) brightness(1.08);
+  box-shadow:
+    inset 0 0 84px rgba(255, 255, 255, 0.05),
+    0 0 104px var(--cm-accent-glow),
+    0 0 220px rgba(54, 194, 229, 0.14),
+    0 54px 132px rgba(0, 0, 0, 0.58);
+}
+
+body:has(#cm-mode-cinematic:checked) .cm-orbit--two {
+  opacity: 0.94;
+}
+
+body:has(#cm-mode-cinematic:checked) .cm-stream {
+  opacity: 0.96;
+}
+
+body:has(#cm-mode-cinematic:checked) .cm-stream--two {
+  opacity: 0.74;
+}
+
+body:has(#cm-mode-cinematic:checked) .cm-field::before {
+  filter: saturate(1.2) contrast(1.06);
+}
+
+body:has(#cm-mode-cinematic:checked) .cm-panel {
+  box-shadow: var(--cm-shadow-mid);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body:has(#cm-mode-cinematic:checked) .cm-core {
+    filter: saturate(1.08);
+  }
+}

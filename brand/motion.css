@@ -1,0 +1,140 @@
+@keyframes cm-field-drift {
+  0%, 100% { transform: translate3d(-2%, -1%, 0) scale(1); opacity: 0.72; }
+  50% { transform: translate3d(2%, 1.5%, 0) scale(1.06); opacity: 1; }
+}
+
+@keyframes cm-enter {
+  from { opacity: 0; transform: translate3d(0, 18px, 0) scale(0.985); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes cm-signal-sweep {
+  0% { transform: translate3d(-120%, 0, 0); opacity: 0; }
+  18% { opacity: 0.75; }
+  72% { opacity: 0.75; }
+  100% { transform: translate3d(220%, 0, 0); opacity: 0; }
+}
+
+@keyframes cm-node-pulse {
+  0%, 100% { transform: scale(0.72); opacity: 0; }
+  35% { opacity: 0.42; }
+  70% { transform: scale(1.65); opacity: 0; }
+}
+
+@keyframes cm-working-pulse {
+  0%, 100% { opacity: 0.72; transform: scale(0.92); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes cm-settle {
+  0% { transform: scale(0.985); opacity: 0.72; }
+  62% { transform: scale(1.012); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.cm-motion-enter {
+  animation: cm-enter var(--cm-duration-emphasis) var(--cm-ease-emphasis) both;
+}
+
+.cm-motion-settle {
+  animation: cm-settle var(--cm-duration-emphasis) var(--cm-ease-settle) both;
+}
+
+.cm-stagger > * {
+  animation: cm-enter var(--cm-duration-emphasis) var(--cm-ease-emphasis) both;
+}
+
+.cm-stagger > :nth-child(2) { animation-delay: 60ms; }
+.cm-stagger > :nth-child(3) { animation-delay: 120ms; }
+.cm-stagger > :nth-child(4) { animation-delay: 180ms; }
+.cm-stagger > :nth-child(5) { animation-delay: 240ms; }
+.cm-stagger > :nth-child(6) { animation-delay: 300ms; }
+
+.cm-field--alive::before {
+  animation: cm-field-drift var(--cm-duration-ambient) ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+.cm-signal-sweep {
+  position: relative;
+  overflow: hidden;
+}
+
+.cm-signal-sweep::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 38%;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, var(--cm-accent-soft), var(--cm-accent-glow), transparent);
+  transform: translate3d(-120%, 0, 0);
+}
+
+.cm-signal-sweep[data-comind-active="true"]::after {
+  animation: cm-signal-sweep 1.45s var(--cm-ease-emphasis) both;
+}
+
+.cm-node-pulse {
+  position: relative;
+}
+
+.cm-node-pulse::after {
+  content: "";
+  position: absolute;
+  inset: -0.45rem;
+  border: 1px solid var(--cm-accent-border);
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.cm-node-pulse[data-comind-active="true"]::after {
+  animation: cm-node-pulse 1.8s var(--cm-ease-standard) infinite;
+}
+
+.cm-focus-bloom {
+  transition:
+    border-color var(--cm-duration-standard) var(--cm-ease-standard),
+    box-shadow var(--cm-duration-standard) var(--cm-ease-standard),
+    transform var(--cm-duration-standard) var(--cm-ease-standard);
+}
+
+.cm-focus-bloom:focus-visible {
+  outline: 2px solid var(--cm-focus);
+  outline-offset: 3px;
+  border-color: var(--cm-accent-border);
+  box-shadow: 0 0 0 6px var(--cm-accent-soft), var(--cm-shadow-low);
+}
+
+.cm-state-indicator[data-comind-state="working"] {
+  animation: cm-working-pulse 1.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
+
+  .cm-motion-enter,
+  .cm-motion-settle,
+  .cm-stagger > *,
+  .cm-field--alive::before,
+  .cm-signal-sweep[data-comind-active="true"]::after,
+  .cm-node-pulse[data-comind-active="true"]::after,
+  .cm-state-indicator[data-comind-state="working"] {
+    animation: none !important;
+  }
+
+  .cm-motion-enter,
+  .cm-motion-settle,
+  .cm-stagger > * {
+    opacity: 1;
+    transform: none;
+  }
+
+  .cm-focus-bloom {
+    transition-duration: 0.01ms;
+  }
+}

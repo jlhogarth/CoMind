@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import {
   AedRequestError, AedUnavailableError, authorizeAed, createAedReader, getAedConfig,
-  listEvents, listExecutions, parseExecutionId, parsePage, type AedConfig,
+  parseExecutionId, parsePage, type AedConfig, type AedReader,
 } from "./server";
-import type { SupabaseClient } from "@supabase/supabase-js";
 
 function json(body: unknown, status: number) {
   return NextResponse.json(body, { status, headers: { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } });
@@ -12,7 +11,7 @@ function json(body: unknown, status: number) {
 export async function handleAedGet(request: Request, id?: string, dependencies: {
   config?: () => AedConfig;
   authorize?: typeof authorizeAed;
-  reader?: (config: AedConfig) => SupabaseClient;
+  reader?: (config: AedConfig) => AedReader;
 } = {}) {
   try {
     // Configuration is checked before any credential or database operation.
@@ -24,10 +23,10 @@ export async function handleAedGet(request: Request, id?: string, dependencies: 
     if (!id && (parsed.kind || parsed.state)) throw new AedRequestError("Event filters require an execution identifier");
     const reader = (dependencies.reader ?? createAedReader)(config);
     if (id) {
-      const result = await listEvents(reader, parseExecutionId(id), parsed.page, parsed.pageSize, parsed.kind, parsed.state);
+      const result = await reader.events(parseExecutionId(id), parsed.page, parsed.pageSize, parsed.kind, parsed.state);
       return result ? json(result, 200) : json({ error: "Execution not found" }, 404);
     }
-    return json(await listExecutions(reader, parsed.page, parsed.pageSize), 200);
+    return json(await reader.executions(parsed.page, parsed.pageSize), 200);
   } catch (error) {
     if (error instanceof AedRequestError) return json({ error: error.message }, 400);
     if (error instanceof AedUnavailableError) return json({ error: "AED retrieval unavailable" }, 503);

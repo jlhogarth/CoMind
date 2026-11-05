@@ -24,7 +24,7 @@ Exact tested head: `93ba9e2312e937721c453ccd54535d7a20533275`. [Run #41940846651
 
 The migration applied twice on isolated PostgreSQL 17. Recovery execution `580f3fad73905c8230b2bfc8` read back 65/65 events and source SHA-256 `20c8cb5e98411d906d0a7bf6019d1e70180959507089f40459ffe6b7718e48f5`. Temporal execution `46a39216f4a41b89382a3fb1` read back 122/122 and SHA-256 `99b51c0ad111e0c98e3df02c68182f94a4b01d0c8cf688f87ff804f8f06b1a23`. Separate reader processes ran after ingestion processes exited. Same-source replay remained idempotent; altered-source replay was rejected without changing readback. The workflow was disabled again after the run.
 
-This is a verified migration and ingest/query path on an ephemeral isolated database. The rows do not survive runner termination. The migration has not been applied to primary Supabase and no durable Supabase AED-007 rows exist yet. Applying it there is a separate C4 Production approval boundary. GitHub artifact retention is temporary, and a human-readable Google Drive report has not yet been written.
+At this isolated-test checkpoint, the rows did not survive runner termination and the primary Supabase migration was still awaiting C4 approval. Joseph subsequently approved and the primary CoMind Supabase Test migration and durable ingestion were completed as recorded in the next section. GitHub artifact retention is temporary, and a human-readable Google Drive report has not yet been written.
 
 ## Primary CoMind Supabase Test database and live interruption proof
 

@@ -50,3 +50,20 @@ jobs:
           curl -fsS http://127.0.0.1:8765/site.css -o /tmp/web001-site.css
           test -s /tmp/web001-brand.css
           test -s /tmp/web001-site.css
+      - name: Install browser for visual verification
+        run: |
+          npm install --no-save playwright@1.58.2
+          npx playwright install --with-deps chromium
+      - name: Browser viewport and keyboard checks
+        run: |
+          python3 -m http.server 8765 --directory apps/public-web/public >/tmp/web001-browser-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill $server_pid || true' EXIT
+          node apps/public-web/browser-check.mjs
+      - name: Preserve viewport screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-001-browser-evidence
+          path: apps/public-web/evidence/*.png
+          if-no-files-found: warn

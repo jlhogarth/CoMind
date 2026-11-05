@@ -25,6 +25,7 @@ try {
       background: getComputedStyle(document.body).backgroundColor,
       backgroundImage: getComputedStyle(document.body).backgroundImage,
     }));
+    assert.deepEqual(failures, [], name + ' page load failures');
     await page.addScriptTag({ path: require.resolve('axe-core/axe.js') });
     const accessibility = await page.evaluate(() => axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] } }));
     assert.deepEqual(accessibility.violations.map(v => ({ id: v.id, impact: v.impact, nodes: v.nodes.length })), [], name + ' accessibility violations');
@@ -36,7 +37,6 @@ try {
     assert.equal(state.reducedMotion, true);
     assert.ok(state.styles.some(s => s.endsWith('/brand/comind-brand.css')));
     assert.ok(state.background !== 'rgba(0, 0, 0, 0)' || state.backgroundImage !== 'none');
-    assert.deepEqual(failures, []);
     console.log(JSON.stringify({ name, width, height, state, firstFocus: focus, accessibilityViolations: accessibility.violations.length, failures }));
     await page.close();
   }

@@ -1,6 +1,8 @@
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
 
 const base = process.env.WEB001_URL || 'http://127.0.0.1:8765/';
 await mkdir('apps/public-web/evidence', { recursive: true });
@@ -23,6 +25,9 @@ try {
       background: getComputedStyle(document.body).backgroundColor,
       backgroundImage: getComputedStyle(document.body).backgroundImage,
     }));
+    await page.addScriptTag({ path: require.resolve('axe-core/axe.js') });
+    const accessibility = await page.evaluate(() => axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] } }));
+    assert.deepEqual(accessibility.violations.map(v => ({ id: v.id, impact: v.impact, nodes: v.nodes.length })), [], name + ' accessibility violations');
     await page.keyboard.press('Tab');
     const focus = await page.evaluate(() => document.activeElement?.textContent?.trim());
     assert.equal(focus, 'Skip to content');
@@ -32,7 +37,7 @@ try {
     assert.ok(state.styles.some(s => s.endsWith('/brand/comind-brand.css')));
     assert.ok(state.background !== 'rgba(0, 0, 0, 0)' || state.backgroundImage !== 'none');
     assert.deepEqual(failures, []);
-    console.log(JSON.stringify({ name, width, height, state, firstFocus: focus, failures }));
+    console.log(JSON.stringify({ name, width, height, state, firstFocus: focus, accessibilityViolations: accessibility.violations.length, failures }));
     await page.close();
   }
 } finally { await browser.close(); }

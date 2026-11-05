@@ -1,0 +1,69 @@
+name: WEB-001 Public Website Validation
+on:
+  pull_request:
+    paths:
+      - 'apps/public-web/**'
+      - 'brand/**'
+      - '.github/workflows/web-001-public-web.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Prepare canonical brand assets
+        run: node apps/public-web/prepare.mjs
+      - name: Verify public website assets and links
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, existsSync } from 'node:fs';
+          import assert from 'node:assert/strict';
+          const base='apps/public-web/public/';
+          const html=readFileSync(base+'index.html','utf8');
+          assert.match(html,/<html lang="en"/);
+          assert.match(html,/<main id="main">/);
+          assert.match(html,/href="#main"/);
+          assert.match(html,/prefers-reduced-motion|site.css/);
+          for(const id of ['research','expertise','founder','labs']) assert.match(html,new RegExp('id="'+id+'"'));
+          for(const path of ['brand/comind-brand.css','brand/tokens.css','brand/layout.css','brand/motion.css','brand/experience.css','brand/mode-native.css','site.css']) assert.ok(existsSync(base+path),path);
+          assert.ok(!html.includes('service_role'));
+          console.log('WEB-001 static content and asset checks passed');
+          NODE
+      - name: Verify BRAND-001 CSS copied without modification
+        run: |
+          for f in comind-brand.css tokens.css layout.css motion.css experience.css mode-native.css; do cmp "brand/$f" "apps/public-web/public/brand/$f"; done
+      - name: Verify local HTTP serving
+        run: |
+          python3 -m http.server 8765 --directory apps/public-web/public >/tmp/web001-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill $server_pid || true' EXIT
+          for i in 1 2 3 4 5; do curl -fsS http://127.0.0.1:8765/ -o /tmp/web001-index.html && break || sleep 1; done
+          grep -q 'Intelligence with' /tmp/web001-index.html
+          curl -fsS http://127.0.0.1:8765/brand/comind-brand.css -o /tmp/web001-brand.css
+          curl -fsS http://127.0.0.1:8765/site.css -o /tmp/web001-site.css
+          test -s /tmp/web001-brand.css
+          test -s /tmp/web001-site.css
+      - name: Install browser for visual verification
+        run: |
+          npm install --no-save playwright@1.58.2 axe-core@4.10.3
+          npx playwright install --with-deps chromium
+      - name: Browser viewport and keyboard checks
+        run: |
+          python3 -m http.server 8765 --directory apps/public-web/public >/tmp/web001-browser-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill $server_pid || true' EXIT
+          node apps/public-web/browser-check.mjs
+      - name: Preserve viewport screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-001-browser-evidence
+          path: apps/public-web/evidence/*.png
+          if-no-files-found: warn

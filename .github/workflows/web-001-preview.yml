@@ -1,0 +1,53 @@
+name: WEB-001 Isolated Cloudflare Preview
+on:
+  push:
+    branches:
+      - web-001-public-headquarters-foundation
+    paths:
+      - '.github/workflows/web-001-preview.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-preview:
+    if: github.repository == 'jlhogarth/CoMind' && github.ref == 'refs/heads/web-001-public-headquarters-foundation'
+    runs-on: ubuntu-latest
+    environment: CoMind Test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Prepare canonical assets
+        run: node apps/public-web/prepare.mjs
+      - name: Check asset graph
+        run: |
+          for f in comind-brand.css tokens.css layout.css motion.css experience.css mode-native.css; do
+            cmp "brand/$f" "apps/public-web/public/brand/$f"
+          done
+          test -f apps/public-web/public/_headers
+      - name: Deploy only WEB-001 preview Worker
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/public-web
+          command: deploy
+      - name: Verify live preview
+        run: |
+          set -e
+          url='https://comind-web-001-preview.jlhogarth.workers.dev'
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            if curl -fsS -D /tmp/web001-headers "$url/" -o /tmp/web001-live.html; then break; fi
+            sleep 3
+          done
+          test -s /tmp/web001-live.html
+          grep -q 'Intelligence with' /tmp/web001-live.html
+          for path in site.css brand/comind-brand.css brand/tokens.css brand/layout.css brand/motion.css brand/experience.css brand/mode-native.css; do
+            curl -fsS "$url/$path" -o /dev/null
+          done
+          grep -iq 'content-security-policy:' /tmp/web001-headers
+          grep -iq 'x-content-type-options: nosniff' /tmp/web001-headers
+          echo "Verified HTTPS, homepage, seven CSS assets and security headers: $url"

@@ -11,6 +11,7 @@ try {
     const failures = [];
     page.on('pageerror', error => failures.push(error.message));
     page.on('requestfailed', request => failures.push(request.url() + ' ' + request.failure()?.errorText));
+    page.on('response', response => { if (response.status() >= 400) failures.push(response.status() + ' ' + response.url()); });
     const response = await page.goto(base, { waitUntil: 'networkidle' });
     assert.equal(response.status(), 200);
     await page.screenshot({ path: `apps/public-web/evidence/${name}.png`, fullPage: true });

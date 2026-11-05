@@ -1,0 +1,61 @@
+name: GCI-001 On-demand Gemini Collaboration
+on:
+  workflow_dispatch:
+    inputs:
+      session_id:
+        description: "Unique session identifier: 8-80 letters/numbers/_/-"
+        required: true
+        type: string
+      document_id:
+        description: "Authorized Google Doc file ID (not a URL)"
+        required: true
+        type: string
+      enable_live:
+        description: "Explicitly allow Google API and Gemini calls"
+        required: true
+        default: false
+        type: boolean
+      model:
+        description: "Gemini model for review"
+        default: "gemini-3.5-flash-lite"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gci-doc-${{ inputs.document_id }}
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      GCI_ENABLE_LIVE: ${{ inputs.enable_live }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: scripts/gci/requirements.txt
+      - name: Install dependencies
+        run: python -m pip install -r scripts/gci/requirements.txt
+      - name: Validate parser and protocol
+        run: python -m unittest discover -s tests/gci -v
+      - name: Run bounded collaboration session
+        run: |
+          python scripts/gci/poller.py \
+            --document-id "$GCI_DOC_ID" \
+            --session-id "$GCI_SESSION_ID" \
+            --model "$GCI_MODEL" \
+            --interval 15 --idle 240 --maximum 1800
+        env:
+          GCI_DOC_ID: ${{ inputs.document_id }}
+          GCI_SESSION_ID: ${{ inputs.session_id }}
+          GCI_MODEL: ${{ inputs.model }}

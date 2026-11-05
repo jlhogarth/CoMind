@@ -1,0 +1,28 @@
+name: GCI-001 isolated protocol CI
+on:
+  pull_request:
+    paths:
+      - "scripts/gci/**"
+      - "tests/gci/**"
+      - ".github/workflows/gci-001-*.yml"
+  push:
+    branches:
+      - gci-001-on-demand-gemini-review
+    paths:
+      - "scripts/gci/**"
+      - "tests/gci/**"
+      - ".github/workflows/gci-001-*.yml"
+permissions:
+  contents: read
+jobs:
+  protocol:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -r scripts/gci/requirements.txt
+      - run: python -m compileall -q scripts/gci tests/gci
+      - run: python -m unittest discover -s tests/gci -v

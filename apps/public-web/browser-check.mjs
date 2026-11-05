@@ -1,0 +1,36 @@
+import { chromium } from 'playwright';
+import assert from 'node:assert/strict';
+import { mkdir } from 'node:fs/promises';
+
+const base = process.env.WEB001_URL || 'http://127.0.0.1:8765/';
+await mkdir('apps/public-web/evidence', { recursive: true });
+const browser = await chromium.launch({ headless: true });
+try {
+  for (const [name, width, height] of [['desktop',1440,900],['laptop',1280,800],['tablet',768,1024],['mobile',390,844],['small-mobile',320,640]]) {
+    const page = await browser.newPage({ viewport: { width, height }, reducedMotion: 'reduce' });
+    const failures = [];
+    page.on('pageerror', error => failures.push(error.message));
+    page.on('requestfailed', request => failures.push(request.url() + ' ' + request.failure()?.errorText));
+    const response = await page.goto(base, { waitUntil: 'networkidle' });
+    assert.equal(response.status(), 200);
+    await page.screenshot({ path: `apps/public-web/evidence/${name}.png`, fullPage: true });
+    const state = await page.evaluate(() => ({
+      overflow: document.documentElement.scrollWidth > innerWidth,
+      missingTargets: [...document.querySelectorAll('nav a[href^="#"]')].filter(a => !document.getElementById(a.hash.slice(1))).map(a => a.hash),
+      styles: [...document.styleSheets].map(s => s.href),
+      reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
+      background: getComputedStyle(document.body).backgroundColor,
+    }));
+    await page.keyboard.press('Tab');
+    const focus = await page.evaluate(() => document.activeElement?.textContent?.trim());
+    assert.equal(focus, 'Skip to content');
+    assert.equal(state.overflow, false, `${name} horizontal overflow`);
+    assert.deepEqual(state.missingTargets, []);
+    assert.equal(state.reducedMotion, true);
+    assert.ok(state.styles.some(s => s.endsWith('/brand/comind-brand.css')));
+    assert.ok(state.background !== 'rgba(0, 0, 0, 0)');
+    assert.deepEqual(failures, []);
+    console.log(JSON.stringify({ name, width, height, state, firstFocus: focus, failures }));
+    await page.close();
+  }
+} finally { await browser.close(); }

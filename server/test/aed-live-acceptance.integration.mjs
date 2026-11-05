@@ -48,14 +48,17 @@ try {
     VALUES ($1,'AED-007 interrupted workload','todo',1) RETURNING task_id`, [project.project_id]);
   await pool.query(`INSERT INTO comind.cm_foundry_work_lease(task_id,max_attempts,not_before)
     VALUES ($1,3,clock_timestamp())`, [task.task_id]);
+  const pmProject = await one(`INSERT INTO comind_pm.pm_projects (project_key,name,source_system,source_ref)
+    VALUES ($1,'AED-007 isolated Test','github',$2) RETURNING id`, [sourceRef, sourceRef]);
 
   workload = spawn(process.execPath, ['test/aed-live-workload.mjs'], {
-    cwd: process.cwd(), env: { ...process.env, AED_TEST_SOURCE_REF: sourceRef }, stdio: 'ignore',
+    cwd: process.cwd(), env: { ...process.env, AED_TEST_SOURCE_REF: sourceRef,
+      AED_PM_PROJECT_ID: pmProject.id }, stdio: 'ignore',
   });
   const progress = await until(async () => {
-    const result = await pool.query(`SELECT occurred_at FROM comind_pm.pm_events
-      WHERE source_ref=$1 AND summary='AED-007 workload progress' ORDER BY occurred_at DESC LIMIT 6`, [sourceRef]);
-    return result.rows.length >= 6 ? result.rows.reverse().map((r) => r.occurred_at) : null;
+    const result = await pool.query(`SELECT created_at FROM comind_pm.pm_events
+      WHERE source_ref=$1 AND summary='AED-007 workload progress' ORDER BY created_at DESC LIMIT 6`, [sourceRef]);
+    return result.rows.length >= 6 ? result.rows.reverse().map((r) => r.created_at) : null;
   });
   const durations = progress.slice(1).map((at, i) => at - progress[i]);
   const timing = summarizeDurations(durations);
@@ -66,7 +69,8 @@ try {
     productionChange: false, productionAuthorized: false, secretsPresent: false };
   const handle = await client.workflow.start('aedLiveAcceptanceWorkflow', {
     taskQueue, workflowId: `aed-live-${randomUUID()}`,
-    args: [{ sourceRef, taskId: task.task_id, controller: `aed-live-${sourceRef}`,
+    args: [{ sourceRef, taskId: task.task_id, projectId: pmProject.id,
+      controller: `aed-live-${sourceRef}`,
       observationIntervalMs, stallThresholdMs, safety }],
   });
   const healthy = await until(async () => {

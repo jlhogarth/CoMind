@@ -22,4 +22,6 @@ General CRUD, parent-child transactional writes, cascade deletion, and raw SQL a
 
 ## Failure behavior
 
+AED-007's additional server-only read boundary, explicit user allowlist, and open deployment prerequisites are documented in `AED-007-RETRIEVAL.md`. Its presence does not authorize browser access to `comind_pm`.
+
 Missing configuration fails closed. RLS or permission denial must be shown as an actionable error rather than triggering a fallback to privileged browser access. Foreign-key metadata that references an undiscovered relation fails schema normalization rather than producing an incomplete relationship graph.

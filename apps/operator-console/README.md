@@ -18,6 +18,9 @@ The CoMind brain-and-computer-chip mark is implemented as a reusable SVG React c
 
 ## Development
 
+AED-007 provides an authenticated, read-only `/aed` view and two bounded server endpoints.
+See `docs/AED-007-RETRIEVAL.md` for the security and acceptance boundary.
+
 Requires Node.js 24.
 
 ```bash

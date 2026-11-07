@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from urllib.parse import quote
 
 import requests
-from google.oauth2 import service_account
+import google.auth
 from google.auth.transport.requests import AuthorizedSession
 
 DRIVE = "https://www.googleapis.com/drive/v3/files"
@@ -61,15 +61,12 @@ def eligible(content: str, session_id: str) -> list[Exchange]:
     return found
 
 
-def google_session(secret: str) -> AuthorizedSession:
-    data = json.loads(secret)
-    credentials = service_account.Credentials.from_service_account_info(
-        data,
-        scopes=[
-            "https://www.googleapis.com/auth/drive.readonly",
-            "https://www.googleapis.com/auth/documents",
-        ],
-    )
+def google_session() -> AuthorizedSession:
+    """Use GitHub OIDC federated Application Default Credentials, not JSON keys."""
+    credentials, _ = google.auth.default(scopes=[
+        "https://www.googleapis.com/auth/drive.readonly",
+        "https://www.googleapis.com/auth/documents",
+    ])
     return AuthorizedSession(credentials)
 
 
@@ -135,11 +132,10 @@ def run(args: argparse.Namespace) -> int:
         event("disabled", reason="GCI_ENABLE_LIVE not true")
         return 0
     api_key = os.environ.get("GEMINI_API_KEY", "")
-    sa = os.environ.get("GDRIVE_SERVICE_ACCOUNT_JSON", "")
-    if not api_key or not sa:
-        event("failed", reason="Required credentials missing")
+    if not api_key or not os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
+        event("failed", reason="Gemini key or OIDC credentials file unavailable")
         return 2
-    client = google_session(sa)
+    client = google_session()
     start = last_activity = time.monotonic()
     last_version = None
     checks = exports = invocations = 0

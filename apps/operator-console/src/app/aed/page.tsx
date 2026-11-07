@@ -38,6 +38,7 @@ export default function AedMonitorPage() {
   const [kind, setKind] = useState("");
   const [state, setState] = useState("");
   const [busy, setBusy] = useState(false);
+  const [linkState, setLinkState] = useState<"idle" | "sending" | "sent" | "limited">("idle");
 
   const load = useCallback(async (path: string) => {
     const client = getBrowserSupabaseClient();
@@ -78,17 +79,34 @@ export default function AedMonitorPage() {
 
   async function sendLink(event: React.FormEvent) {
     event.preventDefault();
+    if (linkState !== "idle") return;
+    setLinkState("sending");
+    setStatus("Sending sign-in link…");
     try {
-      const { error } = await getBrowserSupabaseClient().auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.href } });
+      const { error } = await getBrowserSupabaseClient().auth.signInWithOtp({
+        email: email.trim(),
+        options: { emailRedirectTo: new URL("/aed", window.location.origin).href, shouldCreateUser: false },
+      });
       if (error) throw error;
-      setStatus("Check your email for the Supabase sign-in link, then return to this page.");
-    } catch { setStatus("Sign-in link unavailable. Check the configured Supabase Auth provider."); }
+      setLinkState("sent");
+      setStatus("Sign-in link sent. Open the newest email link once in this same browser.");
+    } catch (error) {
+      if (typeof error === "object" && error !== null &&
+          (("status" in error && error.status === 429) ||
+           ("code" in error && error.code === "over_email_send_rate_limit"))) {
+        setLinkState("limited");
+        setStatus("Supabase has temporarily limited sign-in emails. Use the newest unused link if available, or wait and refresh this page before requesting another.");
+      } else {
+        setLinkState("idle");
+        setStatus("Sign-in link could not be sent. Try again later.");
+      }
+    }
   }
 
   return <main className="aed-shell">
     <header className="aed-header"><CoMindMark compact /><div><a href="/">CoMind Control Plane</a><h1>AED monitoring evidence</h1><p>Read-only execution and event history</p></div></header>
     {status && <p role="status" className="aed-notice">{status}</p>}
-    {!signedIn && <form onSubmit={sendLink} className="aed-panel"><label>Email for operator sign-in <input type="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label><button type="submit">Send sign-in link</button></form>}
+    {!signedIn && <form onSubmit={sendLink} className="aed-panel"><label>Email for operator sign-in <input type="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label><button type="submit" disabled={linkState !== "idle"}>{linkState === "sending" ? "Sending sign-in link…" : linkState === "sent" ? "Link sent" : linkState === "limited" ? "Email limit reached" : "Send sign-in link"}</button></form>}
     {signedIn && <button type="button" onClick={async () => { await getBrowserSupabaseClient().auth.signOut(); setSignedIn(false); setHistory(null); setDetail(null); setSelected(null); }}>Sign out</button>}
     {busy && <p role="status">Loading AED evidence…</p>}
     {history && <section className="aed-panel"><h2>Execution history</h2><div className="aed-scroll"><table><thead><tr><th>Execution</th><th>Lane</th><th>First event</th><th>Last event</th><th>Events</th><th>Evidence</th></tr></thead><tbody>

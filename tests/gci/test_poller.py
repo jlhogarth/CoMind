@@ -83,7 +83,7 @@ class AcceptanceSimulationTests(unittest.TestCase):
             return state["content"], "text/plain"
 
         def append(_client, _id, payload):
-            state["content"] += "\\n" + payload + "\\n"
+            state["content"] += "\n" + payload + "\n"
             state["version"] += 1
             state["appends"].append(payload)
 
@@ -94,15 +94,17 @@ class AcceptanceSimulationTests(unittest.TestCase):
 
         credentials = {"GCI_ENABLE_LIVE": "true", "GEMINI_API_KEY": "not-a-real-key",
                        "GOOGLE_APPLICATION_CREDENTIALS": "/nonexistent/federation.json"}
-        with patch.dict("os.environ", credentials), \\
-             patch.object(module, "google_session", return_value=object()), \\
-             patch.object(module, "metadata", side_effect=metadata), \\
-             patch.object(module, "export", side_effect=export), \\
-             patch.object(module, "append", side_effect=append), \\
-             patch.object(module, "ask_gemini", side_effect=gemini), \\
-             patch.object(module.time, "monotonic", side_effect=lambda: state["now"]), \\
-             patch.object(module.time, "sleep", side_effect=advance), \\
-             patch.object(module, "event") as capture:
+        with (
+            patch.dict("os.environ", credentials),
+            patch.object(module, "google_session", return_value=object()),
+            patch.object(module, "metadata", side_effect=metadata),
+            patch.object(module, "export", side_effect=export),
+            patch.object(module, "append", side_effect=append),
+            patch.object(module, "ask_gemini", side_effect=gemini),
+            patch.object(module.time, "monotonic", side_effect=lambda: state["now"]),
+            patch.object(module.time, "sleep", side_effect=advance),
+            patch.object(module, "event") as capture,
+        ):
             state["exit"] = module.run(self.make_args())
             state["events"] = [call.args[0] for call in capture.call_args_list]
         return state

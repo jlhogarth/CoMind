@@ -110,7 +110,16 @@ export function createAedReader(config: AedConfig): AedReader {
         throw new AedUnavailableError("Dedicated read-only reader identity required");
       }
       return await run(client);
-    } catch {
+    } catch (error) {
+      // Preserve the client-facing generic failure while retaining a non-secret
+      // runtime diagnostic for operators. Connection strings and query values
+      // must never be logged here.
+      console.error("AED monitoring reader unavailable", {
+        name: error instanceof Error ? error.name : "unknown",
+        code: typeof error === "object" && error !== null && "code" in error
+          ? String((error as { code?: unknown }).code ?? "unknown")
+          : "unknown",
+      });
       throw new AedUnavailableError("AED monitoring source unavailable");
     } finally {
       try { await client.query("ROLLBACK"); } catch { /* An unavailable connection cannot be rolled back. */ }

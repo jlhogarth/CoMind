@@ -40,4 +40,31 @@ try {
     console.log(JSON.stringify({ name, width, height, state, firstFocus: focus, accessibilityViolations: accessibility.violations.length, failures }));
     await page.close();
   }
+  for (const route of ['reading/', 'reading/start-here.html', 'reading/continuity.html', 'reading/governed-reasoning.html', 'reading/reliable-autonomy.html']) {
+    for (const [name, width, height] of [['desktop',1440,900],['mobile',390,844],['small-mobile',320,640]]) {
+      const page = await browser.newPage({ viewport: { width, height }, reducedMotion: 'reduce' });
+      const failures = [];
+      page.on('pageerror', error => failures.push(error.message));
+      page.on('requestfailed', request => failures.push(request.url() + ' ' + request.failure()?.errorText));
+      page.on('response', response => { if (response.status() >= 400) failures.push(response.status() + ' ' + response.url()); });
+      const response = await page.goto(new URL(route, base).href, { waitUntil: 'networkidle' });
+      assert.equal(response.status(), 200, route);
+      const state = await page.evaluate(() => ({
+        overflow: document.documentElement.scrollWidth > innerWidth,
+        missingLinks: [...document.querySelectorAll('a[href]')].filter(a => a.origin === location.origin && a.hash && a.pathname === location.pathname && !document.getElementById(a.hash.slice(1))).map(a => a.href),
+        title: document.title,
+      }));
+      assert.equal(state.overflow, false, `${route} ${name} horizontal overflow`);
+      assert.deepEqual(state.missingLinks, []);
+      assert.deepEqual(failures, [], `${route} ${name} page load failures`);
+      await page.keyboard.press('Tab');
+      assert.equal(await page.evaluate(() => document.activeElement?.textContent?.trim()), 'Skip to content');
+      await page.addScriptTag({ path: require.resolve('axe-core/axe.js') });
+      const accessibility = await page.evaluate(() => axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] } }));
+      assert.deepEqual(accessibility.violations.map(v => ({ id: v.id, impact: v.impact, nodes: v.nodes.length })), [], `${route} ${name} accessibility violations`);
+      if (route === 'reading/start-here.html' && name !== 'small-mobile') await page.screenshot({ path: `apps/public-web/evidence/reading-${name}.png`, fullPage: true });
+      console.log(JSON.stringify({ route, name, title: state.title, accessibilityViolations: accessibility.violations.length, failures }));
+      await page.close();
+    }
+  }
 } finally { await browser.close(); }

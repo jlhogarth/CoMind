@@ -57,12 +57,12 @@ try {
       assert.equal(state.overflow, false, `${route} ${name} horizontal overflow`);
       assert.deepEqual(state.missingLinks, []);
       assert.deepEqual(failures, [], `${route} ${name} page load failures`);
+      if (route === 'reading/start-here.html' && name !== 'small-mobile') await page.screenshot({ path: `apps/public-web/evidence/reading-${name}.png`, fullPage: true });
       await page.keyboard.press('Tab');
       assert.equal(await page.evaluate(() => document.activeElement?.textContent?.trim()), 'Skip to content');
       await page.addScriptTag({ path: require.resolve('axe-core/axe.js') });
       const accessibility = await page.evaluate(() => axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] } }));
       assert.deepEqual(accessibility.violations.map(v => ({ id: v.id, impact: v.impact, nodes: v.nodes.length })), [], `${route} ${name} accessibility violations`);
-      if (route === 'reading/start-here.html' && name !== 'small-mobile') await page.screenshot({ path: `apps/public-web/evidence/reading-${name}.png`, fullPage: true });
       console.log(JSON.stringify({ route, name, title: state.title, accessibilityViolations: accessibility.violations.length, failures }));
       await page.close();
     }

@@ -23,6 +23,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 concurrency:
   group: gci-doc-${{ inputs.document_id }}
@@ -35,10 +36,18 @@ jobs:
     env:
       GCI_ENABLE_LIVE: ${{ inputs.enable_live }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
       PYTHONUNBUFFERED: "1"
     steps:
       - uses: actions/checkout@v4
+      - name: Authenticate Google Drive (keyless OIDC)
+        if: ${{ inputs.enable_live }}
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: comind-513807
+          workload_identity_provider: ${{ vars.GCI_WIF_PROVIDER }}
+          service_account: ${{ vars.GCI_SERVICE_ACCOUNT_EMAIL }}
+          create_credentials_file: true
+          export_environment_variables: true
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"

@@ -58,5 +58,80 @@ class ParserTests(unittest.TestCase):
                 self.assertEqual(module.run(args), 0)
                 gs.assert_not_called()
 
+
+class AcceptanceSimulationTests(unittest.TestCase):
+    """Deterministic full-loop simulations; absolutely no external API calls."""
+
+    def make_args(self):
+        from argparse import Namespace
+        return Namespace(document_id="A" * 20, session_id="session001",
+                         model="gemini-3.5-flash-lite", interval=15, idle=240, maximum=1800)
+
+    def run_clock(self, initial_document):
+        state = {"now": 0, "content": initial_document, "version": 1, "calls": 0,
+                 "metadata_checks": 0, "appends": [], "gemini_prompts": []}
+
+        def advance(seconds):
+            state["now"] += seconds
+
+        def metadata(_client, _id):
+            state["metadata_checks"] += 1
+            return {"mimeType": "application/vnd.google-apps.document",
+                    "version": str(state["version"])}
+
+        def export(_client, _id):
+            return state["content"], "text/plain"
+
+        def append(_client, _id, payload):
+            state["content"] += "\\n" + payload + "\\n"
+            state["version"] += 1
+            state["appends"].append(payload)
+
+        def gemini(_key, _model, prompt):
+            state["calls"] += 1
+            state["gemini_prompts"].append(prompt)
+            return "A bounded alternate design.", {"promptTokenCount": 5}
+
+        credentials = {"GCI_ENABLE_LIVE": "true", "GEMINI_API_KEY": "not-a-real-key",
+                       "GOOGLE_APPLICATION_CREDENTIALS": "/nonexistent/federation.json"}
+        with patch.dict("os.environ", credentials), \\
+             patch.object(module, "google_session", return_value=object()), \\
+             patch.object(module, "metadata", side_effect=metadata), \\
+             patch.object(module, "export", side_effect=export), \\
+             patch.object(module, "append", side_effect=append), \\
+             patch.object(module, "ask_gemini", side_effect=gemini), \\
+             patch.object(module.time, "monotonic", side_effect=lambda: state["now"]), \\
+             patch.object(module.time, "sleep", side_effect=advance), \\
+             patch.object(module, "event") as capture:
+            state["exit"] = module.run(self.make_args())
+            state["events"] = [call.args[0] for call in capture.call_args_list]
+        return state
+
+    def test_one_complete_exchange_exactly_once_and_idle_stop(self):
+        doc = exchange("question001", "CHATGPT", "session001", "Which design is safer?")
+        result = self.run_clock(doc)
+        self.assertEqual(result["exit"], 0)
+        self.assertEqual(result["calls"], 1)
+        self.assertEqual(result["gemini_prompts"], ["Which design is safer?"])
+        self.assertEqual(sum("[COMIND_CLAIM" in v for v in result["appends"]), 1)
+        self.assertEqual(sum("[COMIND_REPLY" in v for v in result["appends"]), 1)
+        self.assertEqual(result["now"], 240)
+        self.assertEqual(result["events"][-1], "idle_stopped")
+        self.assertGreaterEqual(result["metadata_checks"], 10)
+
+    def test_no_exchange_no_billable_calls_and_idle_stop(self):
+        result = self.run_clock("No complete exchange.")
+        self.assertEqual(result["exit"], 0)
+        self.assertEqual(result["calls"], 0)
+        self.assertEqual(result["appends"], [])
+        self.assertEqual(result["now"], 240)
+        self.assertEqual(result["events"][-1], "idle_stopped")
+
+    def test_missing_google_federation_fails_closed(self):
+        with patch.dict("os.environ", {"GCI_ENABLE_LIVE": "true", "GEMINI_API_KEY": "test"},
+                        clear=True), patch.object(module, "google_session") as connect:
+            self.assertEqual(module.run(self.make_args()), 2)
+            connect.assert_not_called()
+
 if __name__ == "__main__":
     unittest.main()

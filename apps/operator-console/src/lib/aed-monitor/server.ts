@@ -10,6 +10,7 @@ export interface AedConfig {
   url: string;
   publishableKey: string;
   databaseUrl: string;
+  databaseCa: string;
   operatorIds: Set<string>;
 }
 
@@ -30,6 +31,10 @@ export function getAedConfig(env: AedEnvironment = process.env): AedConfig {
   const ids = required("OPERATOR_CONSOLE_AED_OPERATOR_IDS").split(",").map((id) => id.trim());
   if (ids.some((id) => !uuid.test(id))) throw new AedUnavailableError("Invalid operator identity configuration");
   const databaseUrl = required("AED_MONITOR_DATABASE_URL");
+  const databaseCa = required("AED_MONITOR_DATABASE_CA");
+  if (!/^-----BEGIN CERTIFICATE-----[\s\S]+-----END CERTIFICATE-----\s*$/.test(databaseCa)) {
+    throw new AedUnavailableError("Invalid AED reader certificate authority");
+  }
   let parsed: URL;
   try { parsed = new URL(databaseUrl); }
   catch { throw new AedUnavailableError("Invalid AED reader connection"); }
@@ -38,13 +43,14 @@ export function getAedConfig(env: AedEnvironment = process.env): AedConfig {
   const pooled = parsed.hostname.endsWith(".pooler.supabase.com") && parsed.username === `comind_aed_monitor_reader.${projectRef}`;
   if (!["postgres:", "postgresql:"].includes(parsed.protocol) ||
       !(direct || pooled) ||
-      parsed.pathname !== "/postgres") {
+      parsed.pathname !== "/postgres" || parsed.search || parsed.hash) {
     throw new AedUnavailableError("AED reader must use the dedicated CoMind database role");
   }
   return {
     url,
     publishableKey: required("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"),
     databaseUrl,
+    databaseCa,
     operatorIds: new Set(ids),
   };
 }
@@ -101,7 +107,9 @@ const eventColumns = "execution_id,sequence,event_at,elapsed_ms,kind,case_id,sta
 export function createAedReader(config: AedConfig): AedReader {
   if (typeof window !== "undefined") throw new AedUnavailableError("AED reader is server-only");
   async function withReader<T>(run: (client: Client) => Promise<T>): Promise<T> {
-    const client = new Client({ connectionString: config.databaseUrl, ssl: { rejectUnauthorized: true }, connectionTimeoutMillis: 5000, query_timeout: 10000 });
+    const client = new Client({ connectionString: config.databaseUrl,
+      ssl: { ca: config.databaseCa, rejectUnauthorized: true, servername: new URL(config.databaseUrl).hostname },
+      connectionTimeoutMillis: 5000, query_timeout: 10000 });
     try {
       await client.connect();
       await client.query("BEGIN READ ONLY");

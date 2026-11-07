@@ -11,6 +11,7 @@ const env = {
   NEXT_PUBLIC_SUPABASE_URL: "https://sbgfuanxiqepcoboxzcl.supabase.co",
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "public-test-key",
   AED_MONITOR_DATABASE_URL: "postgresql://comind_aed_monitor_reader:synthetic-test-password@db.sbgfuanxiqepcoboxzcl.supabase.co/postgres",
+  AED_MONITOR_DATABASE_CA: "-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----",
   OPERATOR_CONSOLE_AED_OPERATOR_IDS: owner,
 };
 const config = getAedConfig(env);
@@ -19,6 +20,8 @@ const id = "580f3fad73905c8230b2bfc8";
 test("AED configuration fails closed without credentials, mode and explicit operator identities", () => {
   assert.throws(() => getAedConfig({}), /disabled/);
   assert.throws(() => getAedConfig({ ...env, AED_MONITOR_DATABASE_URL: undefined }), /AED_MONITOR_DATABASE_URL/);
+  assert.throws(() => getAedConfig({ ...env, AED_MONITOR_DATABASE_CA: undefined }), /AED_MONITOR_DATABASE_CA/);
+  assert.throws(() => getAedConfig({ ...env, AED_MONITOR_DATABASE_URL: `${env.AED_MONITOR_DATABASE_URL}?sslmode=require` }), /dedicated/);
   assert.throws(() => getAedConfig({ ...env, AED_MONITOR_DATABASE_URL: "postgresql://postgres:synthetic@db.sbgfuanxiqepcoboxzcl.supabase.co/postgres" }), /dedicated/);
   assert.throws(() => getAedConfig({ ...env, OPERATOR_CONSOLE_AED_OPERATOR_IDS: "everyone" }), /Invalid operator/);
 });

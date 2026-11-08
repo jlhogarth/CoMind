@@ -51,7 +51,7 @@ jobs:
           for path in site.css brand/comind-brand.css brand/tokens.css brand/layout.css brand/motion.css brand/experience.css brand/mode-native.css; do
             curl -fsS "$url/$path" -o /dev/null
           done
-          for path in reading/ reading/start-here.html reading/continuity.html reading/governed-reasoning.html reading/reliable-autonomy.html; do
+          for path in reading/ reading/start-here.html reading/continuity.html reading/governed-reasoning.html reading/reliable-autonomy.html reading/research-agenda.html reading/literature-map.html reading/continuity-protocol.html reading/belief-update.html reading/memory-prosthetic.html; do
             curl -fsS "$url/$path" -o /dev/null
           done
           grep -iq 'content-security-policy:' /tmp/web001-headers

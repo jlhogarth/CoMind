@@ -40,7 +40,7 @@ try {
     console.log(JSON.stringify({ name, width, height, state, firstFocus: focus, accessibilityViolations: accessibility.violations.length, failures }));
     await page.close();
   }
-  for (const route of ['reading/', 'reading/start-here.html', 'reading/continuity.html', 'reading/governed-reasoning.html', 'reading/reliable-autonomy.html']) {
+  for (const route of ['reading/', 'reading/start-here.html', 'reading/continuity.html', 'reading/governed-reasoning.html', 'reading/reliable-autonomy.html', 'reading/research-agenda.html', 'reading/literature-map.html', 'reading/continuity-protocol.html', 'reading/belief-update.html', 'reading/memory-prosthetic.html']) {
     for (const [name, width, height] of [['desktop',1440,900],['mobile',390,844],['small-mobile',320,640]]) {
       const page = await browser.newPage({ viewport: { width, height }, reducedMotion: 'reduce' });
       const failures = [];
@@ -57,7 +57,7 @@ try {
       assert.equal(state.overflow, false, `${route} ${name} horizontal overflow`);
       assert.deepEqual(state.missingLinks, []);
       assert.deepEqual(failures, [], `${route} ${name} page load failures`);
-      if (route === 'reading/start-here.html' && name !== 'small-mobile') await page.screenshot({ path: `apps/public-web/evidence/reading-${name}.png`, fullPage: true });
+      if (['reading/start-here.html', 'reading/memory-prosthetic.html', 'reading/research-agenda.html'].includes(route) && name !== 'small-mobile') await page.screenshot({ path: `apps/public-web/evidence/${route.replace(/[^a-z0-9]/gi, '-')}-${name}.png`, fullPage: true });
       await page.keyboard.press('Tab');
       assert.equal(await page.evaluate(() => document.activeElement?.textContent?.trim()), 'Skip to content');
       await page.addScriptTag({ path: require.resolve('axe-core/axe.js') });

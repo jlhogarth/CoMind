@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { getBrowserSupabaseClient } from "@/lib/supabase/browser";
+import { verifyAedBaseline, type BaselineReport } from "@/lib/aed-monitor/baseline";
 import { CoMindMark } from "@/components/CoMindMark";
 
 type Execution = {
@@ -39,6 +40,8 @@ export default function AedMonitorPage() {
   const [state, setState] = useState("");
   const [busy, setBusy] = useState(false);
   const [linkState, setLinkState] = useState<"idle" | "sending" | "sent" | "limited">("idle");
+  const [verification, setVerification] = useState<BaselineReport | null>(null);
+  const [verifying, setVerifying] = useState(false);
 
   const load = useCallback(async (path: string) => {
     const client = getBrowserSupabaseClient();
@@ -103,11 +106,30 @@ export default function AedMonitorPage() {
     }
   }
 
+  async function verifyBaseline() {
+    if (verifying) return;
+    setVerifying(true);
+    setVerification(null);
+    setStatus("Reading and reconciling all AED-007 baseline pages…");
+    try {
+      const report = await verifyAedBaseline(load);
+      setVerification(report);
+      setStatus(report.passed ? "Baseline readback passed." : "Baseline readback found a mismatch. See the results below.");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Baseline readback failed.");
+    } finally {
+      setVerifying(false);
+    }
+  }
+
   return <main className="aed-shell">
     <header className="aed-header"><CoMindMark compact /><div><a href="/">CoMind Control Plane</a><h1>AED monitoring evidence</h1><p>Read-only execution and event history</p></div></header>
     {status && <p role="status" className="aed-notice">{status}</p>}
     {!signedIn && <form onSubmit={sendLink} className="aed-panel"><label>Email for operator sign-in <input type="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label><button type="submit" disabled={linkState !== "idle"}>{linkState === "sending" ? "Sending sign-in link…" : linkState === "sent" ? "Link sent" : linkState === "limited" ? "Email limit reached" : "Send sign-in link"}</button></form>}
-    {signedIn && <button type="button" onClick={async () => { await getBrowserSupabaseClient().auth.signOut(); setSignedIn(false); setHistory(null); setDetail(null); setSelected(null); }}>Sign out</button>}
+    {signedIn && <button type="button" onClick={async () => { await getBrowserSupabaseClient().auth.signOut(); setSignedIn(false); setHistory(null); setDetail(null); setSelected(null); setVerification(null); }}>Sign out</button>}
+    {signedIn && <section className="aed-panel"><h2>AED-007 baseline acceptance</h2><p>Read all eleven event pages through your operator session and compare the three original executions with independently recorded database digests. This checks recorded hashes and timestamps; it does not rehash raw private payloads.</p><button type="button" onClick={verifyBaseline} disabled={verifying}>{verifying ? "Verifying baseline…" : "Verify 246 baseline events"}</button>
+      {verification && <div role="status"><p>{verification.passed ? "PASS" : "FAIL"} · Checked {verification.checkedAt} · {verification.results.reduce((sum, row) => sum + row.received, 0)} of 246 baseline events read</p><ul>{verification.results.map((row) => <li key={row.id}>{row.passed ? "PASS" : "FAIL"} · {row.id} · {row.received}/{row.expected} events · {row.pages} pages · {row.reason}</li>)}</ul></div>}
+    </section>}
     {busy && <p role="status">Loading AED evidence…</p>}
     {history && <section className="aed-panel"><h2>Execution history</h2><div className="aed-scroll"><table><thead><tr><th>Execution</th><th>Lane</th><th>First event</th><th>Last event</th><th>Events</th><th>Evidence</th></tr></thead><tbody>
       {history.rows.map((row) => <tr key={row.execution_id}><td><button type="button" onClick={() => { setSelected(row.execution_id); setEventPage(1); }}>{row.execution_id}</button></td><td>{row.lane_id ?? "Unknown"}</td><td>{row.first_at}</td><td>{row.last_at}</td><td>{row.event_count}</td><td>{validEvidenceUrl(row.workflow_run_url) ? <a href={validEvidenceUrl(row.workflow_run_url)!} target="_blank" rel="noreferrer">Run</a> : "No run link"}</td></tr>)}

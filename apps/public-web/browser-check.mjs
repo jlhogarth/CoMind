@@ -56,14 +56,15 @@ try {
       }));
       assert.equal(state.overflow, false, `${route} ${name} horizontal overflow`);
       assert.deepEqual(state.missingLinks, []);
-      assert.deepEqual(failures, [], `${route} ${name} page load failures`);
+      const pageLoadFailures = [...failures];
+      assert.deepEqual(pageLoadFailures, [], `${route} ${name} page load failures`);
       if (['reading/start-here.html', 'reading/memory-prosthetic.html', 'reading/research-agenda.html'].includes(route) && name !== 'small-mobile') await page.screenshot({ path: `apps/public-web/evidence/${route.replace(/[^a-z0-9]/gi, '-')}-${name}.png`, fullPage: true });
       await page.keyboard.press('Tab');
       assert.equal(await page.evaluate(() => document.activeElement?.textContent?.trim()), 'Skip to content');
       await page.addScriptTag({ path: require.resolve('axe-core/axe.js') });
       const accessibility = await page.evaluate(() => axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] } }));
       assert.deepEqual(accessibility.violations.map(v => ({ id: v.id, impact: v.impact, nodes: v.nodes.length })), [], `${route} ${name} accessibility violations`);
-      console.log(JSON.stringify({ route, name, title: state.title, accessibilityViolations: accessibility.violations.length, failures }));
+      console.log(JSON.stringify({ route, name, title: state.title, accessibilityViolations: accessibility.violations.length, pageLoadFailures, auditSideRequests: failures.slice(pageLoadFailures.length) }));
       await page.close();
     }
   }

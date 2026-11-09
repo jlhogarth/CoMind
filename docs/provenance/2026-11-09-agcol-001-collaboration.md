@@ -25,3 +25,9 @@ Known unrelated CI gate: the No Placeholder Policy on the previous documentation
 ## Remaining proof
 
 The exact AGCOL PR head must pass the build, new tests, MDO and Foundry regressions, then run the guarded live Test job. Inspect the uploaded artifact, database task/lease/authorization/execution/contribution/evidence readback, grant cleanup, and current main before merging. Do not claim enterprise readiness from one pilot.
+
+## First live Test attempt and bounded repair
+
+GitHub Actions AGCOL run 42712431165 at exact head `8e960bae4258e4bf68bc418e98977fbb860dfae1` passed the contract and isolated PostgreSQL claim-scope jobs. The live job connected to Supabase Test, then stopped in fixture preflight before workforce grants or agent execution: the existing synthetic MDO-003 module was at lifecycle stage `specified`, while the historical harness asserted `conceived`. The failed artifact is GitHub artifact 13717040710. The failure does not prove an agent execution.
+
+The repair accepts only the verified pre-build fixture stages `conceived` or `specified`, records the stage before execution, and asserts the readback stage is unchanged. It does not move the module backward or change maturity. Syntax, whitespace and No Placeholder checks passed locally after this edit. A new exact-head CI and live Test run is required.

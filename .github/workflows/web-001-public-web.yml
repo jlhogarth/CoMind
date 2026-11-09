@@ -31,8 +31,10 @@ jobs:
           assert.match(html,/<main id="main">/);
           assert.match(html,/href="#main"/);
           assert.match(html,/prefers-reduced-motion|site.css/);
-          for(const id of ['research','expertise','founder','labs']) assert.match(html,new RegExp('id="'+id+'"'));
-          for(const path of ['brand/comind-brand.css','brand/tokens.css','brand/layout.css','brand/motion.css','brand/experience.css','brand/mode-native.css','site.css']) assert.ok(existsSync(base+path),path);
+          for(const id of ['home','discover','tools','stories','trails','questions','world','about']) assert.match(html,new RegExp('id="'+id+'"'));
+          for(const path of ['brand/comind-brand.css','brand/tokens.css','brand/layout.css','brand/motion.css','brand/experience.css','brand/mode-native.css','site.css','hub.js','decision-clinic.js','reading/decision-clinic.html','reading/reasoning-field-guide.html']) assert.ok(existsSync(base+path),path);
+          assert.match(html,/href="\.\/reading\/decision-clinic\.html"/);
+          assert.match(html,/id="site-search"/);
           assert.ok(!html.includes('service_role'));
           console.log('WEB-001 static content and asset checks passed');
           NODE

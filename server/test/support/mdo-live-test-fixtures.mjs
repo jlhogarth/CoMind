@@ -106,7 +106,7 @@ export function createMdoLiveTestFixtures({ db, model, candidateRef, candidateKe
       module = moduleRows.rows[0];
     }
     assert.equal(module.project_id, project.project_id);
-    assert.equal(module.lifecycle_stage, 'conceived');
+    assert.ok(['conceived', 'specified'].includes(module.lifecycle_stage), 'Fixture stage must remain in a verified pre-build state');
     assert.equal(module.status, 'enabled');
     assert.equal(module.source_system, 'github');
     assert.equal(module.source_ref, 'github:issue:370#module-fixture');

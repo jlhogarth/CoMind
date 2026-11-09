@@ -114,8 +114,8 @@ test('isolated PostgreSQL 17 reader privilege and HTTP proof',{skip:!raw},async(
   assert.equal(first.evaluation.size, 'escalation');
   assert.equal(first.evaluation.rollover, 'blocked');
   const stored = await admin.query(`SELECT id, outcome, details FROM comind_pm.pm_events
-    WHERE source_system = 'runbook_lifecycle_test' AND source_ref = $1`, [
-    `${lifecycleSlot.volumeId}:${lifecycleSlot.scheduledFor}`,
+    WHERE source_system = 'supabase' AND source_ref = $1`, [
+    `drb-003:test:${lifecycleSlot.volumeId}:${lifecycleSlot.scheduledFor}`,
   ]);
   assert.deepEqual(stored.rows, [{ id: first.eventId, outcome: 'blocked', details: first.evaluation }]);
   assert.equal((await readLifecycleFreshness(lifecycleSlot, lifecycleLedger)).status, 'current');

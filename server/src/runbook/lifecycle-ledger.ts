@@ -2,8 +2,8 @@ import type { Pool, PoolClient } from 'pg';
 import type { LifecycleEvaluation, LifecycleLedger, LifecycleReceipt, LifecycleSlot } from './lifecycle.js';
 
 const projectKey = 'COMIND';
-const source = 'runbook_lifecycle_test';
-const sourceRef = (slot: LifecycleSlot) => `${slot.volumeId}:${slot.scheduledFor}`;
+const source = 'supabase';
+const sourceRef = (slot: LifecycleSlot) => `drb-003:test:${slot.volumeId}:${slot.scheduledFor}`;
 
 async function find(queryable: Pool | PoolClient, slot: LifecycleSlot): Promise<LifecycleReceipt | null> {
   const result = await queryable.query<{ id: string; details: LifecycleEvaluation }>(

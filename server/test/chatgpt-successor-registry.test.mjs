@@ -103,7 +103,7 @@ test('inactive predecessor cannot be superseded', async () => {
 
 test('invalid successor identity is rejected before a transaction starts', async () => {
   const client = fakeClient();
-  const result = await promoteChatgptSuccessorBinding(client, input({ successorConversationUrl: 'https://example.com/not-chatgpt' }));
+  const result = await promoteChatgptSuccessorBinding(client, input({ successorConversationUrl: 'https://untrusted.host.invalid/not-chatgpt' }));
   assert.equal(result.promoted, false);
   assert.equal(result.reason, 'successor_registry_identity_invalid');
   assert.equal(client.calls.length, 0);

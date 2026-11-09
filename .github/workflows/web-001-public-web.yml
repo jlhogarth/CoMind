@@ -47,7 +47,7 @@ jobs:
           server_pid=$!
           trap 'kill $server_pid || true' EXIT
           for i in 1 2 3 4 5; do curl -fsS http://127.0.0.1:8765/ -o /tmp/web001-index.html && break || sleep 1; done
-          grep -q 'Intelligence with' /tmp/web001-index.html
+          grep -q 'Follow the question' /tmp/web001-index.html
           curl -fsS http://127.0.0.1:8765/brand/comind-brand.css -o /tmp/web001-brand.css
           curl -fsS http://127.0.0.1:8765/site.css -o /tmp/web001-site.css
           test -s /tmp/web001-brand.css

@@ -43,17 +43,21 @@ jobs:
           set -e
           url='https://comind-web-001-preview.jlhogarth.workers.dev'
           for attempt in 1 2 3 4 5 6 7 8 9 10; do
-            if curl -fsS -D /tmp/web001-headers "$url/" -o /tmp/web001-live.html; then break; fi
+            if curl -fsS -D /tmp/web001-headers "$url/" -o /tmp/web001-live.html && grep -q 'Follow the question' /tmp/web001-live.html; then break; fi
             sleep 3
           done
           test -s /tmp/web001-live.html
-          grep -q 'Intelligence with' /tmp/web001-live.html
+          grep -q 'Follow the question' /tmp/web001-live.html
+          curl -fsS "$url/reading/decision-clinic.html" -o /tmp/web001-clinic.html
+          grep -q 'Bring your own question' /tmp/web001-clinic.html
+          curl -fsS "$url/reading/reasoning-field-guide.html" -o /tmp/web001-guide.html
+          grep -q 'From a claim to a justified next move' /tmp/web001-guide.html
           for path in site.css brand/comind-brand.css brand/tokens.css brand/layout.css brand/motion.css brand/experience.css brand/mode-native.css; do
             curl -fsS "$url/$path" -o /dev/null
           done
           for path in reading/ reading/start-here.html reading/continuity.html reading/governed-reasoning.html reading/reliable-autonomy.html reading/research-agenda.html reading/literature-map.html reading/continuity-protocol.html reading/belief-update.html reading/memory-prosthetic.html reading/decision-clinic.html reading/reasoning-field-guide.html hub.js decision-clinic.js; do
             curl -fsS "$url/$path" -o /dev/null
           done
-          grep -iq 'content-security-policy:' /tmp/web001-headers
+          grep -iq "content-security-policy:.*script-src 'self'" /tmp/web001-headers
           grep -iq 'x-content-type-options: nosniff' /tmp/web001-headers
           echo "Verified HTTPS, homepage, seven CSS assets and security headers: $url"

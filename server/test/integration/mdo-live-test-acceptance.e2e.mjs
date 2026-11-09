@@ -22,7 +22,7 @@ test('MDO-003 executes durable governed Test planning with negative authorizatio
   assert.equal(evidence.readback.role_authorization_count, 12);
   assert.equal(evidence.readback.execution_context_count, 10);
   assert.equal(evidence.readback.plan_status, 'in_review');
-  assert.equal(evidence.readback.module_lifecycle_stage, 'conceived');
+  assert.equal(evidence.readback.module_lifecycle_stage, evidence.module_lifecycle_stage_before);
   assert.equal(evidence.ce_preflight.proceed_allowed, true);
   assert.deepEqual(evidence.negative_authorizations.map(item => item.error_code).sort(), ['authorization_expired', 'authorization_scope_mismatch']);
   assert.equal(evidence.grant_cleanup.active, 0);

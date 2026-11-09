@@ -64,7 +64,7 @@ class AcceptanceSimulationTests(unittest.TestCase):
 
     def make_args(self):
         from argparse import Namespace
-        return Namespace(document_id="A" * 20, session_id="session001",
+        return Namespace(document_id="1dJEOjmLPm9gdw8xsVF8J_dyPK0HDx5N5RmW0ID42cnE", session_id="gci_smoke_20261107",
                          model="gemini-3.5-flash-lite", interval=15, idle=240, maximum=1800)
 
     def run_clock(self, initial_document):
@@ -110,7 +110,7 @@ class AcceptanceSimulationTests(unittest.TestCase):
         return state
 
     def test_one_complete_exchange_exactly_once_and_idle_stop(self):
-        doc = exchange("question001", "CHATGPT", "session001", "Which design is safer?")
+        doc = exchange("question001", "CHATGPT", "gci_smoke_20261107", "Which design is safer?")
         result = self.run_clock(doc)
         self.assertEqual(result["exit"], 0)
         self.assertEqual(result["calls"], 1)
@@ -128,6 +128,26 @@ class AcceptanceSimulationTests(unittest.TestCase):
         self.assertEqual(result["appends"], [])
         self.assertEqual(result["now"], 240)
         self.assertEqual(result["events"][-1], "idle_stopped")
+
+    def test_legacy_collaboration_never_invokes_gemini(self):
+        legacy_id = "1T2pSlnnLysrUagxLiXm2sWp7K_gHsa1FUl97eiKx5G0"
+        allowed, reason = module.authorized_document(legacy_id, "session001")
+        self.assertFalse(allowed)
+        self.assertEqual(reason, "document_not_authorized_for_automatic_invocation")
+        with patch.dict("os.environ", {"GCI_ENABLE_LIVE": "true", "GEMINI_API_KEY": "test"},
+                        clear=True), patch.object(module, "google_session") as connect:
+            args = self.make_args()
+            args.document_id = legacy_id
+            self.assertEqual(module.run(args), 5)
+            connect.assert_not_called()
+
+    def test_unregistered_document_rejected(self):
+        self.assertFalse(module.authorized_document("A" * 20, "gci_smoke_20261107")[0])
+
+    def test_registered_document_rejects_other_session(self):
+        doc = "1dJEOjmLPm9gdw8xsVF8J_dyPK0HDx5N5RmW0ID42cnE"
+        self.assertFalse(module.authorized_document(doc, "session001")[0])
+        self.assertTrue(module.authorized_document(doc, "gci_smoke_20261107")[0])
 
     def test_missing_google_federation_fails_closed(self):
         with patch.dict("os.environ", {"GCI_ENABLE_LIVE": "true", "GEMINI_API_KEY": "test"},

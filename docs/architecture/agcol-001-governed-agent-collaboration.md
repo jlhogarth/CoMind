@@ -3,7 +3,7 @@
 Date: 2026-11-09
 Issue: https://github.com/jlhogarth/CoMind/issues/548
 Governance: T2 bounded cross-agent Test execution, C1 specialist ceiling
-Status: implementation contract, not runtime activation
+Status: Test implementation candidate; live activation requires exact-head readback
 Production authorization: false
 Paid-provider authorization: false
 

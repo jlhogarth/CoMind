@@ -40,7 +40,7 @@ jobs:
           command: deploy
       - name: Verify live preview
         run: |
-          set -e
+          set -ex
           url='https://comind-web-001-preview.jlhogarth.workers.dev'
           for attempt in 1 2 3 4 5 6 7 8 9 10; do
             if curl -fsS -D /tmp/web001-headers "$url/" -o /tmp/web001-live.html && grep -q 'Follow the question' /tmp/web001-live.html; then break; fi

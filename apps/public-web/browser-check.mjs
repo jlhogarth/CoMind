@@ -17,12 +17,6 @@ try {
     const response = await page.goto(base, { waitUntil: 'networkidle' });
     assert.equal(response.status(), 200);
     await page.screenshot({ path: `apps/public-web/evidence/${name}.png`, fullPage: true });
-    await page.locator('#site-search').fill('belief');
-    await page.locator('#search-button').click();
-    assert.match(await page.locator('#search-results').innerText(), /Belief update specification/);
-    await page.locator('#site-search').fill('no-such-topic');
-    assert.match(await page.locator('#search-results').innerText(), /No match/);
-    await page.locator('#site-search').fill('');
     const state = await page.evaluate(() => ({
       overflow: document.documentElement.scrollWidth > innerWidth,
       missingTargets: [...document.querySelectorAll('nav a[href^="#"]')].filter(a => !document.getElementById(a.hash.slice(1))).map(a => a.hash),
@@ -38,6 +32,12 @@ try {
     await page.keyboard.press('Tab');
     const focus = await page.evaluate(() => document.activeElement?.textContent?.trim());
     assert.equal(focus, 'Skip to content');
+    await page.locator('#site-search').fill('belief');
+    await page.locator('#search-button').click();
+    assert.match(await page.locator('#search-results').innerText(), /Belief update specification/);
+    await page.locator('#site-search').fill('no-such-topic');
+    assert.match(await page.locator('#search-results').innerText(), /No match/);
+    await page.locator('#site-search').fill('');
     assert.equal(state.overflow, false, `${name} horizontal overflow`);
     assert.deepEqual(state.missingTargets, []);
     assert.equal(state.reducedMotion, true);

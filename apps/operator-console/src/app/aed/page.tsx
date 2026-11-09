@@ -19,6 +19,10 @@ type Page<T> = { rows: T[]; total: number; page: number; pageSize: number };
 type Detail = Page<Event> & { execution: Execution; evidence_detail_limit: string };
 
 const pageSize = 25;
+function eventField(value: string | null, kind: string, appliesTo: string[]) {
+  if (value !== null && value !== "") return value;
+  return appliesTo.includes(kind) ? "Not recorded" : "N/A";
+}
 function validEvidenceUrl(value: string | null) {
   if (!value) return null;
   try {
@@ -146,9 +150,10 @@ export default function AedMonitorPage() {
       {history.rows.map((row) => <tr key={row.execution_id}><td><button type="button" aria-label={`Open execution ${row.execution_id}`} onClick={() => openExecution(row.execution_id)}>View {row.execution_id}</button></td><td>{row.lane_id ?? "Unknown"}</td><td>{row.first_at}</td><td>{row.last_at}</td><td>{row.event_count}</td><td>{validEvidenceUrl(row.workflow_run_url) ? <a href={validEvidenceUrl(row.workflow_run_url)!} target="_blank" rel="noreferrer">Run</a> : "No run link"}</td></tr>)}
     </tbody></table></div><p>Page {historyPage} of {Math.max(1, Math.ceil(history.total / pageSize))}</p><button disabled={historyPage <= 1} onClick={() => setHistoryPage(historyPage - 1)}>Previous</button><button disabled={historyPage * pageSize >= history.total} onClick={() => setHistoryPage(historyPage + 1)}>Next</button></section>}
     {detail && <section id="aed-execution-detail" className="aed-panel" tabIndex={-1}><h2>Execution {detail.execution.execution_id}</h2><p>Source SHA-256: <code>{detail.execution.source_sha256}</code></p><p>Artifact SHA-256: <code>{detail.execution.artifact_sha256 ?? "Unavailable"}</code></p><p>{detail.evidence_detail_limit}</p>
+      <p><strong>Cost evidence:</strong> {detail.rows.filter((row) => row.actual_cost_usd !== null).length} of {detail.rows.length} events on this page have a recorded USD charge. The approved event view does not include token usage. A USD estimate cannot be calculated from elapsed time, output bytes, or heartbeats. Reconcile provider billing or Work usage records by execution and time window. “N/A” below means the field does not describe that event type; “Not recorded” means no value was captured.</p>
       <div className="aed-filters"><label>Event type <input value={kind} onChange={(event) => { setKind(event.target.value); setEventPage(1); }} /></label><label>State <input value={state} onChange={(event) => { setState(event.target.value); setEventPage(1); }} /></label></div>
-      <div className="aed-scroll"><table><thead><tr><th>Sequence</th><th>Timestamp</th><th>Type</th><th>State</th><th>Outcome</th><th>Case</th><th>Wake</th><th>Provider</th><th>Actual cost USD</th><th>Elapsed ms</th><th>Payload SHA-256</th></tr></thead><tbody>
-        {detail.rows.map((row) => <tr key={row.sequence}><td>{row.sequence}</td><td>{row.event_at}</td><td>{row.kind}</td><td>{row.state ?? "Unknown"}</td><td>{row.outcome ?? "Unknown"}</td><td>{row.case_id ?? "None"}</td><td>{row.wake_source ?? "Unknown"}</td><td>{row.provider ?? "Unknown"}</td><td>{row.actual_cost_usd ?? "Unmeasured"}</td><td>{row.elapsed_ms}</td><td><code>{row.payload_sha256}</code></td></tr>)}
+      <div className="aed-scroll"><table><thead><tr><th>Sequence</th><th>Timestamp</th><th>Type</th><th>State</th><th>Outcome</th><th>Case</th><th>Wake</th><th>Provider</th><th>Recorded charge USD</th><th>Elapsed ms</th><th>Payload SHA-256</th></tr></thead><tbody>
+        {detail.rows.map((row) => <tr key={row.sequence}><td>{row.sequence}</td><td>{row.event_at}</td><td>{row.kind}</td><td>{eventField(row.state, row.kind, ["aed_event"])}</td><td>{eventField(row.outcome, row.kind, ["aed_event"])}</td><td>{eventField(row.case_id, row.kind, ["aed_event"])}</td><td>{eventField(row.wake_source, row.kind, ["aed_event"])}</td><td>{eventField(row.provider, row.kind, ["preflight"])}</td><td>{row.actual_cost_usd ?? "Not recorded"}</td><td>{row.elapsed_ms}</td><td><code>{row.payload_sha256}</code></td></tr>)}
       </tbody></table></div><p>{detail.total} matching events. Page {eventPage} of {Math.max(1, Math.ceil(detail.total / pageSize))}.</p><button disabled={eventPage <= 1} onClick={() => setEventPage(eventPage - 1)}>Previous</button><button disabled={eventPage * pageSize >= detail.total} onClick={() => setEventPage(eventPage + 1)}>Next</button>
     </section>}
   </main>;

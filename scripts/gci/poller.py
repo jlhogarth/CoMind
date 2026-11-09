@@ -201,7 +201,19 @@ def run(args: argparse.Namespace) -> int:
                                  f"[COMIND_EXCHANGE_START id=g_{msg.exchange_id} role=GEMINI session={args.session_id}]\n"
                                  f"{answer}\n[COMIND_EXCHANGE_COMPLETE id=g_{msg.exchange_id}]")
                         append(client, args.document_id, reply)
-                        event("delivered", exchange=msg.exchange_id, sha256=digest, usage=usage)
+                        # Never report a delivery solely because the write returned 2xx.
+                        # Read back the document to establish the marker and response
+                        # really became visible before recording a successful delivery.
+                        verified_content, _ = export(client, args.document_id)
+                        expected_marker = f"[COMIND_REPLY parent={msg.exchange_id} session={args.session_id}]"
+                        expected_complete = f"[COMIND_EXCHANGE_COMPLETE id=g_{msg.exchange_id}]"
+                        if (expected_marker not in verified_content or
+                                expected_complete not in verified_content or
+                                answer not in verified_content):
+                            event("delivery_unverified", exchange=msg.exchange_id)
+                            return 6
+                        event("delivered", exchange=msg.exchange_id, sha256=digest, usage=usage,
+                              readback_sha256=hashlib.sha256(verified_content.encode()).hexdigest())
                         last_activity = time.monotonic()
                     except Exception as exc:
                         event("processing_failed", exchange=msg.exchange_id, reason=type(exc).__name__)

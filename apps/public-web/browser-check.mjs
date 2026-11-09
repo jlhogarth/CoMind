@@ -40,7 +40,7 @@ try {
     console.log(JSON.stringify({ name, width, height, state, firstFocus: focus, accessibilityViolations: accessibility.violations.length, failures }));
     await page.close();
   }
-  for (const route of ['reading/', 'reading/start-here.html', 'reading/continuity.html', 'reading/governed-reasoning.html', 'reading/reliable-autonomy.html', 'reading/research-agenda.html', 'reading/literature-map.html', 'reading/continuity-protocol.html', 'reading/belief-update.html', 'reading/memory-prosthetic.html']) {
+  for (const route of ['reading/', 'reading/start-here.html', 'reading/continuity.html', 'reading/governed-reasoning.html', 'reading/reliable-autonomy.html', 'reading/research-agenda.html', 'reading/literature-map.html', 'reading/continuity-protocol.html', 'reading/belief-update.html', 'reading/memory-prosthetic.html', 'reading/decision-clinic.html']) {
     for (const [name, width, height] of [['desktop',1440,900],['mobile',390,844],['small-mobile',320,640]]) {
       const page = await browser.newPage({ viewport: { width, height }, reducedMotion: 'reduce' });
       const failures = [];
@@ -58,9 +58,17 @@ try {
       assert.deepEqual(state.missingLinks, []);
       const pageLoadFailures = [...failures];
       assert.deepEqual(pageLoadFailures, [], `${route} ${name} page load failures`);
-      if (['reading/start-here.html', 'reading/memory-prosthetic.html', 'reading/research-agenda.html'].includes(route) && name !== 'small-mobile') await page.screenshot({ path: `apps/public-web/evidence/${route.replace(/[^a-z0-9]/gi, '-')}-${name}.png`, fullPage: true });
+      if (['reading/start-here.html', 'reading/memory-prosthetic.html', 'reading/research-agenda.html', 'reading/decision-clinic.html'].includes(route) && name !== 'small-mobile') await page.screenshot({ path: `apps/public-web/evidence/${route.replace(/[^a-z0-9]/gi, '-')}-${name}.png`, fullPage: true });
       await page.keyboard.press('Tab');
       assert.equal(await page.evaluate(() => document.activeElement?.textContent?.trim()), 'Skip to content');
+      if (route === 'reading/decision-clinic.html') {
+        const disclosures = page.locator('.clinic-case details');
+        assert.equal(await disclosures.count(), 3);
+        await disclosures.first().locator('summary').focus();
+        await page.keyboard.press('Enter');
+        assert.equal(await disclosures.first().evaluate(el => el.open), true);
+        assert.match(await disclosures.first().innerText(), /current invitation says 11:30/);
+      }
       await page.addScriptTag({ path: require.resolve('axe-core/axe.js') });
       const accessibility = await page.evaluate(() => axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] } }));
       assert.deepEqual(accessibility.violations.map(v => ({ id: v.id, impact: v.impact, nodes: v.nodes.length })), [], `${route} ${name} accessibility violations`);

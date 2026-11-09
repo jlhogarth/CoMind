@@ -9,6 +9,7 @@ import argparse
 import hashlib
 import json
 import os
+import pathlib
 import re
 import sys
 import time
@@ -59,6 +60,30 @@ def eligible(content: str, session_id: str) -> list[Exchange]:
         seen.add(key)
         found.append(Exchange(exchange_id, sid, body.strip()))
     return found
+
+
+REGISTRY_PATH = pathlib.Path(__file__).resolve().parents[2] / "docs/integrations/gci-001-collaboration-registry.json"
+
+
+def authorized_document(document_id: str, session_id: str) -> tuple[bool, str]:
+    """Fail closed unless a test dispatch is explicitly registered.
+
+    Legacy CM-XAI and governance documents remain inventory/read-only.
+    No historic turn is replayed into a billable Gemini invocation.
+    """
+    try:
+        register = json.loads(REGISTRY_PATH.read_text(encoding="utf-8"))
+        matches = [entry for entry in register["entries"] if entry["document_id"] == document_id]
+        if len(matches) != 1:
+            return False, "document_not_uniquely_registered"
+        entry = matches[0]
+        if entry["mode"] != "test_dispatch_allowed" or entry["protocol"] != "COMIND-v1":
+            return False, "document_not_authorized_for_automatic_invocation"
+        if not entry.get("auto_invoke_gemini") or entry.get("session_id") != session_id:
+            return False, "document_session_not_authorized"
+        return True, "registered_test_document"
+    except (OSError, KeyError, ValueError, TypeError):
+        return False, "document_registry_unavailable"
 
 
 def google_session() -> AuthorizedSession:
@@ -131,6 +156,10 @@ def run(args: argparse.Namespace) -> int:
     if os.environ.get("GCI_ENABLE_LIVE", "false").lower() != "true":
         event("disabled", reason="GCI_ENABLE_LIVE not true")
         return 0
+    allowed, gate_reason = authorized_document(args.document_id, args.session_id)
+    if not allowed:
+        event("rejected", reason=gate_reason)
+        return 5
     api_key = os.environ.get("GEMINI_API_KEY", "")
     if not api_key or not os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
         event("failed", reason="Gemini key or OIDC credentials file unavailable")

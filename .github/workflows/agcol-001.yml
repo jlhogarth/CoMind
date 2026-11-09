@@ -162,6 +162,8 @@ jobs:
       OLLAMA_BASE_URL: http://127.0.0.1:11434
       OLLAMA_MODEL: qwen3:0.6b
       MDO_TEST_ARTIFACT: artifacts/agcol-001-test-acceptance.json
+      AGCOL_TEST_RUN: 'true'
+      AGCOL_CANDIDATE_REF: ${{ github.event.pull_request.head.sha }}
     steps:
       - name: Checkout exact candidate
         uses: actions/checkout@v4

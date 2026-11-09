@@ -17,6 +17,12 @@ try {
     const response = await page.goto(base, { waitUntil: 'networkidle' });
     assert.equal(response.status(), 200);
     await page.screenshot({ path: `apps/public-web/evidence/${name}.png`, fullPage: true });
+    await page.locator('#site-search').fill('belief');
+    await page.locator('#search-button').click();
+    assert.match(await page.locator('#search-results').innerText(), /Belief update specification/);
+    await page.locator('#site-search').fill('no-such-topic');
+    assert.match(await page.locator('#search-results').innerText(), /No match/);
+    await page.locator('#site-search').fill('');
     const state = await page.evaluate(() => ({
       overflow: document.documentElement.scrollWidth > innerWidth,
       missingTargets: [...document.querySelectorAll('nav a[href^="#"]')].filter(a => !document.getElementById(a.hash.slice(1))).map(a => a.hash),
@@ -40,7 +46,7 @@ try {
     console.log(JSON.stringify({ name, width, height, state, firstFocus: focus, accessibilityViolations: accessibility.violations.length, failures }));
     await page.close();
   }
-  for (const route of ['reading/', 'reading/start-here.html', 'reading/continuity.html', 'reading/governed-reasoning.html', 'reading/reliable-autonomy.html', 'reading/research-agenda.html', 'reading/literature-map.html', 'reading/continuity-protocol.html', 'reading/belief-update.html', 'reading/memory-prosthetic.html', 'reading/decision-clinic.html']) {
+  for (const route of ['reading/', 'reading/start-here.html', 'reading/continuity.html', 'reading/governed-reasoning.html', 'reading/reliable-autonomy.html', 'reading/research-agenda.html', 'reading/literature-map.html', 'reading/continuity-protocol.html', 'reading/belief-update.html', 'reading/memory-prosthetic.html', 'reading/decision-clinic.html', 'reading/reasoning-field-guide.html']) {
     for (const [name, width, height] of [['desktop',1440,900],['mobile',390,844],['small-mobile',320,640]]) {
       const page = await browser.newPage({ viewport: { width, height }, reducedMotion: 'reduce' });
       const failures = [];
@@ -58,10 +64,26 @@ try {
       assert.deepEqual(state.missingLinks, []);
       const pageLoadFailures = [...failures];
       assert.deepEqual(pageLoadFailures, [], `${route} ${name} page load failures`);
-      if (['reading/start-here.html', 'reading/memory-prosthetic.html', 'reading/research-agenda.html', 'reading/decision-clinic.html'].includes(route) && name !== 'small-mobile') await page.screenshot({ path: `apps/public-web/evidence/${route.replace(/[^a-z0-9]/gi, '-')}-${name}.png`, fullPage: true });
+      if (['reading/start-here.html', 'reading/memory-prosthetic.html', 'reading/research-agenda.html', 'reading/decision-clinic.html', 'reading/reasoning-field-guide.html'].includes(route) && name !== 'small-mobile') await page.screenshot({ path: `apps/public-web/evidence/${route.replace(/[^a-z0-9]/gi, '-')}-${name}.png`, fullPage: true });
       await page.keyboard.press('Tab');
       assert.equal(await page.evaluate(() => document.activeElement?.textContent?.trim()), 'Skip to content');
       if (route === 'reading/decision-clinic.html') {
+        await page.locator('#aid-decision').fill('Announce the guide');
+        await page.locator('#aid-stakes').selectOption('high');
+        await page.locator('#aid-reverse').selectOption('no');
+        await page.locator('#aid-next').click();
+        await page.locator('#aid-observed').fill('The deployment job is green');
+        await page.locator('#aid-next').click();
+        await page.locator('#aid-inference').fill('The page is available');
+        await page.locator('#aid-next').click();
+        await page.locator('#aid-action').fill('Read the public URL');
+        await page.locator('#aid-review').click();
+        assert.match(await page.locator('#aid-signal').innerText(), /Pause and verify/);
+        assert.match(await page.locator('#aid-gaps').innerText(), /source|where the observation came from/i);
+        assert.match(await page.locator('#aid-memo').innerText(), /Announce the guide/);
+        await page.locator('#aid-clear').click();
+        assert.equal(await page.locator('#aid-decision').inputValue(), '');
+        assert.equal(await page.locator('#aid-output').isVisible(), false);
         const disclosures = page.locator('.clinic-case details');
         assert.equal(await disclosures.count(), 3);
         await disclosures.first().locator('summary').focus();

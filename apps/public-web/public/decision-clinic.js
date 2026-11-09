@@ -33,5 +33,5 @@ form.addEventListener('submit',event=>{
 });
 document.querySelector('#aid-edit').addEventListener('click',()=>showStep(current));
 document.querySelector('#aid-print').addEventListener('click',()=>window.print());
-form.addEventListener('reset',()=>{setTimeout(()=>{showStep(0);document.querySelector('#aid-decision').focus()},0)});
+form.addEventListener('reset',()=>{showStep(0);setTimeout(()=>document.querySelector('#aid-decision').focus(),0)});
 showStep(0,false);

@@ -48,10 +48,18 @@ jobs:
           done
           test -s /tmp/web001-live.html
           grep -q 'Follow the question' /tmp/web001-live.html
-          curl -fsS "$url/reading/decision-clinic.html" -o /tmp/web001-clinic.html
-          grep -q 'Bring your own question' /tmp/web001-clinic.html
-          curl -fsS "$url/reading/reasoning-field-guide.html" -o /tmp/web001-guide.html
-          grep -q 'From a claim to a justified next move' /tmp/web001-guide.html
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            curl -fsS "$url/reading/decision-clinic.html" -o /tmp/web001-clinic.html
+            if grep -q 'Bring your own question' /tmp/web001-clinic.html; then break; fi
+            sleep 3
+          done
+          grep -q 'Bring your own question' /tmp/web001-clinic.html || { echo 'Decision Clinic served stale content'; grep -o '<h1[^>]*>[^<]*' /tmp/web001-clinic.html | head; exit 1; }
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            curl -fsS "$url/reading/reasoning-field-guide.html" -o /tmp/web001-guide.html
+            if grep -q 'From a claim to a justified next move' /tmp/web001-guide.html; then break; fi
+            sleep 3
+          done
+          grep -q 'From a claim to a justified next move' /tmp/web001-guide.html || { echo 'Field guide served stale content'; grep -o '<h1[^>]*>[^<]*' /tmp/web001-guide.html | head; exit 1; }
           for path in site.css brand/comind-brand.css brand/tokens.css brand/layout.css brand/motion.css brand/experience.css brand/mode-native.css; do
             curl -fsS "$url/$path" -o /dev/null
           done

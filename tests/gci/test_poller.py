@@ -67,7 +67,7 @@ class AcceptanceSimulationTests(unittest.TestCase):
         return Namespace(document_id="1dJEOjmLPm9gdw8xsVF8J_dyPK0HDx5N5RmW0ID42cnE", session_id="gci_smoke_20261107",
                          model="gemini-3.5-flash-lite", interval=15, idle=240, maximum=1800)
 
-    def run_clock(self, initial_document):
+    def run_clock(self, initial_document, drop_reply=False):
         state = {"now": 0, "content": initial_document, "version": 1, "calls": 0,
                  "metadata_checks": 0, "appends": [], "gemini_prompts": []}
 
@@ -83,7 +83,8 @@ class AcceptanceSimulationTests(unittest.TestCase):
             return state["content"], "text/plain"
 
         def append(_client, _id, payload):
-            state["content"] += "\n" + payload + "\n"
+            if not (drop_reply and "[COMIND_REPLY" in payload):
+                state["content"] += "\n" + payload + "\n"
             state["version"] += 1
             state["appends"].append(payload)
 
@@ -119,7 +120,16 @@ class AcceptanceSimulationTests(unittest.TestCase):
         self.assertEqual(sum("[COMIND_REPLY" in v for v in result["appends"]), 1)
         self.assertEqual(result["now"], 240)
         self.assertEqual(result["events"][-1], "idle_stopped")
+        self.assertIn("delivered", result["events"])
         self.assertGreaterEqual(result["metadata_checks"], 10)
+
+    def test_unverified_reply_never_reports_delivery(self):
+        doc = exchange("question001", "CHATGPT", "gci_smoke_20261107", "Check writeback")
+        result = self.run_clock(doc, drop_reply=True)
+        self.assertEqual(result["exit"], 6)
+        self.assertEqual(result["calls"], 1)
+        self.assertIn("delivery_unverified", result["events"])
+        self.assertNotIn("delivered", result["events"])
 
     def test_no_exchange_no_billable_calls_and_idle_stop(self):
         result = self.run_clock("No complete exchange.")

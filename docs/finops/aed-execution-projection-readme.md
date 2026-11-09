@@ -1,22 +1,20 @@
-# FinOps AED evidence projection, Issue #550
+# Private AED reconciliation
 
-## Verified 2026-11-09 against primary Supabase Test
+FinOps owns this read-only report under issue #550 and draft PR #551. AED-007 owns the three reused scripts, collection, monitoring, ingestion and recovery under issue #540 and draft PR #541. This is T1 reversible Test development. It creates no database objects, credentials, policies, billing receipts or Production deployment. The authorized private Drive writeback is a T2 recordkeeping action kept outside the API receipt ledger.
 
-The read-only query in `aed-execution-readonly-projection.sql` was executed against project `sbgfuanxiqepcoboxzcl` before committing. It returned exactly three executions, 65, 122, and 59 events, with all three `sequence_verified=true`. All three `actual_cost_usd` values were NULL. Each execution has one provider-tagged event; provider tags are not cost receipts. No table, view, policy, grant, or other database object was created.
+## Operator workflow
 
-The query joins only existing private AED execution and event relations, aggregates by immutable execution ID, checks event-count and sequence continuity, and preserves workflow and source/artifact SHA-256 provenance. It deliberately excludes raw event payload. It does not turn process elapsed time into Work credits.
+1. In a read-only transaction through the existing authorized private SQL connection, execute [the projection](aed-execution-readonly-projection.sql). Save the complete returned array of rows as a private JSON file. For a client that returns one object per row, convert its result to an array. Never export raw payloads to this report.
+2. Obtain the AED-007 tools from the verified [PR #541 commit](https://github.com/jlhogarth/CoMind/tree/32d19fc955b9620db5c3ddcfadb8420362bf9cdb/server/scripts). The bridge verifies the pinned bytes before executing them. The dependency is explicit while the AED lane remains separate. The normal default test path is `server/scripts` once the reviewed dependency is available there.
+3. Run `python scripts/finops_aed_reconciliation.py --help` for inputs. Pass `--projection-json` the private query result. For each archive, pass `--aed-tools` the verified script directory and `--proof` the local archive path, its SHA-256 from the independent provenance record, and its authorized private source reference. Supply the tools directory once when passing multiple proofs. Redirect the JSON output to a private destination. The CLI exits on the first invalid input without emitting a partial report. Without proofs, it still reports the Supabase rows with no observed account meter.
+4. Keep output in the authorized private workspace or Drive structure. The report is queryable JSON and does not run a public service. It contains account readings and their provenance links. Keep those out of GitHub.
 
-## Reuse of existing observation intake
+The bridge checks the archive SHA-256 and every manifested member. It reuses AED-007 to verify the execution identity, contiguous events, snapshot hashes, timing and sidecar digest, and to regenerate the AED report. A matching persisted row must also have verified sequence and hash coverage plus identical execution ID, source digest, event count and execution boundaries. Archive-only runs are explicitly marked outside Supabase. Shared-account windows that overlap are refused as ambiguous. Missing readings and balance increases do not produce consumption values. The historical alternate SQL file `aed_execution_evidence_projection.sql` predates this bridge and remains a reference.
 
-AED-007 Issue #540, draft PR #541, branch `issue-540-aed-007-transaction-monitor` owns the existing personal-plan before/after meter-observation intake. Do not create a duplicate capture or alter that lane from Issue #550. A future reconciled report must consume its *validated* observation output by execution digest, not by timestamp alone. Only after actual account snapshots exist may it report a shared-account allowance delta, labeled `observed_unallocated`; it must never call that an exact per-execution charge without exclusivity evidence. Unknown historical deltas remain NULL.
+The JSON separates measured process and FlowOps bytes from account-meter movement. Account differences are observed and unallocated. The projection reports AED cost-evidence coverage and keeps actual and estimated USD null until a verified financial source exists. A provider tag alone does not establish billing. SQL token totals include reporting terminal steps only and may represent partial telemetry. A runtime model is unavailable in the current AED event contract.
 
-AED source: `apps/operator-console/docs/AED-007-RETRIEVAL.md`; Drive checkpoint: https://docs.google.com/document/d/1CNNQYLWXXCi_D6B_3gHPwoKIZF7kXFbTv4_tU-v7ydo/edit . FinOps audit: Issue #550. Canonical API Cost Register: https://docs.google.com/spreadsheets/d/1bmexEZ1KGFblStLNZOdX5qm7CagqqG1o9T1-0zHl9b8/edit . No provider receipt rows were found in `comind.cm_api_cost_receipt` at audit time. These are separate accounting categories.
+## Verification and evidence
 
-## Acceptance and security
-
-- Live query readback: PASS, three rows and 246 event counts; all three continuity checks true.
-- Source provenance retained: PASS, execution ID, workflow URL, source and artifact hashes.
-- Unknown cost not misrepresented as zero: PASS, NULL for all three executions.
-- Existing observation intake reused by reference: DESIGN CONTRACT ONLY; no real meter observations available, no cross-source join yet.
-- Authenticated application-level FinOps report, CI regression, and real Work allowance reconciliation: NOT YET VERIFIED.
-- Keep private AED schema unexposed; no browser grants, SQL SECURITY DEFINER, schema migration, Production deployment, paid inference, or new monitoring pipeline.
+- With the verified AED tools directory in `FINOPS_AED_TOOLS`, run `python scripts/test_finops_aed_reconciliation.py -v`. The tests use synthetic inputs and invoke the same pinned AED scripts.
+- Run [the baseline and permissions assertion](../../db/verification/verify_finops_aed_readonly_projection.sql) in CoMind Test. To exercise enforcement, start a fresh read-only transaction for each of `anon` and `authenticated`, set the local role, and run the projection. Expect SQLSTATE `42501` for both. The authorized operator query must succeed. Use the appropriate reader connection when available.
+- [RunBook evidence](../runbook/FINOPS-550-AED-RECONCILIATION.md) records the acceptance outcome, integration limits, failure evidence, and next action.

@@ -5,10 +5,15 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createFileAudit, loadPrivatePrincipals } from '../dist/runbook/security.js';
 import { randomBytes } from 'node:crypto';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { Pool } from 'pg';
 import { projectRunbookLanes } from '../../apps/primary-interface/src/drb-lanes.mjs';
 import { buildRunbookQueryService } from '../dist/runbook/query-service.js';
 import { createRunbookReadQuery, verifyRunbookReader } from '../dist/runbook/database.js';
+
+import { createTestLifecycleLedger } from '../dist/runbook/lifecycle-ledger.js';
+import { readLifecycleFreshness, runLifecycleCheck } from '../dist/runbook/lifecycle.js';
 
 const raw=process.env.DRB_TEST_ADMIN_URL;
 test('isolated PostgreSQL 17 reader privilege and HTTP proof',{skip:!raw},async()=>{
@@ -92,6 +97,46 @@ test('isolated PostgreSQL 17 reader privilege and HTTP proof',{skip:!raw},async(
   const auditRecords=(await readFile(auditPath,'utf8')).trim().split('\n').map(JSON.parse);
   assert.ok(auditRecords.some(r=>r.status===401));assert.ok(auditRecords.some(r=>r.status===200));
   assert.equal(JSON.stringify(auditRecords).includes(token),false);
+  // Share the existing disposable PostgreSQL fixture with the lifecycle contract.
+  const lifecycleLedger = createTestLifecycleLedger(admin);
+  const lifecycleSlot = { volumeId: 'isolated-lifecycle-fixture', scheduledFor: '2026-11-09T14:00:00.000Z' };
+  assert.equal((await readLifecycleFreshness(lifecycleSlot, lifecycleLedger)).status, 'missed');
+  const readSnapshot = async () => ({
+    snapshot: {
+      documentId: lifecycleSlot.volumeId,
+      revisionId: 'test-revision',
+      tabs: [{ tabId: 't.0', body: { content: [{ endIndex: 750001 }] } }],
+    },
+  });
+  const [first, retry] = await Promise.all(Array.from({ length: 2 }, () =>
+    runLifecycleCheck(lifecycleSlot, lifecycleLedger, readSnapshot, () => '2026-11-09T14:01:00.000Z')));
+  assert.deepEqual(first, retry);
+  assert.equal(first.evaluation.size, 'escalation');
+  assert.equal(first.evaluation.rollover, 'blocked');
+  const stored = await admin.query(`SELECT id, outcome, details FROM comind_pm.pm_events
+    WHERE source_system = 'runbook_lifecycle_test' AND source_ref = $1`, [
+    `${lifecycleSlot.volumeId}:${lifecycleSlot.scheduledFor}`,
+  ]);
+  assert.deepEqual(stored.rows, [{ id: first.eventId, outcome: 'blocked', details: first.evaluation }]);
+  assert.equal((await readLifecycleFreshness(lifecycleSlot, lifecycleLedger)).status, 'current');
+  const cliPath = new URL('../dist/runbook/lifecycle-cli.js', import.meta.url);
+  const execute = promisify(execFile);
+  const command = (...args) => execute(process.execPath, [cliPath.pathname, ...args], {
+    env: { ...process.env, DRB_TEST_ADMIN_URL: raw },
+  });
+  const cliSlot = { ...lifecycleSlot, scheduledFor: new Date(Date.now() - 60_000).toISOString() };
+  const cliArgs = [cliSlot.volumeId, cliSlot.scheduledFor];
+  await assert.rejects(command('status', ...cliArgs), error =>
+    error.code === 2 && JSON.parse(error.stdout).status === 'missed');
+  const fixturePath = join(privateDirectory, 'lifecycle.json');
+  await writeFile(fixturePath, JSON.stringify({
+    ...await readSnapshot(),
+    retention: [{ classification: 'routine', hold: 'unknown' }],
+  }));
+  const cliReceipt = JSON.parse((await command('check', ...cliArgs, fixturePath)).stdout);
+  assert.deepEqual(cliReceipt.evaluation.retention.dispositions, ['blocked_missing_retention_evidence']);
+  const cliStatus = JSON.parse((await command('status', ...cliArgs)).stdout);
+  assert.deepEqual(cliStatus, { status: 'current', receipt: cliReceipt });
   const original=(await admin.query("select name from comind_pm.pm_projects where project_key='COMIND'")).rows[0].name;
   await assert.rejects(read("update comind_pm.pm_projects set name='denied'",[]));
   assert.equal((await admin.query("select name from comind_pm.pm_projects where project_key='COMIND'")).rows[0].name,original);

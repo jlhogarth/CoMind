@@ -1,5 +1,10 @@
 name: GCI-001 On-demand Gemini Collaboration
 on:
+  push:
+    branches:
+      - gci-001-on-demand-gemini-review
+    paths:
+      - ".github/workflows/gci-001-on-demand-gemini.yml"
   workflow_dispatch:
     inputs:
       session_id:
@@ -34,8 +39,21 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  offline:
+    name: Register workflow or verify disabled dispatch
+    if: >-
+      github.ref == 'refs/heads/gci-001-on-demand-gemini-review' &&
+      (github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && !inputs.enable_live))
+    permissions: {}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - run: echo "GCI live access is disabled. No Google or Gemini calls."
   poll:
-    if: ${{ github.ref == 'refs/heads/gci-001-on-demand-gemini-review' }}
+    if: >-
+      github.ref == 'refs/heads/gci-001-on-demand-gemini-review' &&
+      github.event_name == 'workflow_dispatch' && inputs.enable_live
     permissions:
       contents: read
       id-token: write
@@ -56,7 +74,6 @@ jobs:
       - name: Validate parser and protocol
         run: python -m unittest discover -s tests/gci -v
       - name: Authenticate Google Drive (keyless OIDC)
-        if: ${{ inputs.enable_live }}
         uses: google-github-actions/auth@v3
         with:
           project_id: comind-513807

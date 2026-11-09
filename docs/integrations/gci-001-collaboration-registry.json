@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "owner_lane": "GCI-001",
+  "issue": "https://github.com/jlhogarth/CoMind/issues/544",
+  "entries": [
+    {
+      "key": "legacy_aed_credit_review",
+      "document_id": "1T2pSlnnLysrUagxLiXm2sWp7K_gHsa1FUl97eiKx5G0",
+      "title": "CoMind AED x Astra Credit Review | Gemini-ChatGPT Exchange | 2026-11-03",
+      "role": "legacy_collaboration_record",
+      "protocol": "CM-XAI-v1",
+      "mode": "read_only",
+      "auto_invoke_gemini": false,
+      "permitted_actions": [
+        "inventory",
+        "read_provenance",
+        "human_authorized_append"
+      ],
+      "migration": "Preserve turn IDs CM-XAI-001, CM-XAI-002 and CM-XAI-PROTOCOL-002, append-only. Never reinterpret historic turns as a new Gemini API request; any future handoff must be a newly authorized COMIND envelope in a scoped live document. No bulk replay.",
+      "security": "Restricted owner-only verified on 2026-11-09; external sharing requires separate document-level approval.",
+      "review_limit": "Four cycles or earlier stop conditions in original document; no autonomous ChatGPT wake."
+    },
+    {
+      "key": "gci_isolated_acceptance",
+      "document_id": "1dJEOjmLPm9gdw8xsVF8J_dyPK0HDx5N5RmW0ID42cnE",
+      "title": "CoMind GCI-001 | Isolated Live Acceptance Exchange | 2026-11-07",
+      "role": "synthetic_test_exchange",
+      "protocol": "COMIND-v1",
+      "mode": "test_dispatch_allowed",
+      "auto_invoke_gemini": true,
+      "permitted_actions": [
+        "test_dispatch",
+        "read",
+        "append_claim",
+        "append_reply"
+      ],
+      "session_id": "gci_smoke_20261107",
+      "security": "Restricted owner-only on last readback, targeted service-account editor grant not yet verified. Test-only synthetic content."
+    },
+    {
+      "key": "gci_architecture",
+      "document_id": "1kzwoIvy3ZJMbuA2DwMx74pDJ2LyGG7BJsNgrxB6TdDI",
+      "role": "governance_specification",
+      "protocol": "GCI-design",
+      "mode": "read_only",
+      "auto_invoke_gemini": false
+    },
+    {
+      "key": "gci_protocol",
+      "document_id": "17AQSjG5OW7yqVQe5gqSzZdFZeqcoHEXNMtMaBDvCLx0",
+      "role": "protocol_specification",
+      "protocol": "GCI-design",
+      "mode": "read_only",
+      "auto_invoke_gemini": false
+    },
+    {
+      "key": "gci_runbook",
+      "document_id": "1bIEYHSU_IDxWAHaEY-P3tu7gw9Az-S2_3UKfGJ-wBjI",
+      "role": "operations_specification",
+      "protocol": "GCI-design",
+      "mode": "read_only",
+      "auto_invoke_gemini": false
+    },
+    {
+      "key": "gci_flow",
+      "document_id": "1HaUQoYrMWxc3LGGxB4aXAbOGfVeO8T4KWPRQm5_I1Tg",
+      "role": "diagram_specification",
+      "protocol": "GCI-design",
+      "mode": "read_only",
+      "auto_invoke_gemini": false
+    }
+  ]
+}

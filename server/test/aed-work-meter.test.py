@@ -120,6 +120,23 @@ class WorkMeterTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 evidence.reconcile(execution, bad, after, root / "bad.json")
 
+    def test_browser_observation_provenance_is_preserved(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            before, after = root / "before.json", root / "after.json"
+            execution = root / "execution.jsonl"
+            evidence.capture(before, datetime.now(timezone.utc).isoformat(), 37, 43,
+                             capture_method="browser_observation", weekly=27)
+            self.assertEqual(monitor.run([sys.executable, "-c", "print('test')"], execution, 10), 0)
+            evidence.capture(after, datetime.now(timezone.utc).isoformat(), 34, 43,
+                             capture_method="browser_observation", weekly=26)
+            result = root / "result.json"
+            row = evidence.reconcile(execution, before, after, result)
+            self.assertEqual(row["source"], "openai_usage_ui_browser")
+            self.assertEqual(row["weekly_percentage_points_observed"], 1)
+            self.assertEqual(reporter.report([execution], usage_evidence=[result])[0]
+                             ["work_account_meter"]["source"], "openai_usage_ui_browser")
+
 
 if __name__ == "__main__":
     unittest.main()

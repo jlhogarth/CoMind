@@ -29,19 +29,25 @@ def save_exclusive(path, value):
         destination.write("\n")
 
 
-def capture(path, captured_at, allowance=None, purchased=None, evidence_sha256=None):
+def capture(path, captured_at, allowance=None, purchased=None, evidence_sha256=None,
+            capture_method="operator_transcription", weekly=None):
     at = timestamp(captured_at)
     if at > datetime.now(timezone.utc):
         raise ValueError("future meter reading")
-    if allowance is None and purchased is None:
+    if allowance is None and purchased is None and weekly is None:
         raise ValueError("at least one account meter value is required")
     if evidence_sha256 is not None and (len(evidence_sha256) != 64 or
                                         any(c not in "0123456789abcdef" for c in evidence_sha256)):
         raise ValueError("invalid evidence SHA-256")
-    row = {"schema": "comind.aed.work-usage-snapshot.v1", "source": "openai_usage_ui_manual",
-           "captured_at": at.isoformat(), "capture_method": "operator_transcription",
+    sources = {"operator_transcription": "openai_usage_ui_manual",
+               "browser_observation": "openai_usage_ui_browser"}
+    if capture_method not in sources:
+        raise ValueError("invalid capture method")
+    row = {"schema": "comind.aed.work-usage-snapshot.v1", "source": sources[capture_method],
+           "captured_at": at.isoformat(), "capture_method": capture_method,
            "evidence_sha256": evidence_sha256,
            "included_allowance_remaining_percent": number(allowance, 100) if allowance is not None else None,
+           "weekly_allowance_remaining_percent": number(weekly, 100) if weekly is not None else None,
            "purchased_credits_remaining": number(purchased) if purchased is not None else None}
     save_exclusive(path, row)
     return row
@@ -53,14 +59,20 @@ def load_snapshot(path):
         raise ValueError("snapshot size out of bounds")
     row = json.loads(raw)
     expected = {"schema", "source", "captured_at", "capture_method", "evidence_sha256",
-                "included_allowance_remaining_percent", "purchased_credits_remaining"}
+                "included_allowance_remaining_percent", "weekly_allowance_remaining_percent",
+                "purchased_credits_remaining"}
+    sources = {"operator_transcription": "openai_usage_ui_manual",
+               "browser_observation": "openai_usage_ui_browser"}
     if set(row) != expected or row["schema"] != "comind.aed.work-usage-snapshot.v1" or \
-            row["source"] != "openai_usage_ui_manual" or row["capture_method"] != "operator_transcription":
+            row["source"] != sources.get(row["capture_method"]):
         raise ValueError("invalid snapshot contract")
     timestamp(row["captured_at"])
-    if row["included_allowance_remaining_percent"] is None and row["purchased_credits_remaining"] is None:
+    if all(row[key] is None for key in ("included_allowance_remaining_percent",
+                                        "weekly_allowance_remaining_percent", "purchased_credits_remaining")):
         raise ValueError("empty snapshot")
-    for key, maximum in (("included_allowance_remaining_percent", 100), ("purchased_credits_remaining", None)):
+    for key, maximum in (("included_allowance_remaining_percent", 100),
+                         ("weekly_allowance_remaining_percent", 100),
+                         ("purchased_credits_remaining", None)):
         if row[key] is not None and (type(row[key]) not in (int, float) or
                                      number(row[key], maximum) != row[key]):
             raise ValueError("invalid meter value")
@@ -86,20 +98,24 @@ def reconcile(execution_path, before_path, after_path, output_path):
         raise ValueError("inconsistent execution evidence")
     before, before_hash = load_snapshot(before_path)
     after, after_hash = load_snapshot(after_path)
+    if before["source"] != after["source"]:
+        raise ValueError("mixed meter sources")
     before_at, after_at = timestamp(before["captured_at"]), timestamp(after["captured_at"])
     if before_at > timestamp(rows[0]["at"]) or after_at < timestamp(rows[-1]["at"]) or after_at <= before_at:
         raise ValueError("meter readings do not bracket execution")
     deltas = {}
     for key, label in (("included_allowance_remaining_percent", "allowance_percentage_points"),
+                       ("weekly_allowance_remaining_percent", "weekly_percentage_points"),
                        ("purchased_credits_remaining", "purchased_credits")):
         first, last = before[key], after[key]
         deltas[label] = round(first - last, 6) if first is not None and last is not None and first >= last else None
     result = {"schema": "comind.aed.work-usage-reconciliation.v1", "execution_id": execution_id,
               "execution_sha256": hashlib.sha256(raw).hexdigest(), "before_snapshot_sha256": before_hash,
               "after_snapshot_sha256": after_hash, "before_at": before["captured_at"],
-              "after_at": after["captured_at"], "source": "openai_usage_ui_manual",
+              "after_at": after["captured_at"], "source": before["source"],
               "account_scope": "shared", "attribution": "unallocated",
               "allowance_percentage_points_observed": deltas["allowance_percentage_points"],
+              "weekly_percentage_points_observed": deltas["weekly_percentage_points"],
               "purchased_credits_observed": deltas["purchased_credits"],
               "actual_work_charge_usd": None,
               "limits": "Display refresh and other account activity can affect the observed difference."}
@@ -114,8 +130,11 @@ def main():
     snap.add_argument("--out", type=Path, required=True)
     snap.add_argument("--captured-at", required=True, help="Timezone-aware time when the UI value was seen")
     snap.add_argument("--allowance-remaining-percent")
+    snap.add_argument("--weekly-remaining-percent")
     snap.add_argument("--purchased-credits-remaining")
     snap.add_argument("--evidence-sha256", help="Optional SHA-256 of a private screenshot")
+    snap.add_argument("--capture-method", choices=["operator_transcription", "browser_observation"],
+                      default="operator_transcription")
     pair = actions.add_parser("reconcile")
     pair.add_argument("--execution", type=Path, required=True)
     pair.add_argument("--before", type=Path, required=True)
@@ -124,7 +143,8 @@ def main():
     args = parser.parse_args()
     try:
         result = (capture(args.out, args.captured_at, args.allowance_remaining_percent,
-                          args.purchased_credits_remaining, args.evidence_sha256)
+                          args.purchased_credits_remaining, args.evidence_sha256, args.capture_method,
+                          args.weekly_remaining_percent)
                   if args.action == "capture" else
                   reconcile(args.execution, args.before, args.after, args.out))
     except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError) as error:

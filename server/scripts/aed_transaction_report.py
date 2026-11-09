@@ -17,17 +17,20 @@ def report(paths, case=None, usage_evidence=()):
         row = json.loads(raw)
         required = {"schema", "execution_id", "execution_sha256", "before_snapshot_sha256",
                     "after_snapshot_sha256", "before_at", "after_at", "source", "account_scope",
-                    "attribution", "allowance_percentage_points_observed", "purchased_credits_observed",
+                    "attribution", "allowance_percentage_points_observed", "weekly_percentage_points_observed",
+                    "purchased_credits_observed",
                     "actual_work_charge_usd", "limits"}
         if set(row) != required or row["schema"] != "comind.aed.work-usage-reconciliation.v1" or \
-                row["source"] != "openai_usage_ui_manual" or row["attribution"] != "unallocated" or \
+                row["source"] not in ("openai_usage_ui_manual", "openai_usage_ui_browser") or \
+                row["attribution"] != "unallocated" or \
                 row["account_scope"] != "shared" or row["actual_work_charge_usd"] is not None:
             raise ValueError("invalid usage reconciliation")
         for key in ("execution_sha256", "before_snapshot_sha256", "after_snapshot_sha256"):
             digest = row[key]
             if not isinstance(digest, str) or len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest):
                 raise ValueError("invalid reconciliation hash")
-        for key in ("allowance_percentage_points_observed", "purchased_credits_observed"):
+        for key in ("allowance_percentage_points_observed", "weekly_percentage_points_observed",
+                    "purchased_credits_observed"):
             value = row[key]
             if value is not None and (type(value) not in (int, float) or not math.isfinite(value) or value < 0):
                 raise ValueError("invalid reconciliation meter")

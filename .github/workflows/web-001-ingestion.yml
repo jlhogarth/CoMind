@@ -1,0 +1,34 @@
+name: WEB-001 Visitor Ingestion Contract
+on:
+  pull_request:
+    paths:
+      - 'apps/public-web/ingestion/**'
+      - 'apps/public-web/migrations/visitor_contributions_test.sql'
+      - '.github/workflows/web-001-ingestion.yml'
+  push:
+    branches:
+      - web-001-public-headquarters-foundation
+    paths:
+      - 'apps/public-web/ingestion/**'
+      - 'apps/public-web/migrations/visitor_contributions_test.sql'
+      - '.github/workflows/web-001-ingestion.yml'
+permissions:
+  contents: read
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax and secure ingress contract
+        run: |
+          node --check apps/public-web/ingestion/worker.mjs
+          node --check apps/public-web/ingestion/worker.test.mjs
+          node --test apps/public-web/ingestion/worker.test.mjs
+      - name: Schema security guardrails
+        run: |
+          grep -qi 'enable row level security' apps/public-web/migrations/visitor_contributions_test.sql
+          grep -qi 'revoke all' apps/public-web/migrations/visitor_contributions_test.sql
+          grep -qi 'withdrawal_token_hash' apps/public-web/migrations/visitor_contributions_test.sql

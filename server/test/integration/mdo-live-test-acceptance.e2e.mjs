@@ -7,7 +7,7 @@ const harness = createMdoLiveTestHarness({
   ollamaBaseUrl: process.env.OLLAMA_BASE_URL ?? 'http://127.0.0.1:11434',
   model: process.env.OLLAMA_MODEL ?? 'qwen3:0.6b',
   artifactPath: process.env.MDO_TEST_ARTIFACT ?? 'artifacts/mdo-003-test-acceptance.json',
-  candidateRef: process.env.GITHUB_SHA,
+  candidateRef: process.env.AGCOL_CANDIDATE_REF ?? process.env.GITHUB_SHA,
   runAttempt: process.env.GITHUB_RUN_ATTEMPT ?? '1',
 });
 
@@ -28,6 +28,10 @@ test('MDO-003 executes durable governed Test planning with negative authorizatio
   assert.equal(evidence.grant_cleanup.active, 0);
   assert.equal(evidence.production_authorized, false);
   assert.equal(evidence.paid_provider_authorized, false);
+  if (process.env.AGCOL_TEST_RUN === 'true') {
+    assert.equal(evidence.issue, 548);
+    assert.equal(evidence.candidate_ref, process.env.AGCOL_CANDIDATE_REF);
+  }
 });
 
 test.after(async () => {

@@ -35,7 +35,9 @@
         "append_reply"
       ],
       "session_id": "gci_smoke_20261107",
-      "security": "Restricted owner-only on last readback, targeted service-account editor grant not yet verified. Test-only synthetic content."
+      "security": "Restricted owner-only on last readback, targeted service-account editor grant not yet verified. Test-only synthetic content.",
+      "exchange_id": "question0001",
+      "payload_sha256": "a68c05e7078ba7841567262adc22691635706de0641f26a5026e66ce9f99adba"
     },
     {
       "key": "gci_architecture",

@@ -1,51 +1,27 @@
-# GCI-001 | On-demand Gemini Collaboration (TEST ONLY)
+# GCI-001 | On-demand Gemini collaboration in Test
 
-Issue: #544. Source specifications: GCI-001 through GCI-004 in CoMind Google Drive. No production deployment.
+[Issue #544](https://github.com/jlhogarth/CoMind/issues/544) · [Draft PR #545](https://github.com/jlhogarth/CoMind/pull/545)
 
-The workflow is **manually dispatched and off by default**. To run, select a fresh `session_id`, authorized Google Doc `document_id`, and explicitly set `enable_live=true`. After startup, the runner immediately inspects the document, checks metadata every 15 seconds, and stops after 240 seconds of inactivity or 30 minutes total. It invokes Gemini only for complete CHATGPT-origin envelopes belonging to the active session.
+GCI-001 is an off-by-default, manually dispatched Test workflow. Its only authorized Gemini input is the exact synthetic prompt registered as `question0001` in session `gci_smoke_20261107`. The repository registry pins its SHA-256 digest. Other documents, sessions, exchanges and edited versions of the prompt are ineligible. The original CM-XAI conversation is preserved separately. An active ChatGPT session or a user return is required to review a reply in chat.
 
-Required GitHub Actions secret: `GEMINI_API_KEY` (reported installed by the operator; secret value and current validity not independently verified). Google Drive authentication now uses keyless GitHub OIDC, via `google-github-actions/auth@v3` and scoped Workload Identity Federation, instead of a long-lived JSON key. Required repository **variables**: `GCI_WIF_PROVIDER` and `GCI_SERVICE_ACCOUNT_EMAIL`, whose real values are printed by `scripts/gci/bootstrap-google-oidc.sh` after Google Cloud setup. Never store any private key in the public repository. No live dispatch may proceed until both variables, the provider IAM policy, and service-account document sharing are read back.
+## Resume live acceptance
 
-## Send a completed request
+1. Open Google Cloud Console for project `comind-513807`. Use Cloud Shell to retrieve `scripts/gci/bootstrap-google-oidc.sh` from the exact reviewed GCI branch commit. Run `bash -n` and run the script with `--audit`. Confirm the identity for numeric ID `102716239802737631124`, project access, API state, dedicated provider and effective service-account access. Audit leaves IAM and APIs unchanged. An existing provider with different trust rules, an extra provider, a direct project grant, a user-managed key or an unexpected impersonation binding requires review. The script checks direct project and service-account policy. The administrator must separately check inherited policy and organization constraints.
+2. Apply the reviewed script with `--apply` from an authorized administrative session, then rerun `--audit` to confirm the provider and binding. The script scopes GitHub trust to immutable repository and owner IDs, the exact Test branch and workflow, and the dispatch event. It grants impersonation only on the designated service account. Use the printed identifiers for `GCI_WIF_PROVIDER` and `GCI_SERVICE_ACCOUNT_EMAIL` repository variables. Confirm `GEMINI_API_KEY` by secret name only.
+3. Share only the [isolated synthetic Google Doc](https://docs.google.com/document/d/1dJEOjmLPm9gdw8xsVF8J_dyPK0HDx5N5RmW0ID42cnE/edit) with the verified account as Editor. Read back that file's ACL and preserve human ownership and Restricted general access. The runner verifies its Drive identity and the visible, untrashed Drive inventory before reading the document.
+4. Resolve registration for `.github/workflows/gci-001-on-demand-gemini.yml`. GitHub requires a file with that path on the default branch for `workflow_dispatch`. The proposed registration-only change is an inert workflow definition at the same path and with the same inputs, with no checkout, secrets or OIDC permissions on the default branch. Verify default-branch deployment hooks and obtain any required approval before that change. Do not merge the implementation to register it. [GitHub workflow event reference](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_dispatch)
+5. Dispatch the reviewed Test branch with `enable_live=true`, `preflight_only=true`, the registered document and session, and `gemini-3.5-flash-lite`. Verify the identity, Drive inventory, document version, eligible exchange and the key's access to model metadata. The preflight makes zero generation requests and writes nothing.
+6. Dispatch once with the same inputs and `preflight_only=false` after confirming the existing Gemini project and cost boundary. The runner sends at most one generation request per run for the registered synthetic input, with a 512-output-token cap and no inference retry. Verify the generation attempt, provider-reported usage if available, reply digest, Docs revision, one logical reply and `idle_stopped` after at least 240 seconds of meaningful inactivity. Google Drive metadata is polled every 15 seconds. The job has a 35-minute outer timeout, and the poller stops scheduling work after its 30-minute deadline.
+7. Independently reread the Docs reply and digest. Inspect again in read-only preflight, which verifies an existing complete receipt and sends no generation request. Keep run IDs and sanitized evidence in the [acceptance journal](gci-001-acceptance-evidence-2026-11-07.md). Avoid exposing prompt or response bodies, credentials and tokens in the public repository.
 
-Use a designated collaborative Google Doc and enter the exact markers:
+## Concurrency and recovery
 
-```text
-[COMIND_EXCHANGE_START id=question0001 role=CHATGPT session=session001]
-What alternative architecture would you recommend?
-[COMIND_EXCHANGE_COMPLETE id=question0001]
-```
+GitHub serializes runs for a document. The poller reads the Google Docs text and revision in one request, then applies the claim with `requiredRevisionId`. Competing claims against that revision cannot both succeed. The reply also uses a required revision, so concurrent human edits fail closed. A second Docs read checks parent correlation, the complete envelope and SHA-256 digest before reporting delivery. A claim with a missing, duplicated or invalid receipt is quarantined on restart. A provider timeout or interrupted write must be reconciled before any fresh authorization. Never delete a claim to retry a possibly billed request.
 
-The runner appends `[COMIND_CLAIM ...]` before invoking Gemini, then appends `[COMIND_REPLY ...]` and a GEMINI envelope after a response. Existing claims are never automatically retried, to avoid unbounded duplicate billable calls. If a call fails after the claim, reconcile manually before retrying or using a new exchange ID.
+The isolated Test still relies on the document for durable claim and receipt evidence. A document editor can remove both markers, so document revisions alone cannot enforce durable replay protection after deliberate edits. GCI-002 requires a separate transactional exchange ledger, with a unique exchange key and leases, before multi-session or shared-editor use. That larger integration requires an independently validated Test database target and migration. Provider idempotency and exactly-once network execution remain unverified.
 
-## Current limitations
+## Validation and rollback
 
-Initial implementation uses the Google Doc itself as the durable minimal claim/reply record. This is *not* a transactional Supabase ledger; two independent writers or an interrupted append can still require operator reconciliation. Never use parallel live workflows for the same doc. This code does not automatically resume a dormant ChatGPT conversation. It has no authenticated operator-console toggle yet. No hourly existing automation is modified. No service account secret is presumed to exist. Credential and live integration validation remain required before acceptance.
+Run `python -m pip install -r scripts/gci/requirements.txt`, `bash -n scripts/gci/bootstrap-google-oidc.sh` and `python -m unittest discover -s tests/gci -v`. To run the four-minute timer with stubbed providers and a real clock, set `GCI_TEST_REAL_IDLE=true` and filter to `-k real_elapsed`.
 
-## Tests
-
-`python -m pip install -r scripts/gci/requirements.txt`
-
-`python -m unittest discover -s tests/gci -v`
-
-## Rollback
-
-Disable the GitHub workflow or cancel its active run; no schedulers or persistent server remain. The document is not deleted. Review orphaned claims manually.
-
-## Security
-
-The repository is public. Do not publish transcript content, sensitive prompts, session secrets, credential JSON, or internal URLs. Current implementation assumes the designated Google Doc is safe for Gemini disclosure and relies on operator consent prior to each session. Future improvements include stricter allowlisting, durable transactional leases, redaction, usage budgets, retry/backoff and complete operator-console readback.
-
-## Google Cloud bootstrap (not yet executed)
-
-Cloud project verified from operator-provided console URL: `comind-513807`. Service-account numeric ID: `102716239802737631124`; its actual email cannot be inferred without Google Cloud IAM readback. The file `scripts/gci/bootstrap-google-oidc.sh` is an auditable, fail-closed Cloud Shell helper that finds the service account by numeric ID; enables IAM, IAM Credentials, Security Token Service, Drive and Docs APIs; creates a repo-and-workflow-and-branch-scoped GitHub OIDC provider; and grants `roles/iam.workloadIdentityUser` **on that service account**, not broadly on the project. It prints the two GitHub **variable** values. This is a Google Cloud write operation and MUST be inspected and executed by the project administrator. It was not executed by ChatGPT, which lacks Google Cloud Console/IAM administrative access.
-
-After applying the script, set the printed repository variables in GitHub Settings > Secrets and variables > Actions > Variables. The only secret needed is the previously reported `GEMINI_API_KEY`. Share ONLY an isolated designated test Google Doc with the returned service-account email, as **Editor**. The test file's permissions must be rechecked; the CoMind project root stays Restricted. Review project policies and any billing/API quotas before actual API requests. The WIF condition is restricted to this **test branch**. Before merging this workflow to `main`, create a separately reviewed production/ref IAM binding and change the provider condition. Do not loosen it automatically.
-
-Do not dispatch a live run until all prerequisites are proven. The expected evidence is a workflow run ID, isolated protocol test result, one claim marker, one Gemini reply marker, Google Doc readback hash, elapsed idle duration, and explicit `idle_stopped` event. This application does not autonomously wake ChatGPT.
-
-### Current evidence checkpoint
-
-- Security: November 5, 2026 Drive metadata readback showed owner-only access on CoMind root, Architecture, Exports, GCI documents, PDF, and original collaboration document. No broad-link grants remained on inspected items.
-- Code: PR #545, branch `gci-001-on-demand-gemini-review`. Keyless workflow and Cloud Shell bootstrap committed, but Google Cloud configuration and live API/idle tests are unverified.
-- Isolation: existing hourly Gemini Review Watch and AED workflows untouched.
+Cancel an active run or disable the workflow to stop execution. Keep the document evidence and review ambiguous claims manually. If the Test is retired, remove only the verified GCI-specific service-account document grant and federation binding. The hourly Gemini Review Watch operates independently.

@@ -1,8 +1,11 @@
 """Pure contract tests: do not call Google or Gemini."""
 import importlib.util
+import json
+import os
+import time
 import pathlib
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 FILE = pathlib.Path(__file__).resolve().parents[2] / "scripts/gci/poller.py"
 spec = importlib.util.spec_from_file_location("gci_poller", FILE)
@@ -40,9 +43,22 @@ class ParserTests(unittest.TestCase):
         doc += "\n[COMIND_REPLY parent=question001 session=session001]"
         self.assertEqual(module.eligible(doc, "session001"), [])
 
-    def test_duplicate_question_only_once(self):
-        doc = exchange("question001", "CHATGPT", "session001", "Hello") * 2
-        self.assertEqual(len(module.eligible(doc, "session001")), 1)
+    def test_duplicate_question_is_quarantined(self):
+        entry = exchange("question001", "CHATGPT", "session001", "Hello")
+        doc = "\n".join([entry, entry])
+        self.assertEqual(module.eligible(doc, "session001"), [])
+
+    def test_nested_start_cannot_be_included_in_another_payload(self):
+        doc = "[COMIND_EXCHANGE_START id=question001 role=CHATGPT session=session001]\n"
+        doc += exchange("question002", "GEMINI", "session001", "Hello")
+        doc += "\n[COMIND_EXCHANGE_COMPLETE id=question001]"
+        self.assertEqual(module.eligible(doc, "session001"), [])
+
+    def test_completion_digest_is_checked(self):
+        doc = exchange("question001", "CHATGPT", "session001", "Hello")
+        good = doc[:-1] + f" sha256={module.sha256('Hello')}]"
+        self.assertEqual(len(module.eligible(good, "session001")), 1)
+        self.assertEqual(module.eligible(good.replace("Hello", "Changed"), "session001"), [])
 
     def test_incomplete_end_marker_does_not_match(self):
         doc = "[COMIND_EXCHANGE_START id=question001 role=CHATGPT session=session001]\nHi\n"
@@ -65,9 +81,13 @@ class AcceptanceSimulationTests(unittest.TestCase):
     def make_args(self):
         from argparse import Namespace
         return Namespace(document_id="1dJEOjmLPm9gdw8xsVF8J_dyPK0HDx5N5RmW0ID42cnE", session_id="gci_smoke_20261107",
-                         model="gemini-3.5-flash-lite", interval=15, idle=240, maximum=1800)
+                         model=module.MODEL, interval=15, idle=240, maximum=1800, preflight=False)
 
-    def run_clock(self, initial_document, drop_reply=False):
+    def run_clock(self, initial_document, drop_reply=False, *, fail_at=None, preflight=False, real_clock=False):
+        args = self.make_args()
+        args.preflight = preflight
+        authorization, _ = module.authorized_document(args.document_id, args.session_id)
+        authorization["payload_sha256"] = module.sha256("Which design is safer?")
         state = {"now": 0, "content": initial_document, "version": 1, "calls": 0,
                  "metadata_checks": 0, "appends": [], "gemini_prompts": []}
 
@@ -76,42 +96,60 @@ class AcceptanceSimulationTests(unittest.TestCase):
 
         def metadata(_client, _id):
             state["metadata_checks"] += 1
-            return {"mimeType": "application/vnd.google-apps.document",
+            return {"id": args.document_id, "mimeType": "application/vnd.google-apps.document",
                     "version": str(state["version"])}
 
-        def export(_client, _id):
-            return state["content"], "text/plain"
+        def snapshot(_client, _id):
+            return state["content"], str(state["version"])
 
-        def append(_client, _id, payload):
+        def append(_client, _id, revision, payload):
+            self.assertEqual(revision, str(state["version"]))
+            if fail_at == "claim":
+                raise module.requests.HTTPError(response=Mock(status_code=400))
+            if fail_at == "reply" and "[COMIND_REPLY" in payload:
+                raise module.requests.Timeout
             if not (drop_reply and "[COMIND_REPLY" in payload):
                 state["content"] += "\n" + payload + "\n"
             state["version"] += 1
             state["appends"].append(payload)
+            return str(state["version"])
 
         def gemini(_key, _model, prompt):
             state["calls"] += 1
             state["gemini_prompts"].append(prompt)
-            return "A bounded alternate design.", {"promptTokenCount": 5}
+            if fail_at == "gemini":
+                raise module.requests.Timeout
+            if fail_at == "cancel":
+                raise KeyboardInterrupt
+            return "A bounded alternate design.", {"usageMetadata": {"promptTokenCount": 5}}
 
         credentials = {"GCI_ENABLE_LIVE": "true", "GEMINI_API_KEY": "not-a-real-key",
-                       "GOOGLE_APPLICATION_CREDENTIALS": "/nonexistent/federation.json"}
+                       "GOOGLE_APPLICATION_CREDENTIALS": "/nonexistent/federation.json",
+                       "GCI_SERVICE_ACCOUNT_EMAIL": "test-identity"}
+        monotonic = time.monotonic if real_clock else lambda: state["now"]
+        sleep = time.sleep if real_clock else advance
         with (
             patch.dict("os.environ", credentials),
             patch.object(module, "google_session", return_value=object()),
             patch.object(module, "metadata", side_effect=metadata),
-            patch.object(module, "export", side_effect=export),
+            patch.object(module, "snapshot", side_effect=snapshot),
+            patch.object(module, "authorized_document", return_value=(authorization, "registered")),
+            patch.object(module, "verify_identity"),
+            patch.object(module, "verify_document_access"),
+            patch.object(module, "verify_model"),
             patch.object(module, "append", side_effect=append),
             patch.object(module, "ask_gemini", side_effect=gemini),
-            patch.object(module.time, "monotonic", side_effect=lambda: state["now"]),
-            patch.object(module.time, "sleep", side_effect=advance),
+            patch.object(module.time, "monotonic", side_effect=monotonic),
+            patch.object(module.time, "sleep", side_effect=sleep),
             patch.object(module, "event") as capture,
         ):
-            state["exit"] = module.run(self.make_args())
+            state["exit"] = module.run(args)
+            state["details"] = [call.kwargs for call in capture.call_args_list]
             state["events"] = [call.args[0] for call in capture.call_args_list]
         return state
 
     def test_one_complete_exchange_exactly_once_and_idle_stop(self):
-        doc = exchange("question001", "CHATGPT", "gci_smoke_20261107", "Which design is safer?")
+        doc = exchange("question0001", "CHATGPT", "gci_smoke_20261107", "Which design is safer?")
         result = self.run_clock(doc)
         self.assertEqual(result["exit"], 0)
         self.assertEqual(result["calls"], 1)
@@ -124,12 +162,60 @@ class AcceptanceSimulationTests(unittest.TestCase):
         self.assertGreaterEqual(result["metadata_checks"], 10)
 
     def test_unverified_reply_never_reports_delivery(self):
-        doc = exchange("question001", "CHATGPT", "gci_smoke_20261107", "Check writeback")
+        doc = exchange("question0001", "CHATGPT", "gci_smoke_20261107", "Which design is safer?")
         result = self.run_clock(doc, drop_reply=True)
         self.assertEqual(result["exit"], 6)
         self.assertEqual(result["calls"], 1)
         self.assertIn("delivery_unverified", result["events"])
         self.assertNotIn("delivered", result["events"])
+
+    def test_read_only_preflight_makes_no_writes_or_generation_requests(self):
+        doc = exchange("question0001", "CHATGPT", "gci_smoke_20261107", "Which design is safer?")
+        result = self.run_clock(doc, preflight=True)
+        self.assertEqual((result["exit"], result["calls"], result["appends"]), (0, 0, []))
+
+    def test_unapproved_edit_never_reaches_gemini(self):
+        doc = exchange("question0001", "CHATGPT", "gci_smoke_20261107", "Edited question")
+        result = self.run_clock(doc)
+        self.assertEqual((result["calls"], result["appends"]), (0, []))
+
+    def test_revision_conflict_at_claim_never_reaches_gemini(self):
+        doc = exchange("question0001", "CHATGPT", "gci_smoke_20261107", "Which design is safer?")
+        result = self.run_clock(doc, fail_at="claim")
+        self.assertEqual((result["exit"], result["calls"]), (3, 0))
+        self.assertEqual(result["details"][-1]["http_status"], 400)
+
+    def test_ambiguous_failures_preserve_claim_and_do_not_retry_on_restart(self):
+        doc = exchange("question0001", "CHATGPT", "gci_smoke_20261107", "Which design is safer?")
+        for stage, exit_code in [("gemini", 3), ("reply", 3), ("cancel", 130)]:
+            with self.subTest(stage=stage):
+                result = self.run_clock(doc, fail_at=stage)
+                self.assertEqual((result["exit"], result["calls"]), (exit_code, 1))
+                self.assertEqual(len(result["appends"]), 1)
+                restarted = self.run_clock(result["content"])
+                self.assertEqual((restarted["exit"], restarted["calls"]), (7, 0))
+                self.assertIn("orphaned_or_invalid_receipt", restarted["events"])
+
+    def test_tampered_reply_blocks_restart_without_regeneration(self):
+        doc = exchange("question0001", "CHATGPT", "gci_smoke_20261107", "Which design is safer?")
+        result = self.run_clock(doc)
+        restarted = self.run_clock(result["content"].replace("A bounded alternate design.", "Edited answer."))
+        self.assertEqual((restarted["exit"], restarted["calls"]), (7, 0))
+
+    def test_completed_exchange_is_not_processed_again_on_restart(self):
+        doc = exchange("question0001", "CHATGPT", "gci_smoke_20261107", "Which design is safer?")
+        result = self.run_clock(doc)
+        restarted = self.run_clock(result["content"])
+        self.assertEqual((restarted["exit"], restarted["calls"], restarted["appends"]), (0, 0, []))
+
+    @unittest.skipUnless(os.environ.get("GCI_TEST_REAL_IDLE") == "true", "opt-in elapsed-time test")
+    def test_real_elapsed_idle_with_stubbed_providers(self):
+        doc = exchange("question0001", "CHATGPT", "gci_smoke_20261107", "Which design is safer?")
+        result = self.run_clock(doc, real_clock=True)
+        self.assertEqual(result["exit"], 0)
+        self.assertEqual(result["events"][-1], "idle_stopped")
+        self.assertGreaterEqual(result["details"][-1]["idle_seconds"], 240)
+        print(json.dumps(result["details"][-1]), flush=True)
 
     def test_no_exchange_no_billable_calls_and_idle_stop(self):
         result = self.run_clock("No complete exchange.")

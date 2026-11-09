@@ -182,19 +182,24 @@ def private_report(projection, proofs):
         complete = (row["sequence_verified"] is True and count > 0
                     and row["observed_events"] == row["hashed_events"] == row["distinct_sequences"] == count
                     and row["min_sequence"] == 1 and row["max_sequence"] == count)
+        if not complete:
+            # Incomplete or duplicated event sequences cannot support execution totals.
+            row.update(input_tokens=None, output_tokens=None, duration_ms=None)
         rows[identity] = {**row, "persisted_in_supabase": True,
                           "verification": "supabase_sequence_and_hash_coverage" if complete else "incomplete",
                           "work_account_meter": {"status": "not_observed"}, "flowops": None}
 
-    meter_windows, source_hashes = [], set()
+    meter_windows, source_hashes, snapshot_hashes = [], set(), set()
     for proof in proofs:
         identity = proof["execution_id"]
         meter = proof["work_account_meter"]
         start, end = instant(meter["before_at"]), instant(meter["after_at"])
-        if (proof["source_sha256"] in source_hashes
+        snapshots = {meter["before_snapshot_sha256"], meter["after_snapshot_sha256"]}
+        if (proof["source_sha256"] in source_hashes or snapshots & snapshot_hashes
                 or any(start < other_end and other_start < end for other_start, other_end in meter_windows)):
             raise ValueError("duplicate or overlapping shared-account reconciliation")
         source_hashes.add(proof["source_sha256"])
+        snapshot_hashes.update(snapshots)
         meter_windows.append((start, end))
         stored_identity = persisted_sources.get(proof["source_sha256"])
         if stored_identity is not None and stored_identity != identity:

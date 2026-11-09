@@ -10,3 +10,17 @@
 - The pre-change [No Placeholder Policy job](https://github.com/jlhogarth/CoMind/actions/runs/42702820425) failed. The local scanner reproduced the existing finding at `server/test/chatgpt-successor-registry.test.mjs:106`. This lane leaves that file to its owner. The existing CI, Integrity Governance and Implementation Integrity jobs passed at the starting head.
 - No database writes, browser grants, migrations, paid inference tests, or Production deployment. Rollback is to revert the scoped FinOps code and, if required, correct the supplemental private register rows in place using their execution identities. Existing AED and API accounting records remain authoritative.
 - Next acceptance action is a single authorized report using the dedicated reader and a normal monitored execution already archived through AED-007's approved ingestion workflow. A synchronized account window for that same run should be supplied by the existing allowance capture mechanism. Require a separate authorization decision if a new ingestion or credential change is necessary.
+
+## Independent head verification and safeguards
+
+- A concurrent update advanced PR #551 during verification. The review
+  adopted its existing CLI and test paths. The follow-up rejects reuse of
+  a snapshot across adjacent observation windows and suppresses token and
+  duration totals for incomplete persisted sequences. Fifteen deterministic
+  FinOps tests and six upstream meter tests passed.
+- The authoritative query was rerun in CoMind Test. The historical source and
+  artifact SHA-256 values and ordered payload-hash fingerprints matched the
+  independent preflight snapshot. Both browser roles were denied. Catalog
+  checks confirmed RLS and read-only privileges for the dedicated reader.
+- An independently generated private report was retrieved from Drive and
+  matched its local SHA-256. No private account readings were added to GitHub.

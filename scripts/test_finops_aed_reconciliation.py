@@ -93,8 +93,12 @@ class FinOpsAedReconciliationTests(unittest.TestCase):
         self.assertIsNone(meter["process_attributed_work_usage"])
 
     def test_missing_persisted_event_is_incomplete(self):
-        row, = private_report([{**self.projection(), "observed_events": 2}], [])["executions"]
+        projection = {**self.projection(), "observed_events": 2,
+                      "input_tokens": 100, "output_tokens": 10, "duration_ms": 500}
+        row, = private_report([projection], [])["executions"]
         self.assertEqual(row["verification"], "incomplete")
+        for field in ("input_tokens", "output_tokens", "duration_ms"):
+            self.assertIsNone(row[field])
 
     def test_missing_archive_event(self):
         with self.assertRaisesRegex(ValueError, "noncontiguous"):
@@ -136,8 +140,22 @@ class FinOpsAedReconciliationTests(unittest.TestCase):
             private_report([], [proof, proof])
         overlap = copy.deepcopy(proof)
         overlap.update(execution_id="b" * 24, source_sha256="3" * 64)
+        overlap["work_account_meter"].update(before_snapshot_sha256="5" * 64,
+                                             after_snapshot_sha256="6" * 64)
         with self.assertRaisesRegex(ValueError, "duplicate or overlapping"):
             private_report([], [proof, overlap])
+
+    def test_reused_snapshot_at_adjacent_window_boundary_is_rejected(self):
+        proof = self.proof()
+        adjacent = copy.deepcopy(proof)
+        adjacent.update(execution_id="b" * 24, source_sha256="3" * 64)
+        meter = proof["work_account_meter"]
+        adjacent["work_account_meter"].update(
+            before_at=meter["after_at"], after_at="2026-11-01T12:00:05+00:00",
+            before_snapshot_sha256=meter["after_snapshot_sha256"], after_snapshot_sha256="6" * 64,
+        )
+        with self.assertRaisesRegex(ValueError, "duplicate or overlapping"):
+            private_report([], [proof, adjacent])
 
     def test_conflicting_persisted_proof(self):
         proof = self.proof()

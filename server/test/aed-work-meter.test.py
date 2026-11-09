@@ -5,6 +5,7 @@ import json
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 scripts = Path(__file__).resolve().parents[1] / "scripts"
@@ -19,6 +20,7 @@ def module(name):
 
 monitor = module("aed_transaction_monitor")
 reporter = module("aed_transaction_report")
+evidence = module("aed_work_usage_evidence")
 
 
 class WorkMeterTest(unittest.TestCase):
@@ -77,6 +79,46 @@ class WorkMeterTest(unittest.TestCase):
             self.assertEqual([row["phase"] for row in rows if row["kind"] == "usage_unavailable"],
                              ["before", "after"])
             self.assertIsNone(reporter.report([output])[0]["work_account_meter"])
+
+    def test_manual_ui_evidence_brackets_one_run_without_attributing_shared_usage(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            before, after = root / "before.json", root / "after.json"
+            execution, result = root / "execution.jsonl", root / "reconciled.json"
+            evidence.capture(before, datetime.now(timezone.utc).isoformat(), 90, 100)
+            self.assertEqual(monitor.run([sys.executable, "-c", "print('test')"], execution, 10), 0)
+            evidence.capture(after, datetime.now(timezone.utc).isoformat(), 88, 99)
+            row = evidence.reconcile(execution, before, after, result)
+            self.assertEqual(row["allowance_percentage_points_observed"], 2)
+            self.assertEqual(row["purchased_credits_observed"], 1)
+            self.assertEqual(row["attribution"], "unallocated")
+            self.assertIsNone(row["actual_work_charge_usd"])
+            self.assertEqual(json.loads(result.read_text()), row)
+            summary = reporter.report([execution], usage_evidence=[result])[0]
+            self.assertEqual(summary["work_account_meter"]["purchased_credits_observed"], 1)
+            self.assertIsNone(summary["reported_cost_usd"])
+            with self.assertRaises(FileExistsError):
+                evidence.reconcile(execution, before, after, result)
+            altered = root / "altered.jsonl"
+            altered.write_bytes(execution.read_bytes() + b"\n")
+            with self.assertRaises(ValueError):
+                reporter.report([altered], usage_evidence=[result])
+
+    def test_stale_order_and_reset_do_not_create_a_process_charge(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            before, after = root / "before.json", root / "after.json"
+            execution = root / "execution.jsonl"
+            evidence.capture(before, datetime.now(timezone.utc).isoformat(), 40, 10)
+            self.assertEqual(monitor.run([sys.executable, "-c", "print('test')"], execution, 10), 0)
+            evidence.capture(after, datetime.now(timezone.utc).isoformat(), 100, 20)
+            row = evidence.reconcile(execution, before, after, root / "result.json")
+            self.assertIsNone(row["allowance_percentage_points_observed"])
+            self.assertIsNone(row["purchased_credits_observed"])
+            bad = root / "late-before.json"
+            evidence.capture(bad, (datetime.now(timezone.utc) - timedelta(microseconds=1)).isoformat(), 40, 10)
+            with self.assertRaises(ValueError):
+                evidence.reconcile(execution, bad, after, root / "bad.json")
 
 
 if __name__ == "__main__":

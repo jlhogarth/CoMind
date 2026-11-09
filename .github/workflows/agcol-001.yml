@@ -1,0 +1,232 @@
+name: AGCOL-001 Governed Collaboration Test Acceptance
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/agcol-001.yml'
+      - 'server/src/agent-collaboration.ts'
+      - 'server/test/agent-collaboration.test.mjs'
+      - 'db/migrations/20261030_024_mdo_003_plan_scoped_claim_hardening.sql'
+      - 'db/migrations/verify_20261030_024_mdo_003_plan_scoped_claim_hardening.sql'
+      - 'server/test/support/mdo-live-test-db.mjs'
+      - 'server/test/support/mdo-live-test-fixtures.mjs'
+      - 'server/test/support/mdo-live-test-governance.mjs'
+      - 'server/test/support/mdo-live-test-runner.mjs'
+      - 'server/test/support/mdo-live-test-harness.mjs'
+      - 'server/test/integration/mdo-live-test-acceptance.e2e.mjs'
+      - 'server/src/mdo-planning-runtime.ts'
+      - 'server/src/mdo-orchestrator.ts'
+      - 'server/src/foundry-runtime.ts'
+      - 'server/src/continuous-excellence/missingness.ts'
+      - 'server/src/providers/ollama-foundry-adapter.ts'
+      - 'server/test/mdo-planning-runtime.test.mjs'
+      - 'server/test/mdo-planning-context-bounds.test.mjs'
+      - 'server/test/ce-003-missingness-forward-reasoning.test.mjs'
+      - 'docs/architecture/agcol-001-governed-agent-collaboration.md'
+      - 'docs/provenance/2026-11-09-agcol-001-collaboration.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agcol-001-test-acceptance-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: AGCOL-001 harness contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install exact server dependencies
+        working-directory: server
+        run: npm ci
+      - name: Audit production dependencies
+        working-directory: server
+        run: npm audit --omit=dev --audit-level=high
+      - name: Build server
+        working-directory: server
+        run: npm run build
+      - name: Check MDO-003 harness syntax
+        working-directory: server
+        run: |
+          node --check test/support/mdo-live-test-db.mjs
+          node --check test/support/mdo-live-test-fixtures.mjs
+          node --check test/support/mdo-live-test-governance.mjs
+          node --check test/support/mdo-live-test-runner.mjs
+          node --check test/support/mdo-live-test-harness.mjs
+          node --check test/integration/mdo-live-test-acceptance.e2e.mjs
+      - name: Re-run MDO and CE deterministic contracts
+        working-directory: server
+        run: |
+          node --test test/agent-collaboration.test.mjs test/mdo-planning-runtime.test.mjs test/mdo-planning-context-bounds.test.mjs
+          node --test test/ce-003-missingness-forward-reasoning.test.mjs
+
+  claim-scope-contract:
+    name: AGCOL-001 exact-plan claim scope
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.6-pg17-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+      - name: Build and verify accepted MDO-001 substrate
+        run: bash ./scripts/test_mdo_001.sh
+      - name: Apply exact-plan claim hardening twice
+        shell: bash
+        run: |
+          set -euo pipefail
+          for pass in 1 2; do
+            printf 'MDO-003 plan-scope migration pass %s\n' "$pass"
+            psql -X "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+              -f db/migrations/20261030_024_mdo_003_plan_scoped_claim_hardening.sql
+          done
+      - name: Verify exact-plan claim hardening
+        run: >-
+          psql -X "$DATABASE_URL" -v ON_ERROR_STOP=1
+          -f db/migrations/verify_20261030_024_mdo_003_plan_scoped_claim_hardening.sql
+
+  live-test-acceptance:
+    name: AGCOL-001 live Supabase Test proof
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.head_ref == 'issue-548-governed-agent-collaboration' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.repository_owner == 'jlhogarth' &&
+      github.actor == 'jlhogarth'
+    needs: [contract, claim-scope-contract]
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      ollama:
+        image: ollama/ollama:0.40.8
+        env:
+          OLLAMA_NO_CLOUD: '1'
+          OLLAMA_NUM_PARALLEL: '1'
+          OLLAMA_MAX_QUEUE: '1'
+        ports:
+          - 11434:11434
+        options: >-
+          --health-cmd "ollama list >/dev/null 2>&1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      OLLAMA_BASE_URL: http://127.0.0.1:11434
+      OLLAMA_MODEL: qwen3:0.6b
+      MDO_TEST_ARTIFACT: artifacts/agcol-001-test-acceptance.json
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install exact server dependencies
+        working-directory: server
+        run: npm ci
+      - name: Build server
+        working-directory: server
+        run: npm run build
+      - name: Install and verify Supabase database CA
+        shell: bash
+        run: |
+          set -euo pipefail
+          ca_path="$RUNNER_TEMP/supabase-prod-ca-2021.crt"
+          curl --fail --silent --show-error --location \
+            --proto '=https' --tlsv1.2 \
+            https://supabase-downloads.s3-ap-southeast-1.amazonaws.com/prod/ssl/prod-ca-2021.crt \
+            --output "$ca_path"
+          expected='807025AD50D4ED219D2C9C7D299C004F824EB00CF7F65AFEF607D07B72E6CAFA'
+          actual="$(openssl x509 -in "$ca_path" -noout -fingerprint -sha256 \
+            | cut -d= -f2 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+          test "$actual" = "$expected"
+          echo "NODE_EXTRA_CA_CERTS=$ca_path" >> "$GITHUB_ENV"
+      - name: Pull bounded local model
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:11434/api/version >/dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              echo "Local Ollama server did not become ready." >&2
+              exit 1
+            fi
+            sleep 2
+          done
+          curl --fail --silent --show-error --max-time 900 \
+            -H 'Content-Type: application/json' \
+            -d '{"model":"qwen3:0.6b","stream":false}' \
+            http://127.0.0.1:11434/api/pull
+      - name: Execute governed persistent Test acceptance
+        working-directory: server
+        env:
+          SUPABASE_SESSION_DATABASE_URL: ${{ secrets.SUPABASE_SESSION_DATABASE_URL }}
+        run: node --test --test-concurrency=1 test/integration/mdo-live-test-acceptance.e2e.mjs
+      - name: Preserve AGCOL-001 acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agcol-001-test-acceptance-${{ github.run_id }}
+          path: server/artifacts/agcol-001-test-acceptance.json
+          if-no-files-found: error
+          retention-days: 30

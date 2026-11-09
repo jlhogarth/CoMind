@@ -14,6 +14,25 @@ GCI-001 is an off-by-default, manually dispatched Test workflow. Its only author
 6. Dispatch once with the same inputs and `preflight_only=false` after confirming the existing Gemini project and cost boundary. The runner sends at most one generation request per run for the registered synthetic input, with a 512-output-token cap and no inference retry. Verify the generation attempt, provider-reported usage if available, reply digest, Docs revision, one logical reply and `idle_stopped` after at least 240 seconds of meaningful inactivity. Google Drive metadata is polled every 15 seconds. The job has a 35-minute outer timeout, and the poller stops scheduling work after its 30-minute deadline.
 7. Independently reread the Docs reply and digest. Inspect again in read-only preflight, which verifies an existing complete receipt and sends no generation request. Keep run IDs and sanitized evidence in the [acceptance journal](gci-001-acceptance-evidence-2026-11-07.md). Avoid exposing prompt or response bodies, credentials and tokens in the public repository.
 
+## OIDC provider mappings in Google Cloud Console
+
+Use OpenID Connect (OIDC) in project `comind-513807`, pool ID `comind-gci` and provider ID `github-comind`. Use the issuer `https://token.actions.githubusercontent.com` and Default audience. Google requires a mapping for every claim referenced by the attribute condition. Keep all six mappings below.
+
+| Google attribute | OIDC expression |
+| --- | --- |
+| `google.subject` | `assertion.sub` |
+| `attribute.repository_id` | `assertion.repository_id` |
+| `attribute.repository_owner_id` | `assertion.repository_owner_id` |
+| `attribute.ref` | `assertion.ref` |
+| `attribute.workflow_ref` | `assertion.workflow_ref` |
+| `attribute.event_name` | `assertion.event_name` |
+
+Use the full condition below. It restricts admission to the immutable repository and owner IDs, exact Test branch and workflow, and manual dispatch.
+
+```text
+assertion.repository_id == '1028814081' && assertion.repository_owner_id == '83435038' && assertion.ref == 'refs/heads/gci-001-on-demand-gemini-review' && assertion.workflow_ref == 'jlhogarth/CoMind/.github/workflows/gci-001-on-demand-gemini.yml@refs/heads/gci-001-on-demand-gemini-review' && assertion.event_name == 'workflow_dispatch'
+```
+
 ## Concurrency and recovery
 
 GitHub serializes runs for a document. The poller reads the Google Docs text and revision in one request, then applies the claim with `requiredRevisionId`. Competing claims against that revision cannot both succeed. The reply also uses a required revision, so concurrent human edits fail closed. A second Docs read checks parent correlation, the complete envelope and SHA-256 digest before reporting delivery. A claim with a missing, duplicated or invalid receipt is quarantined on restart. A provider timeout or interrupted write must be reconciled before any fresh authorization. Never delete a claim to retry a possibly billed request.

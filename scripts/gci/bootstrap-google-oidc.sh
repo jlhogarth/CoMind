@@ -13,6 +13,8 @@ WORKFLOW=.github/workflows/gci-001-on-demand-gemini.yml
 ISSUER=https://token.actions.githubusercontent.com
 CONDITION="assertion.repository_id == '$REPO_ID' && assertion.repository_owner_id == '$OWNER_ID' && assertion.ref == 'refs/heads/$BRANCH' && assertion.workflow_ref == '$REPO/$WORKFLOW@refs/heads/$BRANCH' && assertion.event_name == 'workflow_dispatch'"
 MAPPING="google.subject=assertion.sub,attribute.repository_id=assertion.repository_id"
+MAPPING+=",attribute.repository_owner_id=assertion.repository_owner_id,attribute.ref=assertion.ref"
+MAPPING+=",attribute.workflow_ref=assertion.workflow_ref,attribute.event_name=assertion.event_name"
 REQUIRED_APIS=(iam.googleapis.com iamcredentials.googleapis.com sts.googleapis.com drive.googleapis.com docs.googleapis.com)
 
 MODE="${1:---audit}"
@@ -49,10 +51,10 @@ if [[ -n "$POOL_DATA" ]]; then
   PROVIDER_DATA="$(jq -c --arg provider "$PROVIDER" '.[] | select(.name == $provider)' <<<"$PROVIDERS")"
 fi
 if [[ -n "$PROVIDER_DATA" ]]; then
-  if ! jq -e --arg cond "$CONDITION" --arg issuer "$ISSUER" '
+  if ! jq -e --arg cond "$CONDITION" --arg issuer "$ISSUER" --arg mapping "$MAPPING" '
     .attributeCondition == $cond and .oidc.issuerUri == $issuer and
     ((.oidc.allowedAudiences // []) | length == 0) and
-    .attributeMapping == {"google.subject":"assertion.sub","attribute.repository_id":"assertion.repository_id"} and
+    .attributeMapping == ($mapping | split(",") | map(split("=") | {key: .[0], value: .[1]}) | from_entries) and
     .state == "ACTIVE" and .disabled != true
   ' <<<"$PROVIDER_DATA" >/dev/null; then
     echo "Existing provider differs from the approved trust rules. Stop for IAM review." >&2

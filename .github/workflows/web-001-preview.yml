@@ -66,6 +66,14 @@ jobs:
           for path in reading/ reading/start-here.html reading/continuity.html reading/governed-reasoning.html reading/reliable-autonomy.html reading/research-agenda.html reading/literature-map.html reading/continuity-protocol.html reading/belief-update.html reading/memory-prosthetic.html reading/decision-clinic.html reading/reasoning-field-guide.html hub.js decision-clinic.js; do
             curl -fsS "$url/$path" -o /dev/null
           done
+          for path in reading/contribute-question.html curiosity-draft.js; do
+            for attempt in 1 2 3 4 5 6 7 8 9 10; do
+              if curl -fsSL "$url/$path" -o /tmp/web001-visitor-asset &&
+                cmp -s "apps/public-web/public/$path" /tmp/web001-visitor-asset; then break; fi
+              sleep 3
+            done
+            cmp "apps/public-web/public/$path" /tmp/web001-visitor-asset
+          done
           grep -iq "content-security-policy:.*script-src 'self'" /tmp/web001-headers
           grep -iq 'x-content-type-options: nosniff' /tmp/web001-headers
           echo "Verified HTTPS, homepage, seven CSS assets and security headers: $url"

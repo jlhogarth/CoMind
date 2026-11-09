@@ -3,14 +3,14 @@ on:
   pull_request:
     paths:
       - 'apps/public-web/ingestion/**'
-      - 'apps/public-web/migrations/visitor_contributions_test.sql'
+      - 'apps/public-web/migrations/*visitor_contributions_test.sql'
       - '.github/workflows/web-001-ingestion.yml'
   push:
     branches:
       - web-001-public-headquarters-foundation
     paths:
       - 'apps/public-web/ingestion/**'
-      - 'apps/public-web/migrations/visitor_contributions_test.sql'
+      - 'apps/public-web/migrations/*visitor_contributions_test.sql'
       - '.github/workflows/web-001-ingestion.yml'
 permissions:
   contents: read
@@ -26,9 +26,11 @@ jobs:
         run: |
           node --check apps/public-web/ingestion/worker.mjs
           node --check apps/public-web/ingestion/worker.test.mjs
+          node --check apps/public-web/ingestion/prepare-test-preview.mjs
           node --test apps/public-web/ingestion/worker.test.mjs
-      - name: Schema security guardrails
+      - name: Verify real Worker runtime and local PostgreSQL contracts
         run: |
-          grep -qi 'enable row level security' apps/public-web/migrations/visitor_contributions_test.sql
-          grep -qi 'revoke all' apps/public-web/migrations/visitor_contributions_test.sql
-          grep -qi 'withdrawal_token_hash' apps/public-web/migrations/visitor_contributions_test.sql
+          npm install --no-save --package-lock=false --prefix "$RUNNER_TEMP/web001-db" @electric-sql/pglite@0.3.15 miniflare@4.20260730.0
+          export NODE_PATH="$RUNNER_TEMP/web001-db/node_modules"
+          node apps/public-web/ingestion/workerd-contract.test.mjs
+          node apps/public-web/ingestion/sql-contract.test.mjs

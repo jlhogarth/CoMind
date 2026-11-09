@@ -1,37 +1,157 @@
-// WEB-001 isolated Cloudflare Worker API. Not deployed until privacy/security acceptance.
-// Secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, TURNSTILE_SECRET.
-// Cloudflare Turnstile must be verified server-side for each contribution.
-const json=(obj,status=200)=>new Response(JSON.stringify(obj),{status,headers:{'content-type':'application/json;charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
-const hex=bytes=>Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
-const digest=async value=>hex(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value))));
-const originAllowed=(request,env)=>request.headers.get('origin')===env.ALLOWED_ORIGIN;
-async function supa(env,path,method,body,prefer){const h={'apikey':env.SUPABASE_SERVICE_ROLE_KEY,'authorization':'Bearer '+env.SUPABASE_SERVICE_ROLE_KEY,'content-type':'application/json'};if(prefer)h.prefer=prefer;const r=await fetch(env.SUPABASE_URL.replace(/\/$/,'')+'/rest/v1/'+path,{method,headers:h,body:body===undefined?undefined:JSON.stringify(body),redirect:'error'});if(!r.ok)throw Error('storage failure '+r.status);return r.status===204?null:await r.json()}
-const cors=(response,env)=>{response.headers.set('access-control-allow-origin',env.ALLOWED_ORIGIN);response.headers.set('vary','Origin');return response};
-const trim=(v,max)=>typeof v==='string'?v.trim().slice(0,max+1):'';
-export default {async fetch(request,env){let response;try{
-if(request.method==='OPTIONS'){if(!originAllowed(request,env))return json({error:'forbidden_origin'},403);return new Response(null,{status:204,headers:{'access-control-allow-origin':env.ALLOWED_ORIGIN,'access-control-allow-methods':'POST, DELETE, OPTIONS','access-control-allow-headers':'content-type, x-withdrawal-token','access-control-max-age':'600','vary':'Origin'}})}
-if(!['POST','DELETE'].includes(request.method))return json({error:'method_not_allowed'},405);
-if(!env.ALLOWED_ORIGIN||!originAllowed(request,env))return json({error:'forbidden_origin'},403);
-if(!env.SUPABASE_URL||!env.SUPABASE_SERVICE_ROLE_KEY||!env.TURNSTILE_SECRET)return json({error:'not_configured'},503);
-if(request.method==='POST'){
-if(request.headers.get('content-type')?.split(';')[0]!=='application/json')return json({error:'unsupported_media_type'},415);
-const length=Number(request.headers.get('content-length'));if(length>7500)return json({error:'payload_too_large'},413);
-const raw=await request.text();if(new TextEncoder().encode(raw).length>7500)return json({error:'payload_too_large'},413);
-let body;try{body=JSON.parse(raw)}catch{return json({error:'invalid_json'},400)}
-const question=trim(body.question,1500),why=trim(body.why,1500),known=trim(body.known,1500),unknown=trim(body.unknown,1500);
-if(question.length<10||question.length>1500||[why,known,unknown].some(v=>v.length>1500)||body.consent!==true||body.consent_version!=='web-curiosity-v1')return json({error:'invalid_contribution_or_consent'},422);
-if(typeof body.turnstile_token!=='string'||body.turnstile_token.length>2048)return json({error:'challenge_required'},422);
-const verification=await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify',{method:'POST',body:new URLSearchParams({secret:env.TURNSTILE_SECRET,response:body.turnstile_token}),redirect:'error'});if(!verification.ok)return json({error:'challenge_unavailable'},503);
-const v=await verification.json();if(v.success!==true||v.hostname!==new URL(env.ALLOWED_ORIGIN).hostname)return json({error:'challenge_failed'},403);
-const token=hex(crypto.getRandomValues(new Uint8Array(32))),hash=await digest(token);
-const rows=await supa(env,'comind_visitor_contributions?select=contribution_id,created_at,expires_at','POST',{question,why_it_matters:why||null,known_context:known||null,uncertainty:unknown||null,consent_version:'web-curiosity-v1',withdrawal_token_hash:hash},'return=representation');
-if(!Array.isArray(rows)||rows.length!==1)throw Error('storage result mismatch');
-return cors(json({contribution_id:rows[0].contribution_id,withdrawal_token:token,created_at:rows[0].created_at,expires_at:rows[0].expires_at},201),env);
+// The public site is static. This separate Worker receives only explicitly consented data.
+const consentVersion = 'web-curiosity-v1';
+const maxBytes = 40_000; // Four 1,500-character fields, including UTF-8 and JSON escaping.
+const uuid = '[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}';
+const uuidPattern = new RegExp('^' + uuid + '$');
+const contributionPath = new RegExp('^/contributions/(' + uuid + ')$');
+const tokenPattern = /^[0-9a-f]{64}$/;
+const fields = ['question', 'why', 'known', 'unknown'];
+const encoder = new TextEncoder();
+
+function reply(status, body, origin, extra) {
+  const headers = new Headers({
+    'cache-control': 'no-store',
+    'content-type': 'application/json; charset=utf-8',
+    'x-content-type-options': 'nosniff',
+    vary: 'Origin',
+    ...extra,
+  });
+  if (origin) headers.set('access-control-allow-origin', origin);
+  return new Response(body === null ? null : JSON.stringify(body), { status, headers });
 }
-const id=new URL(request.url).pathname.match(/^\/contributions\/([0-9a-f-]{36})$/i)?.[1];if(!id)return json({error:'not_found'},404);
-const token=request.headers.get('x-withdrawal-token');if(!token||!/^[a-f0-9]{64}$/.test(token))return json({error:'invalid_token'},403);
-const hash=await digest(token);
-const query='comind_visitor_contributions?contribution_id=eq.'+encodeURIComponent(id)+'&withdrawal_token_hash=eq.'+hash;
-const rows=await supa(env,query+'&select=contribution_id','PATCH',{status:'withdrawn',question:'[withdrawn]',why_it_matters:null,known_context:null,uncertainty:null,withdrawn_at:new Date().toISOString()},'return=representation');
-return cors(rows?.length===1?json({withdrawn:true}):json({error:'not_found'},404),env);
-}catch(e){return json({error:'internal_error'},500)}}};
+
+async function readJson(request) {
+  if (Number(request.headers.get('content-length')) > maxBytes) return { error: 413 };
+  if (!request.body) return { error: 400 };
+  const reader = request.body.getReader();
+  const bytes = new Uint8Array(maxBytes);
+  let size = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (size + value.length > maxBytes) {
+        await reader.cancel();
+        return { error: 413 };
+      }
+      bytes.set(value, size);
+      size += value.length;
+    }
+    const body = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes.subarray(0, size)));
+    return body && typeof body === 'object' && !Array.isArray(body) ? { body } : { error: 400 };
+  } catch {
+    return { error: 400 };
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+async function callStorage(env, operation, params) {
+  const key = env.SUPABASE_SERVICE_ROLE_KEY;
+  const endpoint = new URL('/rest/v1/rpc/' + operation, env.SUPABASE_URL);
+  if (endpoint.protocol !== 'https:') throw new Error('Invalid storage endpoint');
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { apikey: key, authorization: 'Bearer ' + key, 'content-type': 'application/json' },
+    body: JSON.stringify(params),
+    redirect: 'manual',
+    signal: AbortSignal.timeout(8_000),
+  });
+  if (!response.ok) throw new Error('Storage unavailable');
+  return response.json();
+}
+
+async function verifyChallenge(token, env, hostname, ip) {
+  const body = new URLSearchParams({ secret: env.TURNSTILE_SECRET, response: token });
+  if (ip) body.set('remoteip', ip);
+  const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+    method: 'POST', body, redirect: 'manual', signal: AbortSignal.timeout(5_000),
+  });
+  if (!response.ok) throw new Error('Challenge unavailable');
+  const result = await response.json();
+  return result.success === true && result.hostname === hostname && result.action === 'web_curiosity';
+}
+
+export default {
+  async fetch(request, env) {
+    const origin = request.headers.get('origin');
+    if (!origin || origin !== env.ALLOWED_ORIGIN) return reply(403, { error: 'forbidden_origin' });
+    const respond = (status, body, extra) => reply(status, body, origin, extra);
+    const url = new URL(request.url);
+    const id = contributionPath.exec(url.pathname)?.[1];
+    const method = url.pathname === '/contributions' ? 'POST' : id ? 'DELETE' : null;
+    if (!method || url.search) return respond(404, { error: 'not_found' });
+    const allowed = { allow: method + ', OPTIONS' };
+    if (request.method === 'OPTIONS') {
+      if (request.headers.get('access-control-request-method') !== method) {
+        return respond(405, { error: 'method_not_allowed' }, allowed);
+      }
+      return respond(204, null, {
+        'access-control-allow-methods': method,
+        'access-control-allow-headers': 'content-type, x-withdrawal-token, x-web001-test-access',
+        'access-control-max-age': '600',
+        vary: 'Origin, Access-Control-Request-Method, Access-Control-Request-Headers',
+      });
+    }
+    if (request.method !== method) return respond(405, { error: 'method_not_allowed' }, allowed);
+    if (env.COLLECTION_MODE !== 'synthetic-test' || !env.TEST_ACCESS_TOKEN || !env.TURNSTILE_SECRET ||
+        !env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY || !env.VISITOR_RATE_LIMIT) {
+      return respond(503, { error: 'not_configured' });
+    }
+
+    const testAccess = request.headers.get('x-web001-test-access');
+    if (!tokenPattern.test(testAccess ?? '') || !tokenPattern.test(env.TEST_ACCESS_TOKEN) ||
+        !crypto.subtle.timingSafeEqual(encoder.encode(testAccess), encoder.encode(env.TEST_ACCESS_TOKEN))) {
+      return respond(403, { error: 'test_access_required' });
+    }
+
+    try {
+      const ip = request.headers.get('cf-connecting-ip');
+      if (!ip) return respond(503, { error: 'network_identity_unavailable' });
+      const limit = await env.VISITOR_RATE_LIMIT.limit({ key: method + ':' + ip });
+      if (!limit.success) return respond(429, { error: 'rate_limited' });
+
+      let body;
+      if (method === 'POST') {
+        const mediaType = request.headers.get('content-type')?.split(';')[0].trim().toLowerCase();
+        if (mediaType !== 'application/json') return respond(415, { error: 'unsupported_media_type' });
+        const decoded = await readJson(request);
+        if (decoded.error) return respond(decoded.error, {
+          error: decoded.error === 413 ? 'payload_too_large' : 'invalid_json',
+        });
+        body = decoded.body;
+        if (body.consent !== true || body.consent_version !== consentVersion ||
+            typeof body.contribution_id !== 'string' || !uuidPattern.test(body.contribution_id) ||
+            fields.some(field => typeof body[field] !== 'string' || Array.from(body[field].trim()).length > 1500 ||
+              /[\u0000\uD800-\uDFFF]/u.test(body[field])) || Array.from(body.question.trim()).length < 10) {
+          return respond(422, { error: 'invalid_contribution_or_consent' });
+        }
+        if (typeof body.turnstile_token !== 'string' || !body.turnstile_token.trim() || body.turnstile_token.length > 2048) {
+          return respond(422, { error: 'challenge_required' });
+        }
+      }
+
+      const token = request.headers.get('x-withdrawal-token');
+      if (!token || !tokenPattern.test(token)) return respond(403, { error: 'invalid_token' });
+      const hash = await crypto.subtle.digest('SHA-256', encoder.encode(token));
+      const tokenHash = Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join('');
+
+      if (method === 'DELETE') {
+        const withdrawn = await callStorage(env, 'web001_withdraw', { p_id: id, p_hash: tokenHash });
+        return withdrawn === true ? respond(200, { withdrawn: true }) : respond(404, { error: 'not_found' });
+      }
+
+      if (!(await verifyChallenge(body.turnstile_token, env, new URL(origin).hostname, ip))) {
+        return respond(403, { error: 'challenge_failed' });
+      }
+      const receipt = await callStorage(env, 'web001_submit', {
+        p_id: body.contribution_id, p_hash: tokenHash, p_consent_version: body.consent_version,
+        p_question: body.question.trim(), p_why: body.why.trim() || null,
+        p_known: body.known.trim() || null, p_unknown: body.unknown.trim() || null,
+      });
+      return receipt ? respond(201, receipt) : respond(409, { error: 'submission_conflict' });
+    } catch {
+      return respond(503, { error: 'temporarily_unavailable' });
+    }
+  },
+};

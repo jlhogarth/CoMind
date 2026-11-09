@@ -1,1 +1,102 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Contribute a Question | CoMind</title><link rel="stylesheet" href="../brand/comind-brand.css"><link rel="stylesheet" href="../site.css"></head><body class="cm-app cm-field"><a class="skip-link" href="#main">Skip to content</a><header class="site-header"><a class="wordmark" href="../">Co<span>Mind</span></a><nav aria-label="Primary navigation"><a href="../">Home</a><a href="./decision-clinic.html">Decision Clinic</a><a href="./choice-lab.html">Choice Lab</a></nav></header><main id="main"><article class="reading-article"><header class="article-hero"><p class="eyebrow">CoMind / Curiosity</p><h1>What question should we explore?</h1><p class="article-lead">Turn your curiosity into a carefully framed research question.</p></header><div class="article-body"><section class="article-section"><h2>Shape your question</h2><p>This first version is a private drafting tool. <strong>Nothing is submitted to CoMind or stored on a server.</strong> You can export your draft for yourself. A future consent-based contribution service will require separate security validation before activation.</p><form id="question-form"><label for="question">Your question</label><textarea id="question" required maxlength="1500" rows="4" placeholder="What would you like to understand?"></textarea><label for="why">Why does it matter? (optional)</label><textarea id="why" maxlength="1500" rows="3"></textarea><label for="known">What do you already know? (optional)</label><textarea id="known" maxlength="1500" rows="3"></textarea><label for="unknown">What remains uncertain? (optional)</label><textarea id="unknown" maxlength="1500" rows="3"></textarea><button type="submit">Prepare research brief</button><button type="reset">Clear</button></form></section><section class="article-section" id="brief-section" hidden aria-live="polite"><h2>Your research brief</h2><div id="brief"></div><p>Check whether this draft contains private or identifying details before sharing it anywhere.</p><button id="export" type="button">Export my brief (.txt)</button></section><section class="article-section"><h2>How CoMind can use questions in the future</h2><p>With explicit, informed consent, submitted questions could be reviewed for recurring themes, linked to evidence, and considered for original research. No contribution is collected by this page.</p><p>For a deeper investigation, explore the <a href="./reasoning-field-guide.html">reasoning field guide</a>.</p></section></div></article></main><script src="../curiosity-draft.js" defer></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Contribute a Question | CoMind</title>
+  <link rel="stylesheet" href="../brand/comind-brand.css">
+  <link rel="stylesheet" href="../site.css">
+</head>
+<body class="cm-app cm-field">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="wordmark" href="../">Co<span>Mind</span></a>
+    <nav aria-label="Primary navigation">
+      <a href="../">Home</a><a href="./decision-clinic.html">Decision Clinic</a><a href="./choice-lab.html">Choice Lab</a>
+    </nav>
+  </header>
+  <main id="main">
+    <article class="reading-article">
+      <header class="article-hero">
+        <p class="eyebrow">CoMind / Curiosity</p>
+        <h1>What question should we explore?</h1>
+        <p class="article-lead">Turn your curiosity into a carefully framed research question.</p>
+      </header>
+      <div class="article-body">
+        <section class="article-section">
+          <h2>Shape your question</h2>
+          <p>Draft and export your research brief privately in this browser. Preparing the brief is optional and sends no draft content to CoMind.</p>
+          <form id="question-form" class="aid-form" autocomplete="off">
+            <label for="question">Your question</label>
+            <textarea id="question" required maxlength="1500" rows="4" placeholder="What would you like to understand?"></textarea>
+            <label for="why">Why does it matter? (optional)</label>
+            <textarea id="why" maxlength="1500" rows="3"></textarea>
+            <label for="known">What do you already know? (optional)</label>
+            <textarea id="known" maxlength="1500" rows="3"></textarea>
+            <label for="unknown">What remains uncertain? (optional)</label>
+            <textarea id="unknown" maxlength="1500" rows="3"></textarea>
+            <div class="aid-actions"><button type="submit">Prepare research brief</button><button type="reset">Clear</button></div>
+          </form>
+        </section>
+        <section class="article-section" id="brief-section" hidden>
+          <h2 id="brief-heading" tabindex="-1">Your research brief</h2>
+          <div id="brief"></div>
+          <p>Check whether this draft contains private or identifying details before sharing it.</p>
+          <div class="aid-actions">
+            <button id="export" type="button">Export my brief (.txt)</button>
+            <button id="review-contribution" type="button" hidden>Review a synthetic test contribution</button>
+          </div>
+        </section>
+        <section class="article-section" id="contribution-section" hidden>
+          <h2 id="contribution-heading" tabindex="-1">Review your contribution</h2>
+          <p>This is a restricted CoMind Test feature. Enter fictional material only. Leave out names, contact information, health details, and any information that could identify someone.</p>
+          <p>CoMind receives only the fields shown below. Authorized reviewers may read them to identify topics for research or future website content. Sharing is optional and your private brief remains available if you decline.</p>
+          <p>Content expires after 90 days. Withdrawal removes content and related research candidates from the active system. CoMind keeps a limited consent and withdrawal record for up to 30 days after removal. Save your receipt to withdraw before the contribution expires.</p>
+          <form id="contribution-form" class="aid-form" autocomplete="off">
+            <label for="share-question">Question to share</label>
+            <textarea id="share-question" required minlength="10" maxlength="1500" rows="4"></textarea>
+            <label for="share-why">Why it matters (optional)</label>
+            <textarea id="share-why" maxlength="1500" rows="3"></textarea>
+            <label for="share-known">What you already know (optional)</label>
+            <textarea id="share-known" maxlength="1500" rows="3"></textarea>
+            <label for="share-unknown">What remains uncertain (optional)</label>
+            <textarea id="share-unknown" maxlength="1500" rows="3"></textarea>
+            <div class="curiosity-consent">
+              <input id="share-consent" type="checkbox" required>
+              <label for="share-consent">I agree to share the fields above for research topic review.</label>
+            </div>
+            <label for="test-access">CoMind Test access token</label>
+            <input id="test-access" type="password" required minlength="64" maxlength="64" pattern="[a-f0-9]{64}" autocomplete="off">
+            <div id="share-challenge"></div>
+            <p id="share-status" role="status"></p>
+            <div class="aid-actions">
+              <button type="submit" id="share-submit">Complete challenge and submit</button>
+              <button type="button" id="save-pending-receipt" hidden>Download recovery receipt</button>
+              <button type="button" id="share-cancel">Keep my brief private</button>
+            </div>
+          </form>
+        </section>
+        <section class="article-section" id="receipt-section" hidden>
+          <h2 id="receipt-heading" tabindex="-1">Contribution receipt and withdrawal</h2>
+          <p>Save the receipt somewhere private. Anyone with its withdrawal token and CoMind Test access can withdraw the contribution.</p>
+          <div class="aid-actions"><button id="save-receipt" type="button" hidden>Download withdrawal receipt</button></div>
+          <form id="withdraw-form" class="aid-form" autocomplete="off">
+            <label for="withdraw-receipt">Choose a saved receipt to withdraw a previous contribution</label>
+            <input id="withdraw-receipt" type="file" accept=".json,application/json">
+            <label for="withdraw-access">CoMind Test access token</label>
+            <input id="withdraw-access" type="password" required minlength="64" maxlength="64" pattern="[a-f0-9]{64}" autocomplete="off">
+            <p id="withdraw-status" role="status"></p>
+            <div class="aid-actions"><button type="submit">Withdraw contribution</button></div>
+          </form>
+        </section>
+        <section class="article-section">
+          <h2>From questions to research</h2>
+          <p id="collection-status">This public preview offers private drafting and export. Contribution submission is disabled.</p>
+          <p>For a deeper investigation, explore the <a href="./reasoning-field-guide.html">reasoning field guide</a>.</p>
+        </section>
+      </div>
+    </article>
+  </main>
+  <script src="../curiosity-draft.js" defer></script>
+</body>
+</html>

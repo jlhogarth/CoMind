@@ -62,6 +62,7 @@ jobs:
           server_pid=$!
           trap 'kill $server_pid || true' EXIT
           node apps/public-web/browser-check.mjs
+          node apps/public-web/ingestion/browser-check.mjs
       - name: Preserve viewport screenshots
         if: always()
         uses: actions/upload-artifact@v4

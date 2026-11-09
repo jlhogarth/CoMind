@@ -78,7 +78,7 @@ export function createMdoLiveTestHarness({
       assert.equal(initialReadback.role_authorization_count, 12);
       assert.equal(initialReadback.execution_context_count, 10);
       assert.equal(initialReadback.plan_status, 'in_review');
-      assert.equal(initialReadback.module_lifecycle_stage, 'conceived');
+      assert.equal(initialReadback.module_lifecycle_stage, fixture.module.lifecycle_stage);
 
       const replay = await plan.mdo.enqueuePlan({
         moduleId: fixture.module.module_id,
@@ -112,6 +112,7 @@ export function createMdoLiveTestHarness({
         paid_provider_authorized: false,
         project_id: fixture.project.project_id,
         module_id: fixture.module.module_id,
+        module_lifecycle_stage_before: fixture.module.lifecycle_stage,
         plan_id: plan.planId,
         workforce: Object.values(profiles).map(profile => ({
           key: profile.key,

@@ -74,7 +74,7 @@ export default function AedMonitorPage() {
     if (kind) params.set("kind", kind);
     if (state) params.set("state", state);
     load(`/api/aed/executions/${selected}?${params}`)
-      .then((result) => { if (active) { setDetail(result); setStatus(""); } })
+      .then((result) => { if (active) { setDetail(result); setStatus(""); requestAnimationFrame(() => document.getElementById("aed-execution-detail")?.scrollIntoView({ block: "start" })); } })
       .catch((error) => { if (active) setStatus(error instanceof Error ? error.message : "AED detail failed."); })
       .finally(() => { if (active) setBusy(false); });
     return () => { active = false; };
@@ -122,6 +122,17 @@ export default function AedMonitorPage() {
     }
   }
 
+  function openExecution(id: string) {
+    if (selected === id && detail) {
+      document.getElementById("aed-execution-detail")?.scrollIntoView({ block: "start" });
+      return;
+    }
+    setStatus(`Opening execution ${id}…`);
+    setDetail(null);
+    setEventPage(1);
+    setSelected(id);
+  }
+
   return <main className="aed-shell">
     <header className="aed-header"><CoMindMark compact /><div><a href="/">CoMind Control Plane</a><h1>AED monitoring evidence</h1><p>Read-only execution and event history</p></div></header>
     {status && <p role="status" className="aed-notice">{status}</p>}
@@ -132,9 +143,9 @@ export default function AedMonitorPage() {
     </section>}
     {busy && <p role="status">Loading AED evidence…</p>}
     {history && <section className="aed-panel"><h2>Execution history</h2><div className="aed-scroll"><table><thead><tr><th>Execution</th><th>Lane</th><th>First event</th><th>Last event</th><th>Events</th><th>Evidence</th></tr></thead><tbody>
-      {history.rows.map((row) => <tr key={row.execution_id}><td><button type="button" onClick={() => { setSelected(row.execution_id); setEventPage(1); }}>{row.execution_id}</button></td><td>{row.lane_id ?? "Unknown"}</td><td>{row.first_at}</td><td>{row.last_at}</td><td>{row.event_count}</td><td>{validEvidenceUrl(row.workflow_run_url) ? <a href={validEvidenceUrl(row.workflow_run_url)!} target="_blank" rel="noreferrer">Run</a> : "No run link"}</td></tr>)}
+      {history.rows.map((row) => <tr key={row.execution_id}><td><button type="button" aria-label={`Open execution ${row.execution_id}`} onClick={() => openExecution(row.execution_id)}>View {row.execution_id}</button></td><td>{row.lane_id ?? "Unknown"}</td><td>{row.first_at}</td><td>{row.last_at}</td><td>{row.event_count}</td><td>{validEvidenceUrl(row.workflow_run_url) ? <a href={validEvidenceUrl(row.workflow_run_url)!} target="_blank" rel="noreferrer">Run</a> : "No run link"}</td></tr>)}
     </tbody></table></div><p>Page {historyPage} of {Math.max(1, Math.ceil(history.total / pageSize))}</p><button disabled={historyPage <= 1} onClick={() => setHistoryPage(historyPage - 1)}>Previous</button><button disabled={historyPage * pageSize >= history.total} onClick={() => setHistoryPage(historyPage + 1)}>Next</button></section>}
-    {detail && <section className="aed-panel"><h2>Execution {detail.execution.execution_id}</h2><p>Source SHA-256: <code>{detail.execution.source_sha256}</code></p><p>Artifact SHA-256: <code>{detail.execution.artifact_sha256 ?? "Unavailable"}</code></p><p>{detail.evidence_detail_limit}</p>
+    {detail && <section id="aed-execution-detail" className="aed-panel" tabIndex={-1}><h2>Execution {detail.execution.execution_id}</h2><p>Source SHA-256: <code>{detail.execution.source_sha256}</code></p><p>Artifact SHA-256: <code>{detail.execution.artifact_sha256 ?? "Unavailable"}</code></p><p>{detail.evidence_detail_limit}</p>
       <div className="aed-filters"><label>Event type <input value={kind} onChange={(event) => { setKind(event.target.value); setEventPage(1); }} /></label><label>State <input value={state} onChange={(event) => { setState(event.target.value); setEventPage(1); }} /></label></div>
       <div className="aed-scroll"><table><thead><tr><th>Sequence</th><th>Timestamp</th><th>Type</th><th>State</th><th>Outcome</th><th>Case</th><th>Wake</th><th>Provider</th><th>Actual cost USD</th><th>Elapsed ms</th><th>Payload SHA-256</th></tr></thead><tbody>
         {detail.rows.map((row) => <tr key={row.sequence}><td>{row.sequence}</td><td>{row.event_at}</td><td>{row.kind}</td><td>{row.state ?? "Unknown"}</td><td>{row.outcome ?? "Unknown"}</td><td>{row.case_id ?? "None"}</td><td>{row.wake_source ?? "Unknown"}</td><td>{row.provider ?? "Unknown"}</td><td>{row.actual_cost_usd ?? "Unmeasured"}</td><td>{row.elapsed_ms}</td><td><code>{row.payload_sha256}</code></td></tr>)}

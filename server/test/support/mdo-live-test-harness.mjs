@@ -28,13 +28,16 @@ export function createMdoLiveTestHarness({
   const fixtures = createMdoLiveTestFixtures({ db, model, candidateRef, candidateKey });
   const governance = createMdoLiveTestGovernance({ db, fixtures, candidateRef, candidateKey });
   const runner = createMdoLiveTestRunner({ db, fixtures, ollamaBaseUrl, model, candidateKey });
+  const agcolRun = process.env.AGCOL_TEST_RUN === 'true';
+  const evidenceIssue = agcolRun ? 548 : 370;
+  const evidenceSchema = agcolRun ? 'comind.agcol-001.test-acceptance.v1' : 'comind.mdo-003.test-acceptance.v1';
 
   async function writeArtifact(evidence) {
     mkdirSync(dirname(artifactPath), { recursive: true });
     writeFileSync(artifactPath, `${JSON.stringify(evidence, null, 2)}\n`, { mode: 0o600 });
     if (process.env.GITHUB_STEP_SUMMARY) {
       const lines = [
-        '# MDO-003 governed persistent Test acceptance',
+        agcolRun ? '# AGCOL-001 governed collaboration Test acceptance' : '# MDO-003 governed persistent Test acceptance',
         '',
         `- Exact candidate: ${candidateRef}`,
         `- Provider/model: ollama_local / ${model}`,
@@ -99,8 +102,8 @@ export function createMdoLiveTestHarness({
       assert.equal(grantCleanup.active, 0);
 
       const evidence = {
-        schema_version: 'comind.mdo-003.test-acceptance.v1',
-        issue: 370,
+        schema_version: evidenceSchema,
+        issue: evidenceIssue,
         outcome: 'accepted_test_proof',
         candidate_ref: candidateRef,
         run_attempt: runAttempt,
@@ -138,8 +141,8 @@ export function createMdoLiveTestHarness({
     } catch (error) {
       if (!grantCleanup && grantIds.length > 0) grantCleanup = await fixtures.revokeRunAuthority(grantIds);
       await writeArtifact({
-        schema_version: 'comind.mdo-003.test-acceptance.v1',
-        issue: 370,
+        schema_version: evidenceSchema,
+        issue: evidenceIssue,
         outcome: 'failed_test_proof',
         candidate_ref: candidateRef,
         run_attempt: runAttempt,

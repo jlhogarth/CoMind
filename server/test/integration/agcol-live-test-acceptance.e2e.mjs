@@ -163,6 +163,19 @@ try {
     assert.equal(error.code, 'authorization_expired');
     negative.push({ mode: 'expired_authorization', code: error.code });
   }
+  try {
+    await foundry.execute({
+      profileId: specialists[0].profileId, capabilityCode: specialists[0].capabilityCode,
+      authorizationDecisionId: expiredDecision, authorityLevel: 'C1', environment: 'isolated',
+      projectId: randomUUID(), taskId: specialists[0].taskId,
+      targetKind: specialists[0].targetKind, targetRef: specialists[0].targetRef,
+      idempotencyKey: `${runKey}:project-negative`, input: { synthetic: true },
+    });
+    assert.fail('Wrong project must fail');
+  } catch (error) {
+    assert.equal(error.code, 'grant_not_valid');
+    negative.push({ mode: 'wrong_project', code: error.code });
+  }
   outcome = await runParallelCollaboration({
     foundry,
     async claim(task) {

@@ -103,7 +103,11 @@ export function createReadOnlyMcpAdapter(
     if (request.action !== 'read' || request.authorityLevel !== 'C1'
       || request.targetKind !== 'evidence_resource' || !request.targetRef
       || !REF.test(request.targetRef) || request.input.synthetic !== true
-      || Object.keys(request.input).some(key => !['synthetic', 'predecessor_evidence'].includes(key))) {
+      || Object.keys(request.input).some(key => !['synthetic', 'predecessor_evidence'].includes(key))
+      || (request.input.predecessor_evidence !== undefined
+        && (!Array.isArray(request.input.predecessor_evidence)
+          || request.input.predecessor_evidence.length > 8
+          || request.input.predecessor_evidence.some(ref => typeof ref !== 'string' || !REF.test(ref))))) {
       throw new McpBoundaryError('mcp_scope', 'Read-only MCP adapter rejected untrusted input or authority');
     }
     const resource = request.targetRef;

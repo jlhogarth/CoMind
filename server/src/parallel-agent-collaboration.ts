@@ -21,6 +21,8 @@ export interface ParallelReceipt {
   readonly evidenceRef: string;
   readonly predecessors: readonly string[];
   readonly elapsedMs: number;
+  readonly leaseToken: string;
+  readonly fencingEpoch: number;
 }
 export interface ParallelOutcome {
   readonly status: 'completed' | 'blocked';
@@ -33,7 +35,10 @@ export class ParallelCollaborationError extends Error {
     this.name = 'ParallelCollaborationError';
   }
 }
+export interface ParallelClaim { readonly taskId: string; readonly leaseToken: string; readonly fencingEpoch: number; }
 export interface ParallelDependencies {
+  readonly claim: (task: ParallelSpecialist) => Promise<ParallelClaim>;
+  readonly finish: (task: ParallelSpecialist, claim: ParallelClaim, completed: boolean) => Promise<boolean>;
   readonly foundry: Pick<FoundryRuntimeOrchestrator, 'execute'>;
   // The accountable authority evaluates this exact task and canonical predecessor receipts.
   readonly authorize: (task: ParallelSpecialist, predecessors: readonly ParallelReceipt[]) => Promise<string>;
@@ -94,7 +99,13 @@ export async function runParallelCollaboration(
   async function execute(task: ParallelSpecialist): Promise<void> {
     const predecessors = Object.freeze(task.predecessors.map(key => receipts.get(key)!));
     const start = now();
+    let claim: ParallelClaim | null = null;
     try {
+      claim = await dependencies.claim(task);
+      if (claim.taskId !== task.taskId || !claim.leaseToken
+        || !Number.isSafeInteger(claim.fencingEpoch) || claim.fencingEpoch < 1) {
+        throw new ParallelCollaborationError('claim_mismatch', 'Fenced claim does not match assigned task');
+      }
       // Authorization belongs to the specialist, and is requested only after all dependencies finish.
       const authorizationDecisionId = await dependencies.authorize(task, predecessors);
       if (!authorizationDecisionId) throw new ParallelCollaborationError('authorization_missing', 'No task-specific decision');
@@ -114,15 +125,26 @@ export async function runParallelCollaboration(
       if (!evidenceRef || evidenceRef !== result.resultRef) {
         throw new ParallelCollaborationError('evidence_mismatch', 'Canonical evidence does not match execution result');
       }
+      if (!await dependencies.finish(task, claim, true)) {
+        throw new ParallelCollaborationError('lease_finish_failed', 'Fenced completion was not recorded');
+      }
+      const completedClaim = claim;
+      claim = null;
       receipts.set(task.key, Object.freeze({
         key: task.key, taskId: task.taskId, authorizationDecisionId,
         executionContextId: result.executionContextId,
         adapterOperationResultId: result.adapterOperationResultId,
         executionOutcomeId: result.executionOutcomeId, evidenceRef,
         predecessors: Object.freeze([...task.predecessors]), elapsedMs: Math.max(0, now() - start),
+        leaseToken: completedClaim.leaseToken, fencingEpoch: completedClaim.fencingEpoch,
       }));
     } catch {
       failed = true;
+      if (claim !== null) {
+        try {
+          if (!await dependencies.finish(task, claim, false)) failed = true;
+        } catch { failed = true; }
+      }
     }
   }
   while (pending.size || running.size) {

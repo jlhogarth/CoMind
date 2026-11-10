@@ -37,6 +37,6 @@ test('foreign tool output, scope expansion and receipt failure fail closed', asy
   await assert.rejects(adapter(request), { code: 'mcp_output' });
   await assert.rejects(adapter({ ...request, action: 'write' }), { code: 'mcp_scope' });
   await assert.rejects(adapter({ ...request, input: { synthetic: true, command: 'override' } }), { code: 'mcp_scope' });
-  const good = { callTool: resource => callIsolatedReadOnlyMcp(resource.arguments.resource) };
+  const good = { callTool: (_name, args) => callIsolatedReadOnlyMcp(args.resource) };
   await assert.rejects(createReadOnlyMcpAdapter(good, async () => '')(request), { code: 'mcp_receipt' });
 });

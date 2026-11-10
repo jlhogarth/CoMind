@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { createMdoLiveTestDb } from '../support/mdo-live-test-db.mjs';
@@ -199,9 +199,8 @@ try {
         JOIN comind.cm_foundry_execution_context ec ON ec.execution_context_id=eo.execution_context_id
         WHERE ec.task_id=ANY($1::uuid[]) AND eo.terminal_status='succeeded') AS outcomes,
        (SELECT count(*)::int FROM comind.cm_evidence
-        WHERE source_type='agcol_mcp_test' AND metadata->>'candidate'=$2::text
-          AND metadata->'receipt'->>'resource' LIKE 'agcol002:%') AS receipts`,
-    [tasks, candidate]
+        WHERE source_type='agcol_mcp_test' AND evidence_id=ANY($2::uuid[])) AS receipts`,
+    [tasks, outcome.receipts.map(x => x.evidenceRef)]
   );
   for (const value of Object.values(readback)) assert.equal(value, 3);
   const replay = await runParallelCollaboration({

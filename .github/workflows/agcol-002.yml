@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - '.github/workflows/agcol-002.yml'
+      - 'db/migrations/20261110_001_agcol_002_exact_task_claim.sql'
+      - 'db/migrations/verify_20261110_001_agcol_002_exact_task_claim.sql'
       - 'server/src/parallel-agent-collaboration.ts'
       - 'server/src/agcol-readonly-mcp.ts'
       - 'server/test/parallel-agent-collaboration.test.mjs'
@@ -40,3 +42,39 @@ jobs:
       - name: Bounded graph and actual local MCP protocol
         working-directory: server
         run: node --test test/parallel-agent-collaboration.test.mjs test/agcol-readonly-mcp.test.mjs test/agent-collaboration.test.mjs
+
+  scoped-lease:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.6-pg17-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+      - run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+      - run: bash ./scripts/test_mdo_001.sh
+      - name: Apply migration twice and verify fenced exact claim
+        run: |
+          set -euo pipefail
+          psql -X "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/migrations/20261110_001_agcol_002_exact_task_claim.sql
+          psql -X "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/migrations/20261110_001_agcol_002_exact_task_claim.sql
+          psql -X "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/migrations/verify_20261110_001_agcol_002_exact_task_claim.sql

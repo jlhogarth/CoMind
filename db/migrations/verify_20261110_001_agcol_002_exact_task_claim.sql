@@ -1,6 +1,8 @@
 BEGIN;
 DO $$
 DECLARE
+  v_org uuid;
+  v_actor uuid;
   v_project uuid;
   v_task uuid;
   v_claim record;
@@ -10,9 +12,15 @@ BEGIN
        'comind.cm_agcol_claim_task(uuid,uuid,text,integer)', 'EXECUTE') THEN
     RAISE EXCEPTION 'AGCOL exact-task claim grant missing';
   END IF;
-  SELECT project_id INTO STRICT v_project FROM comind.cm_project
-   WHERE project_code::text = 'COMIND' AND source_system = 'github'
-     AND source_ref = 'github:repo:jlhogarth/CoMind' AND status = 'active';
+  INSERT INTO comind.cm_org(name, slug)
+  VALUES ('AGCOL verifier', 'agcol-verifier-' || replace(gen_random_uuid()::text, '-', ''))
+  RETURNING org_id INTO v_org;
+  INSERT INTO comind.cm_actor(org_id, kind, handle, display_name)
+  VALUES (v_org, 'service', 'agcol-verifier-' || replace(gen_random_uuid()::text, '-', ''), 'AGCOL verifier')
+  RETURNING actor_id INTO v_actor;
+  INSERT INTO comind.cm_project(org_id, title, slug, created_by)
+  VALUES (v_org, 'AGCOL verifier', 'agcol-project-' || replace(gen_random_uuid()::text, '-', ''), v_actor)
+  RETURNING project_id INTO v_project;
   INSERT INTO comind.cm_task(project_id, title, status)
   VALUES (v_project, 'AGCOL-002 migration verifier synthetic task', 'todo')
   RETURNING task_id INTO v_task;

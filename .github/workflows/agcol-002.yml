@@ -1,0 +1,42 @@
+name: AGCOL-002 Bounded Collaboration Contract
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/agcol-002.yml'
+      - 'server/src/parallel-agent-collaboration.ts'
+      - 'server/src/agcol-readonly-mcp.ts'
+      - 'server/test/parallel-agent-collaboration.test.mjs'
+      - 'server/test/agcol-readonly-mcp.test.mjs'
+      - 'server/test/support/agcol-readonly-mcp-server.mjs'
+      - 'docs/architecture/agcol-002-bounded-parallel-mcp.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install
+        working-directory: server
+        run: npm ci
+      - name: Build
+        working-directory: server
+        run: npm run build
+      - name: Bounded graph and actual local MCP protocol
+        working-directory: server
+        run: node --test test/parallel-agent-collaboration.test.mjs test/agcol-readonly-mcp.test.mjs test/agent-collaboration.test.mjs

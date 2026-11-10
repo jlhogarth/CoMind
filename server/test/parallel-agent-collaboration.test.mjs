@@ -15,7 +15,10 @@ function fixture({ fail = '', hold = false } = {}) {
   const pending = new Map();
   const started = [];
   const authorized = [];
+  const finished = [];
   const dependencies = {
+    async claim(task) { return { taskId: task.taskId, leaseToken: `token-${task.key}`, fencingEpoch: 1 }; },
+    async finish(task, claim, completed) { finished.push([task.key, claim.leaseToken, completed]); return true; },
     async authorize(task, receipts) {
       authorized.push([task.key, receipts.map(r => r.key)]);
       return `decision-${task.key}`;
@@ -35,7 +38,7 @@ function fixture({ fail = '', hold = false } = {}) {
     },
     async verifyEvidence(_task, result) { return result.resultRef; },
   };
-  return { dependencies, pending, started, authorized };
+  return { dependencies, pending, started, authorized, finished };
 }
 test('parallel roots and deterministic evidence-backed reviewer join', async () => {
   const f = fixture({ hold: true });
@@ -51,6 +54,7 @@ test('parallel roots and deterministic evidence-backed reviewer join', async () 
   assert.equal(outcome.status, 'completed');
   assert.deepEqual(outcome.receipts.map(r => r.key), ['scout', 'analyst', 'reviewer']);
   assert.deepEqual(f.authorized[2], ['reviewer', ['scout', 'analyst']]);
+  assert.deepEqual(f.finished.map(x => x[2]), [true, true, true]);
 });
 test('partial failure drains in-flight specialist and blocks join', async () => {
   const f = fixture({ fail: 'scout', hold: true });
@@ -80,4 +84,28 @@ test('missing canonical evidence prevents reviewer authorization', async () => {
   const outcome = await runParallelCollaboration(f.dependencies, tasks, 'agcol002', 2);
   assert.equal(outcome.status, 'blocked');
   assert.equal(f.started.includes('reviewer'), false);
+});
+
+test('fenced claim mismatch blocks execution and releases the claim', async () => {
+  const f = fixture();
+  f.dependencies.claim = async task => ({ taskId: 'another-task', leaseToken: 'token', fencingEpoch: 1 });
+  const outcome = await runParallelCollaboration(f.dependencies, tasks, 'agcol002', 2);
+  assert.equal(outcome.status, 'blocked');
+  assert.deepEqual(f.started, []);
+  assert.deepEqual(f.finished.map(x => x[2]), [false, false]);
+});
+test('replayed handoff is refused by Foundry idempotency before reviewer', async () => {
+  const f = fixture();
+  const seen = new Set();
+  const execute = f.dependencies.foundry.execute;
+  f.dependencies.foundry.execute = async request => {
+    if (seen.has(request.idempotencyKey)) throw new Error('duplicate_idempotency');
+    seen.add(request.idempotencyKey);
+    return execute(request);
+  };
+  assert.equal((await runParallelCollaboration(f.dependencies, tasks, 'agcol002', 2)).status, 'completed');
+  const replay = await runParallelCollaboration(f.dependencies, tasks, 'agcol002', 2);
+  assert.equal(replay.status, 'blocked');
+  assert.equal(replay.receipts.length, 0);
+  assert.equal(seen.size, 3);
 });

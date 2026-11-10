@@ -188,6 +188,28 @@ try {
   }, specialists, runKey, 2);
   assert.equal(outcome.status, 'completed');
   assert.deepEqual(outcome.receipts.map(x => x.key), names);
+  const negative = [];
+  const staleDecision = await fixtureTools.issueAuthorization({
+    profile: { profileId: specialists[0].profileId }, actorId: specialists[0].actorId,
+    capabilityId: specialists[0].capabilityId, projectId: specialists[0].projectId,
+    taskId: specialists[0].taskId, targetKind: specialists[0].targetKind,
+    targetRef: specialists[0].targetRef, sponsorActorId: fixture.sponsor.actor_id,
+    reason: 'AGCOL-002 expired decision denial.', expired: true,
+  });
+  try {
+    await foundry.execute({
+      profileId: specialists[0].profileId, capabilityCode: specialists[0].capabilityCode,
+      authorizationDecisionId: staleDecision, authorityLevel: 'C1', environment: 'isolated',
+      projectId: specialists[0].projectId, taskId: specialists[0].taskId,
+      targetKind: specialists[0].targetKind, targetRef: specialists[0].targetRef,
+      idempotencyKey: `${runKey}:expired-negative`, input: { synthetic: true },
+    });
+    assert.fail('Expired decision must fail');
+  } catch (error) {
+    assert.equal(error.code, 'grant_task_limit_exceeded');
+    negative.push({ mode: 'consumed_single_task_grant', code: error.code });
+  }
+
   const readback = await one(
     `SELECT
        (SELECT count(*)::int FROM comind.cm_task WHERE task_id=ANY($1::uuid[]) AND status='done') AS done_tasks,
@@ -222,10 +244,30 @@ try {
   const cleanup = await one(`SELECT count(*)::int AS active FROM comind.cm_foundry_capability_grant
     WHERE grant_id=ANY($1::uuid[]) AND revoked_at IS NULL`, [grants]);
   assert.equal(cleanup.active, 0);
+  const deniedDecision = await fixtureTools.issueAuthorization({
+    profile: { profileId: specialists[0].profileId }, actorId: specialists[0].actorId,
+    capabilityId: specialists[0].capabilityId, projectId: specialists[0].projectId,
+    taskId: specialists[0].taskId, targetKind: specialists[0].targetKind,
+    targetRef: specialists[0].targetRef, sponsorActorId: fixture.sponsor.actor_id,
+    reason: 'AGCOL-002 revoked grant denial.',
+  });
+  try {
+    await foundry.execute({
+      profileId: specialists[0].profileId, capabilityCode: specialists[0].capabilityCode,
+      authorizationDecisionId: deniedDecision, authorityLevel: 'C1', environment: 'isolated',
+      projectId: specialists[0].projectId, taskId: specialists[0].taskId,
+      targetKind: specialists[0].targetKind, targetRef: specialists[0].targetRef,
+      idempotencyKey: `${runKey}:revoked-negative`, input: { synthetic: true },
+    });
+    assert.fail('Revoked grant must fail');
+  } catch (error) {
+    assert.equal(error.code, 'grant_not_valid');
+    negative.push({ mode: 'revoked_grant', code: error.code });
+  }
   artifact({ schema_version: 'comind.agcol-002.test-acceptance.v1', issue: 553,
     outcome: 'accepted_test_proof', candidate_ref: candidate,
     environment: 'isolated', database: identity, project_id: fixture.project.project_id,
-    task_ids: tasks, grant_ids: grants, grant_cleanup: cleanup, readback, receipts: outcome.receipts,
+    task_ids: tasks, grant_ids: grants, grant_cleanup: cleanup, negative, readback, receipts: outcome.receipts,
     production_authorized: false, paid_provider_authorized: false });
 } catch (error) {
   artifact({ schema_version: 'comind.agcol-002.test-acceptance.v1', issue: 553,
@@ -241,6 +283,10 @@ try {
     const row = await one(`SELECT count(*)::int AS active FROM comind.cm_foundry_capability_grant
       WHERE grant_id=ANY($1::uuid[]) AND revoked_at IS NULL`, [grants]);
     assert.equal(row.active, 0);
+  }
+  if (tasks.length) {
+    await query(`UPDATE comind.cm_task SET status='blocked'
+      WHERE task_id=ANY($1::uuid[]) AND status NOT IN ('done','blocked')`, [tasks]);
   }
   await db.close();
 }

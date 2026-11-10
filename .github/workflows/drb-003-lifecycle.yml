@@ -9,6 +9,7 @@ on:
       - 'server/package-lock.json'
       - 'db/migrations/*comind_pm_ledger*.sql'
       - 'db/migrations/*durable_runbook*.sql'
+      - 'db/migrations/*drb_004_live_runbook.sql'
       - 'db/test/drb_002_reader.sql'
       - 'db/test/bootstrap_supabase_compat.sql'
 
@@ -44,6 +45,6 @@ jobs:
           cache-dependency-path: server/package-lock.json
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run build
-      - run: node --test test/runbook-lifecycle.test.mjs test/runbook-query.integration.test.mjs
+      - run: node --test test/runbook-lifecycle.test.mjs test/runbook-lifecycle-live.test.mjs test/runbook-query.integration.test.mjs
         env:
           DRB_TEST_ADMIN_URL: postgres://postgres:drb_isolated_ci_only@127.0.0.1:5432/drb_test

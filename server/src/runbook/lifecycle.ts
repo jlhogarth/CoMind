@@ -24,7 +24,7 @@ export type LifecycleSlot = z.infer<typeof slotSchema>;
 
 const snapshotSchema = z.object({
   documentId: identifier,
-  revisionId: z.string().min(1).max(512),
+  revisionId: z.string().min(1).max(512).optional(),
   tabs: z.array(z.object({
     tabId: identifier,
     body: z.object({
@@ -88,11 +88,13 @@ export function evaluateLifecycle(
   const plan = observation.kind === 'received' ? planSchema.safeParse(observation.plan) : null;
   const blockers: string[] = [];
   if (size === 'unavailable' || size === 'invalid') blockers.push('measurement_unverified');
+  if (snapshot?.success && !snapshot.data.revisionId) blockers.push('revision_unverified');
   if (!plan?.success) {
     blockers.push('rollover_evidence_incomplete');
   } else {
-    if (!snapshot?.success || snapshot.data.documentId !== key.volumeId || plan.data.documentId !== key.volumeId
-      || plan.data.reviewedRevisionId !== snapshot.data.revisionId) {
+    if (plan.data.documentId !== key.volumeId || (snapshot?.success
+      && (snapshot.data.documentId !== key.volumeId || (snapshot.data.revisionId
+        && plan.data.reviewedRevisionId !== snapshot.data.revisionId)))) {
       blockers.push('reviewed_revision_mismatch');
     }
     if (plan.data.writers.some((writer) => writer.status !== 'verified')

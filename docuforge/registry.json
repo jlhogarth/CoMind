@@ -1,0 +1,57 @@
+{
+  "schema_version": "1.0.0",
+  "formats": {
+    "docx": {
+      "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "editable": true,
+      "google_native": "application/vnd.google-apps.document"
+    },
+    "pdf": {
+      "mime": "application/pdf",
+      "editable": false,
+      "google_native": null
+    },
+    "pptx": {
+      "mime": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      "editable": true,
+      "google_native": "application/vnd.google-apps.presentation",
+      "conversion_warning": "Animations and transitions may not survive Google Slides conversion."
+    },
+    "xlsx": {
+      "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "editable": true,
+      "google_native": "application/vnd.google-apps.spreadsheet",
+      "conversion_warning": "Formulas, charts and macros require post-conversion validation."
+    },
+    "csv": {
+      "mime": "text/csv",
+      "editable": true,
+      "google_native": null
+    },
+    "svg": {
+      "mime": "image/svg+xml",
+      "editable": true,
+      "google_native": null
+    },
+    "png": {
+      "mime": "image/png",
+      "editable": false,
+      "google_native": null
+    },
+    "jpg": {
+      "mime": "image/jpeg",
+      "editable": false,
+      "google_native": null
+    },
+    "md": {
+      "mime": "text/markdown",
+      "editable": true,
+      "google_native": null
+    },
+    "html": {
+      "mime": "text/html",
+      "editable": true,
+      "google_native": null
+    }
+  }
+}

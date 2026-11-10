@@ -142,6 +142,27 @@ try {
     }
   ));
   const foundry = new FoundryRuntimeOrchestrator(query, registry);
+  const negative = [];
+  const expiredDecision = await fixtureTools.issueAuthorization({
+    profile: { profileId: specialists[0].profileId }, actorId: specialists[0].actorId,
+    capabilityId: specialists[0].capabilityId, projectId: specialists[0].projectId,
+    taskId: specialists[0].taskId, targetKind: specialists[0].targetKind,
+    targetRef: specialists[0].targetRef, sponsorActorId: fixture.sponsor.actor_id,
+    reason: 'AGCOL-002 expired authorization denial.', expired: true,
+  });
+  try {
+    await foundry.execute({
+      profileId: specialists[0].profileId, capabilityCode: specialists[0].capabilityCode,
+      authorizationDecisionId: expiredDecision, authorityLevel: 'C1', environment: 'isolated',
+      projectId: specialists[0].projectId, taskId: specialists[0].taskId,
+      targetKind: specialists[0].targetKind, targetRef: specialists[0].targetRef,
+      idempotencyKey: `${runKey}:expired-negative`, input: { synthetic: true },
+    });
+    assert.fail('Expired decision must fail');
+  } catch (error) {
+    assert.equal(error.code, 'authorization_expired');
+    negative.push({ mode: 'expired_authorization', code: error.code });
+  }
   outcome = await runParallelCollaboration({
     foundry,
     async claim(task) {
@@ -188,13 +209,12 @@ try {
   }, specialists, runKey, 2);
   assert.equal(outcome.status, 'completed');
   assert.deepEqual(outcome.receipts.map(x => x.key), names);
-  const negative = [];
   const staleDecision = await fixtureTools.issueAuthorization({
     profile: { profileId: specialists[0].profileId }, actorId: specialists[0].actorId,
     capabilityId: specialists[0].capabilityId, projectId: specialists[0].projectId,
     taskId: specialists[0].taskId, targetKind: specialists[0].targetKind,
     targetRef: specialists[0].targetRef, sponsorActorId: fixture.sponsor.actor_id,
-    reason: 'AGCOL-002 expired decision denial.', expired: true,
+    reason: 'AGCOL-002 consumed grant denial.',
   });
   try {
     await foundry.execute({
@@ -202,9 +222,9 @@ try {
       authorizationDecisionId: staleDecision, authorityLevel: 'C1', environment: 'isolated',
       projectId: specialists[0].projectId, taskId: specialists[0].taskId,
       targetKind: specialists[0].targetKind, targetRef: specialists[0].targetRef,
-      idempotencyKey: `${runKey}:expired-negative`, input: { synthetic: true },
+      idempotencyKey: `${runKey}:consumed-negative`, input: { synthetic: true },
     });
-    assert.fail('Expired decision must fail');
+    assert.fail('Consumed grant must fail');
   } catch (error) {
     assert.equal(error.code, 'grant_task_limit_exceeded');
     negative.push({ mode: 'consumed_single_task_grant', code: error.code });

@@ -217,10 +217,15 @@ try {
   }, specialists, runKey, 2);
   assert.equal(replay.status, 'blocked');
   assert.equal(replay.receipts.length, 0);
+  await query(`UPDATE comind.cm_foundry_capability_grant SET revoked_at=clock_timestamp()
+    WHERE grant_id=ANY($1::uuid[]) AND revoked_at IS NULL`, [grants]);
+  const cleanup = await one(`SELECT count(*)::int AS active FROM comind.cm_foundry_capability_grant
+    WHERE grant_id=ANY($1::uuid[]) AND revoked_at IS NULL`, [grants]);
+  assert.equal(cleanup.active, 0);
   artifact({ schema_version: 'comind.agcol-002.test-acceptance.v1', issue: 553,
     outcome: 'accepted_test_proof', candidate_ref: candidate,
     environment: 'isolated', database: identity, project_id: fixture.project.project_id,
-    task_ids: tasks, grant_ids: grants, readback, receipts: outcome.receipts,
+    task_ids: tasks, grant_ids: grants, grant_cleanup: cleanup, readback, receipts: outcome.receipts,
     production_authorized: false, paid_provider_authorized: false });
 } catch (error) {
   artifact({ schema_version: 'comind.agcol-002.test-acceptance.v1', issue: 553,

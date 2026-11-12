@@ -1,0 +1,46 @@
+# GCI-001 | On-demand Gemini collaboration in Test
+
+[Issue #544](https://github.com/jlhogarth/CoMind/issues/544) · [Draft PR #545](https://github.com/jlhogarth/CoMind/pull/545)
+
+GCI-001 is an off-by-default, manually dispatched Test workflow. Its only authorized Gemini input is the exact synthetic prompt registered as `question0001` in session `gci_smoke_20261107`. The repository registry pins its SHA-256 digest. Other documents, sessions, exchanges and edited versions of the prompt are ineligible. The original CM-XAI conversation is preserved separately. An active ChatGPT session or a user return is required to review a reply in chat.
+
+## Resume live acceptance
+
+1. Open Google Cloud Console for project `comind-513807`. Use Cloud Shell to retrieve `scripts/gci/bootstrap-google-oidc.sh` from the exact reviewed GCI branch commit. Run `bash -n` and run the script with `--audit`. Confirm the identity for numeric ID `102716239802737631124`, project access, API state, dedicated provider and effective service-account access. Audit leaves IAM and APIs unchanged. An existing provider with different trust rules, an extra provider, a direct project grant, a user-managed key or an unexpected impersonation binding requires review. The script checks direct project and service-account policy. The administrator must separately check inherited policy and organization constraints.
+2. Apply the reviewed script with `--apply` from an authorized administrative session, then rerun `--audit` to confirm the provider and binding. The script scopes GitHub trust to immutable repository and owner IDs, the exact Test branch and workflow, and the dispatch event. It grants impersonation only on the designated service account. Use the printed identifiers for `GCI_WIF_PROVIDER` and `GCI_SERVICE_ACCOUNT_EMAIL` repository variables. Confirm `GEMINI_API_KEY` by secret name only.
+3. Share only the [isolated synthetic Google Doc](https://docs.google.com/document/d/1dJEOjmLPm9gdw8xsVF8J_dyPK0HDx5N5RmW0ID42cnE/edit) with the verified account as Editor. Read back that file's ACL and preserve human ownership and Restricted general access. The runner verifies its Drive identity and the visible, untrashed Drive inventory before reading the document.
+4. Confirm registration for `.github/workflows/gci-001-on-demand-gemini.yml`. An update to this file on the existing Test branch can run a credential-free registration job. Once GitHub lists the workflow, use its numeric workflow ID and the exact Test branch with `enable_live=false` to prove manual dispatch before enabling Google access. GitHub documents default-branch registration, so treat branch-only dispatch as supported for this repository only after a successful run is observed. If GitHub rejects the probe, review an inert default-branch definition and verify its deployment effects before changing the default branch. [GitHub workflow event reference](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_dispatch)
+5. Dispatch the reviewed Test branch with `enable_live=true`, `preflight_only=true`, the registered document and session, and `gemini-3.5-flash-lite`. Verify the identity, Drive inventory, document version, eligible exchange and the key's access to model metadata. The preflight makes zero generation requests and writes nothing.
+6. Dispatch once with the same inputs and `preflight_only=false` after confirming the existing Gemini project and cost boundary. The runner sends at most one generation request per run for the registered synthetic input, with a 512-output-token cap and no inference retry. Verify the generation attempt, provider-reported usage if available, reply digest, Docs revision, one logical reply and `idle_stopped` after at least 240 seconds of meaningful inactivity. Google Drive metadata is polled every 15 seconds. The job has a 35-minute outer timeout, and the poller stops scheduling work after its 30-minute deadline.
+7. Independently reread the Docs reply and digest. Inspect again in read-only preflight, which verifies an existing complete receipt and sends no generation request. Keep run IDs and sanitized evidence in the [acceptance journal](gci-001-acceptance-evidence-2026-11-07.md). Avoid exposing prompt or response bodies, credentials and tokens in the public repository.
+
+## OIDC provider mappings in Google Cloud Console
+
+Use OpenID Connect (OIDC) in project `comind-513807`, pool ID `comind-gci` and provider ID `github-comind`. Use the issuer `https://token.actions.githubusercontent.com` and Default audience. Google requires a mapping for every claim referenced by the attribute condition. Keep all six mappings below.
+
+| Google attribute | OIDC expression |
+| --- | --- |
+| `google.subject` | `assertion.sub` |
+| `attribute.repository_id` | `assertion.repository_id` |
+| `attribute.repository_owner_id` | `assertion.repository_owner_id` |
+| `attribute.ref` | `assertion.ref` |
+| `attribute.workflow_ref` | `assertion.workflow_ref` |
+| `attribute.event_name` | `assertion.event_name` |
+
+Use the full condition below. It restricts admission to the immutable repository and owner IDs, exact Test branch and workflow, and manual dispatch.
+
+```text
+assertion.repository_id == '1028814081' && assertion.repository_owner_id == '83435038' && assertion.ref == 'refs/heads/gci-001-on-demand-gemini-review' && assertion.workflow_ref == 'jlhogarth/CoMind/.github/workflows/gci-001-on-demand-gemini.yml@refs/heads/gci-001-on-demand-gemini-review' && assertion.event_name == 'workflow_dispatch'
+```
+
+## Concurrency and recovery
+
+GitHub serializes runs for a document. The poller reads the Google Docs text and revision in one request, then applies the claim with `requiredRevisionId`. Competing claims against that revision cannot both succeed. The reply also uses a required revision, so concurrent human edits fail closed. A second Docs read checks parent correlation, the complete envelope and SHA-256 digest before reporting delivery. A claim with a missing, duplicated or invalid receipt is quarantined on restart. A provider timeout or interrupted write must be reconciled before any fresh authorization. Never delete a claim to retry a possibly billed request.
+
+The isolated Test still relies on the document for durable claim and receipt evidence. A document editor can remove both markers, so document revisions alone cannot enforce durable replay protection after deliberate edits. GCI-002 requires a separate transactional exchange ledger, with a unique exchange key and leases, before multi-session or shared-editor use. That larger integration requires an independently validated Test database target and migration. Provider idempotency and exactly-once network execution remain unverified.
+
+## Validation and rollback
+
+Run `python -m pip install -r scripts/gci/requirements.txt`, `bash -n scripts/gci/bootstrap-google-oidc.sh` and `python -m unittest discover -s tests/gci -v`. To run the four-minute timer with stubbed providers and a real clock, set `GCI_TEST_REAL_IDLE=true` and filter to `-k real_elapsed`.
+
+Cancel an active run or disable the workflow to stop execution. Keep the document evidence and review ambiguous claims manually. If the Test is retired, remove only the verified GCI-specific service-account document grant and federation binding. The hourly Gemini Review Watch operates independently.

@@ -48,7 +48,11 @@ export async function startRunBookLifecycleScheduler(
   if (credentials.type !== 'external_account' || !credentials.service_account_impersonation_url) {
     throw new Error('RunBook Test scheduler requires a federated Google Viewer service account');
   }
-  const pool = new Pool({ connectionString: config.database, max: 2,
+  const database = new URL(config.database);
+  const ca = environment.DRB_RUNBOOK_DATABASE_CA;
+  if (!ca?.includes('-----BEGIN CERTIFICATE-----')) throw new Error('RunBook Test database CA is missing');
+  database.search = '';
+  const pool = new Pool({ connectionString: database.toString(), ssl: { ca, rejectUnauthorized: true }, max: 2,
     connectionTimeoutMillis: 5_000, query_timeout: 15_000 });
   try {
     const { rows } = await pool.query<{ safe: boolean }>(

@@ -54,8 +54,13 @@ export function getRunBookConsoleConfig(environment: Readonly<Record<string, str
 }
 
 export async function readRunBookLifecycleStatus() {
+  const database = new URL(getRunBookConsoleConfig());
+  const ca = process.env.DRB_RUNBOOK_DATABASE_CA;
+  if (!ca?.includes("-----BEGIN CERTIFICATE-----")) throw new Error("RunBook database CA is missing");
+  database.search = "";
   const client = new Client({
-    connectionString: getRunBookConsoleConfig(),
+    connectionString: database.toString(),
+    ssl: { ca, rejectUnauthorized: true },
     connectionTimeoutMillis: 4_000,
     query_timeout: 5_000,
   });

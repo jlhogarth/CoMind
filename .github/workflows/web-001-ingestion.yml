@@ -3,14 +3,14 @@ on:
   pull_request:
     paths:
       - 'apps/public-web/ingestion/**'
-      - 'apps/public-web/migrations/*visitor_contributions_test.sql'
+      - 'apps/public-web/migrations/*visitor_contributions*_test.sql'
       - '.github/workflows/web-001-ingestion.yml'
   push:
     branches:
       - web-001-public-headquarters-foundation
     paths:
       - 'apps/public-web/ingestion/**'
-      - 'apps/public-web/migrations/*visitor_contributions_test.sql'
+      - 'apps/public-web/migrations/*visitor_contributions*_test.sql'
       - '.github/workflows/web-001-ingestion.yml'
 permissions:
   contents: read

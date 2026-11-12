@@ -28,6 +28,12 @@ try {
   await db.exec(migration);
   const results = await db.exec(verify);
   assert.ok(results.some(result => result.rows.some(row => row.verification?.startsWith('PASS: '))));
+  const scoped = await readFile(new URL('../migrations/visitor_contributions_scoped_test.sql', import.meta.url), 'utf8');
+  const scopedVerify = await readFile(new URL('../migrations/verify_visitor_contributions_scoped_test.sql', import.meta.url), 'utf8');
+  await db.exec(scoped);
+  await db.exec(scoped);
+  const scopedResults = await db.exec(scopedVerify);
+  assert.ok(scopedResults.some(result => result.rows.some(row => row.verification?.startsWith('PASS: '))));
   const after = await db.query('select count(*)::int as count from web001_private.contributions');
   assert.equal(after.rows[0].count, 0);
   const version = await db.query("select current_setting('server_version') as version");

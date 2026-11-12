@@ -46,21 +46,6 @@ async function readJson(request) {
   }
 }
 
-async function callStorage(env, operation, params) {
-  const key = env.SUPABASE_SERVICE_ROLE_KEY;
-  const endpoint = new URL('/rest/v1/rpc/' + operation, env.SUPABASE_URL);
-  if (endpoint.protocol !== 'https:') throw new Error('Invalid storage endpoint');
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: { apikey: key, authorization: 'Bearer ' + key, 'content-type': 'application/json' },
-    body: JSON.stringify(params),
-    redirect: 'manual',
-    signal: AbortSignal.timeout(8_000),
-  });
-  if (!response.ok) throw new Error('Storage unavailable');
-  return response.json();
-}
-
 async function verifyChallenge(token, env, hostname, ip) {
   const body = new URLSearchParams({ secret: env.TURNSTILE_SECRET, response: token });
   if (ip) body.set('remoteip', ip);
@@ -95,7 +80,7 @@ export default {
     }
     if (request.method !== method) return respond(405, { error: 'method_not_allowed' }, allowed);
     if (env.COLLECTION_MODE !== 'synthetic-test' || !env.TEST_ACCESS_TOKEN || !env.TURNSTILE_SECRET ||
-        !env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY || !env.VISITOR_RATE_LIMIT) {
+        !env.WEB001_STORAGE || !env.VISITOR_RATE_LIMIT) {
       return respond(503, { error: 'not_configured' });
     }
 
@@ -137,14 +122,14 @@ export default {
       const tokenHash = Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join('');
 
       if (method === 'DELETE') {
-        const withdrawn = await callStorage(env, 'web001_withdraw', { p_id: id, p_hash: tokenHash });
+        const withdrawn = await env.WEB001_STORAGE.call('web001_withdraw', { p_id: id, p_hash: tokenHash });
         return withdrawn === true ? respond(200, { withdrawn: true }) : respond(404, { error: 'not_found' });
       }
 
       if (!(await verifyChallenge(body.turnstile_token, env, new URL(origin).hostname, ip))) {
         return respond(403, { error: 'challenge_failed' });
       }
-      const receipt = await callStorage(env, 'web001_submit', {
+      const receipt = await env.WEB001_STORAGE.call('web001_submit', {
         p_id: body.contribution_id, p_hash: tokenHash, p_consent_version: body.consent_version,
         p_question: body.question.trim(), p_why: body.why.trim() || null,
         p_known: body.known.trim() || null, p_unknown: body.unknown.trim() || null,

@@ -9,7 +9,7 @@ const token = 'a'.repeat(64);
 const access = 'b'.repeat(64);
 const env = {
   ALLOWED_ORIGIN: origin, COLLECTION_MODE: 'synthetic-test', TEST_ACCESS_TOKEN: access,
-  SUPABASE_URL: 'https://database.example.test', SUPABASE_SERVICE_ROLE_KEY: 'test-database-secret',
+  WEB001_STORAGE: { call: async () => assert.fail('unexpected storage call') },
   TURNSTILE_SECRET: 'test-turnstile-secret', VISITOR_RATE_LIMIT: { limit: async () => ({ success: true }) },
 };
 const fields = { question: 'How can we compare competing explanations?', why: '', known: '', unknown: '' };
@@ -103,19 +103,18 @@ test('rejects wrong hostname or action, expired and replayed challenges before s
 test('submits only approved fields, hashes the token and returns an idempotent receipt', async t => {
   const calls = [];
   t.mock.method(globalThis, 'fetch', async (url, options) => {
-    if (String(url).includes('siteverify')) {
-      assert.equal(options.body.get('response'), 'challenge');
-      assert.equal(options.body.get('remoteip'), '192.0.2.1');
-      return Response.json(challenge);
-    }
-    assert.equal(String(url), env.SUPABASE_URL + '/rest/v1/rpc/web001_submit');
-    assert.equal(options.headers.apikey, env.SUPABASE_SERVICE_ROLE_KEY);
-    assert.equal(options.redirect, 'manual');
-    calls.push(JSON.parse(options.body));
-    return Response.json(receipt);
+    assert.equal(String(url), 'https://challenges.cloudflare.com/turnstile/v0/siteverify');
+    assert.equal(options.body.get('response'), 'challenge');
+    assert.equal(options.body.get('remoteip'), '192.0.2.1');
+    return Response.json(challenge);
   });
+  const storage = { async call(operation, params) {
+    assert.equal(operation, 'web001_submit');
+    calls.push(params);
+    return receipt;
+  } };
   for (let retry = 0; retry < 2; retry++) {
-    const response = await worker.fetch(request({ ...payload, extra: 'Discard this' }), env);
+    const response = await worker.fetch(request({ ...payload, extra: 'Discard this' }), { ...env, WEB001_STORAGE: storage });
     assert.equal(response.status, 201);
     assert.equal(response.headers.get('cache-control'), 'no-store');
     assert.deepEqual(await response.json(), receipt);
@@ -128,29 +127,32 @@ test('submits only approved fields, hashes the token and returns an idempotent r
 });
 
 test('converts storage conflicts and failures into safe errors', async t => {
-  let result = () => Response.json(null);
-  t.mock.method(globalThis, 'fetch', async url => String(url).includes('siteverify') ? Response.json(challenge) : result());
-  assert.equal((await worker.fetch(request(), env)).status, 409);
-  result = () => { throw new Error(env.SUPABASE_SERVICE_ROLE_KEY + fields.question); };
-  const response = await worker.fetch(request(), env);
+  let result = () => null;
+  const bound = { ...env, WEB001_STORAGE: { call: async () => result() } };
+  t.mock.method(globalThis, 'fetch', async () => Response.json(challenge));
+  assert.equal((await worker.fetch(request(), bound)).status, 409);
+  result = () => { throw new Error('private provider error: ' + fields.question); };
+  const response = await worker.fetch(request(), bound);
   assert.equal(response.status, 503);
   assert.deepEqual(await response.json(), { error: 'temporarily_unavailable' });
 });
 
 test('withdrawal accepts a canonical id and token and reveals nothing when the RPC declines', async t => {
   let matches = false;
-  const upstream = t.mock.method(globalThis, 'fetch', async (url, options) => {
-    assert.equal(String(url), env.SUPABASE_URL + '/rest/v1/rpc/web001_withdraw');
-    assert.deepEqual(JSON.parse(options.body), { p_id: id, p_hash: createHash('sha256').update(token).digest('hex') });
-    return Response.json(matches);
-  });
+  const storage = { async call(operation, params) {
+    assert.equal(operation, 'web001_withdraw');
+    assert.deepEqual(params, { p_id: id, p_hash: createHash('sha256').update(token).digest('hex') });
+    return matches;
+  } };
+  const upstream = t.mock.method(storage, 'call', storage.call);
+  const bound = { ...env, WEB001_STORAGE: storage };
   const deletion = { method: 'DELETE', path: '/contributions/' + id };
-  assert.equal((await worker.fetch(request(null, { ...deletion, path: '/contributions/------------------------------------' }), env)).status, 404);
-  assert.equal((await worker.fetch(request(null, { ...deletion, header: { 'x-withdrawal-token': 'invalid' } }), env)).status, 403);
+  assert.equal((await worker.fetch(request(null, { ...deletion, path: '/contributions/------------------------------------' }), bound)).status, 404);
+  assert.equal((await worker.fetch(request(null, { ...deletion, header: { 'x-withdrawal-token': 'invalid' } }), bound)).status, 403);
   assert.equal(upstream.mock.callCount(), 0);
-  assert.equal((await worker.fetch(request(null, deletion), env)).status, 404);
+  assert.equal((await worker.fetch(request(null, deletion), bound)).status, 404);
   matches = true;
-  const response = await worker.fetch(request(null, deletion), env);
+  const response = await worker.fetch(request(null, deletion), bound);
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { withdrawn: true });
 });

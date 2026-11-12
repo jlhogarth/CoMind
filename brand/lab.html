@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en" data-comind-experience="operational" data-comind-motion-override="full">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Interactive reference lab for the CoMind Brand Runtime." />
+  <title>CoMind Experience Lab</title>
+  <link rel="stylesheet" href="./comind-brand.css" />
+  <script src="./lab.js" defer></script>
+</head>
+<body class="cm-app cm-field cm-field--alive" data-comind-scope="cognition">
+  <header class="cm-topbar">
+    <div class="cm-brand-lockup" data-comind-scope="cognition">
+      <span class="cm-brand-mark" aria-hidden="true"></span>
+      <div>
+        <div class="cm-brand-title">CoMind</div>
+        <div class="cm-brand-subtitle">Experience Lab · BRAND-001</div>
+      </div>
+    </div>
+
+    <div class="cm-cluster" style="justify-content: flex-end;">
+      <span class="cm-mode-readout" data-current-experience aria-live="polite">Mode: operational</span>
+      <div class="cm-mode-switch" aria-label="Experience intensity">
+        <button class="cm-mode-button cm-focus-bloom" type="button" data-set-experience="calm" aria-pressed="false">Calm</button>
+        <button class="cm-mode-button cm-focus-bloom" type="button" data-set-experience="operational" aria-pressed="true">Operational</button>
+        <button class="cm-mode-button cm-focus-bloom" type="button" data-set-experience="cinematic" aria-pressed="false">Cinematic</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="cm-stage" style="margin-inline: auto;">
+    <section class="cm-experience-stage" aria-labelledby="lab-title">
+      <div class="cm-experience-copy cm-motion-enter">
+        <p class="cm-eyebrow">Governed cinematic interface system</p>
+        <h1 id="lab-title" class="cm-title">Persistent cognition should feel alive.</h1>
+        <p class="cm-lede">
+          This lab turns CoMind branding into a behavioral visual system. Signal color, field depth,
+          motion intensity, operator emphasis, governance context, and completion states all share
+          one semantic contract rather than page-local styling decisions.
+        </p>
+
+        <div class="cm-cluster" style="margin-top: var(--cm-space-8);">
+          <button class="cm-action cm-action--primary cm-focus-bloom" type="button" data-run-scenario>Run visual simulation</button>
+          <button class="cm-action cm-focus-bloom" type="button" data-toggle-motion aria-pressed="false">Reduce motion</button>
+        </div>
+      </div>
+
+      <div class="cm-experience-visual" data-hero-visual data-comind-scope="cognition" aria-hidden="true">
+        <div class="cm-stream"></div>
+        <div class="cm-stream cm-stream--two"></div>
+        <div class="cm-orbit"><span class="cm-orbit-node"></span></div>
+        <div class="cm-orbit cm-orbit--two"><span class="cm-orbit-node"></span></div>
+        <div class="cm-core"></div>
+      </div>
+    </section>
+
+    <section class="cm-command-bar" aria-label="Simulation status" style="margin-bottom: var(--cm-space-8);" data-comind-scope="cognition">
+      <div class="cm-cluster">
+        <span class="cm-state-indicator" data-lab-status-dot></span>
+        <div>
+          <strong style="color: var(--cm-text-strong);" data-lab-status>Ready for simulation</strong>
+          <div class="cm-muted" style="font-size: 0.82rem; margin-top: 0.12rem;">Visual state only. No authority or production action is implied.</div>
+        </div>
+      </div>
+      <div style="min-width: min(100%, 18rem); flex: 0 1 24rem;">
+        <div class="cm-progress-track" role="progressbar" aria-label="Visual simulation progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-lab-progress>
+          <div class="cm-progress-fill"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="cm-grid cm-stagger" aria-label="Brand runtime characteristics">
+      <article class="cm-panel cm-panel--padded cm-metric" data-comind-scope="cognition">
+        <div class="cm-metric-value">Signal</div>
+        <div class="cm-metric-label">Blue-shifted Caribbean signal identifies cognition, data movement, and active system focus.</div>
+      </article>
+      <article class="cm-panel cm-panel--padded cm-metric" data-comind-scope="operator">
+        <div class="cm-metric-value">Agency</div>
+        <div class="cm-metric-label">Copper marks deliberate human action, provenance, and consequential intervention.</div>
+      </article>
+      <article class="cm-panel cm-panel--padded cm-metric" data-comind-scope="governance">
+        <div class="cm-metric-value">Evidence</div>
+        <div class="cm-metric-label">Governance gold highlights policy, review points, evidence, and control context.</div>
+      </article>
+    </section>
+
+    <hr class="cm-rule" />
+
+    <section class="cm-grid" style="grid-template-columns: minmax(0, 1.15fr) minmax(18rem, 0.85fr);">
+      <article class="cm-panel cm-panel--padded">
+        <div class="cm-lab-toolbar">
+          <div>
+            <p class="cm-eyebrow" style="margin-bottom: 0.35rem;">Semantic scope laboratory</p>
+            <h2 style="margin: 0; color: var(--cm-text-strong);">One component, different meaning.</h2>
+          </div>
+          <div class="cm-lab-toolbar-actions" aria-label="Select semantic scope">
+            <button class="cm-mode-button cm-focus-bloom" type="button" data-set-scope="cognition" aria-pressed="true">Cognition</button>
+            <button class="cm-mode-button cm-focus-bloom" type="button" data-set-scope="operator" aria-pressed="false">Operator</button>
+            <button class="cm-mode-button cm-focus-bloom" type="button" data-set-scope="governance" aria-pressed="false">Governance</button>
+            <button class="cm-mode-button cm-focus-bloom" type="button" data-set-scope="success" aria-pressed="false">Success</button>
+            <button class="cm-mode-button cm-focus-bloom" type="button" data-set-scope="warning" aria-pressed="false">Warning</button>
+            <button class="cm-mode-button cm-focus-bloom" type="button" data-set-scope="danger" aria-pressed="false">Danger</button>
+          </div>
+        </div>
+
+        <div style="height: var(--cm-space-5);"></div>
+
+        <div class="cm-panel cm-panel--padded cm-panel--interactive cm-focus-bloom cm-signal-sweep cm-scope-preview" data-scope-preview data-comind-scope="cognition" data-comind-active="true" tabindex="0">
+          <div class="cm-stack">
+            <span class="cm-badge">Scoped component</span>
+            <strong>Semantic tokens change presentation without changing component markup.</strong>
+            <span class="cm-muted">The same panel can communicate cognition, operator action, governance, success, warning, or danger.</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="cm-panel cm-panel--padded" data-comind-scope="governance">
+        <p class="cm-eyebrow">Runtime event stream</p>
+        <div class="cm-log" data-lab-log aria-live="polite" aria-label="Experience lab event log"></div>
+      </article>
+    </section>
+
+    <hr class="cm-rule" />
+
+    <section aria-labelledby="states-title">
+      <div class="cm-stack" style="--cm-stack-gap: 0.45rem; margin-bottom: var(--cm-space-6);">
+        <p class="cm-eyebrow" style="margin: 0;">State choreography</p>
+        <h2 id="states-title" style="margin: 0; color: var(--cm-text-strong); font-size: clamp(1.8rem, 4vw, 3rem);">Motion has a job.</h2>
+      </div>
+
+      <div class="cm-grid">
+        <article class="cm-panel cm-panel--padded cm-panel--interactive" data-comind-scope="cognition">
+          <div class="cm-activity-line">
+            <span class="cm-state-indicator" data-comind-state="working"></span>
+            <div>
+              <div class="cm-activity-name">Active cognition</div>
+              <div class="cm-activity-detail">Pulse means ongoing work, not decoration.</div>
+            </div>
+            <span class="cm-badge">working</span>
+          </div>
+        </article>
+
+        <article class="cm-panel cm-panel--padded cm-panel--interactive" data-comind-scope="operator">
+          <div class="cm-activity-line">
+            <span class="cm-state-indicator"></span>
+            <div>
+              <div class="cm-activity-name">Operator boundary</div>
+              <div class="cm-activity-detail">Copper is reserved for human agency and consequential action.</div>
+            </div>
+            <span class="cm-badge">review</span>
+          </div>
+        </article>
+
+        <article class="cm-panel cm-panel--padded cm-panel--interactive cm-motion-settle" data-comind-scope="success">
+          <div class="cm-activity-line">
+            <span class="cm-state-indicator"></span>
+            <div>
+              <div class="cm-activity-name">Verified completion</div>
+              <div class="cm-activity-detail">A settle animation ends in visual quiet.</div>
+            </div>
+            <span class="cm-badge">stable</span>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <footer class="cm-muted" style="padding: var(--cm-space-16) 0 var(--cm-space-6); line-height: 1.65;">
+      BRAND-001 Experience Lab. Visual scopes are presentation semantics only and never represent authorization,
+      certification, production readiness, or security state.
+    </footer>
+  </main>
+</body>
+</html>

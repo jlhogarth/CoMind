@@ -24,6 +24,8 @@ Ordinary row reads use the Supabase Data API with a publishable key and remain c
 
 ## Mutation architecture
 
+AED-007 has a separate authenticated server read path documented in `AED-007-RETRIEVAL.md`. It restricts fixed monitoring-table projections after Supabase Auth identity verification and a server-side operator allowlist; it does not change generic row-read permissions.
+
 Mutation capabilities are deliberately absent from OC-001. Future parent-child writes must be atomic at the database/server transaction boundary. Future deletes must evaluate actual PostgreSQL FK actions and provide impact evidence before execution. Raw SQL must remain behind an independently authorized server boundary.
 
 ## Extraction trigger

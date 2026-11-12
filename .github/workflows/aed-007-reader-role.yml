@@ -1,0 +1,68 @@
+name: AED-007 isolated reader role
+
+on:
+  pull_request:
+    paths:
+      - 'db/migrations/20261105_001_aed_007_reader_role.sql'
+      - 'db/verification/20261105_001_aed_007_reader_role.sql'
+      - '.github/workflows/aed-007-reader-role.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  reader-role:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d comind_ci"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/comind_ci
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Apply AED tables and reader role twice
+        run: |
+          set -euo pipefail
+          for attempt in 1 2; do
+            psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f db/migrations/20261104_001_aed_007_monitoring.sql
+            psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f db/migrations/20261105_001_aed_007_reader_role.sql
+          done
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f db/verification/20261105_001_aed_007_reader_role.sql
+      - name: Verify role-scoped RLS and unrelated relation denial
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO comind_pm.pm_aed_monitor_execution(execution_id,first_at,last_at,event_count,source_sha256)
+          VALUES ('580f3fad73905c8230b2bfc8', now(), now(), 1, repeat('a',64));
+          INSERT INTO comind_pm.pm_aed_monitor_event(execution_id,sequence,event_at,elapsed_ms,kind,payload,payload_sha256)
+          VALUES ('580f3fad73905c8230b2bfc8',1,now(),0,'fixture','{}',repeat('b',64));
+          CREATE TABLE comind_pm.unrelated_private_fixture(id integer);
+          BEGIN READ ONLY;
+          SET ROLE comind_aed_monitor_reader;
+          DO $verify$ BEGIN
+            IF (SELECT count(*) FROM comind_pm.pm_aed_monitor_event) <> 1 THEN
+              RAISE EXCEPTION 'Reader cannot see AED fixture';
+            END IF;
+            IF has_table_privilege(current_user, 'comind_pm.unrelated_private_fixture', 'SELECT') THEN
+              RAISE EXCEPTION 'Reader can see unrelated relation';
+            END IF;
+            IF current_setting('transaction_read_only') <> 'on' THEN
+              RAISE EXCEPTION 'Reader transaction is writable';
+            END IF;
+          END $verify$;
+          ROLLBACK;
+          SQL

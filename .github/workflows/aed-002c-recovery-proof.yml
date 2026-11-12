@@ -1,4 +1,5 @@
 name: AED-002C CLEAR Recovery Proof
+# AED-007 monitored isolated acceptance, no external provider calls.
 
 on:
   pull_request:
@@ -7,6 +8,14 @@ on:
       - 'server/lib/l4a-semantic-progress.js'
       - 'server/src/aed-temporal/**'
       - 'server/test/aed-002c-recovery.integration.mjs'
+      - 'server/test/aed-temporal-runtime.integration.mjs'
+      - 'server/test/aed-live-acceptance.integration.mjs'
+      - 'server/test/aed-live-workload.mjs'
+      - 'server/src/aed-temporal/**'
+      - 'server/scripts/aed_transaction_monitor.py'
+      - 'server/scripts/aed_monitor_store.py'
+      - 'server/test/aed-monitor-store.integration.py'
+      - 'db/migrations/20261104_001_aed_007_monitoring.sql'
       - '.github/workflows/aed-002c-recovery-proof.yml'
   workflow_dispatch:
 
@@ -62,6 +71,11 @@ jobs:
       - name: Establish canonical isolated Foundry lease substrate
         run: bash scripts/test_foundry_work_lease_kernel.sh
 
+      - name: Establish isolated RunBook progress ledger
+        run: |
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f db/migrations/20261006_001_comind_pm_ledger.sql
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f db/migrations/20261016_001_durable_runbook_foundation.sql
+
       - name: Start pinned Temporal development service
         run: |
           set -euo pipefail
@@ -86,7 +100,14 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p ../artifacts/aed-002c
-          node test/aed-002c-recovery.integration.mjs | tee ../artifacts/aed-002c/recovery-proof.json
+          python scripts/aed_transaction_monitor.py --output ../artifacts/aed-002c/recovery-transactions.jsonl --timeout 180 -- bash -o pipefail -c 'node test/aed-002c-recovery.integration.mjs | tee ../artifacts/aed-002c/recovery-proof.jsonl'
+          python scripts/aed_transaction_monitor.py --output ../artifacts/aed-002c/temporal-transactions.jsonl --timeout 180 -- bash -o pipefail -c 'node test/aed-temporal-runtime.integration.mjs | tee ../artifacts/aed-002c/temporal-proof.jsonl'
+          python scripts/aed_transaction_monitor.py --output ../artifacts/aed-002c/live-transactions.jsonl --timeout 180 -- bash -o pipefail -c 'node test/aed-live-acceptance.integration.mjs 2>&1 | tee ../artifacts/aed-002c/live-proof.jsonl'
+
+      - name: Persist and independently query AED monitoring evidence
+        env:
+          GITHUB_RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: python server/test/aed-monitor-store.integration.py | tee artifacts/aed-002c/database-readback.jsonl
 
       - name: Upload bounded AED-002C evidence
         if: always()
@@ -95,7 +116,7 @@ jobs:
           name: aed-002c-recovery-proof
           path: artifacts/aed-002c
           if-no-files-found: warn
-          retention-days: 7
+          retention-days: 90
 
       - name: Stop Temporal development service
         if: always()

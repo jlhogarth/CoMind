@@ -31,3 +31,13 @@ The bounded runner now has manifest persistence, canonical completion reload, fe
 - AGCOL-002 exact head `cfdf475da0852e7d0f322b41cad7c0b264db14b8`: workflow run 43133639478 passed contract, isolated lease, and Supabase Test acceptance.
 - Independent Test readback on 2026-11-12: one manifest, three tasks, nine progress events, three completed leases, three result references. All were synthetic Test work.
 - AGCOL-003 draft PR #560: local typecheck, API deny and response tests, and Next build passed. Additive Test migration applied. Hosted Console readback and AED recovery linkage remain unverified.
+
+## Persistent Test operations
+
+Supabase pg_cron hosts the operations worker. The named job runs every minute, with a 20-second statement limit and a transaction lock to prevent overlap. A successful transaction records its heartbeat. The Console shows a heartbeat as stale after three minutes. Use `db/operations/agcol_test_operations_start.sql` after the migration verifier passes and bind the established Test Auth operator explicitly. To stop scheduling, run `SELECT cron.unschedule('agcol-test-operations');` on CoMind Test. The last heartbeat and audit records remain available. Scheduled cycles run SQL and do not launch the AGCOL specialist graph or invoke models.
+
+AED examines expired and exhausted one-attempt AGCOL Test leases. It records the task and fencing epoch. A matching isolated execution outcome and MCP receipt allow it to repair the lease and append the canonical completion event without repeating the adapter operation. Claims with missing or mismatched proof remain for review. Later evidence can produce a new reconciliation observation for the same epoch.
+
+Agent Work shows the 50 most recent approval proposals and indicates whether a live decision link exists. Existing approval links are one-time credentials and the authority stores only their hashes. Open the original link to decide in the existing approval portal, then refresh Agent Work to see the canonical decision identifier. The intake stores an operator's idea and records a separate decision to accept it for planning or decline it, with a reason. Acceptance does not grant work authority.
+
+The operations RPCs require an authenticated Supabase user in the Test operator registry. Browser roles have no direct table access. The scheduler uses the database host identity. The Test migration verifier exercises authorization, submission replay, disposition, stalled claims, verified completion repair and rollback. Approval decisions and persistent specialist execution retain their existing authority boundaries.

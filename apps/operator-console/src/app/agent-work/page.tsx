@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AgentOperations } from "@/components/AgentOperations";
 import type { AgentWorkSnapshot } from "@/lib/agent-work/server";
 
 function timestamp(value: string | null) {
@@ -47,7 +48,7 @@ export default function AgentWorkPage() {
       <div className="hud-heading"><div><p className="hud-eyebrow">AGCOL accountability</p><h1>Agent work</h1>
         <p>Where specialists worked, their latest recorded phase, and which claims need review.</p></div>
         <button className="hud-refresh" onClick={() => setRefresh(value => value + 1)}>Refresh</button></div>
-      <div className="hud-data-note" role="status">Execution mode: bounded Supabase Test invocation. Persistent agent service: off. Host location for each historical run is not recorded in this projection.</div>
+      <div className="hud-data-note" role="status">Specialist execution history covers bounded Supabase Test runs.</div>
       {error && <div className="hud-read-error" role="alert">{error}</div>}
       {snapshot && <div className="hud-data-note">Latest {snapshot.coverage_limit}. Snapshot {timestamp(snapshot.generated_at)}. Source: Foundry lease and AGCOL evidence.</div>}
       {snapshot?.work.length === 0 && <p>No AGCOL Test runs were recorded within this source coverage.</p>}
@@ -64,8 +65,7 @@ export default function AgentWorkPage() {
           </details>
         </article>)}
       </div>
-      <p><a href="https://approvals.comindinc.com">Review governed approvals</a> · <a href="https://github.com/jlhogarth/CoMind/issues/559">Accountability development lane</a></p>
-      <p>Brainstorming intake and AED recovery actions are planned integrations. This view does not claim they are operating.</p>
+      <AgentOperations />
     </section>
   </main>;
 }

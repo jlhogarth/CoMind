@@ -1,0 +1,163 @@
+{
+  "schema_version": "1.0.0",
+  "formats": {
+    "docx": {
+      "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "editable": true,
+      "google_native": "application/vnd.google-apps.document",
+      "extension": "docx",
+      "conversion": "Preserve the OOXML original when importing into Google Docs.",
+      "conversion_warning": "Fields, page breaks, tables, and embedded objects can change.",
+      "validation": [
+        "package",
+        "editability",
+        "render"
+      ],
+      "publishing": "editable-source"
+    },
+    "pdf": {
+      "mime": "application/pdf",
+      "editable": false,
+      "google_native": null,
+      "extension": "pdf",
+      "conversion": "Store the original PDF without conversion.",
+      "conversion_warning": "Conversion to an editable format can lose layout and structure.",
+      "validation": [
+        "render",
+        "text",
+        "contents",
+        "index",
+        "page-numbers",
+        "metadata"
+      ],
+      "publishing": "reference-publication"
+    },
+    "pptx": {
+      "mime": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      "editable": true,
+      "google_native": "application/vnd.google-apps.presentation",
+      "conversion_warning": "Animations, transitions, timing, and media may change or be lost.",
+      "extension": "pptx",
+      "conversion": "Preserve the OOXML original when importing into Google Slides.",
+      "validation": [
+        "package",
+        "render",
+        "animation-and-transition-playback-after-conversion"
+      ],
+      "publishing": "editable-source"
+    },
+    "xlsx": {
+      "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "editable": true,
+      "google_native": "application/vnd.google-apps.spreadsheet",
+      "conversion_warning": "Formulas, charts, formatting, external links, and advanced workbook features can change.",
+      "extension": "xlsx",
+      "conversion": "Preserve the OOXML original when importing into Google Sheets.",
+      "validation": [
+        "package",
+        "formula-recalculation",
+        "chart-and-format-comparison",
+        "advanced-feature-review-after-conversion"
+      ],
+      "publishing": "editable-source"
+    },
+    "csv": {
+      "mime": "text/csv",
+      "editable": true,
+      "google_native": null,
+      "extension": "csv",
+      "conversion": "Specify encoding and delimiter before importing into a spreadsheet.",
+      "conversion_warning": "Import can change dates, numeric identifiers, delimiters, and formula-like values.",
+      "validation": [
+        "encoding",
+        "column-shape",
+        "type-fidelity"
+      ],
+      "publishing": "data-exchange"
+    },
+    "svg": {
+      "mime": "image/svg+xml",
+      "editable": true,
+      "google_native": null,
+      "extension": "svg",
+      "conversion": "Preserve the vector source when deriving a raster copy.",
+      "conversion_warning": "Fonts, filters, external resources, and scripts can affect rendering.",
+      "validation": [
+        "xml-parse",
+        "safe-render",
+        "visual-comparison"
+      ],
+      "publishing": "vector-source"
+    },
+    "png": {
+      "mime": "image/png",
+      "editable": false,
+      "google_native": null,
+      "extension": "png",
+      "conversion": "Preserve the original raster bytes.",
+      "conversion_warning": "Resizing and color-profile changes can affect fidelity.",
+      "validation": [
+        "decode",
+        "dimensions",
+        "visual-comparison"
+      ],
+      "publishing": "distribution-image"
+    },
+    "jpg": {
+      "mime": "image/jpeg",
+      "editable": false,
+      "google_native": null,
+      "extension": "jpg",
+      "conversion": "Preserve the original raster bytes.",
+      "conversion_warning": "Recompression can degrade detail and alter metadata.",
+      "validation": [
+        "decode",
+        "dimensions",
+        "visual-comparison"
+      ],
+      "publishing": "distribution-image"
+    },
+    "md": {
+      "mime": "text/markdown",
+      "editable": true,
+      "google_native": null,
+      "extension": "md",
+      "conversion": "Declare the Markdown renderer and preserve the text source.",
+      "conversion_warning": "Renderer-specific syntax and relative links can differ.",
+      "validation": [
+        "parse",
+        "link-check",
+        "render"
+      ],
+      "publishing": "editable-source"
+    },
+    "html": {
+      "mime": "text/html",
+      "editable": true,
+      "google_native": null,
+      "extension": "html",
+      "conversion": "Preserve the source and its required assets.",
+      "conversion_warning": "External assets, scripts, and browser rendering can differ.",
+      "validation": [
+        "parse",
+        "link-check",
+        "safe-render"
+      ],
+      "publishing": "web-publication"
+    },
+    "jpeg": {
+      "mime": "image/jpeg",
+      "editable": false,
+      "google_native": null,
+      "extension": "jpeg",
+      "conversion": "Preserve the original raster bytes.",
+      "conversion_warning": "Recompression can degrade detail and alter metadata.",
+      "validation": [
+        "decode",
+        "dimensions",
+        "visual-comparison"
+      ],
+      "publishing": "distribution-image"
+    }
+  }
+}

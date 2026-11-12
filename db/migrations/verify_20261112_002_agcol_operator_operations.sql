@@ -10,6 +10,10 @@ DECLARE
   v_key uuid := gen_random_uuid();
   v_snapshot jsonb;
   v_before_events integer;
+  v_proposal comind.cm_paid_api_access_proposal%ROWTYPE;
+  v_request comind.cm_foundry_authorization_request%ROWTYPE;
+  v_token text := replace(gen_random_uuid()::text,'-','') || replace(gen_random_uuid()::text,'-','');
+  v_authority_result jsonb;
 BEGIN
   IF has_function_privilege('anon','public.operator_agent_operations()','EXECUTE')
     OR has_function_privilege('authenticated','comind.cm_agent_operations_tick()','EXECUTE')
@@ -88,6 +92,47 @@ BEGIN
     OR NOT (v_snapshot->'ideas' @> jsonb_build_array(jsonb_build_object('idea_id',v_idea,'decision','planning_candidate')))
     OR v_snapshot::text ~ 'token_hash|lease_token' THEN
     RAISE EXCEPTION 'Agent operations readback contract failed';
+  END IF;
+  -- Exercise the existing one-time decision authority with a transaction-local proposal.
+  SELECT * INTO STRICT v_proposal FROM comind.cm_paid_api_access_proposal
+  WHERE authorization_request_id IS NOT NULL ORDER BY created_at LIMIT 1;
+  SELECT * INTO STRICT v_request FROM comind.cm_foundry_authorization_request
+    WHERE authorization_request_id=v_proposal.authorization_request_id;
+  v_request.authorization_request_id := gen_random_uuid();
+  v_request.environment := 'isolated';
+  v_request.status := 'pending';
+  v_request.requested_at := now();
+  v_request.expires_at := now() + interval '5 minutes';
+  INSERT INTO comind.cm_foundry_authorization_request SELECT v_request.*;
+  v_proposal.proposal_id := gen_random_uuid();
+  v_proposal.purpose := 'Synthetic rollback-only approval inbox verification';
+  v_proposal.authorization_request_id := v_request.authorization_request_id;
+  v_proposal.authorization_decision_id := NULL;
+  v_proposal.proposal_status := 'pending_approval';
+  v_proposal.approval_source_system := NULL;
+  v_proposal.approval_source_ref := NULL;
+  v_proposal.approved_at := NULL;
+  v_proposal.approval_expires_at := NULL;
+  v_proposal.supersedes_proposal_id := NULL;
+  v_proposal.created_at := now();
+  v_proposal.updated_at := now();
+  INSERT INTO comind.cm_paid_api_access_proposal SELECT v_proposal.*;
+  INSERT INTO comind.cm_api_approval_link(proposal_id,authorization_request_id,token_hash,request_text,expires_at)
+  VALUES (v_proposal.proposal_id, v_request.authorization_request_id,
+    encode(extensions.digest(v_token,'sha256'),'hex'), 'Synthetic rollback-only Test',now()+interval '5 minutes');
+  v_snapshot := public.operator_agent_operations();
+  IF NOT (v_snapshot->'approvals' @> jsonb_build_array(
+    jsonb_build_object('proposal_id',v_proposal.proposal_id,'awaiting_decision',true)))
+    OR (public.comind_api_approval_get(v_token)->>'proposal_id') IS DISTINCT FROM v_proposal.proposal_id::text THEN
+    RAISE EXCEPTION 'Pending proposal did not reach existing approval authority';
+  END IF;
+  v_authority_result := public.comind_api_approval_decide(v_token,'denied','Synthetic rollback-only Test disposition');
+  v_snapshot := public.operator_agent_operations();
+  IF v_authority_result->>'decision_id' IS NULL OR NOT (v_snapshot->'approvals' @> jsonb_build_array(
+      jsonb_build_object('proposal_id',v_proposal.proposal_id,'awaiting_decision',false,
+        'proposal_status','rejected','authorization_decision_id',v_authority_result->>'decision_id')))
+    OR public.comind_api_approval_get(v_token) IS NOT NULL THEN
+    RAISE EXCEPTION 'Canonical decision did not return to the inbox or link remained usable';
   END IF;
 END;
 $$;

@@ -117,6 +117,7 @@ class PublishTests(unittest.TestCase):
             ledger = runbook_events(conn, REQUEST)
         self.assertEqual(ledger[-1]["p_outcome"], "blocked")
         self.assertEqual(ledger[-1]["p_work_key"], "DFG-002")
+        self.assertEqual(ledger[-1]["p_source_system"], "manual")
         self.assertEqual(len({e["p_source_ref"] for e in ledger}), len(ledger))
         self.assertEqual(len(list(self.root.glob("fixture-id-*.json"))), 3)
 

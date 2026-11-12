@@ -213,7 +213,7 @@ def runbook_events(connection, request_id):
             "p_actor": "DocuForge Test Publisher",
             "p_summary": f"DFG-002 publication {stage}",
             "p_outcome": outcome,
-            "p_source_system": "docuforge",
+            "p_source_system": "manual",
             "p_source_ref": f"docuforge:dfg-002:{request_id}:{event['sequence']}",
             "p_next_action": ("Publication verified" if stage == "verified" else
                               "Inspect the last checkpoint and rerun with the same request ID and state directory"),

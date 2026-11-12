@@ -39,4 +39,4 @@ class DriveTests(unittest.TestCase):
             self.drive.read("fixture-drive-id", 4)
         read = self.open.call_args.args[0]
         self.assertEqual(parse_qs(urlsplit(read.full_url).query), {"alt": ["media"]})
-        self.assertIsNone(NoRedirect().redirect_request(read, None, 302, "", {}, "https://example.com"))
+        self.assertIsNone(NoRedirect().redirect_request(read, None, 302, "", {}, "https://accounts.google.com"))

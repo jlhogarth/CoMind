@@ -35,6 +35,7 @@ import styles from "./control-plane.module.css";
 const navItems = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard, active: true },
   { label: "Monitoring", href: "/activity", icon: Activity },
+  { label: "Agent work", href: "/agent-work", icon: Workflow },
   { label: "CBE Mobile Control", href: "/cbe-control", icon: Smartphone },
   { label: "RuleBook HUD", href: "/rulebook", icon: ShieldCheck },
   { label: "Integration Gateway", href: "/integrations", icon: Network },
@@ -49,6 +50,7 @@ const navItems = [
 
 const quickActions = [
   { label: "Open Activity HUD", href: "/activity", icon: Gauge },
+  { label: "View Agent Work", href: "/agent-work", icon: Workflow },
   { label: "Open CBE Mobile Control", href: "/cbe-control", icon: Smartphone },
   { label: "Open Integration Gateway", href: "/integrations", icon: Network },
   { label: "Review Approvals", href: "https://approvals.comindinc.com", icon: CheckCircle2, external: true },

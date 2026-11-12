@@ -176,8 +176,90 @@ try {
     assert.equal(error.code, 'grant_not_valid');
     negative.push({ mode: 'wrong_project', code: error.code });
   }
-  outcome = await runParallelCollaboration({
+  const dependencies = {
     foundry,
+    async prepareRun(key, manifest) {
+      const metadata = { schema_version: 'comind.agcol-002.run-manifest.v1', issue: 553, candidate, run_key: key, manifest };
+      const checksum = sha256Fingerprint(metadata);
+      const sourceRef = `agcol002-manifest:${key}`;
+      const existing = await query(
+        `SELECT evidence_id::text, checksum FROM comind.cm_evidence
+         WHERE source_type='agcol_manifest_test' AND source_ref=$1::text`, [sourceRef]
+      );
+      if (existing.rows.length) {
+        assert.equal(existing.rows.length, 1);
+        assert.equal(existing.rows[0].checksum, checksum);
+        return existing.rows[0].evidence_id;
+      }
+      const row = await one(
+        `INSERT INTO comind.cm_evidence(title, source_type, source_ref, checksum, metadata)
+         VALUES ('AGCOL-002 run manifest', 'agcol_manifest_test', $1::text, $2::text, $3::jsonb)
+         RETURNING evidence_id::text`, [sourceRef, checksum, JSON.stringify(metadata)]
+      );
+      return row.evidence_id;
+    },
+    async loadCompleted(key, task) {
+      const result = await query(
+        `SELECT ec.execution_context_id::text, ec.authorization_decision_id::text,
+                eo.execution_outcome_id::text, ar.adapter_operation_result_id::text,
+                ar.result_ref, eo.terminal_status, l.state, l.fencing_epoch
+         FROM comind.cm_foundry_execution_context ec
+         JOIN comind.cm_foundry_execution_outcome eo ON eo.execution_context_id=ec.execution_context_id
+         JOIN comind.cm_foundry_adapter_operation_result ar
+           ON ar.adapter_operation_result_id=eo.adapter_operation_result_id
+         JOIN comind.cm_foundry_work_lease l ON l.task_id=ec.task_id
+         JOIN comind.cm_foundry_authorization_decision d
+           ON d.authorization_decision_id=ec.authorization_decision_id
+         JOIN comind.cm_foundry_authorization_request req
+           ON req.authorization_request_id=d.authorization_request_id
+         JOIN comind.cm_foundry_capability cap ON cap.capability_id=ec.capability_id
+         JOIN comind.cm_evidence evidence ON evidence.evidence_id::text=ar.result_ref
+         WHERE ec.task_id=$1::uuid AND ec.profile_id=$2::uuid AND ec.project_id=$3::uuid
+           AND d.decision='approved' AND req.requesting_profile_id=ec.profile_id
+           AND req.task_id=ec.task_id AND req.project_id=ec.project_id
+           AND req.target_kind=$4::text AND req.target_ref=$5::text
+           AND cap.capability_code=$6::text AND evidence.source_type='agcol_mcp_test'
+           AND evidence.metadata->'receipt'->>'executionContextId'=ec.execution_context_id::text`,
+        [task.taskId, task.profileId, task.projectId, task.targetKind, task.targetRef, task.capabilityCode]
+      );
+      if (!result.rows.length) return null;
+      assert.equal(result.rows.length, 1);
+      const row = result.rows[0];
+      assert.equal(row.terminal_status, 'succeeded');
+      assert.equal(row.state, 'completed');
+      const event = await one(
+        `SELECT metadata->'event'->'receipt' AS receipt FROM comind.cm_evidence
+         WHERE source_type='agcol_progress_test' AND source_ref=$1::text`,
+        [`agcol002-progress:${key}:${task.key}:completed`]
+      );
+      const receipt = event.receipt;
+      assert.equal(receipt.executionContextId, row.execution_context_id);
+      assert.equal(receipt.authorizationDecisionId, row.authorization_decision_id);
+      assert.equal(receipt.executionOutcomeId, row.execution_outcome_id);
+      assert.equal(receipt.adapterOperationResultId, row.adapter_operation_result_id);
+      assert.equal(receipt.evidenceRef, row.result_ref);
+      assert.equal(receipt.fencingEpoch, Number(row.fencing_epoch));
+      return receipt;
+    },
+    renewalIntervalMs: 30_000,
+    async renew(task, claim) {
+      const worker = `${runKey}:${task.key}`.slice(0, 128);
+      const row = await one(
+        `SELECT comind.cm_foundry_renew_work($1::uuid,$2::text,$3::uuid,$4::bigint,180) AS ok`,
+        [task.taskId, worker, claim.leaseToken, claim.fencingEpoch]
+      );
+      return row.ok === true;
+    },
+    async observe(event) {
+      const metadata = { schema_version: 'comind.agcol-002.progress.v1', issue: 553, candidate, event };
+      await one(
+        `INSERT INTO comind.cm_evidence(title, source_type, source_ref, checksum, metadata)
+         VALUES ('AGCOL-002 specialist progress', 'agcol_progress_test',
+           $1::text, $2::text, $3::jsonb) RETURNING evidence_id::text`,
+        [`agcol002-progress:${event.runKey}:${event.key}:${event.phase}${event.phase === 'heartbeat' ? `:${randomUUID()}` : ''}`,
+          sha256Fingerprint(metadata), JSON.stringify(metadata)]
+      );
+    },
     async claim(task) {
       const worker = `${runKey}:${task.key}`.slice(0, 128);
       const claim = await one(
@@ -219,7 +301,8 @@ try {
       assert.equal(evidence.metadata.receipt.resource, task.targetRef);
       return evidence.evidence_id;
     },
-  }, specialists, runKey, 2);
+  };
+  outcome = await runParallelCollaboration(dependencies, specialists, runKey, 2);
   assert.equal(outcome.status, 'completed');
   assert.deepEqual(outcome.receipts.map(x => x.key), names);
   const staleDecision = await fixtureTools.issueAuthorization({
@@ -254,24 +337,17 @@ try {
         JOIN comind.cm_foundry_execution_context ec ON ec.execution_context_id=eo.execution_context_id
         WHERE ec.task_id=ANY($1::uuid[]) AND eo.terminal_status='succeeded') AS outcomes,
        (SELECT count(*)::int FROM comind.cm_evidence
-        WHERE source_type='agcol_mcp_test' AND evidence_id=ANY($2::uuid[])) AS receipts`,
-    [tasks, outcome.receipts.map(x => x.evidenceRef)]
+        WHERE source_type='agcol_mcp_test' AND evidence_id=ANY($2::uuid[])) AS receipts,
+       (SELECT count(*)::int FROM comind.cm_evidence
+        WHERE source_type='agcol_progress_test' AND metadata->'event'->>'runKey'=$3::text) AS progress_events`,
+    [tasks, outcome.receipts.map(x => x.evidenceRef), runKey]
   );
-  for (const value of Object.values(readback)) assert.equal(value, 3);
-  const replay = await runParallelCollaboration({
-    foundry, claim: async task => {
-      const result = await query(
-        `SELECT task_id FROM comind.cm_agcol_claim_task($1::uuid,$2::uuid,$3::text,60)`,
-        [task.taskId, task.projectId, `${runKey}:replay`]
-      );
-      assert.equal(result.rows.length, 0);
-      throw new Error('replay refused');
-    },
-    finish: async () => false, authorize: async () => { throw new Error('not reachable'); },
-    verifyEvidence: async () => { throw new Error('not reachable'); },
-  }, specialists, runKey, 2);
-  assert.equal(replay.status, 'blocked');
-  assert.equal(replay.receipts.length, 0);
+  for (const [key, value] of Object.entries(readback)) assert.equal(value, key === 'progress_events' ? 9 : 3);
+  const replay = await runParallelCollaboration(dependencies, specialists, runKey, 2);
+  assert.equal(replay.status, 'completed');
+  assert.equal(replay.receipts.length, 3);
+  assert.equal(replay.manifestEvidenceRef, outcome.manifestEvidenceRef);
+  assert.deepEqual(replay.receipts, outcome.receipts);
   await query(`UPDATE comind.cm_foundry_capability_grant SET revoked_at=clock_timestamp()
     WHERE grant_id=ANY($1::uuid[]) AND revoked_at IS NULL`, [grants]);
   const cleanup = await one(`SELECT count(*)::int AS active FROM comind.cm_foundry_capability_grant

@@ -1,7 +1,4 @@
-import {
-  createContinuousExcellenceSupabaseClient,
-  getContinuousExcellenceRuntimeConfig,
-} from "../continuous-excellence/server";
+import { Client } from "pg";
 
 const states = ["waiting", "missed", "conflicting_receipts", "measurement_failed", "late", "current"] as const;
 type Receipt = {
@@ -39,18 +36,39 @@ export function parseRunBookLifecycleStatus(data: unknown): LifecycleStatus {
 
 export function getRunBookConsoleConfig(environment: Readonly<Record<string, string | undefined>> = process.env) {
   if (environment.DRB_RUNBOOK_CONSOLE !== "test") throw new Error("RunBook Test status disabled");
-  const volumeId = environment.DRB_RUNBOOK_GOOGLE_DOC_ID;
-  if (!volumeId || !/^[A-Za-z0-9_-]{1,160}$/.test(volumeId)) throw new Error("RunBook document not configured");
-  const runtime = getContinuousExcellenceRuntimeConfig(environment);
-  if (runtime.url !== "https://sbgfuanxiqepcoboxzcl.supabase.co") throw new Error("RunBook Test project mismatch");
-  return { runtime, volumeId };
+  if (environment.VERCEL_ENV !== "preview" || environment.DRB_RUNBOOK_CONSOLE_ACCESS !== "trusted-test-perimeter") {
+    throw new Error("RunBook Console requires a protected Test preview");
+  }
+  const database = environment.DRB_RUNBOOK_CONSOLE_DATABASE_URL;
+  if (!database) throw new Error("RunBook Console database binding is missing");
+  const url = new URL(database);
+  const ref = "sbgfuanxiqepcoboxzcl";
+  const login = "comind_runbook_console_login";
+  const direct = url.hostname === `db.${ref}.supabase.co` && url.username === login;
+  const pooled = url.hostname.endsWith(".pooler.supabase.com") && url.username === `${login}.${ref}`;
+  if (!["postgresql:", "postgres:"].includes(url.protocol) || !(direct || pooled)
+    || url.pathname !== "/postgres" || url.searchParams.get("sslmode") !== "verify-full") {
+    throw new Error("RunBook Console requires the scoped TLS binding to CoMind Test");
+  }
+  return database;
 }
 
 export async function readRunBookLifecycleStatus() {
-  const { runtime, volumeId } = getRunBookConsoleConfig();
-  const client = createContinuousExcellenceSupabaseClient(runtime);
-  const { data, error } = await client.rpc("comind_runbook_lifecycle_status", { volume_id: volumeId })
-    .abortSignal(AbortSignal.timeout(5_000));
-  if (error) throw new Error("RunBook status read failed");
-  return parseRunBookLifecycleStatus(data);
+  const database = new URL(getRunBookConsoleConfig());
+  const ca = process.env.DRB_RUNBOOK_DATABASE_CA;
+  if (!ca?.includes("-----BEGIN CERTIFICATE-----")) throw new Error("RunBook database CA is missing");
+  database.search = "";
+  const client = new Client({
+    connectionString: database.toString(),
+    ssl: { ca, rejectUnauthorized: true },
+    connectionTimeoutMillis: 4_000,
+    query_timeout: 5_000,
+  });
+  try {
+    await client.connect();
+    const { rows } = await client.query("SELECT comind_drb_test.console_status() AS status");
+    return parseRunBookLifecycleStatus(rows[0]?.status);
+  } finally {
+    await client.end();
+  }
 }

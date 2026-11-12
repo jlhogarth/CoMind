@@ -253,7 +253,8 @@ def main():
                     allowed = os.environ.get("DOCUFORGE_TEST_FOLDER_ID")
                     if args.destination != allowed:
                         raise PublicationError("Destination is not the configured Test folder")
-                    drive = Drive(os.environ.get("DOCUFORGE_DRIVE_ACCESS_TOKEN"))
+                    # The converter child process does not need the Drive credential.
+                    drive = Drive(os.environ.pop("DOCUFORGE_DRIVE_ACCESS_TOKEN", None))
                     with args.source.open("rb") as source:
                         result = publish(connection, drive, source.read(MAX_BYTES + 1),
                                          args.request_id, args.destination, args.office)

@@ -5,7 +5,6 @@ const projectKey = 'COMIND';
 const source = 'supabase';
 const scopes = {
   isolated: { prefix: 'drb-003:test:', actor: 'DRB-003', summary: 'Test RunBook lifecycle evaluation' },
-  scheduled: { prefix: 'drb-004:scheduled:', actor: 'DRB-004', summary: 'Scheduled Test RunBook lifecycle evaluation' },
 } as const;
 
 async function find(queryable: Pool | PoolClient, ref: string): Promise<LifecycleReceipt | null> {
@@ -22,8 +21,26 @@ async function find(queryable: Pool | PoolClient, ref: string): Promise<Lifecycl
   return row ? { eventId: row.id, evaluation: row.details } : null;
 }
 
-export function createLifecycleLedger(pool: Pool, scope: keyof typeof scopes): LifecycleLedger {
-  const { prefix, actor, summary } = scopes[scope];
+export function createLifecycleLedger(pool: Pool, scope: 'isolated' | 'scheduled'): LifecycleLedger {
+  if (scope === 'scheduled') {
+    return {
+      async find(slot) {
+        const { rows } = await pool.query<{ id: string; details: LifecycleEvaluation }>(
+          'SELECT * FROM comind_drb_test.scheduler_receipt($1, $2::timestamptz)', [slot.volumeId, slot.scheduledFor],
+        );
+        if (rows.length > 1) throw new Error('Conflicting RunBook lifecycle receipts');
+        return rows[0] ? { eventId: rows[0].id, evaluation: rows[0].details } : null;
+      },
+      async record(evaluation) {
+        const { rows } = await pool.query<{ id: string; details: LifecycleEvaluation }>(
+          'SELECT * FROM comind_drb_test.record_scheduler_receipt($1::jsonb)', [JSON.stringify(evaluation)],
+        );
+        if (!rows[0]?.id) throw new Error('RunBook lifecycle receipt was not created');
+        return { eventId: rows[0].id, evaluation: rows[0].details };
+      },
+    };
+  }
+  const { prefix, actor, summary } = scopes.isolated;
   const sourceRef = (slot: LifecycleSlot) => `${prefix}${slot.volumeId}:${slot.scheduledFor}`;
   return {
     find: (slot) => find(pool, sourceRef(slot)),

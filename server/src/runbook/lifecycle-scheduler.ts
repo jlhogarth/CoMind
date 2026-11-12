@@ -38,6 +38,7 @@ export async function runDueRunBookCheck(
 export async function startRunBookLifecycleScheduler(
   environment: NodeJS.ProcessEnv,
   onError: () => void,
+  keepAlive = false,
 ) {
   const config = getRunBookSchedulerConfig(environment);
   if (!config) return null;
@@ -73,7 +74,7 @@ export async function startRunBookLifecycleScheduler(
     }, ledger, readDocument).then(() => {}, onError).finally(() => { running = undefined; });
   };
   const timer = setInterval(tick, intervalMs);
-  timer.unref();
+  if (!keepAlive) timer.unref();
   tick();
   return async () => {
     clearInterval(timer);

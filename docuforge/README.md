@@ -23,3 +23,44 @@ Use the authorized destination under CoMind / 04_Product_Modules / DocuForge / D
 Use `package_manifest.py --help` to package a run. Its context JSON maps to the keyword arguments of `manifest.build_manifest` and supplies observed source references and hashes, validation checks, environment references, and the expected destination. Each receipt must include the observed `file_id`, `folder_id`, `mime`, `bytes`, `retrieved_utc`, and `authenticated`. The verifier compares the bytes in the readback directory with the source hashes and records a failed publication on mismatch. Store the resulting JSON in the same private folder. Preserve the manifest's own file ID and digest externally to avoid self-reference. Reconcile via the existing RunBook.
 
 The registry documents PowerPoint and Excel conversion risks. Those formats have preservation and validation requirements. DFG-001 only exercises DOCX and PDF generation, binary Drive upload and authenticated readback. Hosted activation, native Google conversions and Education Center integration are future milestones.
+
+## DFG-002 one-request Test publishing
+
+The command accepts the sectioned JSON format used by `foundation.json`. The
+current renderer and verifier require the foundation template's contents,
+index, and format-registry section. The Test host must provide LibreOffice,
+the Python dependencies listed above, one preapproved private My Drive folder
+as `DOCUFORGE_TEST_FOLDER_ID`, and a current Google Drive access token through
+its existing secret injection as `DOCUFORGE_DRIVE_ACCESS_TOKEN`. The authorized
+identity must be able to inspect the folder, reserve file IDs, create files, and
+read them back. The runner refuses a shared destination. Keep the token out
+of commands, request files, and logs.
+
+Use one persistent private local state directory on the Test host. Set
+`DFG_STATE_DIR` to that directory, `DFG_REQUEST_ID` to a unique operator-selected
+identifier, and `DFG_SOURCE_JSON` to the source file:
+
+```sh
+python docuforge/publish.py --state-dir "$DFG_STATE_DIR" run \
+  "$DFG_REQUEST_ID" "$DFG_SOURCE_JSON" "$DOCUFORGE_TEST_FOLDER_ID"
+python docuforge/publish.py --state-dir "$DFG_STATE_DIR" events \
+  "$DFG_REQUEST_ID" --runbook
+```
+
+The runner saves validated bytes and Drive IDs before upload. It uses a fresh
+authenticated read and SHA-256 for the Word file, PDF, and receipt. Rerun with
+the same request ID, source, destination, and state directory after an
+interruption. A different source or destination with the same ID is rejected.
+An earlier verified file that becomes missing or mismatched blocks replay. A
+credential change or an external Drive change can require operator action.
+Keep the local state backed up for the approved retention period. Running the
+same request against a fresh or different state directory loses its retry
+guarantee. This is a single-host, on-demand runner for internal Test artifacts.
+
+The `events --runbook` command emits named arguments for the existing
+`comind_pm.record_runbook_event` writer. The governed relay can use each stable
+`p_source_ref` to reconcile an uncertain append before replaying. Emit and append
+events in sequence. The local journal can be inspected while a run is active.
+A crash may leave the latest artifact in a pending stage. Restarting with the
+same ID is the safe next action. Runtime delivery to the existing writer and
+the deployed Console/AED consumers depend on their Test bindings.

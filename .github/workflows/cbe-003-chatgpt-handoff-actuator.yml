@@ -3,6 +3,13 @@ name: CBE-003 ChatGPT Handoff Actuator
 on:
   pull_request:
     paths:
+      - 'server/src/cbe-control/**'
+      - 'server/src/routes/cbe-control.ts'
+      - 'server/src/app.ts'
+      - 'server/src/env.ts'
+      - 'server/test/cbe-recovery-executor.test.mjs'
+      - 'server/test/cbe-control-executor.test.mjs'
+      - 'server/test/cbe-control-route.test.mjs'
       - 'server/src/browser-executor/chatgpt-handoff.ts'
       - 'server/src/browser-executor/chatgpt-handoff-runtime.ts'
       - 'server/src/browser-executor/chatgpt-handoff-cli.ts'
@@ -37,4 +44,4 @@ jobs:
       - name: Build server
         run: npm run build
       - name: Verify ChatGPT handoff engine and MP-006 runtime mapping
-        run: node --test test/chatgpt-handoff.test.mjs test/chatgpt-handoff-runtime.test.mjs
+        run: node --test test/chatgpt-handoff.test.mjs test/chatgpt-handoff-runtime.test.mjs test/cbe-recovery-executor.test.mjs test/cbe-control-executor.test.mjs test/cbe-control-route.test.mjs test/chatgpt-profile-lock.test.mjs test/l4a-repair-return.test.mjs

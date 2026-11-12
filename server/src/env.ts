@@ -30,6 +30,7 @@ const environmentSchema = z
     PORT: z.coerce.number().int().min(1).max(65535).default(3000),
     CBE_CONTROL_TOKEN: optionalControlToken,
     CBE_PROFILE_DIR: optionalNonEmptyString,
+    CBE_HANDOFF_JOB_FILE: optionalNonEmptyString,
     CBE_HUMAN_AUTH_URL: optionalHttpsUrl,
     CBE_HEADLESS: z.enum(['true', 'false']).default('true').transform((value) => value === 'true'),
     ASSISTANT_PROVIDER: z.enum(['disabled', 'openai']).default('disabled'),

@@ -87,8 +87,30 @@ class Drive:
         except DriveError as error:
             if error.status != 409:
                 raise
+            return False
+        return True
 
     def read(self, file_id, size):
         if not FILE_ID.fullmatch(file_id):
             raise PublicationError("Invalid Google Drive file ID")
         return self._request(f"/drive/v3/files/{file_id}", query={"alt": "media"}, maximum=size)
+
+    def files_named(self, folder, name):
+        """List exact-name children to detect duplicate Test publications."""
+        if not FILE_ID.fullmatch(folder) or not name or len(name) > 255:
+            raise PublicationError("Invalid Drive folder or artifact name")
+        quoted = lambda value: value.replace("\\", "\\\\").replace("'", "\\'")
+        query = {"q": f"'{quoted(folder)}' in parents and name = '{quoted(name)}' and trashed = false",
+                 "fields": "nextPageToken,files(id,name,parents,trashed)", "pageSize": 100}
+        found = []
+        for _ in range(10):
+            page = json.loads(self._request("/drive/v3/files", query=query))
+            files = page.get("files")
+            if not isinstance(files, list):
+                raise PublicationError("Invalid Google Drive listing response")
+            found.extend(files)
+            token = page.get("nextPageToken")
+            if not token:
+                return found
+            query["pageToken"] = token
+        raise PublicationError("Google Drive listing exceeded the bounded page limit")

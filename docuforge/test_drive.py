@@ -40,3 +40,12 @@ class DriveTests(unittest.TestCase):
         read = self.open.call_args.args[0]
         self.assertEqual(parse_qs(urlsplit(read.full_url).query), {"alt": ["media"]})
         self.assertIsNone(NoRedirect().redirect_request(read, None, 302, "", {}, "https://accounts.google.com"))
+
+    def test_exact_name_listing_paginates_and_escapes_name(self):
+        self.open.side_effect = [BytesIO(b'{"files":[{"id":"id-1"}],"nextPageToken":"next"}'),
+                                 BytesIO(b'{"files":[{"id":"id-2"}]}')]
+        matches = self.drive.files_named("private-folder-id", "D'FG.docx")
+        self.assertEqual([m["id"] for m in matches], ["id-1", "id-2"])
+        first, second = [call.args[0] for call in self.open.call_args_list]
+        self.assertIn("name = 'D\\'FG.docx'", parse_qs(urlsplit(first.full_url).query)["q"][0])
+        self.assertEqual(parse_qs(urlsplit(second.full_url).query)["pageToken"], ["next"])

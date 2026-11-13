@@ -64,3 +64,33 @@ events in sequence. The local journal can be inspected while a run is active.
 A crash may leave the latest artifact in a pending stage. Restarting with the
 same ID is the safe next action. Runtime delivery to the existing writer and
 the deployed Console/AED consumers depend on their Test bindings.
+
+### Live interruption acceptance
+
+`live_interruption_test.py` is a one-shot Test harness. It requires a fresh
+request ID, the same configured private folder and authorization as the
+publisher, and a private persistent state directory. It forks, uploads the
+first real DOCX using its reserved ID, exits the child immediately before
+recording the response, and resumes in the parent with the same SQLite file.
+It verifies all three files by authenticated readback, replays the request,
+and lists exact-name children to require one stored file per name and ID.
+
+```sh
+python docuforge/live_interruption_test.py --state-dir "$DFG_STATE_DIR" \
+  "$DFG_REQUEST_ID" "$DFG_SOURCE_JSON" "$DOCUFORGE_TEST_FOLDER_ID"
+```
+
+Keep the state directory after the run for audit and recovery. Do not rerun
+this one-shot harness using the same request ID; use `publish.py` to retry an
+interrupted request. A `PASS` result must include three authenticated SHA-256
+readbacks, exactly one listing match for each generated name, and an unchanged
+receipt on replay. A failed or ambiguous result remains blocked.
+
+The approved DFG-001 folder is a private **My Drive** folder. Google service
+accounts cannot own files there. Use an already authorized human OAuth identity
+with access to this folder and inject its short-lived Drive token through an
+approved secret/session mechanism. Do not store an OAuth refresh token in the
+repository, Codespace filesystem, or SQLite state. A Codespace can hold the
+state for a bounded Test run, but its default retention and compute limits do
+not make it an always-on service. The existing GCI service-account federation
+is a different lane and is not a substitute for folder-scoped user access.

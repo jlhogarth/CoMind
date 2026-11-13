@@ -8,6 +8,7 @@ import unittest
 from unittest.mock import patch
 
 from drive import FOLDER_MIME, PublicationError
+from live_interruption_test import run as run_live
 from manifest import build_manifest
 from publish import events, open_state, publish, runbook_events
 
@@ -45,6 +46,12 @@ class FixtureDrive:
         }))
         if self.stop_after_create:
             os._exit(71)
+        return True
+
+    def files_named(self, folder, name):
+        return [entry for path in self.root.glob("fixture-id-*.json")
+                if (entry := json.loads(path.read_text()))["name"] == name
+                and entry["parents"] == [folder]]
 
     def read(self, file_id, size):
         return (self.root / file_id).read_bytes()
@@ -145,3 +152,12 @@ class PublishTests(unittest.TestCase):
         with self.assertRaisesRegex(PublicationError, "metadata mismatch"):
             self.run_request()
         self.assertIsNone(self.drive.metadata("fixture-id-0"))
+
+    def test_live_harness_interrupts_resumes_and_proves_counts(self):
+        with patch("live_interruption_test.Drive", return_value=self.drive):
+            result = run_live(SOURCE, REQUEST, FOLDER, self.root / "private_state", "fixture-token")
+        self.assertEqual(result["status"], "PASS")
+        self.assertEqual(result["pending_stage"], "docx_pending")
+        self.assertTrue(result["resume_verified"])
+        self.assertEqual([file["count"] for file in result["files"]], [1, 1, 1])
+        self.assertEqual((self.root / "reserve").read_text().splitlines(), ["reserve"])

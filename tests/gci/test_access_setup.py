@@ -30,7 +30,7 @@ member="principalSet://iam.googleapis.com/"+pool+"/attribute.repository_id/10288
 if s.get("no_auth"):
  print("You do not currently have an active account",file=sys.stderr);sys.exit(1)
 if a[:3]==["iam","service-accounts","list"]:
- out([{"uniqueId":"102716239802737631124","email":"comind@comind-513807.iam.gserviceaccount.com"}])
+ out([{"uniqueId":"109699106806527626952","email":"gci-001-test@comind-513807.iam.gserviceaccount.com"}])
 elif a[:2]==["projects","describe"]: print(s.get("number","373198958202"))
 elif a[:2]==["services","list"]:
  print("\\n".join(s.get("apis",[])))
@@ -43,7 +43,7 @@ elif a[:4]==["iam","workload-identity-pools","providers","list"]:
  if s.get("foreign_provider"): providers.append({"name":pool+"/providers/foreign"})
  out(providers)
 elif a[:2]==["projects","get-iam-policy"]:
- out({"bindings":[{"role":"roles/viewer","members":["serviceAccount:comind@comind-513807.iam.gserviceaccount.com"]}] if s.get("project_role") else []})
+ out({"bindings":[{"role":"roles/viewer","members":["serviceAccount:gci-001-test@comind-513807.iam.gserviceaccount.com"]}] if s.get("project_role") else []})
 elif a[:4]==["iam","service-accounts","keys","list"]: out([{"name":"fixture-key"}] if s.get("key") else [])
 elif a[:3]==["iam","service-accounts","get-iam-policy"]:
  out({"bindings":[{"role":"roles/iam.workloadIdentityUser","members":[member if not s.get("broad_binding") else "allUsers"]}] if s.get("binding") else []})

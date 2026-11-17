@@ -41,12 +41,18 @@ def sha256(content: str) -> str:
 
 
 def event(kind: str, **attrs: object) -> None:
-    print(json.dumps({
+    record = {
         "at": datetime.now(timezone.utc).isoformat(),
         "event": kind,
         "run_id": os.environ.get("GITHUB_RUN_ID"),
         **attrs,
-    }), flush=True)
+    }
+    serialized = json.dumps(record)
+    print(serialized, flush=True)
+    evidence_file = os.environ.get("GCI_EVIDENCE_FILE")
+    if evidence_file:
+        with open(evidence_file, "a", encoding="utf-8") as stream:
+            stream.write(serialized + "\n")
 
 
 @dataclass(frozen=True)

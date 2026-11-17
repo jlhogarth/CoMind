@@ -97,3 +97,34 @@ jobs:
           GCI_DOC_ID: ${{ inputs.document_id }}
           GCI_SESSION_ID: ${{ inputs.session_id }}
           GCI_MODEL: ${{ inputs.model }}
+          GCI_EVIDENCE_FILE: ${{ runner.temp }}/gci-events.jsonl
+      - name: Preserve sanitized run events
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.enable_live
+        uses: actions/upload-artifact@v4
+        with:
+          name: gci-run-events
+          path: ${{ runner.temp }}/gci-events.jsonl
+          if-no-files-found: ignore
+          retention-days: 7
+
+  receipt:
+    name: Publish sanitized return receipt
+    needs: poll
+    if: always() && github.event_name == 'workflow_dispatch' && inputs.enable_live && github.ref == 'refs/heads/gci-001-on-demand-gemini-review'
+    permissions:
+      contents: read
+      issues: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: gci-run-events
+          path: ${{ runner.temp }}/gci-receipt
+      - name: Post receipt
+        run: python scripts/gci/publish_receipt.py
+        env:
+          GCI_EVIDENCE_FILE: ${{ runner.temp }}/gci-receipt/gci-events.jsonl
+          GITHUB_TOKEN: ${{ github.token }}

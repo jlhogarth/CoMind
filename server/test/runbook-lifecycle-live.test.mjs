@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGoogleRunBookReader } from '../dist/runbook/lifecycle-google.js';
 import { evaluateLifecycle } from '../dist/runbook/lifecycle.js';
-import { getRunBookSchedulerConfig, runDueRunBookCheck } from '../dist/runbook/lifecycle-scheduler.js';
+import { getRunBookSchedulerConfig, runDueRunBookCheck, verifyCloudRunViewerIdentity } from '../dist/runbook/lifecycle-scheduler.js';
 
 const due = '2026-11-09T14:00:00.000Z';
 const volumeId = 'synthetic-runbook';
@@ -66,4 +66,29 @@ test('a scheduler tick records provider failure once and retries reuse the due-s
   assert.equal(first.evaluation.size, 'unavailable');
   assert.deepEqual(await execute(), first);
   assert.equal(tokenRequests, 1);
+});
+
+test('Google-managed Test Viewer is attested and rejects wrong host or account', async () => {
+  const database = 'postgres://comind_runbook_scheduler_login@db.sbgfuanxiqepcoboxzcl.supabase.co/postgres?sslmode=verify-full';
+  const binding = { DRB_RUNBOOK_SCHEDULER: 'test', DRB_RUNBOOK_GOOGLE_DOC_ID: volumeId,
+    DRB_RUNBOOK_DATABASE_URL: database, DRB_RUNBOOK_GOOGLE_IDENTITY: 'cloud-run',
+    DRB_RUNBOOK_GOOGLE_PROJECT_ID: 'comind-513807', K_SERVICE: 'comind-runbook-scheduler-test',
+    DRB_RUNBOOK_GOOGLE_SERVICE_ACCOUNT_EMAIL: 'comind-drb-runbook-viewer@comind-513807.iam.gserviceaccount.com' };
+  assert.equal(getRunBookSchedulerConfig(binding).cloudRun, true);
+  for (const override of [{ K_SERVICE: '' }, { DRB_RUNBOOK_GOOGLE_PROJECT_ID: 'other' },
+    { DRB_RUNBOOK_GOOGLE_SERVICE_ACCOUNT_EMAIL: 'other@example.com' },
+    { DRB_RUNBOOK_GOOGLE_CREDENTIALS_FILE: 'other.json' }]) {
+    assert.throws(() => getRunBookSchedulerConfig({ ...binding, ...override }), /scoped Test Viewer/);
+  }
+  const identity = 'comind-drb-runbook-viewer@comind-513807.iam.gserviceaccount.com';
+  let requests = 0;
+  await verifyCloudRunViewerIdentity(async (url, options) => {
+    requests++;
+    assert.match(url, /^http:\/\/metadata\.google\.internal\//);
+    assert.equal(options.headers['Metadata-Flavor'], 'Google');
+    return new Response(identity, { headers: { 'Metadata-Flavor': 'Google' } });
+  });
+  assert.equal(requests, 1);
+  await assert.rejects(verifyCloudRunViewerIdentity(async () => new Response('other@example.com',
+    { headers: { 'Metadata-Flavor': 'Google' } })), /differs/);
 });

@@ -11,6 +11,7 @@ import os
 import pathlib
 import re
 import sys
+import urllib.error
 import urllib.request
 
 REPOSITORY = "jlhogarth/CoMind"
@@ -71,9 +72,14 @@ def main() -> int:
                  "Content-Type": "application/json", "User-Agent": "CoMind-GCI-001"},
         method="POST",
     )
-    with urllib.request.urlopen(request, timeout=20) as response:
-        if response.status != 201:
-            raise RuntimeError("Receipt comment not accepted")
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            if response.status != 201:
+                raise RuntimeError("Receipt comment not accepted")
+    except urllib.error.HTTPError as exc:
+        details = exc.read(500).decode("utf-8", errors="replace")
+        print(f"receipt_publication_failed: HTTP {exc.code}: {details}", file=sys.stderr)
+        return 1
     print("receipt_published: sanitized PR comment", flush=True)
     return 0
 

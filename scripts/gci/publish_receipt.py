@@ -22,6 +22,47 @@ TERMINAL = {
     "cancelled", "failed", "rejected", "disabled", "deadline_after_claim",
 }
 HEX = re.compile(r"[0-9a-f]{64}\Z")
+IDENT = re.compile(r"[A-Za-z0-9_-]{8,80}\Z")
+SAFE_EVENTS = {
+    "started", "document_read", "claimed", "gemini_request_attempted",
+    "gemini_response_received", "delivered", "preflight_completed",
+    "existing_reply_verified", "idle_stopped", "max_duration_stopped",
+    "orphaned_or_invalid_receipt", "delivery_unverified", "cancelled",
+    "failed", "rejected", "disabled", "deadline_after_claim",
+}
+
+
+def public_telemetry(records: list[dict], run_id: str, session: str, exchange: str) -> dict:
+    """Explicit allowlist of metadata safe for the public Test PR receipt."""
+    if not (run_id.isdecimal() and IDENT.fullmatch(session) and IDENT.fullmatch(exchange)):
+        raise ValueError("Invalid Test receipt identity")
+    events = []
+    for record in records:
+        if record.get("run_id") != run_id or record.get("event") not in SAFE_EVENTS:
+            continue
+        item = {"event": record["event"]}
+        at = record.get("at")
+        if isinstance(at, str) and re.fullmatch(r"[0-9T:.+Z-]{20,40}", at):
+            item["at"] = at
+        for key in ("version", "revision", "sha256"):
+            value = record.get(key)
+            if isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9_.-]{1,120}", value):
+                item[key] = value
+        for key in ("calls", "checks", "eligible"):
+            value = record.get(key)
+            if type(value) is int and 0 <= value <= 100000:
+                item[key] = value
+        for key in ("idle_seconds", "elapsed_seconds"):
+            value = record.get(key)
+            if type(value) in (int, float) and 0 <= value <= 1801:
+                item[key] = value
+        for key in ("stage", "reason"):
+            value = record.get(key)
+            if isinstance(value, str) and re.fullmatch(r"[a-zA-Z0-9_]{1,60}", value):
+                item[key] = value
+        events.append(item)
+    return {"schema": "gci-001-public-telemetry-v1", "run_id": run_id,
+            "session": session, "exchange": exchange, "events": events[-200:]}
 
 
 def summarize(records: list[dict], run_id: str) -> str | None:
@@ -30,6 +71,7 @@ def summarize(records: list[dict], run_id: str) -> str | None:
     terminal = next((r for r in reversed(records) if r.get("event") in TERMINAL), None)
     if not started or not terminal:
         return None
+    payload = public_telemetry(records, run_id, started["session"], started["exchange"])
     delivered = next((r for r in reversed(records) if r.get("event") == "delivered"), None)
     digest = delivered.get("sha256") if delivered else None
     if digest is not None and (not isinstance(digest, str) or not HEX.fullmatch(digest)):
@@ -48,6 +90,7 @@ def summarize(records: list[dict], run_id: str) -> str | None:
         f"Observed event names: `{', '.join(sorted(str(e) for e in events if e))}`",
         "",
         "This public receipt contains no prompt or reply text. A Work return must independently read the restricted Doc, verify its reply digest and claim count, then classify failures or ambiguous attempts without repeating inference.",
+        "<!-- GCI-001-TELEMETRY " + json.dumps(payload, separators=(",", ":")) + " -->",
     ]
     return "\n".join(lines)
 

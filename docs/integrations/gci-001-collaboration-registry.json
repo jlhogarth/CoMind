@@ -34,10 +34,19 @@
         "append_claim",
         "append_reply"
       ],
-      "session_id": "gci_smoke_20261107",
-      "security": "Restricted owner-only on last readback, targeted service-account editor grant not yet verified. Test-only synthetic content.",
-      "exchange_id": "question0001",
-      "payload_sha256": "a68c05e7078ba7841567262adc22691635706de0641f26a5026e66ce9f99adba"
+      "session_id": "gci_chat_20261117",
+      "security": "Restricted Test Doc with dedicated gci-001-test service-account writer grant, verified November 16, 2026. The prior completed exchange remains in the document; only the new exact payload is eligible.",
+      "exchange_id": "question0002",
+      "payload_sha256": "5c174350af284a1967607c3b926af6eb270b42c352e38500221917cba99ac696",
+      "prior_exchanges": [
+        {
+          "session_id": "gci_smoke_20261107",
+          "exchange_id": "question0001",
+          "payload_sha256": "a68c05e7078ba7841567262adc22691635706de0641f26a5026e66ce9f99adba",
+          "completed_run": "https://github.com/jlhogarth/CoMind/actions/runs/43945995084",
+          "reply_sha256": "63fe4585024b1df01932b2d59ae0d67e77c2921dc4f0d6eb01f0ba930297e2d7"
+        }
+      ]
     },
     {
       "key": "gci_architecture",

@@ -76,7 +76,7 @@ test('Google-managed Test Viewer is attested and rejects wrong host or account',
     DRB_RUNBOOK_GOOGLE_SERVICE_ACCOUNT_EMAIL: 'comind-drb-runbook-viewer@comind-513807.iam.gserviceaccount.com' };
   assert.equal(getRunBookSchedulerConfig(binding).cloudRun, true);
   for (const override of [{ K_SERVICE: '' }, { DRB_RUNBOOK_GOOGLE_PROJECT_ID: 'other' },
-    { DRB_RUNBOOK_GOOGLE_SERVICE_ACCOUNT_EMAIL: 'other@example.com' },
+    { DRB_RUNBOOK_GOOGLE_SERVICE_ACCOUNT_EMAIL: 'other@comind-513807.iam.gserviceaccount.com' },
     { DRB_RUNBOOK_GOOGLE_CREDENTIALS_FILE: 'other.json' }]) {
     assert.throws(() => getRunBookSchedulerConfig({ ...binding, ...override }), /scoped Test Viewer/);
   }
@@ -89,6 +89,6 @@ test('Google-managed Test Viewer is attested and rejects wrong host or account',
     return new Response(identity, { headers: { 'Metadata-Flavor': 'Google' } });
   });
   assert.equal(requests, 1);
-  await assert.rejects(verifyCloudRunViewerIdentity(async () => new Response('other@example.com',
+  await assert.rejects(verifyCloudRunViewerIdentity(async () => new Response('other@comind-513807.iam.gserviceaccount.com',
     { headers: { 'Metadata-Flavor': 'Google' } })), /differs/);
 });

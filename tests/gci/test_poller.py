@@ -80,7 +80,7 @@ class AcceptanceSimulationTests(unittest.TestCase):
 
     def make_args(self):
         from argparse import Namespace
-        return Namespace(document_id="1dJEOjmLPm9gdw8xsVF8J_dyPK0HDx5N5RmW0ID42cnE", session_id="gci_chat_20261117",
+        return Namespace(document_id="1dJEOjmLPm9gdw8xsVF8J_dyPK0HDx5N5RmW0ID42cnE", session_id="gci_return_20261117",
                          model=module.MODEL, interval=15, idle=240, maximum=1800, preflight=False)
 
     def run_clock(self, initial_document, drop_reply=False, *, fail_at=None, preflight=False, real_clock=False):
@@ -149,7 +149,7 @@ class AcceptanceSimulationTests(unittest.TestCase):
         return state
 
     def test_one_complete_exchange_exactly_once_and_idle_stop(self):
-        doc = exchange("question0002", "CHATGPT", "gci_chat_20261117", "Which design is safer?")
+        doc = exchange("question0003", "CHATGPT", "gci_return_20261117", "Which design is safer?")
         result = self.run_clock(doc)
         self.assertEqual(result["exit"], 0)
         self.assertEqual(result["calls"], 1)
@@ -162,7 +162,7 @@ class AcceptanceSimulationTests(unittest.TestCase):
         self.assertGreaterEqual(result["metadata_checks"], 10)
 
     def test_unverified_reply_never_reports_delivery(self):
-        doc = exchange("question0002", "CHATGPT", "gci_chat_20261117", "Which design is safer?")
+        doc = exchange("question0003", "CHATGPT", "gci_return_20261117", "Which design is safer?")
         result = self.run_clock(doc, drop_reply=True)
         self.assertEqual(result["exit"], 6)
         self.assertEqual(result["calls"], 1)
@@ -170,23 +170,23 @@ class AcceptanceSimulationTests(unittest.TestCase):
         self.assertNotIn("delivered", result["events"])
 
     def test_read_only_preflight_makes_no_writes_or_generation_requests(self):
-        doc = exchange("question0002", "CHATGPT", "gci_chat_20261117", "Which design is safer?")
+        doc = exchange("question0003", "CHATGPT", "gci_return_20261117", "Which design is safer?")
         result = self.run_clock(doc, preflight=True)
         self.assertEqual((result["exit"], result["calls"], result["appends"]), (0, 0, []))
 
     def test_unapproved_edit_never_reaches_gemini(self):
-        doc = exchange("question0002", "CHATGPT", "gci_chat_20261117", "Edited question")
+        doc = exchange("question0003", "CHATGPT", "gci_return_20261117", "Edited question")
         result = self.run_clock(doc)
         self.assertEqual((result["calls"], result["appends"]), (0, []))
 
     def test_revision_conflict_at_claim_never_reaches_gemini(self):
-        doc = exchange("question0002", "CHATGPT", "gci_chat_20261117", "Which design is safer?")
+        doc = exchange("question0003", "CHATGPT", "gci_return_20261117", "Which design is safer?")
         result = self.run_clock(doc, fail_at="claim")
         self.assertEqual((result["exit"], result["calls"]), (3, 0))
         self.assertEqual(result["details"][-1]["http_status"], 400)
 
     def test_ambiguous_failures_preserve_claim_and_do_not_retry_on_restart(self):
-        doc = exchange("question0002", "CHATGPT", "gci_chat_20261117", "Which design is safer?")
+        doc = exchange("question0003", "CHATGPT", "gci_return_20261117", "Which design is safer?")
         for stage, exit_code in [("gemini", 3), ("reply", 3), ("cancel", 130)]:
             with self.subTest(stage=stage):
                 result = self.run_clock(doc, fail_at=stage)
@@ -197,20 +197,20 @@ class AcceptanceSimulationTests(unittest.TestCase):
                 self.assertIn("orphaned_or_invalid_receipt", restarted["events"])
 
     def test_tampered_reply_blocks_restart_without_regeneration(self):
-        doc = exchange("question0002", "CHATGPT", "gci_chat_20261117", "Which design is safer?")
+        doc = exchange("question0003", "CHATGPT", "gci_return_20261117", "Which design is safer?")
         result = self.run_clock(doc)
         restarted = self.run_clock(result["content"].replace("A bounded alternate design.", "Edited answer."))
         self.assertEqual((restarted["exit"], restarted["calls"]), (7, 0))
 
     def test_completed_exchange_is_not_processed_again_on_restart(self):
-        doc = exchange("question0002", "CHATGPT", "gci_chat_20261117", "Which design is safer?")
+        doc = exchange("question0003", "CHATGPT", "gci_return_20261117", "Which design is safer?")
         result = self.run_clock(doc)
         restarted = self.run_clock(result["content"])
         self.assertEqual((restarted["exit"], restarted["calls"], restarted["appends"]), (0, 0, []))
 
     @unittest.skipUnless(os.environ.get("GCI_TEST_REAL_IDLE") == "true", "opt-in elapsed-time test")
     def test_real_elapsed_idle_with_stubbed_providers(self):
-        doc = exchange("question0002", "CHATGPT", "gci_chat_20261117", "Which design is safer?")
+        doc = exchange("question0003", "CHATGPT", "gci_return_20261117", "Which design is safer?")
         result = self.run_clock(doc, real_clock=True)
         self.assertEqual(result["exit"], 0)
         self.assertEqual(result["events"][-1], "idle_stopped")
@@ -238,12 +238,12 @@ class AcceptanceSimulationTests(unittest.TestCase):
             connect.assert_not_called()
 
     def test_unregistered_document_rejected(self):
-        self.assertFalse(module.authorized_document("A" * 20, "gci_chat_20261117")[0])
+        self.assertFalse(module.authorized_document("A" * 20, "gci_return_20261117")[0])
 
     def test_registered_document_rejects_other_session(self):
         doc = "1dJEOjmLPm9gdw8xsVF8J_dyPK0HDx5N5RmW0ID42cnE"
         self.assertFalse(module.authorized_document(doc, "session001")[0])
-        self.assertTrue(module.authorized_document(doc, "gci_chat_20261117")[0])
+        self.assertTrue(module.authorized_document(doc, "gci_return_20261117")[0])
 
     def test_missing_google_federation_fails_closed(self):
         with patch.dict("os.environ", {"GCI_ENABLE_LIVE": "true", "GEMINI_API_KEY": "test"},

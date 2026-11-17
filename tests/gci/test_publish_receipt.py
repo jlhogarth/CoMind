@@ -10,6 +10,8 @@ class PublishReceiptTest(unittest.TestCase):
              "exchange": "question0002", "preflight": False},
             {"run_id": "12345", "event": "gemini_request_attempted", "calls": 1,
              "prompt": "must not appear"},
+            {"run_id": "12345", "event": "document_read", "version": "17",
+             "revision": "rev0001", "body": "must not appear"},
             {"run_id": "12345", "event": "delivered", "calls": 1,
              "sha256": "a" * 64, "answer": "must not appear"},
             {"run_id": "12345", "event": "idle_stopped", "calls": 1},
@@ -18,6 +20,9 @@ class PublishReceiptTest(unittest.TestCase):
         self.assertIn("GCI-001-RETURN", body)
         self.assertIn("idle_stopped", body)
         self.assertIn("a" * 64, body)
+        self.assertIn("GCI-001-TELEMETRY", body)
+        self.assertIn('"version":"17"', body)
+        self.assertIn('"event":"gemini_request_attempted"', body)
         self.assertNotIn("must not appear", body)
 
     def test_incomplete_run_does_not_publish(self):

@@ -34,10 +34,10 @@
         "append_claim",
         "append_reply"
       ],
-      "session_id": "gci_return_20261117",
-      "security": "Restricted Test Doc with dedicated GCI writer grant. Prior exchanges remain completed; only the exact new return-verification prompt is eligible.",
-      "exchange_id": "question0003",
-      "payload_sha256": "213aed741ec4ec196cf011c901dc792afbe78d235c76867518ad8099b7bb7591",
+      "session_id": "gci_site_20261117",
+      "security": "Restricted Test Doc with dedicated GCI writer grant. Prior exchanges remain completed; only the exact new Site telemetry acceptance prompt is eligible.",
+      "exchange_id": "question0004",
+      "payload_sha256": "2b65aad97b9cc0f8e30518827edffdc8689d913271f9a40ffa5546dcfa371dd2",
       "prior_exchanges": [
         {
           "session_id": "gci_smoke_20261107",
@@ -52,6 +52,13 @@
           "payload_sha256": "5c174350af284a1967607c3b926af6eb270b42c352e38500221917cba99ac696",
           "completed_run": "https://github.com/jlhogarth/CoMind/actions/runs/44040160014",
           "reply_sha256": "a3be32388b5bc1cce30a19786283d782f4c47f48b8433686bee10f35ec1bd717"
+        },
+        {
+          "session_id": "gci_return_20261117",
+          "exchange_id": "question0003",
+          "payload_sha256": "213aed741ec4ec196cf011c901dc792afbe78d235c76867518ad8099b7bb7591",
+          "completed_run": "https://github.com/jlhogarth/CoMind/actions/runs/44155839010",
+          "reply_sha256": "0c49da5df52035b460d0f075007baf59c887c20e5a8fb9653b8dc7df51fa3430"
         }
       ]
     },

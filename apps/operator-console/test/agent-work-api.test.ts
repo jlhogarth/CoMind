@@ -24,14 +24,16 @@ function configure() {
   process.env.OPERATOR_CONSOLE_MANAGEMENT_CAPABILITY = "synthetic-agent-work-read-capability-20261112";
 }
 const snapshot = {
-  schema_version: "comind.agcol-003.operator-work.v1", generated_at: "2026-11-12T01:20:00Z",
-  coverage_limit: "Latest 20 Test run manifests, up to 32 tasks each",
+  schema_version: "comind.agcol-003.operator-work.v2", generated_at: "2026-11-12T01:20:00Z",
+  coverage_limit: "Latest 20 Test run manifests, up to 32 tasks and 16 progress events each",
   activation_mode: "bounded_test_invocation", always_running: false,
   work: [{
     run_key: "synthetic-run", manifest_id: "manifest", manifest_at: "2026-11-12T01:19:00Z",
     specialist_key: "research", profile_id: "profile", task_id: "task", capability_code: "read_resource",
     progress_id: "progress", observed_at: "2026-11-12T01:20:00Z", phase: "completed",
     blocker_code: null, result_ref: "result", lease_state: "completed", lease_expires_at: null,
+    target_ref: "fixture-resource", progress_events: [{ evidence_id: "progress", at: "2026-11-12T01:20:00Z", phase: "completed", code: null }],
+    result_proof: { at: "2026-11-12T01:20:00Z", source: "isolated_fixture", status: "succeeded", tool_name: "lookup_evidence", resource: "fixture-resource", latency_ms: 24, cost_usd: 0, request_fingerprint: "synthetic-request", result_fingerprint: "synthetic-result", adapter_operation_id: "operation", execution_context_id: "context" },
     lease_updated_at: "2026-11-12T01:20:00Z", fencing_epoch: 1, attention: "complete",
   }],
 };

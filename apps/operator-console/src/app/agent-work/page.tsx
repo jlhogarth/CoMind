@@ -59,9 +59,27 @@ export default function AgentWorkPage() {
           <p>Phase: {item.phase ?? "No observation"} · Lease: {item.lease_state ?? "Unknown"} · Last observation: {timestamp(item.observed_at)}</p>
           {item.lease_state === "leased" && <p>Lease expiry: {timestamp(item.lease_expires_at)}. An expired claim needs reconciliation before retry.</p>}
           {item.blocker_code && <p role="alert">Stop reason: {item.blocker_code}. Review the canonical evidence before resuming.</p>}
-          <details><summary>Evidence and identity</summary>
-            <p>Task: <code>{item.task_id}</code> · Profile: <code>{item.profile_id}</code> · Fencing epoch: {item.fencing_epoch ?? "Unknown"}</p>
-            <p>Manifest: <code>{item.manifest_id}</code> · Progress: <code>{item.progress_id ?? "None"}</code> · Result: <code>{item.result_ref ?? "None"}</code></p>
+          <details><summary>Actual evidence and work history</summary>
+            <p>Bounded Test fixture. Manifest recorded {timestamp(item.manifest_at)}. Task <code>{item.task_id}</code>, profile <code>{item.profile_id}</code>, fencing epoch {item.fencing_epoch ?? "Unknown"}.</p>
+            <p>Manifest evidence <code>{item.manifest_id}</code>. Target resource <code style={{ overflowWrap: "anywhere" }}>{item.target_ref ?? "Not recorded"}</code>.</p>
+            <h3>Recorded progress</h3>
+            {item.progress_events.length === 0 ? <p>No progress events recorded.</p> : <ol>
+              {item.progress_events.map(event => <li key={event.evidence_id}>
+                <strong>{event.phase ?? "Unknown phase"}</strong> at {timestamp(event.at)}
+                {event.code && <> · Stop code {event.code}</>}
+                <br />Evidence <code>{event.evidence_id}</code>
+              </li>)}
+            </ol>}
+            <h3>Governed tool receipt</h3>
+            {item.result_proof ? <div>
+              <p><strong>{item.result_proof.status ?? "Unknown status"}</strong> from {item.result_proof.source ?? "unknown source"} using {item.result_proof.tool_name ?? "unknown tool"} at {timestamp(item.result_proof.at)}.</p>
+              <p>Resource <code style={{ overflowWrap: "anywhere" }}>{item.result_proof.resource ?? "Not recorded"}</code>.</p>
+              <p>Latency {item.result_proof.latency_ms ?? "Unknown"} ms · Recorded tool cost {item.result_proof.cost_usd === null ? "Unknown" : `$${item.result_proof.cost_usd}`}.</p>
+              <p>Result evidence <code>{item.result_ref}</code> · Execution context <code>{item.result_proof.execution_context_id}</code> · Adapter operation <code>{item.result_proof.adapter_operation_id}</code>.</p>
+              <p>Request fingerprint <code style={{ overflowWrap: "anywhere" }}>{item.result_proof.request_fingerprint}</code><br />Result fingerprint <code style={{ overflowWrap: "anywhere" }}>{item.result_proof.result_fingerprint}</code></p>
+              <p>Fingerprints identify the recorded fixture request and result. Raw output is not included in this view.</p>
+            </div> : <p>No matching governed tool receipt in this projection. Result reference: <code>{item.result_ref ?? "None"}</code>.</p>}
+            <p>Current lease: {item.lease_state ?? "Unknown"} · Last lease update {timestamp(item.lease_updated_at)} · Expiry {timestamp(item.lease_expires_at)}.</p>
           </details>
         </article>)}
       </div>

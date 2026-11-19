@@ -1,4 +1,5 @@
 import { Network, ShieldCheck } from "lucide-react";
+import { capabilityObservations, capabilityPreflight, isSafeCapabilityInventory } from "@/lib/integration-gateway/capabilities";
 
 import {
   integrationGatewayProcess,
@@ -11,6 +12,9 @@ export default function IntegrationGatewayPage() {
   const snapshot = integrationGatewaySnapshot;
   if (!isPublicIntegrationGatewaySnapshotSafe(snapshot)) {
     throw new Error("Integration Gateway status projection violated its non-secret boundary");
+  }
+  if (!isSafeCapabilityInventory(capabilityObservations)) {
+    throw new Error("Integration capability inventory violated its non-secret evidence boundary");
   }
 
   return (
@@ -34,7 +38,7 @@ export default function IntegrationGatewayPage() {
       <section className="hud-content">
         <header className="hud-topbar">
           <div className="hud-breadcrumb">CoMind <span>/</span> Operator Console <span>/</span> <b>Integration Gateway</b></div>
-          <div className="hud-source-state source-connected"><i /> CIG-001 verified snapshot</div>
+          <div className="hud-source-state source-connected"><i /> CIG-001 historical snapshot</div>
         </header>
 
         <div className="hud-heading">
@@ -47,22 +51,22 @@ export default function IntegrationGatewayPage() {
 
         <div className="hud-data-note" role="status">
           <ShieldCheck size={16} />
-          <span>This is a verified CIG-001 status snapshot, not a promise that OAuth is permanently active. Every consequential action must recheck connection state and current durable authority before execution.</span>
+          <span>The CIG-001 connection snapshot was verified on {snapshot.verified_at.slice(0, 10)}. It is historical, not a current connection-health reading. Every consequential action must recheck connection state and current durable authority before execution.</span>
         </div>
 
         <div className="cards">
           <article className="card"><h2>{snapshot.provider}</h2><p>Managed integration provider</p></article>
           <article className="card"><h2>{snapshot.authority}</h2><p>Bounded autonomous authority</p></article>
-          <article className="card"><h2>{snapshot.connections.length}</h2><p>Verified initial toolkits</p></article>
+          <article className="card"><h2>{snapshot.connections.length}</h2><p>Initial connection proofs</p></article>
           <article className="card"><h2>OFF</h2><p>Production authority</p></article>
         </div>
 
-        <section aria-label="Verified integration connections">
+        <section aria-label="Historical integration connections">
           {snapshot.connections.map((connection) => (
             <article className="activity-card" key={connection.toolkit}>
               <div className="activity-card-main">
                 <div className="activity-state-column">
-                  <span className="state-pill"><i aria-hidden="true" />{connection.status}</span>
+                  <span className="state-pill"><i aria-hidden="true" />{connection.status} at snapshot</span>
                   <span className="activity-key">CIG-001</span>
                 </div>
                 <div className="activity-summary-column">
@@ -73,6 +77,31 @@ export default function IntegrationGatewayPage() {
               </div>
             </article>
           ))}
+        </section>
+
+        <section aria-label="Dated capability observations">
+          <h2>Founder operator access checks</h2>
+          <p>These are dated observations, not a live permission grant. Each action needs a fresh connection, scope and authority check before execution.</p>
+          {capabilityObservations.map((item) => {
+            const preflight = capabilityPreflight(item);
+            return (
+              <article className="activity-card" key={item.id}>
+                <div className="activity-card-main">
+                  <div className="activity-state-column">
+                    <span className="state-pill">{preflight.historical_proof.replaceAll("_", " ")}</span>
+                    <span className="activity-key">{item.observed_on ?? "No proof date"}</span>
+                  </div>
+                  <div className="activity-summary-column">
+                    <div className="activity-title-row"><h3>{item.service}</h3></div>
+                    <p><b>Account:</b> {item.account}</p>
+                    <p><b>Observed action:</b> {item.action}</p>
+                    <p><b>Next check:</b> {item.continuation}</p>
+                    {item.evidence && <a href={item.evidence} target="_blank" rel="noreferrer">Inspect evidence</a>}
+                  </div>
+                </div>
+              </article>
+            );
+          })}
         </section>
 
         <section className="activity-card" aria-labelledby="gateway-process-title">

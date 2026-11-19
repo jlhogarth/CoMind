@@ -48,7 +48,7 @@ if ! gcloud iam workload-identity-pools providers describe "$provider" --workloa
   gcloud iam workload-identity-pools providers create-oidc "$provider" --workload-identity-pool="$pool" --location=global --project="$project" --issuer-uri=https://token.actions.githubusercontent.com --attribute-mapping="$mapping" --attribute-condition="$condition"
 fi
 provider_data="$(gcloud iam workload-identity-pools providers describe "$provider" --workload-identity-pool="$pool" --location=global --project="$project" --format=json)"
-jq -e --arg cond "$condition" --arg issuer https://token.actions.githubusercontent.com '.state == "ACTIVE" and .disabled != true and .attributeCondition == $cond and .oidc.issuerUri == $issuer' <<<"$provider_data" >/dev/null || {
+jq -e --arg cond "$condition" --arg issuer https://token.actions.githubusercontent.com --arg mapping "$mapping" '.state == "ACTIVE" and .disabled != true and .attributeCondition == $cond and .oidc.issuerUri == $issuer and ((.oidc.allowedAudiences // []) | length == 0) and .attributeMapping == ($mapping | split(",") | map(split("=") | {key: .[0], value: .[1]}) | from_entries)' <<<"$provider_data" >/dev/null || {
   echo 'RunBook provider trust differs from the reviewed condition'; exit 3;
 }
 account_policy="$(gcloud iam service-accounts get-iam-policy "$email" --project="$project" --format=json)"
@@ -59,4 +59,6 @@ if ! jq -e --arg member "$member" 'any(.bindings[]?; .role == "roles/iam.workloa
   [[ "$mode" == --apply ]] || { echo 'Scoped impersonation grant absent'; exit 5; }
   gcloud iam service-accounts add-iam-policy-binding "$email" --project="$project" --role=roles/iam.workloadIdentityUser --member="$member" --condition=None >/dev/null
 fi
+account_policy="$(gcloud iam service-accounts get-iam-policy "$email" --project="$project" --format=json)"
+jq -e --arg member "$member" 'any(.bindings[]?; .role == "roles/iam.workloadIdentityUser" and (.members | index($member) != null))' <<<"$account_policy" >/dev/null || { echo 'Scoped grant readback failed'; exit 3; }
 printf 'DRB_GOOGLE_VIEWER_READY=true\nDRB_GOOGLE_VIEWER_EMAIL=%s\n' "$email"

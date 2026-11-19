@@ -144,6 +144,7 @@ export default function ManagementPlanePage() {
         <nav aria-label="Operator Console">
           <a href="/">Overview</a>
           <a href="/activity">Activity HUD</a>
+          <a href="/agent-work">Agent work</a>
           <a className="active" href="/management-plane" aria-current="page">L4A Management</a>
           <a href="/rulebook">RuleBook HUD</a>
           <a href="/integrations">Integration Gateway</a>

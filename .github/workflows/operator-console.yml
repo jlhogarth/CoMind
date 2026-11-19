@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: apps/operator-console
@@ -48,6 +48,8 @@ jobs:
         run: node test/control-plane.browser.mjs
         env:
           CONTROL_PLANE_BROWSER_SCREENSHOT: artifacts/control-plane-browser.png
+      - name: Test Agent Operations sign-in and authorization UI in Chromium
+        run: node test/agent-operations.browser.mjs
       - name: Test Activity HUD pagination and filters in Chromium
         run: npm run browser-test
         env:
@@ -60,6 +62,7 @@ jobs:
           path: |
             apps/operator-console/artifacts/control-plane-browser.png
             apps/operator-console/artifacts/activity-hud-browser.png
+            apps/operator-console/artifacts/agent-operations-browser.png
           if-no-files-found: error
           retention-days: 7
       - name: Build

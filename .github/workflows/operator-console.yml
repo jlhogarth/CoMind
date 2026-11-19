@@ -12,7 +12,8 @@ permissions:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    # Playwright 1.56.0 rejects the Ubuntu 26.04 image behind ubuntu-latest.
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: apps/operator-console

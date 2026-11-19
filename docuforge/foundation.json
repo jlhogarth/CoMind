@@ -1,0 +1,36 @@
+{
+  "id": "DFG-001",
+  "version": "0.2",
+  "title": "DocuForge Foundation",
+  "tagline": "From Intelligence to Publication",
+  "pages": [
+    [
+      ["Purpose and architecture", "CoMind DocuForge turns a publishing request into an editable source, a reference publication, and a receipt that binds both to evidence. DFG-001 establishes the Test workflow for Word, PDF, and binary storage in CoMind’s existing Google Drive.", "The generator renders the editable Word source first and converts that file to PDF. The format registry describes how each supported format should be handled. The manifest links the source, publication, validation, and storage receipt. The Test workflow is invoked on demand."],
+      ["Table of contents", ""]
+    ],
+    [
+      ["Format registry", "The registry covers Office files, PDF, CSV, SVG, PNG, JPEG, Markdown, and HTML. Format identification uses the extension. Format-specific validation checks the actual contents and rendered output."],
+      ["Publishing workflow", "Resolve the approved destination and disclosure classification. Generate the editable source and derive the publication. Inspect both, then hash the exact bytes. Upload without conversion. Retrieve the stored files under authentication and compare hashes, file types, sizes, and destination metadata before recording verified publication."],
+      ["Format fidelity", "Preserve PowerPoint sources when converting to Google Slides. Review animations, transitions, timing, and media in the converted file. For Google Sheets imports, check Excel formulas, charts, formatting, external links, and advanced features. Preserve the editable Word source alongside its PDF."]
+    ],
+    [
+      ["Governance and provenance", "DFG-001 operates in CoMind Test. The Development Environment Contract and L4A govern the lane. The package is internal, and private Drive storage is scoped to the authorized folder. Separate authority is required for public disclosure and Production.", "The manifest identifies the document and version, records source references and SHA-256 hashes, and links the PDF to its editable DOCX. It records the generation time and engine, issue, commit, PR, validation evidence, Drive receipts, and any measured costs. Unknown observations remain null."],
+      ["Validation and acceptance evidence", "Open the Word package, check its editable paragraphs, headings, table, and metadata, then render every page. For PDF, check text extraction, table of contents, index, page numbers, metadata, and visual layout. A missing, mismatched, or unauthenticated Drive readback prevents verified publication.", "Executed results belong in the package manifest and the CoMind Development RunBook. Track implementation and review in GitHub issue #534 and PR #557."]
+    ],
+    [
+      ["Integration and roadmap", "Drive holds the editable source and publication. GitHub holds the code, test history, and review evidence. CoMind’s existing RunBook holds operational checkpoints. A future hosted runtime should submit progress to the existing RunBook so AED and the Operator Console can consume it under their current authority.", "Later increments can add conversion-specific Office and Google Workspace tests, reusable branded templates, publication approval routing, and governed search. Education Center integration is a future consumer."],
+      ["Source references", "GitHub jlhogarth/CoMind issue #534 and PR #557. CoMind Development Environment Contract v1.4. BRAND-001 Test palette from PR #139. The manifest identifies the exact sources and hashes."],
+      ["Index", ""]
+    ]
+  ],
+  "index": {
+    "Acceptance evidence": "Validation and acceptance evidence",
+    "Architecture": "Purpose and architecture",
+    "Drive readback": "Publishing workflow",
+    "Education Center": "Integration and roadmap",
+    "Format preservation": "Format fidelity",
+    "Governance": "Governance and provenance",
+    "Provenance": "Governance and provenance",
+    "Validation": "Validation and acceptance evidence"
+  }
+}

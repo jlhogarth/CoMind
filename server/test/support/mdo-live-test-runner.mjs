@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 const { FoundryAdapterRegistry, FoundryRuntimeOrchestrator } = await import('../../dist/foundry-runtime.js');
 const { MdoOrchestrator } = await import('../../dist/mdo-orchestrator.js');
 const { MdoPlanningWorker, createMdoFoundryAdapter } = await import('../../dist/mdo-planning-runtime.js');
+const { runMdoCollaboration } = await import('../../dist/agent-collaboration.js');
 const { createLocalOllamaFoundryAdapter } = await import('../../dist/providers/ollama-foundry-adapter.js');
 
 const SCHEDULE = Object.freeze([
@@ -106,47 +107,54 @@ export function createMdoLiveTestRunner({ db, fixtures, ollamaBaseUrl, model, ca
   }
 
   async function executeTenRoles(fixture, profiles, planId, runtime) {
-    const results = [];
-    for (let index = 0; index < SCHEDULE.length; index += 1) {
-      const [profileKey, expectedRole] = SCHEDULE[index];
-      const profile = profiles[profileKey];
-      const workerId = `mdo003-${profileKey}-${index + 1}-${candidateKey}`.slice(0, 120);
-      const claim = await runtime.mdo.claimWork({ profileId: profile.profileId, workerInstanceId: workerId, leaseSeconds: 300 });
-      assert.ok(claim, `Expected ${expectedRole} task to be claimable`);
-      const context = await runtime.mdo.loadTaskContext(claim.taskId);
-      assert.equal(context.roleCode, expectedRole);
-      assert.equal(context.planId, planId);
-      const authorizationDecisionId = await fixtures.issueAuthorization({
-        profile,
-        actorId: profile.actorId,
-        capabilityId: profile.capabilityId,
-        projectId: fixture.project.project_id,
-        taskId: claim.taskId,
-        targetKind: 'module_plan',
-        targetRef: planId,
-        sponsorActorId: fixture.sponsor.actor_id,
-        reason: `MDO-003 positive Test execution for ${expectedRole}.`,
-      });
-      const result = await runtime.worker.executeClaim({
-        profileId: profile.profileId,
-        workerInstanceId: workerId,
-        authorizationDecisionId,
-        claim,
-        idempotencyKey: `mdo003-exec:${index + 1}:${candidateKey}`,
-      });
-      assert.equal(result.provider, 'ollama_local');
-      assert.equal(result.model, model);
-      assert.equal(result.execution.terminalStatus, 'succeeded');
-      results.push({
-        role: expectedRole,
-        task_id: result.taskId,
-        contribution_id: result.contributionId,
-        evidence_id: result.evidenceId,
-        execution_context_id: result.execution.executionContextId,
-        authorization_decision_id: authorizationDecisionId,
-      });
-    }
-    return results;
+    const keyByRole = new Map(SCHEDULE.map(([key, role]) => [role, key]));
+    const assignments = SCHEDULE.map(([key, role], index) => ({
+      role,
+      profileId: profiles[key].profileId,
+      workerInstanceId: `mdo003-${key}-${index + 1}-${candidateKey}`.slice(0, 120),
+    }));
+    const outcome = await runMdoCollaboration({
+      mdo: runtime.mdo,
+      worker: runtime.worker,
+      async authorizeClaim(claim, context, assignment) {
+        const profile = profiles[keyByRole.get(assignment.role)];
+        assert.equal(context.planId, planId);
+        return fixtures.issueAuthorization({
+          profile,
+          actorId: profile.actorId,
+          capabilityId: profile.capabilityId,
+          projectId: fixture.project.project_id,
+          taskId: claim.taskId,
+          targetKind: 'module_plan',
+          targetRef: planId,
+          sponsorActorId: fixture.sponsor.actor_id,
+          reason: `AGCOL-001 Test execution for ${assignment.role}.`,
+        });
+      },
+      async releaseMismatchedClaim(claim, workerInstanceId) {
+        const release = await query(
+          `SELECT comind.cm_foundry_finish_work($1::uuid, $2::text, $3::uuid, $4::bigint, false) AS ok`,
+          [claim.taskId, workerInstanceId, claim.leaseToken, claim.fencingEpoch]
+        );
+        if (release.rows.length !== 1 || release.rows[0].ok !== true) {
+          throw new Error('Fenced collaboration claim release failed');
+        }
+      },
+    }, planId, assignments, `agcol001:${candidateKey}`);
+    assert.equal(outcome.status, 'completed', `${outcome.blockedRole}: ${outcome.reason}`);
+    assert.equal(outcome.receipts.length, 10);
+    return outcome.receipts.map((receipt) => {
+      assert.equal(receipt.provider, 'ollama_local');
+      assert.equal(receipt.model, model);
+      return {
+        role: receipt.role,
+        task_id: receipt.taskId,
+        contribution_id: receipt.contributionId,
+        evidence_id: receipt.evidenceId,
+        execution_context_id: receipt.executionContextId,
+        authorization_decision_id: receipt.authorizationDecisionId,
+      };
+    });
   }
 
   async function assertProviderProvenance(planId) {

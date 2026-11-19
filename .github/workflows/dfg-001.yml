@@ -1,0 +1,22 @@
+name: DFG-001 DocuForge
+
+on:
+  pull_request:
+    paths:
+      - 'docuforge/**'
+      - '.github/workflows/dfg-001.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  docuforge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify registry and publication integrity
+        run: python -m unittest discover -s docuforge -v

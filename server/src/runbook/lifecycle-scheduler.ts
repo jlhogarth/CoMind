@@ -7,21 +7,12 @@ import { createGoogleRunBookAuth, createGoogleRunBookReader } from './lifecycle-
 const testProject = 'sbgfuanxiqepcoboxzcl';
 const schedulerLogin = 'comind_runbook_scheduler_login';
 const intervalMs = 15 * 60_000;
-const cloudProject = 'comind-513807';
-const viewerEmail = 'comind-drb-runbook-viewer@comind-513807.iam.gserviceaccount.com';
 
 export function getRunBookSchedulerConfig(environment: NodeJS.ProcessEnv) {
   if (environment.DRB_RUNBOOK_SCHEDULER !== 'test') return null;
   const { DRB_RUNBOOK_GOOGLE_DOC_ID: volumeId, DRB_RUNBOOK_DATABASE_URL: database,
     DRB_RUNBOOK_GOOGLE_CREDENTIALS_FILE: credentialsFile } = environment;
-  const cloudRun = environment.DRB_RUNBOOK_GOOGLE_IDENTITY === 'cloud-run';
-  if (cloudRun && (credentialsFile || !environment.K_SERVICE ||
-    environment.DRB_RUNBOOK_GOOGLE_PROJECT_ID !== cloudProject ||
-    environment.DRB_RUNBOOK_GOOGLE_SERVICE_ACCOUNT_EMAIL !== viewerEmail)) {
-    throw new Error('RunBook Cloud Run identity is not bound to the scoped Test Viewer');
-  }
-  if (!volumeId || !/^[A-Za-z0-9_-]{1,160}$/.test(volumeId) || !database ||
-    (!cloudRun && !credentialsFile)) {
+  if (!volumeId || !/^[A-Za-z0-9_-]{1,160}$/.test(volumeId) || !database || !credentialsFile) {
     throw new Error('RunBook Test scheduler requires a fixed document, dedicated database connection and Google credential configuration');
   }
   const url = new URL(database);
@@ -31,7 +22,7 @@ export function getRunBookSchedulerConfig(environment: NodeJS.ProcessEnv) {
     || url.pathname !== '/postgres' || url.searchParams.get('sslmode') !== 'verify-full') {
     throw new Error('RunBook scheduler must use the verified TLS connection to CoMind Test');
   }
-  return { volumeId, database, credentialsFile, cloudRun };
+  return { volumeId, database, credentialsFile };
 }
 
 export async function runDueRunBookCheck(
@@ -51,15 +42,11 @@ export async function startRunBookLifecycleScheduler(
 ) {
   const config = getRunBookSchedulerConfig(environment);
   if (!config) return null;
-  if (config.cloudRun) {
-    await verifyCloudRunViewerIdentity();
-  } else {
-    const credentials = JSON.parse(await readFile(config.credentialsFile!, 'utf8')) as {
-      type?: string; service_account_impersonation_url?: string;
-    };
-    if (credentials.type !== 'external_account' || !credentials.service_account_impersonation_url) {
-      throw new Error('RunBook Test scheduler requires a federated Google Viewer service account');
-    }
+  const credentials = JSON.parse(await readFile(config.credentialsFile, 'utf8')) as {
+    type?: string; service_account_impersonation_url?: string;
+  };
+  if (credentials.type !== 'external_account' || !credentials.service_account_impersonation_url) {
+    throw new Error('RunBook Test scheduler requires a federated Google Viewer service account');
   }
   const database = new URL(config.database);
   const ca = environment.DRB_RUNBOOK_DATABASE_CA;
@@ -80,8 +67,7 @@ export async function startRunBookLifecycleScheduler(
     throw error;
   }
   const ledger = createLifecycleLedger(pool, 'scheduled');
-  const readDocument = createGoogleRunBookReader(config.volumeId,
-    createGoogleRunBookAuth(config.cloudRun ? undefined : config.credentialsFile));
+  const readDocument = createGoogleRunBookReader(config.volumeId, createGoogleRunBookAuth(config.credentialsFile));
   let running: Promise<void> | undefined;
   const tick = () => {
     if (running) return;
@@ -99,15 +85,4 @@ export async function startRunBookLifecycleScheduler(
     await running;
     await pool.end();
   };
-}
-
-export async function verifyCloudRunViewerIdentity(fetchImpl: typeof fetch = fetch) {
-  const response = await fetchImpl(
-    'http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/email',
-    { headers: { 'Metadata-Flavor': 'Google' }, redirect: 'error', signal: AbortSignal.timeout(5_000) },
-  );
-  if (!response.ok || response.headers.get('Metadata-Flavor') !== 'Google' ||
-    (await response.text()).trim() !== viewerEmail) {
-    throw new Error('RunBook Cloud Run service identity differs from the scoped Viewer');
-  }
 }

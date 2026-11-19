@@ -19,6 +19,23 @@ const snapshot = {
   approvals: [{ proposal_id: "synthetic-proposal", purpose: "Synthetic approval proof", model_or_service: "Test service", proposal_status: "pending_approval", awaiting_decision: true, link_expires_at: new Date(Date.now() + 3600000).toISOString(), authorization_decision_id: null }],
   ideas: [],
 };
+const workSnapshot = {
+  schema_version: "comind.agcol-003.operator-work.v2", generated_at: new Date().toISOString(),
+  coverage_limit: "Latest 20 Test run manifests, up to 32 tasks and 16 progress events each",
+  activation_mode: "bounded_test_invocation", always_running: false,
+  work: [{ run_key: "synthetic-run", manifest_id: "synthetic-manifest", manifest_at: new Date().toISOString(),
+    specialist_key: "scout", profile_id: "synthetic-profile", task_id: "synthetic-task",
+    capability_code: "agcol.test.evidence.read", target_ref: "synthetic-resource",
+    progress_id: "synthetic-progress", observed_at: new Date().toISOString(), phase: "completed",
+    blocker_code: null, result_ref: "synthetic-result-evidence", lease_state: "completed",
+    lease_expires_at: null, lease_updated_at: new Date().toISOString(), fencing_epoch: 1, attention: "complete",
+    progress_events: [{ evidence_id: "synthetic-claimed", at: new Date().toISOString(), phase: "claimed", code: null },
+      { evidence_id: "synthetic-progress", at: new Date().toISOString(), phase: "completed", code: null }],
+    result_proof: { at: new Date().toISOString(), source: "isolated_fixture", status: "succeeded",
+      tool_name: "lookup_evidence", resource: "synthetic-resource", latency_ms: 24, cost_usd: 0,
+      request_fingerprint: "synthetic-request-fingerprint", result_fingerprint: "synthetic-result-fingerprint",
+      adapter_operation_id: "synthetic-adapter", execution_context_id: "synthetic-context" } }],
+};
 let output = "";
 const server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "--hostname", "127.0.0.1", "--port", String(port)], {
   cwd: new URL("..", import.meta.url),
@@ -47,7 +64,7 @@ try {
     const requests = [];
     let retrySubmission = true;
     const data = structuredClone(snapshot);
-    await context.route("**/api/agent-work", route => route.fulfill({ status: 503, json: { error: "Synthetic history source unavailable" } }));
+    await context.route("**/api/agent-work", route => route.fulfill({ json: workSnapshot }));
     await context.route(supabase + "/**", async route => {
       const request = route.request();
       const path = new URL(request.url()).pathname;
@@ -82,6 +99,11 @@ try {
   }
 
   const anonymous = await contextFor();
+  await anonymous.page.getByText("Actual evidence and work history").click();
+  await anonymous.page.getByText("Recorded progress", { exact: true }).waitFor();
+  await anonymous.page.getByText("Governed tool receipt", { exact: true }).waitFor();
+  await anonymous.page.getByText("synthetic-result-fingerprint", { exact: true }).waitFor();
+  assert.equal(await anonymous.page.getByText("synthetic-claimed", { exact: true }).count(), 1);
   await anonymous.page.getByRole("button", { name: "Send sign-in link" }).waitFor();
   assert.equal(await anonymous.page.getByRole("heading", { name: "Approval inbox" }).count(), 0);
   assert.equal(anonymous.requests.filter(r => r.path.endsWith("operator_agent_operations")).length, 0);

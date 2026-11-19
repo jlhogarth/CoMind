@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { getBrowserSupabaseClient } from "@/lib/supabase/browser";
+import { validateOperatorSignInLink } from "@/lib/agent-work/sign-in-link";
 
 type Operations = {
   worker: { state: string; completed_at: string } | null;
@@ -103,6 +104,21 @@ export function AgentOperations() {
     finally { setSending(false); }
   }
 
+  function completeSignIn(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    try {
+      const destination = validateOperatorSignInLink(
+        String(new FormData(form).get("verification_link")), window.location.origin,
+      );
+      form.reset();
+      window.location.assign(destination);
+    } catch {
+      form.reset();
+      setMessage("Use the latest CoMind Test sign-in link requested from this page.");
+    }
+  }
+
   async function submitIdea(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -141,6 +157,14 @@ export function AgentOperations() {
       <label>Test operator email <input type="email" name="email" required /></label>{" "}
       <button className="hud-refresh" disabled={sending}>Send sign-in link</button>
     </form>}
+    {!signedInUser && <details>
+      <summary>Open the email link in this browser</summary>
+      <p>Copy the sign-in link from your latest CoMind email and enter it here.</p>
+      <form onSubmit={completeSignIn}>
+        <label>Sign-in link <input type="password" name="verification_link" autoComplete="off" required /></label>{" "}
+        <button className="hud-refresh">Complete sign-in</button>
+      </form>
+    </details>}
     {snapshot && <>
       <p>Persistent Test worker {snapshot.worker ? <strong>{snapshot.worker.state}</strong> : "has no recorded heartbeat"}.
         {snapshot.worker && <> Last completed cycle {dateTime(snapshot.worker.completed_at)}.</>}</p>

@@ -52,6 +52,7 @@ try {
       const request = route.request();
       const path = new URL(request.url()).pathname;
       requests.push({ path, body: request.postDataJSON(), authorization: request.headers().authorization });
+      if (path === "/auth/v1/verify") return route.fulfill({ contentType: "text/html", body: "<h1>Synthetic link verification</h1>" });
       if (path === "/auth/v1/otp") return route.fulfill({ json: {} });
       if (path === "/auth/v1/user") return route.fulfill({ json: user });
       if (path === "/rest/v1/rpc/operator_agent_operations") {
@@ -89,6 +90,16 @@ try {
   await anonymous.page.getByText("Open the sign-in link in this browser.", { exact: true }).waitFor();
   const otp = anonymous.requests.find(r => r.path === "/auth/v1/otp");
   assert.equal(otp.body.create_user, false);
+  await anonymous.page.getByText("Open the email link in this browser", { exact: true }).click();
+  await anonymous.page.getByLabel("Sign-in link", { exact: true }).fill("https://untrusted.example/verify");
+  await anonymous.page.getByRole("button", { name: "Complete sign-in", exact: true }).click();
+  await anonymous.page.getByText("Use the latest CoMind Test sign-in link requested from this page.", { exact: true }).waitFor();
+  assert.equal(await anonymous.page.getByLabel("Sign-in link", { exact: true }).inputValue(), "");
+  const verification = supabase + "/auth/v1/verify?token=synthetic-browser-token&type=magiclink&redirect_to=" + encodeURIComponent(origin + "/agent-work");
+  await anonymous.page.getByLabel("Sign-in link", { exact: true }).fill(verification);
+  await anonymous.page.getByRole("button", { name: "Complete sign-in", exact: true }).click();
+  await anonymous.page.getByRole("heading", { name: "Synthetic link verification" }).waitFor();
+  assert.equal(anonymous.requests.filter(r => r.path === "/auth/v1/verify").length, 1);
   await anonymous.context.close();
 
   const accepted = await contextFor({ signedIn: true });

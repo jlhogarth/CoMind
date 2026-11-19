@@ -6,14 +6,17 @@ test("RunBook Console requires a bound Test project and trusted perimeter", () =
   assert.throws(() => getRunBookConsoleConfig({}), /disabled/);
   const env = {
     DRB_RUNBOOK_CONSOLE: "test",
-    DRB_RUNBOOK_GOOGLE_DOC_ID: "synthetic-doc",
-    NEXT_PUBLIC_SUPABASE_URL: "https://sbgfuanxiqepcoboxzcl.supabase.co",
-    SUPABASE_SECRET_KEY: "synthetic-secret",
+    DRB_RUNBOOK_CONSOLE_DATABASE_URL:
+      "postgres://comind_runbook_console_login@db.sbgfuanxiqepcoboxzcl.supabase.co/postgres?sslmode=verify-full",
+    VERCEL_ENV: "preview",
   };
-  assert.throws(() => getRunBookConsoleConfig(env), /trusted-perimeter/);
-  const bound = { ...env, OPERATOR_CONSOLE_CE_ACCESS_MODE: "trusted-perimeter" };
-  assert.equal(getRunBookConsoleConfig(bound).volumeId, "synthetic-doc");
-  assert.throws(() => getRunBookConsoleConfig({ ...bound, NEXT_PUBLIC_SUPABASE_URL: "https://synthetic.supabase.co" }), /project mismatch/);
+  assert.throws(() => getRunBookConsoleConfig(env), /protected Test preview/);
+  const bound = { ...env, DRB_RUNBOOK_CONSOLE_ACCESS: "trusted-test-perimeter" };
+  assert.equal(getRunBookConsoleConfig(bound), env.DRB_RUNBOOK_CONSOLE_DATABASE_URL);
+  assert.throws(() => getRunBookConsoleConfig({ ...bound, VERCEL_ENV: "production" }), /protected Test preview/);
+  assert.throws(() => getRunBookConsoleConfig({
+    ...bound, DRB_RUNBOOK_CONSOLE_DATABASE_URL: env.DRB_RUNBOOK_CONSOLE_DATABASE_URL.replace("comind_runbook_console_login", "postgres"),
+  }), /scoped TLS binding/);
 });
 
 test("a manual probe leaves the scheduler status missed", () => {

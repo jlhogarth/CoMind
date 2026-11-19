@@ -1,0 +1,52 @@
+name: DRB-004 RunBook Test Check
+on:
+  schedule:
+    - cron: '7 9 * * 1'
+      timezone: America/Indiana/Indianapolis
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: drb-004-test-runbook
+  cancel-in-progress: false
+
+jobs:
+  check:
+    if: vars.DRB_RUNBOOK_SCHEDULER == 'test'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - name: Install and build RunBook worker
+        working-directory: server
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run build
+          node --test test/runbook-lifecycle.test.mjs test/runbook-lifecycle-live.test.mjs
+      - name: Authenticate dedicated Google Viewer
+        id: google
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: comind-513807
+          workload_identity_provider: projects/373198958202/locations/global/workloadIdentityPools/comind-drb-test/providers/github-runbook
+          service_account: comind-drb-runbook-viewer@comind-513807.iam.gserviceaccount.com
+          create_credentials_file: true
+      - name: Check one bound Test due slot
+        working-directory: server
+        env:
+          DRB_RUNBOOK_SCHEDULER: test
+          DRB_RUNBOOK_GOOGLE_DOC_ID: 1FSDEuwFWxPIVE3i8M0rERBxOVD21wSGIsam1gR774Xk
+          DRB_RUNBOOK_GOOGLE_CREDENTIALS_FILE: ${{ steps.google.outputs.credentials_file_path }}
+          DRB_RUNBOOK_DATABASE_URL: ${{ secrets.DRB_RUNBOOK_DATABASE_URL }}
+          DRB_RUNBOOK_DATABASE_CA: ${{ secrets.DRB_RUNBOOK_DATABASE_CA }}
+        run: node dist/runbook/lifecycle-once.js

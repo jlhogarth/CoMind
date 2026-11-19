@@ -15,7 +15,19 @@ const stateLabels = {
 };
 
 export default async function RunBookPage() {
-  const status = await readRunBookLifecycleStatus().catch(() => null);
+  const status = await readRunBookLifecycleStatus().catch((error: unknown) => {
+    const code = error && typeof error === "object" && "code" in error
+      && typeof error.code === "string" && /^[A-Z0-9_]{1,40}$/.test(error.code)
+      ? error.code : "UNCLASSIFIED";
+    console.error("RunBook status read failed", {
+      code,
+      preview: process.env.VERCEL_ENV === "preview",
+      enabled: process.env.DRB_RUNBOOK_CONSOLE === "test",
+      trustedPerimeter: process.env.DRB_RUNBOOK_CONSOLE_ACCESS === "trusted-test-perimeter",
+      credentialConfigured: Boolean(process.env.DRB_RUNBOOK_CONSOLE_DATABASE_URL),
+    });
+    return null;
+  });
   const latest = status?.latest;
   return (
     <main className="hud-shell">

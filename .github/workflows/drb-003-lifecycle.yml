@@ -10,6 +10,7 @@ on:
       - 'db/migrations/*comind_pm_ledger*.sql'
       - 'db/migrations/*durable_runbook*.sql'
       - 'db/migrations/*drb_004_live_runbook.sql'
+      - 'db/migrations/*drb_004_hosted_roles.sql'
       - 'db/test/drb_002_reader.sql'
       - 'db/test/bootstrap_supabase_compat.sql'
 

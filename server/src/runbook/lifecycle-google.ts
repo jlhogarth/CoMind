@@ -46,7 +46,7 @@ export function createGoogleRunBookReader(
   };
 }
 
-export function createGoogleRunBookAuth(credentialsFile?: string) {
-  const auth = new GoogleAuth({ ...(credentialsFile ? { keyFilename: credentialsFile } : {}), scopes: [docsReadonlyScope] });
+export function createGoogleRunBookAuth(credentialsFile: string) {
+  const auth = new GoogleAuth({ keyFilename: credentialsFile, scopes: [docsReadonlyScope] });
   return async () => (await auth.getAccessToken()) ?? null;
 }

@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "owner_lane": "GCI-001",
+  "issue": "https://github.com/jlhogarth/CoMind/issues/544",
+  "entries": [
+    {
+      "key": "legacy_aed_credit_review",
+      "document_id": "1T2pSlnnLysrUagxLiXm2sWp7K_gHsa1FUl97eiKx5G0",
+      "title": "CoMind AED x Astra Credit Review | Gemini-ChatGPT Exchange | 2026-11-03",
+      "role": "legacy_collaboration_record",
+      "protocol": "CM-XAI-v1",
+      "mode": "read_only",
+      "auto_invoke_gemini": false,
+      "permitted_actions": [
+        "inventory",
+        "read_provenance",
+        "human_authorized_append"
+      ],
+      "migration": "Preserve turn IDs CM-XAI-001, CM-XAI-002 and CM-XAI-PROTOCOL-002, append-only. Never reinterpret historic turns as a new Gemini API request; any future handoff must be a newly authorized COMIND envelope in a scoped live document. No bulk replay.",
+      "security": "Restricted owner-only verified on 2026-11-09; external sharing requires separate document-level approval.",
+      "review_limit": "Four cycles or earlier stop conditions in original document; no autonomous ChatGPT wake."
+    },
+    {
+      "key": "gci_isolated_acceptance",
+      "document_id": "1dJEOjmLPm9gdw8xsVF8J_dyPK0HDx5N5RmW0ID42cnE",
+      "title": "CoMind GCI-001 | Isolated Live Acceptance Exchange | 2026-11-07",
+      "role": "synthetic_test_exchange",
+      "protocol": "COMIND-v1",
+      "mode": "test_dispatch_allowed",
+      "auto_invoke_gemini": true,
+      "permitted_actions": [
+        "test_dispatch",
+        "read",
+        "append_claim",
+        "append_reply"
+      ],
+      "session_id": "gci_site_20261117",
+      "security": "Restricted Test Doc with dedicated GCI writer grant. Prior exchanges remain completed; only the exact new Site telemetry acceptance prompt is eligible.",
+      "exchange_id": "question0004",
+      "payload_sha256": "2b65aad97b9cc0f8e30518827edffdc8689d913271f9a40ffa5546dcfa371dd2",
+      "prior_exchanges": [
+        {
+          "session_id": "gci_smoke_20261107",
+          "exchange_id": "question0001",
+          "payload_sha256": "a68c05e7078ba7841567262adc22691635706de0641f26a5026e66ce9f99adba",
+          "completed_run": "https://github.com/jlhogarth/CoMind/actions/runs/43945995084",
+          "reply_sha256": "63fe4585024b1df01932b2d59ae0d67e77c2921dc4f0d6eb01f0ba930297e2d7"
+        },
+        {
+          "session_id": "gci_chat_20261117",
+          "exchange_id": "question0002",
+          "payload_sha256": "5c174350af284a1967607c3b926af6eb270b42c352e38500221917cba99ac696",
+          "completed_run": "https://github.com/jlhogarth/CoMind/actions/runs/44040160014",
+          "reply_sha256": "a3be32388b5bc1cce30a19786283d782f4c47f48b8433686bee10f35ec1bd717"
+        },
+        {
+          "session_id": "gci_return_20261117",
+          "exchange_id": "question0003",
+          "payload_sha256": "213aed741ec4ec196cf011c901dc792afbe78d235c76867518ad8099b7bb7591",
+          "completed_run": "https://github.com/jlhogarth/CoMind/actions/runs/44155839010",
+          "reply_sha256": "0c49da5df52035b460d0f075007baf59c887c20e5a8fb9653b8dc7df51fa3430"
+        }
+      ]
+    },
+    {
+      "key": "gci_architecture",
+      "document_id": "1kzwoIvy3ZJMbuA2DwMx74pDJ2LyGG7BJsNgrxB6TdDI",
+      "role": "governance_specification",
+      "protocol": "GCI-design",
+      "mode": "read_only",
+      "auto_invoke_gemini": false
+    },
+    {
+      "key": "gci_protocol",
+      "document_id": "17AQSjG5OW7yqVQe5gqSzZdFZeqcoHEXNMtMaBDvCLx0",
+      "role": "protocol_specification",
+      "protocol": "GCI-design",
+      "mode": "read_only",
+      "auto_invoke_gemini": false
+    },
+    {
+      "key": "gci_runbook",
+      "document_id": "1bIEYHSU_IDxWAHaEY-P3tu7gw9Az-S2_3UKfGJ-wBjI",
+      "role": "operations_specification",
+      "protocol": "GCI-design",
+      "mode": "read_only",
+      "auto_invoke_gemini": false
+    },
+    {
+      "key": "gci_flow",
+      "document_id": "1HaUQoYrMWxc3LGGxB4aXAbOGfVeO8T4KWPRQm5_I1Tg",
+      "role": "diagram_specification",
+      "protocol": "GCI-design",
+      "mode": "read_only",
+      "auto_invoke_gemini": false
+    }
+  ]
+}

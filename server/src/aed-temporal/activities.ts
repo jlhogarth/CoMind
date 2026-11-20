@@ -101,6 +101,38 @@ function isolatedDatabaseUrl(): string {
   return value;
 }
 
+export async function observeLiveTestProgress(input: { sourceRef: string }): Promise<string | null> {
+  const pool = new Pool({ connectionString: isolatedDatabaseUrl(), max: 1 });
+  try {
+    const result = await pool.query<{ progress_at: Date | null }>(
+      `SELECT max(created_at) AS progress_at FROM comind_pm.pm_events
+       WHERE source_ref=$1 AND event_type='action' AND summary='AED-007 workload progress'`,
+      [input.sourceRef]
+    );
+    return result.rows[0]?.progress_at?.toISOString() ?? null;
+  } finally {
+    await pool.end();
+  }
+}
+
+export async function continueLiveTestWorkload(input: { sourceRef: string; taskId: string; projectId: string }): Promise<string> {
+  const pool = new Pool({ connectionString: isolatedDatabaseUrl(), max: 1 });
+  try {
+    const task = await pool.query<{ status: string }>(
+      `SELECT status FROM comind.cm_task WHERE task_id=$1::uuid`, [input.taskId]
+    );
+    if (task.rows[0]?.status !== 'in_progress') throw new Error('recovery task state not verified');
+    const result = await pool.query<{ created_at: Date }>(
+      `INSERT INTO comind_pm.pm_events (project_id,event_type,actor,actor_type,source_system,source_ref,summary,consequential)
+       VALUES ($1,'action','aed-007-controller','system','github',$2,'AED-007 continuation action',false)
+       RETURNING created_at`, [input.projectId, input.sourceRef]
+    );
+    return result.rows[0].created_at.toISOString();
+  } finally {
+    await pool.end();
+  }
+}
+
 type LeaseClaim = {
   task_id: string;
   lease_token: string;

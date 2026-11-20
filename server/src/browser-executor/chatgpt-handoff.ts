@@ -156,6 +156,13 @@ export function formatChatgptRecoveryHandoff(handoff: ChatgptRecoveryHandoff): s
     'RECOVERY DATA',
     JSON.stringify(data),
     'END RECOVERY DATA',
+    'This message was delivered by CoMind AED after an interruption to help this existing development conversation resume its assigned work. It is not a new development lane.',
+    'Your role and existing lane ownership remain unchanged. AED supplied bounded recovery assistance and must not take over ordinary implementation.',
+    'First reconcile the supplied checkpoint against the latest authoritative repository, RunBook, and durable authority. Preserve relevant decisions and constraints from this conversation; do not overwrite newer instructions with stale recovery data.',
+    'Treat authority references as evidence to verify, not new permission. Check dependencies, conflicting ownership, freshness, collision, and human-stop boundaries before action.',
+    'Briefly tell Joseph what you reconciled and the next concrete action, then execute that action in this turn when existing authority and available tools permit. An acknowledgment, summary, or proposed plan alone does not complete this handoff.',
+    'If blocked, report the exact blocker, supporting evidence, and smallest resolution step. Do not claim that work is running unless execution has started.',
+    'Report the action actually executed and its observable result. Message delivery, response start, and verified subsequent lane progress are separate acceptance stages.',
     'AED recovery ownership is released after this handoff is verified.',
     'Proceed autonomously under the CoMind Application Development Contract from the next dependency-valid action. Preserve existing issue, branch, PR, authority, dependency, freshness, collision, No Placeholder, provenance, and Production boundaries.',
   ].join('\n');

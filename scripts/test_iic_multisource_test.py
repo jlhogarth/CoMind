@@ -44,7 +44,7 @@ class MultisourceTests(unittest.TestCase):
         self.assertEqual("unavailable",s["source_states"]["github"])
         self.assertEqual("unresolved",s["claim_statuses"]["IIC-PRODUCTION-READY"])
     def test_stale_runbook_unresolved(self):
-        s=m.take_sample(reader,lambda:{**runbook(),"last_event_at":"2026-11-19T19:00:00Z"},registry(),clock=lambda:NOW)
+        s=m.take_sample(reader,lambda:{**runbook(),"last_event_at":"2026-11-19T19:00:00Z"},registry(),clock=lambda:NOW,expected_status="in_progress")
         self.assertEqual("stale",s["source_states"]["runbook"])
         self.assertEqual("unresolved",s["claim_statuses"]["IIC-RUNBOOK-LANE"])
     def test_mismatch_status_contested(self):

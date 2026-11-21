@@ -168,7 +168,7 @@ def evaluate(mode, duration, interval, sample, clock=time.monotonic, sleep=time.
         raise ValueError("duration must be 10..900 seconds")
     if not (isinstance(interval,int) and 10<=interval<=duration):
         raise ValueError("interval must be 10..duration")
-    if (duration // interval)+1 > MAX_SAMPLES:
+    if (duration + interval - 1) // interval > MAX_SAMPLES:
         raise ValueError("sample cap exceeded")
     report={"schema_version":1,"component":"IIC-009-private-test-graph",
             "mode_requested":mode,"auto_stop_seconds":duration,"interval_seconds":interval,

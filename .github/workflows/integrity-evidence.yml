@@ -1,0 +1,34 @@
+name: Cross-System Integrity Evidence Contract
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/integrity_evidence.py'
+      - 'scripts/test_integrity_evidence.py'
+      - 'docs/integrity/IIC-007.md'
+      - '.github/workflows/integrity-evidence.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'scripts/integrity_evidence.py'
+      - 'scripts/test_integrity_evidence.py'
+      - '.github/workflows/integrity-evidence.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iic-evidence-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  read-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test read-only evidence envelopes
+        run: python scripts/test_integrity_evidence.py

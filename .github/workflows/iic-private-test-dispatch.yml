@@ -11,6 +11,10 @@ on:
         options:
           - OFF
           - ON
+      expected_runbook_status:
+        description: "Explicit expected Test lane state for ON; leave empty for OFF"
+        required: false
+        type: string
       duration_seconds:
         description: "Bounded run window in seconds"
         required: true
@@ -52,8 +56,13 @@ jobs:
           IIC_TEST_SCOPE: sbgfuanxiqepcoboxzcl
           IIC_RUN_MODE: ${{ inputs.mode }}
           IIC_DURATION: ${{ inputs.duration_seconds }}
+          IIC_EXPECTED_RUNBOOK_STATUS: ${{ inputs.expected_runbook_status }}
         run: |
-          python scripts/iic_multisource_test.py --mode "$IIC_RUN_MODE" --duration-seconds "$IIC_DURATION" --interval-seconds 15 --output /tmp/iic-009-private-test.json
+          if [ "$IIC_RUN_MODE" = "ON" ]; then
+            python scripts/iic_multisource_test.py --mode ON --expected-runbook-status "$IIC_EXPECTED_RUNBOOK_STATUS" --duration-seconds "$IIC_DURATION" --interval-seconds 15 --output /tmp/iic-009-private-test.json
+          else
+            python scripts/iic_multisource_test.py --mode OFF --duration-seconds "$IIC_DURATION" --interval-seconds 15 --output /tmp/iic-009-private-test.json
+          fi
       - name: Retain bounded redacted evidence on success or failure
         if: always()
         uses: actions/upload-artifact@v4

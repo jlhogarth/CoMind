@@ -73,7 +73,7 @@ def scan(root: Path) -> list[Candidate]:
     for path in iter_workflows(root):
         lines = path.read_text(encoding="utf-8").splitlines()
         rel = path.relative_to(root).as_posix()
-        for line, body in extract_run_blocks(lines):
+        for _source_index, line, body in extract_run_blocks(lines):
             results.extend(scan_command(rel, line, body, "workflow"))
     for path in iter_package_json(root):
         rel = path.relative_to(root).as_posix()

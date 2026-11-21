@@ -71,6 +71,12 @@ class MultisourceTests(unittest.TestCase):
         self.assertEqual(3,rep["observations"])
         self.assertTrue(rep["stopped"])
         self.assertTrue(rep["no_false_success"])
+    def test_no_expected_runbook_state_never_claims_success(self):
+        s=m.take_sample(reader,runbook,registry(),clock=lambda:NOW)
+        self.assertNotIn("IIC-RUNBOOK-LANE",s["claim_statuses"])
+        self.assertEqual("unresolved",s["claim_statuses"]["IIC-PRODUCTION-READY"])
+    def test_on_without_expected_runbook_state_refused(self):
+        self.assertEqual(2,m.main(["--mode","ON","--duration-seconds","30","--interval-seconds","10"]))
     def test_no_credential_in_error(self):
         with self.assertRaises(ValueError) as err:m.postgres_read("postgres://postgres:SECRET@localhost/test")
         self.assertNotIn("SECRET",str(err.exception))

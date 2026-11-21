@@ -27,7 +27,7 @@ The live Foundry one-shot workflow is manually dispatched, verifies a single tas
 - **Cloudflare:** the connected account has four Worker scripts, for the approval portal, Console proxy, WEB-001 ingestion Test and WEB-001 preview. No Foundry or Temporal worker is present.
 - **Render:** the connected workspace has no services.
 - **Railway:** the connected `CoMind OC-002 Acceptance` project contains the Operator Console and RunBook/CBE acceptance resources. The RunBook scheduler has a staged configuration and no deployment; it belongs to DRB-004 #555/#561 and must not be activated or repurposed here. No Foundry/Temporal service is deployed.
-- **Temporal:** existing proofs use the pinned development service only inside ephemeral CI. No Temporal Cloud service is configured or authorized.
+- **Temporal:** existing proofs use the pinned development service only inside ephemeral CI. The accepted AED issue states that no Temporal Cloud account is authorized; no direct Temporal Cloud account inventory was available for this audit.
 
 These observations do not establish hosting account pricing or entitlement. No service was created, changed, deployed, or billed during this audit.
 

@@ -106,7 +106,7 @@ def github_read(token=None):
     return branch,runs
 
 def take_sample(github_reader, runbook_reader, registry, clock=time.time,
-                expected_status="done"):
+                expected_status=None):
     observed=iso(clock())
     flags=[]
     envelopes=[]
@@ -144,7 +144,7 @@ def take_sample(github_reader, runbook_reader, registry, clock=time.time,
             "environment":"Test","expected":{"claim_type":"github.run.conclusion","claim_value":"success"},
             "authority_required":False})
         bindings.append({"kind":"evidence","claim_id":"IIC-GITHUB-WORKFLOW","evidence_ref":gh["evidence_ref"]})
-    if runbook_state!="unavailable":
+    if runbook_state!="unavailable" and expected_status in STATUSES:
         rb=next(x for x in envelopes if x["source_system"]=="durable-runbook")
         claims.append({"claim_id":"IIC-RUNBOOK-LANE","statement":"Scoped Test RunBook latest lane reports expected state",
             "environment":"Test","expected":{"claim_type":"runbook.lane.status","claim_value":expected_status},
@@ -203,9 +203,13 @@ def main(argv=None):
     p.add_argument("--mode",choices=["ON","OFF"],default="OFF")
     p.add_argument("--duration-seconds",type=int,default=180)
     p.add_argument("--interval-seconds",type=int,default=15)
+    p.add_argument("--expected-runbook-status",choices=sorted(STATUSES))
     p.add_argument("--registry",type=Path,default=Path("config/integrity-registry.v1.json"))
     p.add_argument("--output",type=Path,default=Path("iic-009-private-test.json"))
     args=p.parse_args(argv)
+    if args.mode=="ON" and args.expected_runbook_status not in STATUSES:
+        print("IIC-009: ON requires a declared expected RunBook lane state",file=sys.stderr)
+        return 2
     if args.mode=="ON" and (not os.environ.get("IIC_TEST_DATABASE_URL")
                             or os.environ.get("IIC_TEST_SCOPE")!="sbgfuanxiqepcoboxzcl"):
         print("IIC-009: dedicated Test credential/scope not configured",file=sys.stderr)
@@ -218,7 +222,8 @@ def main(argv=None):
         signal.signal(signal.SIGINT,stop)
         report=evaluate(args.mode,args.duration_seconds,args.interval_seconds,
             sample=lambda:take_sample(lambda:github_read(os.environ.get("GH_TOKEN")),
-                lambda:postgres_read(os.environ.get("IIC_TEST_DATABASE_URL")),registry))
+                lambda:postgres_read(os.environ.get("IIC_TEST_DATABASE_URL")),registry,
+                expected_status=args.expected_runbook_status))
         args.output.parent.mkdir(parents=True,exist_ok=True)
         args.output.write_text(json.dumps(report,sort_keys=True,indent=2)+"\n",encoding="utf-8")
         print(json.dumps({"stopped":report["stopped"],"reason":report["stop_reason"],

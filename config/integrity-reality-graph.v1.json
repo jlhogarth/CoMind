@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "graph_id": "COMIND-IIC-IMPLEMENTATION-REALITY-GRAPH",
+  "node_types": [
+    "claim",
+    "repository_revision",
+    "configuration_contract",
+    "test_ci_result",
+    "runtime_outcome",
+    "evidence_artifact",
+    "documentation_statement",
+    "authority",
+    "environment",
+    "dependency",
+    "integrity_control",
+    "integrity_finding"
+  ],
+  "edge_types": [
+    "implemented_by",
+    "verified_by",
+    "observed_in",
+    "documented_by",
+    "authorized_by",
+    "depends_on",
+    "contradicts",
+    "supersedes",
+    "stale_against",
+    "limited_by",
+    "unresolved_due_to"
+  ],
+  "assessment_statuses": [
+    "supported",
+    "contested",
+    "unresolved"
+  ],
+  "authority_contract": "An authority-required claim can be supported only by explicitly supplied, verified, environment-matching approval scoped to that claim. The graph never creates approval.",
+  "source_contract": "IIC-007 evidence envelopes with explicit provenance and freshness; absent or stale evidence cannot establish success.",
+  "ownership": "Derived read-only projection; original sources remain canonical."
+}

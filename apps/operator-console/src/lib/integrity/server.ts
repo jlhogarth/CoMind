@@ -1,4 +1,4 @@
-import "server-only";
+// Server-rendered route dependency only. No client import or browser credential path.
 
 export const INTEGRITY_SOURCE_REPOSITORY = "jlhogarth/CoMind";
 export const INTEGRITY_FRESHNESS_MS = 24 * 60 * 60 * 1000;

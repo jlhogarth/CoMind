@@ -15,6 +15,9 @@ const address = process.env.TEMPORAL_ADDRESS || '127.0.0.1:7233';
 const namespace = process.env.TEMPORAL_NAMESPACE || 'default';
 const taskQueue = `aed-002c-${randomUUID()}`;
 const pool = new Pool({ connectionString: databaseUrl, max: 4 });
+function observe(event) {
+  console.log(`AED_EVENT ${JSON.stringify(event)}`);
+}
 
 async function one(text, params = []) {
   const result = await pool.query(text, params);
@@ -105,7 +108,13 @@ try {
     workflowId: `aed-002c-recovered-${suffix}`,
     args: [workflowInput(recoveredTask, 'AED-002C-RECOVERED')],
   });
+  observe({ case: 'AED-002C-RECOVERED', workflow_id: recoveredHandle.workflowId,
+    state: 'running', checkpoint: beforeProgress });
   const recovered = await recoveredHandle.result();
+  observe({ case: 'AED-002C-RECOVERED', workflow_id: recoveredHandle.workflowId,
+    state: 'verified', outcome: recovered.outcome,
+    progress_at: recovered.verification?.afterAt ?? null,
+    fencing_epoch: recovered.shock?.fencingEpoch ?? null });
   assert.equal(recovered.assessment.liveness, 'STALLED');
   assert.equal(recovered.assessment.aedLevel, 'AED-2');
   assert.equal(recovered.outcome, 'RECOVERED');
@@ -136,6 +145,8 @@ try {
     args: [workflowInput(staleTask, 'AED-002C-STALE', clear, 'stale_lease_probe')],
   });
   const stale = await staleHandle.result();
+  observe({ case: 'AED-002C-STALE', workflow_id: staleHandle.workflowId,
+    state: 'blocked', outcome: stale.outcome, reason: stale.shock?.status ?? null });
   assert.equal(stale.outcome, 'ESCALATED_OR_HOLD');
   assert.equal(stale.shock.status, 'lease_rejected');
   assert.equal(stale.shock.mutationApplied, false);
@@ -151,6 +162,8 @@ try {
     args: [workflowInput(blockedTask, 'AED-002C-BLOCKED', blockedSafety)],
   });
   const blocked = await blockedHandle.result();
+  observe({ case: 'AED-002C-BLOCKED', workflow_id: blockedHandle.workflowId,
+    state: 'blocked', outcome: blocked.outcome, reason: 'freshnessClear' });
   assert.equal(blocked.outcome, 'ESCALATED_OR_HOLD');
   assert.equal(blocked.shock, null);
   assert.ok(blocked.assessment.failedSafety.includes('freshnessClear'));

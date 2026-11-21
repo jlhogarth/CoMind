@@ -1,0 +1,38 @@
+# IIC-009 | Dual-source Test collector, OFF by default
+
+## T1 governance, economics, and lifecycle
+Existing issue #573. Builds on merged IIC-007 adapters, IIC-008 graph and IIC-009 finite GitHub test. This is a **host-neutral code foundation**, not an activated worker. Explicit OFF/ON environment setting, **OFF default**. Even ON has 900-second maximum lifetime and 60-observation cap, then stops. A hosting supervisor must not restart it automatically after expiry; zero replicas when OFF, and no cron. Manual ad hoc invocation remains possible. Production authority remains absent in all outputs.
+
+## Authentication, privacy and evidence
+GitHub uses fixed public API endpoints and optional existing short-lived built-in token. Private RunBook must use an independently approved **dedicated restricted PostgreSQL Test reader role** via `IIC_TEST_DATABASE_URL`, with exact project binding `IIC_TEST_SCOPE=sbgfuanxiqepcoboxzcl`, server-side only. No superuser or postgres role, no role with INSERT to the canonical RunBook event ledger. Each connection enters a read-only transaction with a 4-second statement timeout. Only `comind_pm.v_runbook_lane_state` is queried. The row has its project/work identifiers hashed in memory before creating an IIC-007 evidence envelope; no raw private identity or secret is written to logs or artifacts.
+
+`scripts/iic_multisource_test.py --mode OFF` makes no network reads. `--mode ON --duration-seconds 180 --interval-seconds 15` runs a bounded two-source sample and IIC-008 graph. An expected RunBook lane status must be chosen explicitly in the evidence contract; the current small demo uses `done` and will mark observed other status `contested`, not silently align expectations with observed values. The Production readiness claim always remains unresolved absent independent human authority and Production evidence.
+
+## Acceptance and remaining blockers
+The deterministic tests cover OFF zero-reads, ON hard stop, controlled credentials, stale/absent source, conflicting status, identity isolation, cross-source graph and authority. The **live private-source connection is not yet approved or configured**: the existing Test host's credentials and staged Railway patch belong to another lane. Do not use the privileged postgres/service-role credentials as a shortcut. Existing Railway environment has a staged RunBook scheduler and CBE changes; do not accept or deploy that patch as part of IIC-009.
+
+Before hosted acceptance: establish a dedicated least-privilege Test database login via separately authorized credential provisioning; bind authenticated source readback, inspect actual role grants/RLS; select cost-neutral or bounded Test host, verify an enforceable spending control, OFF action, no automatic restart, and existing operator perimeter; bind signed/private graph snapshots to the Console and verify browser access plus source-stale/stop/restart tests. Then optionally run a brief ON soak, retain evidence, and set OFF. Production activation always requires an independent human approval.
+
+## Cost evaluation
+No paid service is added by this repository change. Railway's Hobby plan has a $5 monthly minimum and usage beyond included credits; the Railway workspace may have other running services and hard caps may operate workspace-wide. Never assume an isolated $5 cap. Vercel Hobby has included serverless usage but is not a persistent process host. Record exact plan/account/cap before any chargeable deployment.
+
+## Live privilege inventory and required human boundary, November 21, 2026
+
+Read-only queries to the connected CoMind Supabase Test project verified two pre-existing login roles: `comind_runbook_console_login` and `comind_runbook_scheduler_login`. Neither currently has `USAGE` on `comind_pm` or `SELECT` on `comind_pm.v_runbook_lane_state`; neither has `INSERT` to the event ledger. The current view grants were to `postgres` and `service_role`, neither suitable as the dedicated collector credential. Therefore **the hosted private-source ON mode is intentionally unbound and unexecuted**. Do not borrow credentials or extend those roles across DRB-004 ownership without a specific approved least-privilege role scope.
+
+The operator-selectable `.github/workflows/iic-private-test-dispatch.yml` is OFF by default. Its OFF selection performs synthetic tests and zero private source calls. ON needs an independently provisioned, reviewed `IIC_TEST_DATABASE_URL` secret for a dedicated restricted Test role. The workflow is manually triggered only, has no schedule, limits runtime to 20 minutes, and keeps only short-lived redacted results. Read-only GitHub built-in token is the sole GitHub credential.
+
+Source authentication has structural project binding, administrative-role rejection, and a runtime database privilege check rejecting privileged roles or any DML grants on private `comind_pm` tables. These checks are complementary to, not substitutes for, independent DBA review, least-privilege grant evidence and secret custody. The currently staged Railway acceptance patch belongs to another lane and was not modified.
+
+The actual *always-on until switched OFF* service and protected hosted Console multi-source graph display are **not implemented by this first Test runner**. A later host binding must provide lease-based ON/OFF policy, automatic expiration and emergency stop, verified cost ceiling, and no unapproved restart after OFF. Do not confuse repeated manual dispatch with continuous hosting. Production activation stays separately gated.
+
+## Hosting and legal/cost review
+Railway Hobby has a $5 monthly minimum and usage above included credit; its hard limits can be workspace-wide and interrupt other projects. Vercel Hobby has non-commercial personal-use restrictions that make it unsuitable to assume as a compliant CoMind company host. Cloudflare Workers may allow a low-cost event-driven approach, but its Free scheduled CPU limit and environment-source binding need separate real-workload verification before selection. No service was activated or bill incurred from the implementation.
+
+## Scoped private reader, not yet deployed
+A single-purpose `SECURITY DEFINER` function is proposed in `docs/integrity/IIC-009-scoped-test-reader-proposal.sql`, with an immutable COMIND scope and hashed identifiers generated in PostgreSQL. PUBLIC, anon and authenticated execute are explicitly revoked. The proposal grants **no credentials or role permissions** and has **not** been applied to Test. After a separate authority review, provision a dedicated reader with schema USAGE plus EXECUTE on this function only, independently validate grants, and store the credential in a governed secret location. Existing DRB-004 login roles remain untouched.
+
+The collector now uses only this narrow projection and rejects raw identifiers in result rows. Hashes remain pseudonymous and are not safe for unrestricted public display. The hosted protected Console binding and autonomous ON/OFF service remain separate acceptance gates.
+
+## Epistemic hardening
+ON mode now requires an explicit `--expected-runbook-status` choice supplied by the operator through the manual dispatch input. The collector never infers that the latest RunBook lane ought to be `done` or any other status. OFF requires no expected state. A missing state on ON fails before any authenticated source connection. Added synthetic cases prove no unsupported RunBook claim appears without an expectation and the 900-second/60-observation hard boundary is accepted. This addresses a pre-activation assumption discovered in review; no live data was reclassified to hide it.

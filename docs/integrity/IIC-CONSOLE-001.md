@@ -21,3 +21,9 @@ The new view may be visible on a currently deployed Console only after separate 
 
 ## Acceptance
 Exact-head Console unit tests, typecheck, build, user-interface smoke/CI, IIC/No Placeholder, broad CI. Synthetic tests cover success, source mismatch, stale, failure, pending, unknown/missing, invalid registry, future time, error, and bounded fixed URLs. Real GitHub response readback and final collision checks must be preserved before merge.
+
+## CI failure and repair evidence
+First PR head `88428bdd4e0a5dbf95b630bd5dde7090434cefc1` failed the Console Node test runner because the optional `server-only` side-effect import was unavailable. It was removed without introducing a client import or an exposed credential, repair `ff7ec3a16312c78d1b249eae4147b5cbb64f0995`.
+The next Console run discovered a separate external dependency shift: GitHub migrated `ubuntu-latest` to Ubuntu 26.04, which the currently locked Playwright 1.56.0 rejected when installing Chromium. Official GitHub documentation confirms `ubuntu-24.04` remains a supported explicit runner label. The Console CI workflow was pinned to Ubuntu 24.04 in `2f0a47cb9775c401ff5b92d00d8ea24d498a89bf`, preserving the Chromium acceptance tests. Operator Console CI run #44938635181 passed, including existing tests, typecheck and build, on that repaired head.
+
+This follow-up adds a route-specific Chromium navigation and source/authority presentation check, so the final exact-head run must be reinspected.

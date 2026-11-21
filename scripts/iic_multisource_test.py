@@ -48,14 +48,22 @@ def safe_hash(value):
 
 def postgres_read(url, project=TEST_PROJECT):
     """Private Test read-only transaction. Requires pre-approved restricted role."""
-    if not url or project not in url or not url.startswith(("postgresql://","postgres://")):
+    if not url or not url.startswith(("postgresql://","postgres://")):
         raise ValueError("Test database scope not verifiable")
     from urllib.parse import urlsplit
     parsed = urlsplit(url)
-    if not parsed.hostname or parsed.hostname in ("localhost","127.0.0.1"):
-        raise ValueError("Test database host invalid")
-    # Reject administrative principals even when used for a SELECT.
-    if not parsed.username or parsed.username.split(".")[0].lower() in ("postgres","supabase_admin","service_role"):
+    hostname=(parsed.hostname or "").lower()
+    username=parsed.username or ""
+    # Verify project in a structural address field, never an arbitrary password
+    # or query parameter. Pooled usernames use role.<project-ref>.
+    scoped_pool=(hostname.endswith(".pooler.supabase.com")
+                 and username.endswith("."+project))
+    scoped_direct=(hostname=="db."+project+".supabase.co")
+    if not (scoped_pool or scoped_direct):
+        raise ValueError("Test database host or username scope invalid")
+    # Reject administrator principals and empty/anonymous user.
+    principal=username.split(".")[0].lower()
+    if principal in ("","postgres","supabase_admin","service_role"):
         raise ValueError("dedicated restricted Test reader role required")
     import psycopg
     from psycopg.rows import dict_row
@@ -65,9 +73,15 @@ def postgres_read(url, project=TEST_PROJECT):
             conn.execute("SET LOCAL statement_timeout = '4000ms'")
             meta = conn.execute(
                 "SELECT current_user AS actor, current_database() AS db, "
-                "has_table_privilege(current_user, 'comind_pm.pm_events', 'INSERT') AS can_write"
+                "(SELECT rolsuper OR rolcreaterole OR rolcreatedb OR rolreplication OR rolbypassrls "
+                " FROM pg_roles WHERE rolname=current_user) AS elevated, "
+                "EXISTS (SELECT 1 FROM pg_class c "
+                " WHERE c.relnamespace='comind_pm'::regnamespace AND c.relkind IN ('r','p') "
+                " AND (has_table_privilege(current_user,c.oid,'INSERT') "
+                " OR has_table_privilege(current_user,c.oid,'UPDATE') "
+                " OR has_table_privilege(current_user,c.oid,'DELETE'))) AS can_write"
             ).fetchone()
-            if meta["can_write"] or meta["db"] != TEST_DB or meta["actor"].startswith("postgres"):
+            if meta["elevated"] or meta["can_write"] or meta["db"] != TEST_DB or meta["actor"] != principal:
                 raise ValueError("database identity or permission boundary invalid")
             row = conn.execute(
                 "SELECT project_key, work_key, status, last_event_at "

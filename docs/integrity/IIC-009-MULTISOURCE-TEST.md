@@ -15,3 +15,16 @@ Before hosted acceptance: establish a dedicated least-privilege Test database lo
 
 ## Cost evaluation
 No paid service is added by this repository change. Railway's Hobby plan has a $5 monthly minimum and usage beyond included credits; the Railway workspace may have other running services and hard caps may operate workspace-wide. Never assume an isolated $5 cap. Vercel Hobby has included serverless usage but is not a persistent process host. Record exact plan/account/cap before any chargeable deployment.
+
+## Live privilege inventory and required human boundary, November 21, 2026
+
+Read-only queries to the connected CoMind Supabase Test project verified two pre-existing login roles: `comind_runbook_console_login` and `comind_runbook_scheduler_login`. Neither currently has `USAGE` on `comind_pm` or `SELECT` on `comind_pm.v_runbook_lane_state`; neither has `INSERT` to the event ledger. The current view grants were to `postgres` and `service_role`, neither suitable as the dedicated collector credential. Therefore **the hosted private-source ON mode is intentionally unbound and unexecuted**. Do not borrow credentials or extend those roles across DRB-004 ownership without a specific approved least-privilege role scope.
+
+The operator-selectable `.github/workflows/iic-private-test-dispatch.yml` is OFF by default. Its OFF selection performs synthetic tests and zero private source calls. ON needs an independently provisioned, reviewed `IIC_TEST_DATABASE_URL` secret for a dedicated restricted Test role. The workflow is manually triggered only, has no schedule, limits runtime to 20 minutes, and keeps only short-lived redacted results. Read-only GitHub built-in token is the sole GitHub credential.
+
+Source authentication has structural project binding, administrative-role rejection, and a runtime database privilege check rejecting privileged roles or any DML grants on private `comind_pm` tables. These checks are complementary to, not substitutes for, independent DBA review, least-privilege grant evidence and secret custody. The currently staged Railway acceptance patch belongs to another lane and was not modified.
+
+The actual *always-on until switched OFF* service and protected hosted Console multi-source graph display are **not implemented by this first Test runner**. A later host binding must provide lease-based ON/OFF policy, automatic expiration and emergency stop, verified cost ceiling, and no unapproved restart after OFF. Do not confuse repeated manual dispatch with continuous hosting. Production activation stays separately gated.
+
+## Hosting and legal/cost review
+Railway Hobby has a $5 monthly minimum and usage above included credit; its hard limits can be workspace-wide and interrupt other projects. Vercel Hobby has non-commercial personal-use restrictions that make it unsuitable to assume as a compliant CoMind company host. Cloudflare Workers may allow a low-cost event-driven approach, but its Free scheduled CPU limit and environment-source binding need separate real-workload verification before selection. No service was activated or bill incurred from the implementation.

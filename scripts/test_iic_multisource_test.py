@@ -54,6 +54,13 @@ class MultisourceTests(unittest.TestCase):
         with self.assertRaises(ValueError):m.evaluate("ON",901,15,lambda:None)
     def test_poll_limit_rejected(self):
         with self.assertRaises(ValueError):m.evaluate("ON",900,10,lambda:None)
+    def test_max_duration_with_15_second_interval_is_admissible(self):
+        tick=[0.]
+        def sleep(delta):tick[0]+=delta
+        r=m.evaluate("ON",900,15,lambda:{"claim_statuses":{"IIC-PRODUCTION-READY":"unresolved"}},
+                clock=lambda:tick[0],sleep=sleep)
+        self.assertEqual(60,r["observations"])
+        self.assertEqual("deadline-or-sample-cap",r["stop_reason"])
     def test_invalid_mode_rejected(self):
         with self.assertRaises(ValueError):m.evaluate("ALWAYS",30,15,lambda:None)
     def test_on_auto_stops_and_has_count(self):

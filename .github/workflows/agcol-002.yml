@@ -1,0 +1,137 @@
+name: AGCOL-002 Bounded Collaboration Contract
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/agcol-002.yml'
+      - 'db/migrations/20261110_001_agcol_002_exact_task_claim.sql'
+      - 'db/migrations/verify_20261110_001_agcol_002_exact_task_claim.sql'
+      - 'server/src/parallel-agent-collaboration.ts'
+      - 'server/src/agcol-readonly-mcp.ts'
+      - 'server/test/parallel-agent-collaboration.test.mjs'
+      - 'server/test/agcol-readonly-mcp.test.mjs'
+      - 'server/test/integration/agcol-live-test-acceptance.e2e.mjs'
+      - 'server/test/support/agcol-readonly-mcp-server.mjs'
+      - 'docs/architecture/agcol-002-bounded-parallel-mcp.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agcol-002-test-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install
+        working-directory: server
+        run: npm ci
+      - name: Build
+        working-directory: server
+        run: npm run build
+      - name: Bounded graph and actual local MCP protocol
+        working-directory: server
+        run: node --test test/parallel-agent-collaboration.test.mjs test/agcol-readonly-mcp.test.mjs test/agent-collaboration.test.mjs
+
+  scoped-lease:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.6-pg17-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_ci
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+      - run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+      - run: bash ./scripts/test_mdo_001.sh
+      - name: Apply migration twice and verify fenced exact claim
+        run: |
+          set -euo pipefail
+          psql -X "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/migrations/20261110_001_agcol_002_exact_task_claim.sql
+          psql -X "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/migrations/20261110_001_agcol_002_exact_task_claim.sql
+          psql -X "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/migrations/verify_20261110_001_agcol_002_exact_task_claim.sql
+
+  live-test:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.head_ref == 'issue-553-agcol-002-bounded-parallel-mcp' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.repository_owner == 'jlhogarth' &&
+      github.actor == 'jlhogarth'
+    needs: [contract, scoped-lease]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      AGCOL_CANDIDATE_REF: ${{ github.event.pull_request.head.sha }}
+      AGCOL_TEST_ARTIFACT: artifacts/agcol-002-test-acceptance.json
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci
+        working-directory: server
+      - run: npm run build
+        working-directory: server
+      - name: Verify Supabase database CA
+        shell: bash
+        run: |
+          set -euo pipefail
+          ca_path="$RUNNER_TEMP/supabase-prod-ca-2021.crt"
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            https://supabase-downloads.s3-ap-southeast-1.amazonaws.com/prod/ssl/prod-ca-2021.crt \
+            --output "$ca_path"
+          expected='807025AD50D4ED219D2C9C7D299C004F824EB00CF7F65AFEF607D07B72E6CAFA'
+          actual="$(openssl x509 -in "$ca_path" -noout -fingerprint -sha256 | cut -d= -f2 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+          test "$actual" = "$expected"
+          echo "NODE_EXTRA_CA_CERTS=$ca_path" >> "$GITHUB_ENV"
+      - name: Execute guarded Supabase Test acceptance
+        working-directory: server
+        env:
+          SUPABASE_SESSION_DATABASE_URL: ${{ secrets.SUPABASE_SESSION_DATABASE_URL }}
+        run: node --test --test-concurrency=1 test/integration/agcol-live-test-acceptance.e2e.mjs
+      - name: Preserve acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agcol-002-test-acceptance-${{ github.run_id }}
+          path: server/artifacts/agcol-002-test-acceptance.json
+          if-no-files-found: error
+          retention-days: 30

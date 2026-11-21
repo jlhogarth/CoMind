@@ -1,0 +1,9 @@
+{
+  "title": "Synthetic AED illustration, not real user data",
+  "messages": [
+    {"role":"user","content":"Investigate one stalled conversation."},
+    {"role":"assistant","content":"I will first inspect the available metadata."},
+    {"role":"tool","content":"Synthetic example: conversation status available, 3 messages."},
+    {"role":"assistant","content":"The synthetic test completed. No live operations occurred."}
+  ]
+}

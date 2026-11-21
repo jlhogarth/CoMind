@@ -1,0 +1,55 @@
+name: IIC Bounded Test Trial
+
+on:
+  workflow_dispatch:
+    inputs:
+      duration_seconds:
+        description: "Finite monitoring window in seconds (10..300)"
+        required: true
+        default: "180"
+        type: choice
+        options:
+          - "60"
+          - "90"
+          - "180"
+          - "300"
+  pull_request:
+    paths:
+      - ".github/workflows/iic-bounded-trial.yml"
+      - "scripts/iic_bounded_trial.py"
+      - "scripts/test_iic_bounded_trial.py"
+      - "docs/integrity/IIC-009-BOUNDED-TRIAL.md"
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: iic-bounded-trial-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bounded-trial:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test finite sampler and negative source behavior
+        run: python scripts/test_iic_bounded_trial.py
+      - name: Sample exact-main GitHub integrity evidence for a finite Test window
+        id: sampler
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TRIAL_DURATION: ${{ github.event_name == 'workflow_dispatch' && inputs.duration_seconds || '60' }}
+        run: python scripts/iic_bounded_trial.py --duration-seconds "$TRIAL_DURATION" --interval-seconds 15 --output iic-009-trial.json
+      - name: Upload bounded source evidence even if any sample fails
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iic-009-bounded-source-trial
+          path: iic-009-trial.json
+          if-no-files-found: warn
+          retention-days: 7

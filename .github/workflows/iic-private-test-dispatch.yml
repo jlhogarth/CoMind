@@ -1,0 +1,64 @@
+name: IIC Private Test Graph On-Demand
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "OFF makes no source calls; ON requires approved restricted Test database secret"
+        required: true
+        type: choice
+        default: OFF
+        options:
+          - OFF
+          - ON
+      duration_seconds:
+        description: "Bounded run window in seconds"
+        required: true
+        type: choice
+        default: "180"
+        options:
+          - "180"
+          - "300"
+          - "600"
+          - "900"
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: iic-private-graph-test
+  cancel-in-progress: true
+
+jobs:
+  governed-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code at exact dispatch revision
+        uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify OFF default and graph adversarial contract
+        run: python scripts/test_iic_multisource_test.py
+      - name: Install pinned PostgreSQL client only for approved ON mode
+        if: inputs.mode == 'ON'
+        run: python -m pip install "psycopg[binary]==3.3.9"
+      - name: Evaluate protected Test sources and automatically stop
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IIC_TEST_DATABASE_URL: ${{ secrets.IIC_TEST_DATABASE_URL }}
+          IIC_TEST_SCOPE: sbgfuanxiqepcoboxzcl
+          IIC_RUN_MODE: ${{ inputs.mode }}
+          IIC_DURATION: ${{ inputs.duration_seconds }}
+        run: |
+          python scripts/iic_multisource_test.py --mode "$IIC_RUN_MODE" --duration-seconds "$IIC_DURATION" --interval-seconds 15 --output /tmp/iic-009-private-test.json
+      - name: Retain bounded redacted evidence on success or failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iic-private-test-graph-snapshot
+          path: /tmp/iic-009-private-test.json
+          if-no-files-found: ignore
+          retention-days: 3

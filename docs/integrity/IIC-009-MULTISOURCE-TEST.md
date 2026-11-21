@@ -28,3 +28,8 @@ The actual *always-on until switched OFF* service and protected hosted Console m
 
 ## Hosting and legal/cost review
 Railway Hobby has a $5 monthly minimum and usage above included credit; its hard limits can be workspace-wide and interrupt other projects. Vercel Hobby has non-commercial personal-use restrictions that make it unsuitable to assume as a compliant CoMind company host. Cloudflare Workers may allow a low-cost event-driven approach, but its Free scheduled CPU limit and environment-source binding need separate real-workload verification before selection. No service was activated or bill incurred from the implementation.
+
+## Scoped private reader, not yet deployed
+A single-purpose `SECURITY DEFINER` function is proposed in `db/migrations/20261121_001_iic_009_scoped_test_reader_proposal.sql`, with an immutable COMIND scope and hashed identifiers generated in PostgreSQL. PUBLIC, anon and authenticated execute are explicitly revoked. The proposal grants **no credentials or role permissions** and has **not** been applied to Test. After a separate authority review, provision a dedicated reader with schema USAGE plus EXECUTE on this function only, independently validate grants, and store the credential in a governed secret location. Existing DRB-004 login roles remain untouched.
+
+The collector now uses only this narrow projection and rejects raw identifiers in result rows. Hashes remain pseudonymous and are not safe for unrestricted public display. The hosted protected Console binding and autonomous ON/OFF service remain separate acceptance gates.

@@ -85,16 +85,17 @@ def postgres_read(url, project=TEST_PROJECT):
                 raise ValueError("database identity or permission boundary invalid")
             row = conn.execute(
                 "SELECT project_key, work_key, status, last_event_at "
-                "FROM comind_pm.v_runbook_lane_state "
-                "WHERE project_key = %s AND work_key IS NOT NULL "
-                "AND last_event_at IS NOT NULL "
-                "ORDER BY last_event_at DESC LIMIT 1", ("COMIND",)
+                "FROM comind_pm.iic_test_lane_state()"
             ).fetchone()
             if row is None:
-                raise ValueError("private Test RunBook has no scoped records")
+                raise ValueError("private Test RunBook projection returned no record")
+            for key in ("project_key","work_key"):
+                value=row[key]
+                if not isinstance(value,str) or len(value)!=64 or any(ch not in "0123456789abcdef" for ch in value):
+                    raise ValueError("source IDs must be hashed inside PostgreSQL")
             return {
-                "project_key": safe_hash(str(row["project_key"])),
-                "work_key": safe_hash(str(row["work_key"])),
+                "project_key": row["project_key"],
+                "work_key": row["work_key"],
                 "status": row["status"],
                 "last_event_at": row["last_event_at"].astimezone(timezone.utc).isoformat().replace("+00:00","Z")
             }

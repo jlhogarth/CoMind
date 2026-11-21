@@ -1,0 +1,36 @@
+name: Implementation Reality Graph
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/integrity_reality_graph.py'
+      - 'scripts/test_integrity_reality_graph.py'
+      - 'config/integrity-reality-graph.v1.json'
+      - 'docs/integrity/IIC-008.md'
+      - '.github/workflows/integrity-reality-graph.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'scripts/integrity_reality_graph.py'
+      - 'scripts/test_integrity_reality_graph.py'
+      - 'config/integrity-reality-graph.v1.json'
+      - '.github/workflows/integrity-reality-graph.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iic-reality-graph-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  projection-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run graph contract and adversarial tests
+        run: python scripts/test_integrity_reality_graph.py

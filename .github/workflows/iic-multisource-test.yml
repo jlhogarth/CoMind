@@ -1,0 +1,45 @@
+name: IIC Private Multi-Source Test Contract
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/iic_multisource_test.py'
+      - 'scripts/test_iic_multisource_test.py'
+      - 'docs/integrity/IIC-009-MULTISOURCE-TEST.md'
+      - '.github/workflows/iic-multisource-test.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'scripts/iic_multisource_test.py'
+      - 'scripts/test_iic_multisource_test.py'
+      - '.github/workflows/iic-multisource-test.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iic-multisource-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  offline-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify complete OFF/ON and graph evidence contract without secret access
+        run: python scripts/test_iic_multisource_test.py
+      - name: Execute OFF mode without private credentials or network
+        run: |
+          python scripts/iic_multisource_test.py --mode OFF --duration-seconds 30 --interval-seconds 10 --output /tmp/iic-009-off.json
+          python -c 'import json; d=json.load(open("/tmp/iic-009-off.json")); assert d["stopped"] and d["samples"]==[] and d["stop_reason"]=="switch-off"'
+      - name: Reject ON without restricted Test credentials
+        run: |
+          if python scripts/iic_multisource_test.py --mode ON --duration-seconds 30 --interval-seconds 10 --output /tmp/iic-009-unbound.json; then
+            echo 'IIC-009 unexpectedly accepted ON without source scope'
+            exit 1
+          fi

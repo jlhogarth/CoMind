@@ -165,10 +165,10 @@
         },
         {
           "state": "SHADOW",
-          "evidence": "IIC-006 issue #350 implementation; acceptance pending exact-head CI"
+          "evidence": "IIC-006 exact-head Integrity Workflow #44875553616, commit 4f928052c0cb13cd6953b356ac54824f1fb37578"
         }
       ],
-      "last_accepted_verification": "IIC-006 issue #350 implementation; final acceptance pending"
+      "last_accepted_verification": "IIC-006 CI #44875553616: 12 synthetic tests passed; repository 0 NRC/NCI shadow candidates"
     },
     {
       "control_id": "NCI-001",
@@ -194,10 +194,10 @@
         },
         {
           "state": "SHADOW",
-          "evidence": "IIC-006 issue #350 implementation; acceptance pending exact-head CI"
+          "evidence": "IIC-006 exact-head Integrity Workflow #44875553616, commit 4f928052c0cb13cd6953b356ac54824f1fb37578"
         }
       ],
-      "last_accepted_verification": "IIC-006 issue #350 implementation; final acceptance pending"
+      "last_accepted_verification": "IIC-006 CI #44875553616: 12 synthetic tests passed; repository 0 NRC/NCI shadow candidates"
     }
   ],
   "defined_controls": [

@@ -20,11 +20,11 @@ class RetryCleanupTests(unittest.TestCase):
         self.assertEqual(["NRC-001"], [f.control_id for f in x])
         self.assertEqual("candidate", x[0].classification)
     def test_unbounded_curl_retry_is_candidate(self):
-        self.assertEqual(1, len(module.scan_command("ci.yml", 4, "curl --retry 999 https://example.org", "workflow")))
+        self.assertEqual(1, len(module.scan_command("ci.yml", 4, "curl --retry 999 https://github.com", "workflow")))
     def test_finite_curl_retry_not_flagged(self):
-        self.assertEqual([], module.scan_command("ci.yml", 1, "curl --retry 3 https://example.org", "workflow"))
+        self.assertEqual([], module.scan_command("ci.yml", 1, "curl --retry 3 https://github.com", "workflow"))
     def test_dynamic_retry_count_is_reviewed(self):
-        self.assertEqual(1, len(module.scan_command("ci.yml", 1, "curl --retry $COUNT https://example.org", "workflow")))
+        self.assertEqual(1, len(module.scan_command("ci.yml", 1, "curl --retry $COUNT https://github.com", "workflow")))
     def test_temp_without_cleanup_is_candidate(self):
         x = module.scan_command("ci.yml", 2, "tmp=$(mktemp -d)", "workflow")
         self.assertEqual(["NCI-001"], [f.control_id for f in x])

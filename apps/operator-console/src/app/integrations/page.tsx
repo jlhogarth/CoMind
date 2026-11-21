@@ -95,6 +95,17 @@ export default function IntegrationGatewayPage() {
           </div>
         </section>
 
+
+        <section className="activity-card" aria-labelledby="gateway-integrity-title">
+          <div className="activity-card-main">
+            <div className="activity-summary-column">
+              <h3 id="gateway-integrity-title">Implementation Integrity</h3>
+              <p>Inspect current-main CI evidence, source freshness, canonical control maturity, and explicit Production authority limitations.</p>
+              <a href="/integrity">Open read-only Integrity projection</a>
+            </div>
+          </div>
+        </section>
+
         <div className="hud-data-note">
           Canonical records: <a href="https://github.com/jlhogarth/CoMind/issues/414" target="_blank" rel="noreferrer">CIG-001 issue #414</a> · <a href="https://github.com/jlhogarth/CoMind/blob/main/docs/governance/COMIND-DEVELOPMENT-ENVIRONMENT-CONTRACT.md" target="_blank" rel="noreferrer">Development Contract</a> · <a href="https://github.com/jlhogarth/CoMind/blob/main/docs/governance/rulebook-control-plane.md" target="_blank" rel="noreferrer">RuleBook Control Plane</a>.
         </div>

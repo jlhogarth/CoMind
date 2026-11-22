@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { createEnvelope, dispatchReturn, sha256 } from '../dist/return-protocol/core.js';
 import { createOpenAIAdapter, returnMessage } from '../dist/return-protocol/openai-adapter.js';
 import { buildReturnFallbackService } from '../dist/return-protocol/fallback-service.js';
-import { createFoundryReturnAuthority } from '../dist/return-protocol/authority.js';
+import { createFoundryReturnAuthority, createClearReturnVerifier, stageGovernedFallback } from '../dist/return-protocol/authority.js';
 
 const origin = (id, conversationId, ownerBinding) => ({ originId: id,
   surface: 'openai_api', conversationId, ownerBinding, workKey: 'CBE-004', authorityRef: 'test-authority' });
@@ -210,4 +210,28 @@ test('Foundry authority rejects stale lease and requires the injected CLEAR reso
     authority: clearDenied, adapter: createOpenAIAdapter(provider(), 'owner-A') });
   assert.equal(denied.state, 'AUTHORIZATION_REJECTED');
   assert.equal(denied.lastReason, 'clear_invalid');
+});
+
+test('fallback admission requires registered owner, fresh Foundry lease and current CLEAR facts', async () => {
+  const source = origin(randomUUID(), 'conv_admission', 'owner-A');
+  const payload = envelopeFor(source, { adapter: 'comind_fallback' });
+  const existing = new Map([[source.originId, source]]);
+  const store = new Store();
+  const safety = { l4aAuthorized: true, oneIssueOneBranchOnePr: true,
+    noPlaceholder: true, collisionClear: true, freshnessClear: true,
+    dependencyValid: true, costGuardrailClear: true, productionChange: false,
+    productionAuthorized: false, secretsPresent: false };
+  const verifyClear = createClearReturnVerifier(async ref => ref === 'test-clear' ? safety : null);
+  const admit = (owner, lease = true) => stageGovernedFallback({ envelope: payload,
+    authenticatedOwnerBinding: owner, store: {
+      resolveOrigin: async id => existing.get(id) ?? null,
+      stage: e => store.stage(e),
+    }, authority: { resolveOrigin: async id => existing.get(id) ?? null,
+      verifyLease: async () => lease, verifyClear } });
+  await assert.rejects(admit('owner-B'), /owner_binding_mismatch/);
+  await assert.rejects(admit('owner-A', false), /lease_invalid/);
+  safety.collisionClear = false;
+  await assert.rejects(admit('owner-A'), /clear_invalid/);
+  safety.collisionClear = true;
+  assert.equal((await admit('owner-A')).state, 'QUEUED');
 });

@@ -28,6 +28,12 @@ The following are permitted when used deliberately:
 
 An agent may report success only when it can cite the executed validation, schema comparison, test result, or deployment record that establishes success. Unsupported confidence is not evidence.
 
+## Credit-first benefit gate (GOV-DEV-016)
+
+Before selecting a paid service or provider route, check whether the current subscription or service provides applicable included usage or benefit credits. Verify the issued grant, receiving organization and project, remaining balance, expiry, terms, and purchased-credit/recharge spillover from authoritative account evidence. Prefer a verified eligible credit-funded route over additional cash spending when it meets the same capability, quality, latency, privacy, security, and authority requirements. Adequate deterministic/local work still takes precedence. Never treat an advertised offer as an activated balance or unknown as zero.
+
+Use existing FinOps and Compute Router gates. If credits are unverified, insufficient, inapplicable, or unsafe to bound, block the affected paid route or obtain the existing explicit financial authority for a documented alternative. Require a verified stop before purchased credits or cash are used without authorization. This repository instruction is procedural for agents; automatic runtime enforcement exists only at call sites wired to the verified pre-dispatch gate. The full standing rule is in `docs/governance/COMIND-DEVELOPMENT-ENVIRONMENT-CONTRACT.md`.
+
 ## Continuous Excellence and recovery interrupts
 
 The canonical operating contract is `docs/governance/continuous-excellence-contract.md` and the architecture is `docs/architecture/continuous-excellence.md`.

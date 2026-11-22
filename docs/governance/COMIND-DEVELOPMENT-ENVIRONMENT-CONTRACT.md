@@ -1,7 +1,7 @@
 # CoMind Development Environment Contract
 
-**Version:** 1.4  
-**Effective:** November 2, 2026  
+**Version:** 1.5
+**Effective:** November 22, 2026
 **Status:** Standing Founder-Assistant Development Operating Agreement  
 **Canonical source:** `jlhogarth/CoMind/docs/governance/COMIND-DEVELOPMENT-ENVIRONMENT-CONTRACT.md`  
 **Google Drive mirror:** https://docs.google.com/document/d/1L8PkOMdPg2sopn9kx7RLmZlJRxrNLUtI2g57GgH5mKg/edit  
@@ -188,6 +188,19 @@ Do not go silent during substantial work. Keep updates concise enough to remain 
 
 Do not repeatedly ask permission for actions already authorized by the Development Lane. Stop and ask when a genuinely new human decision, consequential authority expansion, Production action, financial approval, irreversible action, or material ambiguity requires it.
 
+## GOV-DEV-016: Credit-First Benefit Utilization
+
+Joseph explicitly authorized this standing rule on November 22, 2026. For every subscribed service that offers included usage, promotional grants, or subscription benefit credits, the acting lane must inspect the benefit before selecting an additional cash-funded route. This includes the ChatGPT Pro 100 API benefit when actually eligible and activated. The rule applies to future services without assuming that their offers have the same terms.
+
+1. Identify the account, organization, project, eligible workloads, grant type, amount actually issued, remaining balance, expiration, renewal, exclusions, data and security restrictions, and any purchased-credit spillover or automatic recharge. A marketing offer or subscription purchase alone is not proof of an issued grant. Record an authoritative readback and timestamp. Unknown is never zero.
+2. Before a metered execution, compare eligible deterministic/local and included routes, then available benefit-funded routes with comparable quality, security, latency, data handling, and authority. Prefer use of a verified applicable benefit over a new out-of-pocket charge. Do not force a model call to spend a credit, displace an adequate local route, or claim that unused credit is cash savings without a credible displaced expense.
+3. Bind benefit use to the verified receiving organization and project. Use existing FinOps reservation, ceilings, rate-card, routing, and provider usage evidence. Keep subscription allowance, granted credits, purchased credits, actual cash expenditure, and estimated provider charges as distinct measures. Preserve failed and retried consumption, expiry, and unallocated differences.
+4. A benefit-funded request may proceed only after its balance and scope are verified sufficiently near execution, its worst-case bounded consumption fits the available grant, and purchased-credit spillover or recharge is blocked by a verified control. A prompt saying “ask before spending” is not a billing hold. Recheck and reserve for concurrent calls. If a provider lacks an enforceable hard stop, stop before the known benefit boundary and record the unresolved exposure.
+5. If the benefit is exhausted, inapplicable, expired, unclaimed, or unverified, do not silently substitute purchased credits or a cash-funded service. Preserve the reason, source, alternatives, and required financial authority. An explicitly authorized cash route still requires existing spending ceilings and approval. Do not activate auto-recharge or purchase new credits on the strength of this rule.
+6. A decision to reject a benefit route is valid when it fails capability, quality, latency, privacy, residency, retention, terms, safety, project permission, or human-authority requirements. Record the reason. A lower cash cost never overrides those gates.
+
+This contract governs the acting lane procedurally. The deterministic Compute Router enforces its scoped API-route evidence gate where invoked. Neither this text nor the router proves that all provider adapters call it. Each paid runtime needs a verified pre-dispatch binding to the existing FinOps and authority controls before claiming automatic enforcement.
+
 ## Paid API and Metered-Service Governance
 
 Before any paid API, model, browser automation, agent service, or other metered-provider call that requires approval, present Joseph with a concise approval request containing:
@@ -269,7 +282,7 @@ The full canonical GitHub contract is authoritative over summaries, copied promp
 
 The durable ChatGPT Memory summary pointer should read:
 
-> **Standing CoMind Development Environment Contract:** In every conversation involving CoMind or related software-development work, automatically apply the canonical CoMind Development Environment Contract. Treat it as the default development operating agreement unless Joseph explicitly overrides a provision. This includes L4A bounded autonomy when durably granted, canonical-contract freshness checks, the GOV-DEV-014 Forward Impact Gate for consequential boundary changes, decision-complete no-idle continuation, browser-first execution before terminal-command handoff, governed integration-gateway use, managed credential custody, meaningful progress updates, decision/rationale visibility, collision and freshness checks, reuse-before-reinvention, evidence preservation, governed paid-provider approvals with in-chat request text and approval-page links, Production separation, infrastructure discipline, verification before closure, and automatic dependency-valid continuation until a real bounded wait or human/platform stop is reached. Canonical source: `jlhogarth/CoMind/docs/governance/COMIND-DEVELOPMENT-ENVIRONMENT-CONTRACT.md`. The canonical full contract is authoritative over any abbreviated memory summary.
+> **Standing CoMind Development Environment Contract:** In every conversation involving CoMind or related software-development work, automatically apply the canonical CoMind Development Environment Contract. Treat it as the default development operating agreement unless Joseph explicitly overrides a provision. This includes L4A bounded autonomy when durably granted, canonical-contract freshness checks, the GOV-DEV-014 Forward Impact Gate and GOV-DEV-016 credit-first benefit rule for consequential financial choices, decision-complete no-idle continuation, browser-first execution before terminal-command handoff, governed integration-gateway use, managed credential custody, meaningful progress updates, decision/rationale visibility, collision and freshness checks, reuse-before-reinvention, evidence preservation, governed paid-provider approvals with in-chat request text and approval-page links, Production separation, infrastructure discipline, verification before closure, and automatic dependency-valid continuation until a real bounded wait or human/platform stop is reached. Canonical source: `jlhogarth/CoMind/docs/governance/COMIND-DEVELOPMENT-ENVIRONMENT-CONTRACT.md`. The canonical full contract is authoritative over any abbreviated memory summary.
 
 The Memory summary is an invocation pointer, not the authoritative copy of this contract.
 
@@ -283,6 +296,8 @@ Version 1.3 incorporates Joseph's explicit November 1, 2026 authorization for GO
 
 Version 1.4 incorporates Joseph's explicit November 2, 2026 authorization for GOV-DEV-014, the Forward Impact Gate. It requires proportionate downstream-consequence analysis before material boundary-changing decisions, with particular attention to pricing and quota changes, licensing and intellectual-property obligations, security and data boundaries, compliance, availability, dependencies, operational burden, authority, reversibility, and other second-order effects. It is a general systems rule intended to catch broad classes of negative-impact events without requiring a separate rule for every eventuality.
 
+Version 1.5 incorporates Joseph's explicit November 22, 2026 authorization for GOV-DEV-016, the Credit-First Benefit Utilization rule. It requires actual grant and scope readback, suitable benefit-first routing before additional cash use, and a verified boundary against purchased-credit spillover. It does not expand authority, buy credits, or imply Production activation.
+
 ---
 
-End of CoMind Development Environment Contract v1.4.
+End of CoMind Development Environment Contract v1.5.

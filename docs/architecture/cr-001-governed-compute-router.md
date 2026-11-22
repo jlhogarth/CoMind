@@ -23,6 +23,8 @@ A more capable route is not automatically a better route. A route is eligible on
 
 Among eligible routes, the router chooses the lowest normalized estimated cost. Equal-cost ties prefer `LOCAL`, then `API_BATCH`, then `API_REALTIME`, then `CHAT_WORK`.
 
+Under GOV-DEV-016, API routes now require an explicitly sourced, scoped benefit observation no older than one hour relative to the decision. An actually available grant must cover the entire estimated request, remain unexpired, and have a verified block on paid fallback. If the benefit is documented exhausted or inapplicable, an explicit separate cash authorization is required. Unknown, stale, wrong-scope, partial, or expired benefit evidence blocks API routing. Verified covered credits give a zero *estimated marginal cash* ranking for that request, while gross provider usage, grant consumption and actual out-of-pocket charges remain separate. Local still wins a zero-cost tie. This is a deterministic routing check, not a provider-level hard spending stop or a substitute for atomic FinOps reservation and balance recheck immediately before dispatch.
+
 ## Failure avoidance
 
 CR-001 is deliberately a pure deterministic function. It performs no provider calls, browser operations, database writes, or paid execution.
@@ -68,6 +70,7 @@ Routing consumes:
 - user importance;
 - approval state;
 - per-route availability, sufficiency, quality, sensitivity ceiling, normalized cost, and cost evidence freshness.
+- per-API-route grant observation, source reference, scope verification, remaining USD balance, expiration, paid fallback status, explicit additional-cash authority, and decision time.
 
 No credential, token, cookie, MFA value, browser storage, or provider secret belongs in the routing request.
 

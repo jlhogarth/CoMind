@@ -14,7 +14,7 @@ Official API references: [Conversations API](https://platform.openai.com/docs/gu
 
 `server/src/return-protocol/core.ts` defines schema `1.0`: return and execution IDs, registered origin and owner binding, work key, artifact references and SHA-256 digests, exact destination, authorization reference, Foundry lease reference, result, logical key, and expiry. The private envelope contains the lease capability and result text. Never log it or expose it through a browser token. API origins must come from the provider's conversation creation response. Consumer origins must come from the existing exact CBE binding plus independently authenticated ownership. A URL alone proves no authorization.
 
-`db/migrations/20261122_001_aed_crp_outbox.sql` creates private origin, return, and append-only event tables with RLS and no public, anon, or authenticated grants. Deployment requires an existing approved privileged server database principal with scoped grants. The migration has **not** been applied to the shared Supabase project. Its main branch is labeled Production, and no separate development branch was found. The SQL verification script has not run against PostgreSQL.
+`db/migrations/20261122_001_aed_crp_outbox.sql` creates private origin, return, and append-only event tables with RLS and no public, anon, or authenticated grants. Deployment requires an existing approved privileged server database principal with scoped grants. The migration and SQL verification passed on a separate `comind_crp_acceptance` database in the existing Codespaces PostgreSQL 17.11 service. The shared Supabase project was untouched: its main branch is labeled Production, and no separate development branch was found. This isolated database is not an independently hosted Test return service.
 
 The store registers immutable origins, atomically stages by a stable logical key, and fences a dispatch claim with a token and expiry. A stale dispatch is treated as uncertain and must be independently reconciled before any further write. Provider readback failure and ambiguous send remain `DELIVERY_UNCERTAIN`. An absent receipt after an ambiguous send does not authorize another submission. The provider list is bounded to 500 items; an incomplete list fails closed. A five-claim ceiling prevents unbounded activity, though an automated retry schedule and dead-letter operator action are still required.
 
@@ -40,31 +40,33 @@ The local tests used no OpenAI API calls, model tokens, or new paid service. The
 
 ## Acceptance evidence, November 22, 2026 UTC
 
-Environment: isolated local checkout, Node 24.22.3, OpenAI SDK 7.28.0, TypeScript build. `npm run build` passed. `node --test` over AED-CRP plus existing CBE tests passed 32 of 32; six CRP tests passed. Tests use an in-memory provider and store unless noted. They do not establish live provider, PostgreSQL, or hosted delivery.
+Environment: isolated local checkout, Node 24.22.3, OpenAI SDK 7.28.0, TypeScript build. `npm run build` passed. `node --test` over AED-CRP plus existing CBE tests passed 32 of 32; six CRP tests passed. These use an in-memory provider and store unless noted.
+
+In the existing GitHub Codespace, a separate `comind_crp_acceptance` PostgreSQL 17.11 database received the exact committed migration. The SQL verification ran without error, including RLS, grants, and append-only checks. An isolated clone of this branch built successfully and ran `server/test/aed-crp-postgres.integration.mjs` against that database. The first run passed one of two tests: a duplicate fallback request with a new return ID incorrectly conflicted with the canonical destination. Commit `ad8cd9201da76101766a66291ed04e3d4ba597f1` corrected the duplicate lookup to return the existing logical record. The rerun passed **2 of 2**. It verified two origin bindings, owner rejection, logical duplicate stage, pool restart and independent readback, digest-bound acknowledgment, append-only events, concurrent claim fencing, and rejection of a wrong claim token. Read-only SQL after both runs observed six synthetic origins, six returns, and 11 events. [Sanitized JSONL evidence](../evidence/aed-crp-postgres-20261122.jsonl) records the six persisted returns, states, digests, timestamps, and event counts without result text or lease credentials. The first three rows are from the failing run; the last three are from the passing rerun. The local Codespaces database is not a live hosted service or provider receipt.
 
 | ID | Outcome | Evidence and limit |
 | --- | --- | --- |
-| CRP-001 | Local pass | Envelope and staged logical record; PostgreSQL persistence untested. |
+| CRP-001 | Isolated PostgreSQL pass | Versioned envelope and persistent logical record in PostgreSQL 17.11. |
 | CRP-002 | Local pass | Exact origin and owner checks, wrong-owner rejection. |
 | CRP-003 | Local pass | Adapter makes item create/list/retrieve calls, no Responses call; live API untested. |
 | CRP-004 | Local pass | Independent item retrieval and exact digest in fake provider. |
-| CRP-005 | Local pass | Stable logical key and readback prevent duplicate logical send. |
+| CRP-005 | Isolated PostgreSQL pass | Stable logical key returns canonical row for duplicate stage; fake provider readback prevents duplicate logical send. |
 | CRP-006 | Local pass | Write followed by simulated network loss, then readback without resend. |
-| CRP-007 | Local pass | Second worker reconciles uncertain send; real process/DB restart untested. |
+| CRP-007 | Isolated PostgreSQL pass | New pool reads the committed result and competing workers enforce fenced claims; independently hosted worker restart untested. |
 | CRP-008 | Blocked | No live expired consumer session proof. |
 | CRP-009 | Local pass | Wrong owner and stale lease rejected before send. |
 | CRP-010 | Local pass | Two origins dispatch concurrently to distinct provider conversations. |
 | CRP-011 | Local pass | Readback outage leaves uncertain and does not send. |
-| CRP-012 | Blocked | Five-claim ceiling exists; dead-letter operator flow incomplete. |
-| CRP-013 | Local pass | SHA-256 checked at envelope validation and fallback read. |
+| CRP-012 | Blocked | Five-claim ceiling and append-only events exist; dead-letter operator flow incomplete. |
+| CRP-013 | Isolated PostgreSQL pass | SHA-256 checked at envelope validation and fallback read; persisted digest is visible in sanitized JSONL. |
 | CRP-014 | Local pass | Revoked origin and CLEAR denial reject dispatch. |
 | CRP-015 | Not run | Model continuation would incur inference; no approval for billable test. |
 | CRP-016 | Not supported by documented API | Consumer ChatGPT UUID cannot be addressed through Conversations item API; CBE live experiment remains #489. |
-| CRP-017 | Local pass | Authenticated HTTP fallback read and digest-bound acknowledgment via Fastify injection; hosted Test untested. |
+| CRP-017 | Isolated PostgreSQL and HTTP unit pass | Owner-bound store read and digest-bound acknowledgment persisted; authenticated HTTP route tested via Fastify injection. Combined hosted Test route untested. |
 | CRP-018 | Blocked | Autonomous consumer continuation and independently hosted AED runtime not proven. |
 
 ## Acceptance level and next action
 
-The implementation proves local contract behavior only. It does **not** meet live Level 1 durability until a PostgreSQL Test migration, process restart, and independent readback pass. Level 2 needs authenticated Test principal and canonical authority wiring. Level 3 API-managed conversation needs a permitted live item creation/readback; consumer ChatGPT is separate. Level 4 needs independently observed continuation.
+The implementation proves local contract behavior and isolated PostgreSQL durability across a pool restart. It does **not** establish a deployed, independently running Level 1 Test service. Level 2 needs authenticated Test principal and canonical authority wiring. Level 3 API-managed conversation needs a permitted live item creation/readback; consumer ChatGPT is separate. Level 4 needs independently observed continuation.
 
-Next: run the migration and verification in an isolated PostgreSQL 17 Test instance; bind the existing CLEAR resolver and server principal; run two real origins and worker restart; record JSONL plus private event readback; then assess a bounded OpenAI API call's published request/storage cost before executing it. Avoid the shared Supabase main/Production branch until Test scope is established. No live API token, password, or lease reference belongs in GitHub evidence.
+Next: bind the existing CLEAR resolver and authenticated server principal, mount the fallback behind verified TLS on an existing authorized Test host, and run a hosted worker restart and dual-origin readback. Then assess a bounded OpenAI API call's published request/storage cost before executing it. Avoid the shared Supabase main/Production branch until Test scope is established. No live API token, password, or lease reference belongs in GitHub evidence.

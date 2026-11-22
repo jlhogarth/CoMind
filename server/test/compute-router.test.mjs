@@ -4,10 +4,15 @@ import { routeCompute } from '../dist/compute-router.js';
 
 const baseRoutes = () => ({
   LOCAL: { available: true, sufficient: true, qualityScore: 80, maxSensitivity: 'restricted', estimatedCostUsd: 0, costEvidence: 'not_required' },
-  API_BATCH: { available: true, sufficient: true, qualityScore: 90, maxSensitivity: 'confidential', estimatedCostUsd: 0.05, costEvidence: 'fresh' },
-  API_REALTIME: { available: true, sufficient: true, qualityScore: 95, maxSensitivity: 'confidential', estimatedCostUsd: 0.1, costEvidence: 'fresh' },
+  API_BATCH: { available: true, sufficient: true, qualityScore: 90, maxSensitivity: 'confidential', estimatedCostUsd: 0.05, costEvidence: 'fresh', creditBenefit: covered(1) },
+  API_REALTIME: { available: true, sufficient: true, qualityScore: 95, maxSensitivity: 'confidential', estimatedCostUsd: 0.1, costEvidence: 'fresh', creditBenefit: covered(1) },
   CHAT_WORK: { available: true, sufficient: true, qualityScore: 98, maxSensitivity: 'confidential', estimatedCostUsd: 0.2, costEvidence: 'fresh' },
 });
+
+function covered(remainingUsd) {
+  return { state: 'verified_available', sourceReference: 'private-grant-readback', observedAt: '2026-11-22T09:00:00Z',
+    expiresAt: '2026-11-23T09:00:00Z', remainingUsd, scopeVerified: true, paidFallbackBlocked: true };
+}
 
 function request(overrides = {}) {
   return {
@@ -24,6 +29,8 @@ function request(overrides = {}) {
     userImportance: 50,
     humanApprovalRequired: false,
     humanApprovalGranted: false,
+    additionalCashApproved: false,
+    decisionAt: '2026-11-22T09:01:00Z',
     routes: baseRoutes(),
     ...overrides,
   };
@@ -94,4 +101,61 @@ test('batch is rejected when latency budget is below the governed completion win
 
 test('throws on invalid importance instead of silently normalizing it', () => {
   assert.throws(() => routeCompute(request({ userImportance: 101 })), /invalid_userImportance/);
+});
+
+test('unknown benefit balance blocks API, without inventing a zero-cost route', () => {
+  const routes = baseRoutes();
+  routes.LOCAL.sufficient = false;
+  delete routes.API_REALTIME.creditBenefit;
+  const d = routeCompute(request({ requiredQualityScore: 90, routes }));
+  assert.equal(d.status, 'BLOCKED');
+  assert.ok(d.rejectedRoutes.find(x => x.route === 'API_REALTIME').reasons.includes('verified_credit_evidence_required'));
+});
+
+test('available grant without a paid-fallback stop blocks dispatch recommendation', () => {
+  const routes = baseRoutes();
+  routes.LOCAL.sufficient = false;
+  routes.API_REALTIME.creditBenefit.paidFallbackBlocked = false;
+  const d = routeCompute(request({ requiredQualityScore: 90, routes }));
+  assert.equal(d.status, 'BLOCKED');
+  assert.ok(d.rejectedRoutes.find(x => x.route === 'API_REALTIME').reasons.includes('paid_fallback_not_blocked'));
+});
+
+test('partial or expired grant blocks before purchased-credit spillover', () => {
+  for (const mutation of [b => { b.remainingUsd = 0.01; }, b => { b.expiresAt = '2026-11-22T09:00:00Z'; }]) {
+    const routes = baseRoutes();
+    routes.LOCAL.sufficient = false;
+    mutation(routes.API_REALTIME.creditBenefit);
+    const d = routeCompute(request({ requiredQualityScore: 90, routes }));
+    assert.equal(d.status, 'BLOCKED');
+    assert.ok(d.rejectedRoutes.find(x => x.route === 'API_REALTIME').reasons.includes('benefit_insufficient_or_expired'));
+  }
+});
+
+test('stale or wrong-scope evidence cannot authorize benefit usage', () => {
+  for (const mutation of [b => { b.observedAt = '2026-11-21T09:00:00Z'; }, b => { b.scopeVerified = false; }]) {
+    const routes = baseRoutes();
+    routes.LOCAL.sufficient = false;
+    mutation(routes.API_REALTIME.creditBenefit);
+    const d = routeCompute(request({ requiredQualityScore: 90, routes }));
+    assert.equal(d.status, 'BLOCKED');
+  }
+});
+
+test('documented inapplicability requires separate cash authority', () => {
+  const routes = baseRoutes();
+  routes.LOCAL.sufficient = false;
+  routes.API_REALTIME.creditBenefit = { ...covered(null), state: 'not_applicable', remainingUsd: null };
+  assert.equal(routeCompute(request({ requiredQualityScore: 90, routes })).status, 'BLOCKED');
+  const approved = routeCompute(request({ requiredQualityScore: 90, routes, additionalCashApproved: true }));
+  assert.equal(approved.selectedRoute, 'API_REALTIME');
+});
+
+test('covered credit is selected before an authorized cash route if both qualify', () => {
+  const routes = baseRoutes();
+  routes.LOCAL.sufficient = false;
+  routes.API_BATCH.creditBenefit = { ...covered(null), state: 'not_applicable', remainingUsd: null };
+  const d = routeCompute(request({ requiredQualityScore: 85, deferredAllowed: true, bulkWork: true,
+    maxLatencySeconds: 86400, additionalCashApproved: true, routes }));
+  assert.equal(d.selectedRoute, 'API_REALTIME');
 });

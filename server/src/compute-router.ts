@@ -3,6 +3,17 @@ export type RiskTier = 'low' | 'medium' | 'high' | 'critical';
 export type DataSensitivity = 'public' | 'internal' | 'confidential' | 'restricted';
 export type CostEvidenceState = 'fresh' | 'stale' | 'unknown' | 'not_required';
 
+// Supplied by the existing FinOps authority, never inferred from an advertised offer.
+export interface CreditBenefitEvidence {
+  state: 'verified_available' | 'verified_exhausted' | 'not_applicable';
+  sourceReference: string;
+  observedAt: string;
+  expiresAt: string | null;
+  remainingUsd: number | null;
+  scopeVerified: boolean;
+  paidFallbackBlocked: boolean;
+}
+
 export interface RouteCapability {
   available: boolean;
   sufficient: boolean;
@@ -10,6 +21,7 @@ export interface RouteCapability {
   maxSensitivity: DataSensitivity;
   estimatedCostUsd: number | null;
   costEvidence: CostEvidenceState;
+  creditBenefit?: CreditBenefitEvidence;
 }
 
 export interface ComputeRoutingRequest {
@@ -26,6 +38,9 @@ export interface ComputeRoutingRequest {
   userImportance: number;
   humanApprovalRequired: boolean;
   humanApprovalGranted: boolean;
+  // Explicit authority for cash or already-purchased credits after the benefit gate.
+  additionalCashApproved: boolean;
+  decisionAt: string;
   routes: Record<ComputeRoute, RouteCapability>;
 }
 
@@ -68,6 +83,9 @@ function validateRequest(request: ComputeRoutingRequest): void {
   if (!Number.isFinite(request.userImportance) || request.userImportance < 0 || request.userImportance > 100) {
     throw new Error('invalid_userImportance');
   }
+  if (!Number.isFinite(Date.parse(request.decisionAt)) || !/^\d{4}-\d\d-\d\dT/.test(request.decisionAt)) {
+    throw new Error('invalid_decisionAt');
+  }
   for (const [route, capability] of Object.entries(request.routes)) {
     if (!Number.isFinite(capability.qualityScore) || capability.qualityScore < 0 || capability.qualityScore > 100) {
       throw new Error(`invalid_qualityScore:${route}`);
@@ -75,7 +93,35 @@ function validateRequest(request: ComputeRoutingRequest): void {
     if (capability.estimatedCostUsd !== null && (!Number.isFinite(capability.estimatedCostUsd) || capability.estimatedCostUsd < 0)) {
       throw new Error(`invalid_estimatedCostUsd:${route}`);
     }
+    if (capability.creditBenefit?.remainingUsd !== null && capability.creditBenefit?.remainingUsd !== undefined &&
+        (!Number.isFinite(capability.creditBenefit.remainingUsd) || capability.creditBenefit.remainingUsd < 0)) {
+      throw new Error(`invalid_creditBenefit_balance:${route}`);
+    }
   }
+}
+
+function creditRejectionReasons(capability: RouteCapability, request: ComputeRoutingRequest): string[] {
+  const evidence = capability.creditBenefit;
+  if (!evidence || !evidence.sourceReference.trim() || !evidence.scopeVerified ||
+      !Number.isFinite(Date.parse(evidence.observedAt)) ||
+      Date.parse(evidence.observedAt) > Date.parse(request.decisionAt) ||
+      Date.parse(request.decisionAt) - Date.parse(evidence.observedAt) > 60 * 60 * 1000) {
+    return ['verified_credit_evidence_required'];
+  }
+  if (evidence.state === 'verified_available') {
+    if (evidence.remainingUsd === null || capability.estimatedCostUsd === null ||
+        evidence.remainingUsd < capability.estimatedCostUsd ||
+        !evidence.expiresAt || !Number.isFinite(Date.parse(evidence.expiresAt)) ||
+        Date.parse(evidence.expiresAt) <= Date.parse(request.decisionAt)) {
+      return ['benefit_insufficient_or_expired'];
+    }
+    if (!evidence.paidFallbackBlocked) return ['paid_fallback_not_blocked'];
+    return [];
+  }
+  if (evidence.state === 'verified_exhausted' || evidence.state === 'not_applicable') {
+    return request.additionalCashApproved ? [] : ['additional_cash_approval_required'];
+  }
+  return ['verified_credit_evidence_required'];
 }
 
 function routeRejectionReasons(route: ComputeRoute, capability: RouteCapability, request: ComputeRoutingRequest): string[] {
@@ -104,6 +150,10 @@ function routeRejectionReasons(route: ComputeRoute, capability: RouteCapability,
   if (route !== 'LOCAL') {
     if (capability.costEvidence !== 'fresh') reasons.push('fresh_cost_evidence_required');
     if (capability.estimatedCostUsd === null) reasons.push('normalized_cost_estimate_required');
+  }
+
+  if (route === 'API_BATCH' || route === 'API_REALTIME') {
+    reasons.push(...creditRejectionReasons(capability, request));
   }
 
   return reasons;
@@ -148,8 +198,8 @@ export function routeCompute(request: ComputeRoutingRequest): ComputeRoutingDeci
   }
 
   candidates.sort((a, b) => {
-    const aCost = a.capability.estimatedCostUsd ?? 0;
-    const bCost = b.capability.estimatedCostUsd ?? 0;
+    const aCost = a.capability.creditBenefit?.state === 'verified_available' ? 0 : (a.capability.estimatedCostUsd ?? 0);
+    const bCost = b.capability.creditBenefit?.state === 'verified_available' ? 0 : (b.capability.estimatedCostUsd ?? 0);
     if (aCost !== bCost) return aCost - bCost;
     return ROUTE_TIE_BREAK[a.route] - ROUTE_TIE_BREAK[b.route];
   });
@@ -164,6 +214,10 @@ export function routeCompute(request: ComputeRoutingRequest): ComputeRoutingDeci
   if (selected.route === 'API_BATCH') rationale.push('Deferred bulk processing is allowed and the latency budget accommodates the batch completion window.');
   if (selected.route === 'CHAT_WORK') rationale.push('Interactive browser, authenticated UI, or human participation makes ChatGPT Work materially necessary.');
   if (selected.route === 'LOCAL') rationale.push('Local capability is sufficient, so no metered external route is justified.');
+  if ((selected.route === 'API_BATCH' || selected.route === 'API_REALTIME') &&
+      selected.capability.creditBenefit?.state === 'verified_available') {
+    rationale.push('Verified, scoped benefit covers this estimate with paid fallback blocked; FinOps must still reserve and recheck the grant before dispatch.');
+  }
 
   const confidence = selected.route === 'LOCAL' || selected.capability.costEvidence === 'fresh' ? 'high' : 'medium';
 

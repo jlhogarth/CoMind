@@ -77,7 +77,8 @@ export class PostgresReturnStore implements ReturnStore {
       if (!result.rows[0]) throw new Error('stage_failed');
       const existing = record(result.rows[0] as Row);
       if (existing.envelope.adapter !== envelope.adapter ||
-          existing.envelope.destinationRef !== envelope.destinationRef ||
+          (envelope.adapter === 'openai_api' &&
+            existing.envelope.destinationRef !== envelope.destinationRef) ||
           existing.envelope.authorizationRef !== envelope.authorizationRef ||
           existing.envelope.contextDigest !== envelope.contextDigest ||
           existing.envelope.resultDigest !== envelope.resultDigest) {

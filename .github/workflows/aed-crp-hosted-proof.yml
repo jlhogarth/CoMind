@@ -1,0 +1,62 @@
+name: AED-CRP Hosted Test Proof
+
+on:
+  pull_request:
+    paths:
+      - 'server/src/return-protocol/**'
+      - 'server/lib/aed-liveness.*'
+      - 'server/scripts/aed-crp-hosted-proof.mjs'
+      - 'server/test/aed-crp.test.mjs'
+      - 'db/migrations/20261122_001_aed_crp_outbox.sql'
+      - 'db/migrations/verify_20261122_001_aed_crp_outbox.sql'
+      - '.github/workflows/aed-crp-hosted-proof.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-return:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: comind_crp_acceptance
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comind_crp_acceptance"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      AED_CRP_TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/comind_crp_acceptance
+      AED_CRP_TEST_PORT: 3012
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install and build
+        working-directory: server
+        run: |
+          npm ci --ignore-scripts
+          npm run build
+      - name: Verify governed return admission
+        working-directory: server
+        run: node --test test/aed-crp.test.mjs
+      - name: Run isolated host, dual origin and restart proof
+        working-directory: server
+        run: node scripts/aed-crp-hosted-proof.mjs
+      - name: Preserve sanitized JSONL
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aed-crp-hosted-proof
+          path: artifacts/aed-crp-hosted-proof.jsonl
+          if-no-files-found: warn
+          retention-days: 14

@@ -7,6 +7,7 @@ const chatgptUrl = z.string().regex(/^https:\/\/chatgpt\.com\/c\/[0-9a-f]{8}-[0-
 
 const handoffSchema = z.strictObject({
   recoveryId: boundedText,
+  workKey: boundedText,
   reasonCode: boundedText,
   repairSummary: boundedText,
   verifiedState: boundedText,
@@ -70,6 +71,7 @@ export function parseAuthorizedDispatchEvent(
     throw new Error('CBE_DISPATCH_EVENT_ID_MISMATCH');
   }
   const details = detailsSchema.parse(row.details);
+  if (details.handoff.workKey !== row.work_key) throw new Error('CBE_HANDOFF_WORK_KEY_MISMATCH');
   return {
     eventId: row.event_id,
     workKey: row.work_key,

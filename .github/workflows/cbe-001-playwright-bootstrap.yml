@@ -36,8 +36,10 @@ jobs:
         run: |
           set -euo pipefail
           node - <<'NODE'
-          const declared = require('./package.json').devDependencies.playwright;
+          const pkg = require('./package.json');
+          const declared = pkg.dependencies?.playwright;
           const installed = require('./node_modules/playwright/package.json').version;
+          if (pkg.devDependencies?.playwright) throw new Error('Playwright must be a runtime dependency, not a devDependency');
           if (declared !== installed) throw new Error(`Playwright mismatch: declared ${declared}, installed ${installed}`);
           console.log(JSON.stringify({ status: 'ok', playwright: installed, node: process.version }));
           NODE

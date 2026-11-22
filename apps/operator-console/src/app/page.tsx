@@ -17,6 +17,7 @@ import {
   Globe2,
   HardDrive,
   LayoutDashboard,
+  Smartphone,
   LockKeyhole,
   Mail,
   Network,
@@ -34,7 +35,9 @@ import styles from "./control-plane.module.css";
 const navItems = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard, active: true },
   { label: "Monitoring", href: "/activity", icon: Activity },
+  { label: "CBE Mobile Control", href: "/cbe-control", icon: Smartphone },
   { label: "RuleBook HUD", href: "/rulebook", icon: ShieldCheck },
+  { label: "RunBook Health", href: "/runbook", icon: FileCheck2 },
   { label: "Integration Gateway", href: "/integrations", icon: Network },
   { label: "Approvals", href: "https://approvals.comindinc.com", icon: CheckCircle2, external: true },
   { label: "Cloudflare", href: "https://dash.cloudflare.com", icon: Cloud, external: true },
@@ -47,6 +50,7 @@ const navItems = [
 
 const quickActions = [
   { label: "Open Activity HUD", href: "/activity", icon: Gauge },
+  { label: "Open CBE Mobile Control", href: "/cbe-control", icon: Smartphone },
   { label: "Open Integration Gateway", href: "/integrations", icon: Network },
   { label: "Review Approvals", href: "https://approvals.comindinc.com", icon: CheckCircle2, external: true },
   { label: "View Infrastructure", href: "https://dash.cloudflare.com", icon: ServerCog, external: true },
@@ -100,7 +104,7 @@ export default function Home() {
         </a>
 
         <nav className={styles.nav}>
-          {navItems.slice(0, 8).map(({ label, href, icon: Icon, active, external }) => (
+          {navItems.slice(0, 9).map(({ label, href, icon: Icon, active, external }) => (
             <ExternalAwareLink
               key={label}
               href={href}
@@ -113,7 +117,7 @@ export default function Home() {
             </ExternalAwareLink>
           ))}
           <div className={styles.navDivider} aria-hidden="true" />
-          {navItems.slice(8).map(({ label, href, icon: Icon, external }) => (
+          {navItems.slice(9).map(({ label, href, icon: Icon, external }) => (
             <ExternalAwareLink key={label} href={href} external={external} className={styles.navExternal}>
               <Icon size={17} aria-hidden="true" />
               <span>{label}</span>

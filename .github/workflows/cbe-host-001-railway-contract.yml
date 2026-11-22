@@ -1,0 +1,26 @@
+name: CBE-HOST-001 Railway Contract
+
+on:
+  pull_request:
+    paths:
+      - 'config/cbe_railway_acceptance_manifest.json'
+      - 'scripts/verify_cbe_host_001_railway_contract.mjs'
+      - 'docs/provenance/2026-11-01-cbe-host-001-railway-acceptance-contract.md'
+      - '.github/workflows/cbe-host-001-railway-contract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  railway-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v4
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify bounded Railway acceptance contract
+        run: node scripts/verify_cbe_host_001_railway_contract.mjs

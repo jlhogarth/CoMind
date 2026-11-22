@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "workKey": "CBE-HOST-001",
+  "productionChange": false,
+  "hostingActivated": false,
+  "paidCommitmentAuthorized": false,
+  "railway": {
+    "project": {
+      "id": "0ddd5aa1-d1e5-4425-b6e8-448bc6d5b6ca",
+      "name": "CoMind OC-002 Acceptance"
+    },
+    "environment": {
+      "id": "b10f2849-a859-48f1-9613-c731c38e2f33",
+      "name": "acceptance",
+      "ephemeral": false
+    },
+    "existingOperatorConsole": {
+      "serviceId": "5b3fcf74-5b2f-4bcb-9eb4-dea75dd06dce",
+      "name": "operator-console-oc002",
+      "repurposeAsCbe": false,
+      "reason": "The mobile control plane and browser execution plane remain separate services."
+    },
+    "proposedCbeService": {
+      "name": "cbe-execution-acceptance",
+      "source": {
+        "repo": "jlhogarth/CoMind",
+        "branch": "main",
+        "rootDirectory": "/server",
+        "dockerfilePath": "Dockerfile.cbe"
+      },
+      "healthcheckPath": "/health",
+      "port": 3000,
+      "profileMountPath": "/var/lib/comind/cbe-profile",
+      "routineNetworking": "private",
+      "publicExecutionDomainRequired": false,
+      "initialReplicaCount": 1,
+      "serverlessAcceptanceDefault": false,
+      "serverlessEvaluationRequired": true,
+      "livenessAuthority": false
+    },
+    "proposedPersistentVolume": {
+      "name": "cbe-auth-profile-acceptance",
+      "mountPath": "/var/lib/comind/cbe-profile",
+      "initialTargetSizeGB": 0.5,
+      "containsAuthenticatedBrowserState": true,
+      "mustNotBePublic": true
+    }
+  },
+  "configuration": {
+    "secretNames": [
+      "CBE_CONTROL_TOKEN",
+      "DATABASE_URL"
+    ],
+    "nonSecretVariables": {
+      "PORT": "3000",
+      "CBE_PROFILE_DIR": "/var/lib/comind/cbe-profile",
+      "CBE_HEADLESS": "true"
+    },
+    "humanAuthUrlVariable": "CBE_HUMAN_AUTH_URL",
+    "humanAuthSurfaceStatus": "unbound",
+    "secretValuesPermittedInRepository": false
+  },
+  "costGate": {
+    "pricingAsOf": "2026-11-02",
+    "sources": [
+      "https://railway.com/pricing",
+      "https://docs.railway.com/pricing",
+      "https://docs.railway.com/volumes/reference",
+      "https://docs.railway.com/deployments/serverless"
+    ],
+    "free": {
+      "baseMonthlyUsd": 0,
+      "postTrialResourceCreditUsd": 1,
+      "maxVcpuPerService": 1,
+      "maxMemoryGbPerService": 0.5,
+      "maxVolumeGb": 0.5,
+      "servicesPerProject": 3,
+      "volumesPerProject": 1
+    },
+    "hobby": {
+      "minimumMonthlyUsd": 5,
+      "includedUsageUsd": 5,
+      "maxVolumeGb": 5
+    },
+    "resourceRates": {
+      "memoryUsdPerGbMonth": 10,
+      "cpuUsdPerVcpuMonth": 20,
+      "volumeUsdPerGbMonth": 0.15,
+      "egressUsdPerGb": 0.05
+    },
+    "paidCommitmentRequiresExplicitHumanAuthorization": true,
+    "planSelection": "after_empirical_acceptance_measurement"
+  },
+  "acceptanceMeasurements": [
+    "server_idle_memory_gb",
+    "browser_start_peak_memory_gb",
+    "browser_steady_memory_gb",
+    "peak_cpu_vcpu",
+    "container_start_to_health_seconds",
+    "browser_start_seconds",
+    "profile_persistence_across_restart",
+    "serverless_sleep_with_browser_closed",
+    "serverless_wake_latency_seconds",
+    "serverless_behavior_with_browser_open",
+    "bounded_test_cost_usd"
+  ],
+  "governance": {
+    "deploymentRequiresSeparateAuthorization": true,
+    "paidPlanRequiresSeparateAuthorization": true,
+    "productionActivationAuthorized": false,
+    "routineMobileControlMustNotExposeBearerToken": true,
+    "aedLivenessMustNotDependOnCbeProcessResidency": true,
+    "conversationWakeRemainsFailClosedUntilExactRecoveryResolverIsBound": true
+  }
+}

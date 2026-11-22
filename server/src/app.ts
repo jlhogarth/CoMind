@@ -23,6 +23,8 @@ import { registerAssistantRoutes } from './routes/assistant.js';
 import { registerMemoryRoutes } from './routes/memory.js';
 import { registerChatRoutes } from './routes/chat.js';
 import { registerGovernanceRoutes } from './routes/governance.js';
+import { registerCbeControlRoutes } from './routes/cbe-control.js';
+import { createCbeControlExecutor, type CbeControlExecutor } from './cbe-control/executor.js';
 import {
   closePool,
   ConversationLockRunner,
@@ -41,6 +43,7 @@ type AppDependencies = {
   conversationLock: ConversationLockRunner;
   providerAcquisitionWriter: ProviderAcquisitionWriter;
   checkpointingEnabled: boolean;
+  cbeControlExecutor: CbeControlExecutor;
 };
 
 const defaultDependencies: AppDependencies = {
@@ -52,6 +55,11 @@ const defaultDependencies: AppDependencies = {
   conversationLock: withConversationLock,
   providerAcquisitionWriter: persistOpenAIProviderAcquisitionEvent,
   checkpointingEnabled: env.ACP_CHECKPOINTS_ENABLED,
+  cbeControlExecutor: createCbeControlExecutor({
+    profileDir: env.CBE_PROFILE_DIR,
+    headless: env.CBE_HEADLESS,
+    humanAuthUrl: env.CBE_HUMAN_AUTH_URL,
+  }),
 };
 
 export async function buildApp(overrides: Partial<AppDependencies> = {}) {
@@ -136,6 +144,7 @@ export async function buildApp(overrides: Partial<AppDependencies> = {}) {
   registerAdminRoutes(app);
   registerChatRoutes(app);
   registerGovernanceRoutes(app, dependencies.query);
+  registerCbeControlRoutes(app, dependencies.cbeControlExecutor, env.CBE_CONTROL_TOKEN ?? null);
 
   app.get('/', async () => ({ ok: true }));
   app.get('/health', async () => ({ ok: true, service: 'comind-api' }));
@@ -143,6 +152,7 @@ export async function buildApp(overrides: Partial<AppDependencies> = {}) {
 
   app.addHook('onClose', async () => {
     await checkpointScheduler.close();
+    await dependencies.cbeControlExecutor.close();
     await dependencies.closePool();
   });
 

@@ -13,11 +13,25 @@ const optionalUuid = z.preprocess(
   z.string().uuid().optional()
 );
 
+const optionalControlToken = z.preprocess(
+  (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+  z.string().trim().min(32).optional()
+);
+
+const optionalHttpsUrl = z.preprocess(
+  (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+  z.string().url().refine((value) => value.startsWith('https://'), 'URL must use HTTPS').optional()
+);
+
 const environmentSchema = z
   .object({
     DATABASE_URL: z.string().url().startsWith('postgres'),
     CORS_ORIGINS: z.string().default(''),
     PORT: z.coerce.number().int().min(1).max(65535).default(3000),
+    CBE_CONTROL_TOKEN: optionalControlToken,
+    CBE_PROFILE_DIR: optionalNonEmptyString,
+    CBE_HUMAN_AUTH_URL: optionalHttpsUrl,
+    CBE_HEADLESS: z.enum(['true', 'false']).default('true').transform((value) => value === 'true'),
     ASSISTANT_PROVIDER: z.enum(['disabled', 'openai']).default('disabled'),
     ACP_CHECKPOINTS_ENABLED: z.enum(['true', 'false']).default('false').transform(value => value === 'true'),
     ASSISTANT_MAX_HISTORY_MESSAGES: z.coerce.number().int().min(1).max(200).default(40),

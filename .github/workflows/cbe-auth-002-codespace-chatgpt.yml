@@ -1,0 +1,46 @@
+name: CBE-AUTH-002 Codespaces ChatGPT Bootstrap
+
+on:
+  pull_request:
+    paths:
+      - 'server/scripts/cbe-chatgpt-codespace-auth.mjs'
+      - 'server/scripts/cbe-chatgpt-auth-check.mjs'
+      - 'server/src/browser-executor/chatgpt-profile-lock.ts'
+      - 'scripts/cbe_chatgpt_codespace_auth.sh'
+      - 'scripts/verify_cbe_chatgpt_codespace_contract.mjs'
+      - '.devcontainer/devcontainer.json'
+      - '.devcontainer/Dockerfile'
+      - '.github/workflows/cbe-auth-002-codespace-chatgpt.yml'
+      - 'docs/provenance/2026-11-01-cbe-auth-002-codespace-chatgpt.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  codespace-chatgpt-auth-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - name: Install server dependencies
+        working-directory: server
+        run: npm ci
+      - name: Validate shell and session syntax
+        run: |
+          bash -n scripts/cbe_chatgpt_codespace_auth.sh
+          node --check server/scripts/cbe-chatgpt-codespace-auth.mjs
+          node --check scripts/verify_cbe_chatgpt_codespace_contract.mjs
+      - name: Build server regression
+        working-directory: server
+        run: npm run build
+      - name: Verify Codespaces interactive browser contract
+        run: node scripts/verify_cbe_chatgpt_codespace_contract.mjs
+      - name: Verify shared profile lock and authentication selectors
+        working-directory: server
+        run: node --test test/chatgpt-profile-lock.test.mjs test/cbe-chatgpt-auth-bootstrap.test.mjs

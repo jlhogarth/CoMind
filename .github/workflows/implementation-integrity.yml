@@ -38,17 +38,24 @@ jobs:
       - name: Run NMC-001 detector tests
         run: python scripts/test_check_magic_configuration.py
 
+      - name: Run IIC-006 retry and cleanup adversarial tests
+        run: python scripts/test_check_retry_cleanup_integrity.py
+
       - name: Enforce NDT-001 and report NFS candidates
         run: python scripts/check_implementation_integrity.py . --mode enforce --format json --output integrity-findings.json
 
       - name: Run NMC-001 in shadow mode
         run: python scripts/check_magic_configuration.py . --output nmc-findings.json
 
+      - name: Run IIC-006 NRC/NCI candidates in shadow mode
+        run: python scripts/check_retry_cleanup_integrity.py . --output retry-cleanup-findings.json
+
       - name: Render findings in job log
         if: always()
         run: |
           cat integrity-findings.json
           cat nmc-findings.json
+          cat retry-cleanup-findings.json
 
       - name: Preserve exact-head integrity evidence
         if: always()
@@ -58,5 +65,6 @@ jobs:
           path: |
             integrity-findings.json
             nmc-findings.json
+            retry-cleanup-findings.json
           if-no-files-found: error
           retention-days: 14

@@ -20,6 +20,7 @@ export type BrowserNavigationObservation = {
   statusCode: number | null;
   ok: boolean | null;
   screenshot?: BrowserScreenshotEvidence;
+  metrics?: { contextStartupMs: number; navigationMs: number; titleBytes: number; screenshotBytes: number; modelRequests: 0 };
 };
 
 export interface BrowserDriver {
@@ -121,19 +122,25 @@ export function createPlaywrightDriver(options: PlaywrightDriverOptions = {}): B
 
   return {
     async navigate(input) {
+      const contextStart = performance.now();
       const activeContext = await ensureContext();
+      const contextStartupMs = Math.round(performance.now() - contextStart);
       const page = await activeContext.newPage();
       try {
+        const navigationStart = performance.now();
         const response = await page.goto(input.targetUrl, {
           waitUntil: 'domcontentloaded',
           timeout: input.timeoutMs,
         });
+        const navigationMs = Math.round(performance.now() - navigationStart);
+        const title = await page.title();
         const screenshot = input.captureScreenshot
           ? await page.screenshot({ type: 'png' })
           : null;
         return {
           finalUrl: page.url(),
-          title: await page.title(),
+          title,
+          metrics: { contextStartupMs, navigationMs, titleBytes: Buffer.byteLength(title, 'utf8'), screenshotBytes: screenshot?.byteLength ?? 0, modelRequests: 0 },
           statusCode: response?.status() ?? null,
           ok: response?.ok() ?? null,
           ...(screenshot

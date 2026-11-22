@@ -12,7 +12,9 @@
     "build": "tsc -p tsconfig.json",
     "test": "node --test test/*.test.mjs",
     "maintenance:audit": "node dist/maintenance-control/cli.js",
+    "cbe:chatgpt-auth-bootstrap": "node scripts/cbe-chatgpt-auth-bootstrap.mjs",
     "cbe:chatgpt-handoff": "node dist/browser-executor/chatgpt-handoff-cli.js",
+    "cbe:chatgpt-successor": "node dist/browser-executor/chatgpt-successor-cli.js",
     "cbe:chatgpt-live-proof": "node scripts/cbe-chatgpt-live-proof.mjs"
   },
   "dependencies": {
@@ -26,14 +28,15 @@
     "@temporalio/workflow": "1.25.0",
     "dotenv": "^16.4.5",
     "fastify": "^5.12.4",
+    "google-auth-library": "11.3.4",
     "openai": "7.28.0",
     "pg": "^8.11.5",
+    "playwright": "1.64.1",
     "zod": "4.6.7"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "@types/pg": "^8.23.1",
-    "playwright": "1.64.1",
     "tsx": "^4.23.13",
     "typescript": "^5.4.5"
   }

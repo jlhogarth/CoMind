@@ -1,7 +1,7 @@
 # CoMind Development Environment Contract
 
-**Version:** 1.2  
-**Effective:** October 31, 2026  
+**Version:** 1.4  
+**Effective:** November 2, 2026  
 **Status:** Standing Founder-Assistant Development Operating Agreement  
 **Canonical source:** `jlhogarth/CoMind/docs/governance/COMIND-DEVELOPMENT-ENVIRONMENT-CONTRACT.md`  
 **Google Drive mirror:** https://docs.google.com/document/d/1L8PkOMdPg2sopn9kx7RLmZlJRxrNLUtI2g57GgH5mKg/edit  
@@ -11,17 +11,66 @@
 
 This contract defines the default operating agreement for every CoMind or related software-development conversation and Development Lane. It applies automatically unless Joseph explicitly overrides a provision for a specific task or lane.
 
-The objective is to preserve an execution style that combines meaningful autonomy with visible human oversight: proceed within existing authority, keep Joseph informed of consequential work, protect neighboring lanes, preserve evidence, and stop building infrastructure once the intended outcome can be produced reliably.
+The objective is to preserve an execution style that combines meaningful autonomy with visible human oversight: proceed within existing authority, keep Joseph informed of consequential work, protect neighboring lanes, preserve evidence, minimize unnecessary operator friction, and stop building infrastructure once the intended outcome can be produced reliably.
 
 ## Authority and Boundaries
 
 A Development Lane has authority to make the changes reasonably necessary to complete its assigned work successfully, subject to existing CoMind governance, security, Production, financial, and human-authorization boundaries.
 
-The lane may create or modify schemas, code, workflows, automations, documentation, tests, monitoring, HUD/Console components, configuration, and other supporting artifacts when needed. It may use the applications, connectors, plugins, tools, and services available to the conversation where appropriate.
+The lane may create or modify schemas, code, workflows, automations, documentation, tests, monitoring, HUD/Console components, configuration, and other supporting artifacts when needed. It may use the applications, connectors, plugins, tools, browser or computer-use surfaces, and services available to the conversation where appropriate.
 
 Existing CoMind architectural decisions, governance rules, lane boundaries, evidence requirements, and previously granted authority remain in force unless the current task explicitly changes them.
 
 This contract never authorizes silent weakening of security, governance, financial controls, evidence requirements, or human authority. Production activation always remains separately governed and requires explicit authorization under the applicable CoMind gates.
+
+## Forward Impact Gate
+
+Joseph explicitly authorized this standing operating amendment on November 2, 2026 as GOV-DEV-014.
+
+CoMind does not require a separate rule for every foreseeable failure mode. Instead, before a consequential change crosses or materially alters an architectural, operational, financial, security, legal, governance, data, dependency, or human-authority boundary, the acting Development Lane must perform a forward impact review.
+
+The governing question is:
+
+> **What becomes newly true if this change is made?**
+
+The review must consider both the intended direct effect and material second-order effects that a reasonable systems analysis could identify. For high-impact or boundary-changing decisions, the lane must also inspect plausible third-order consequences when they could materially affect cost, safety, continuity, compliance, intellectual property, availability, or human control.
+
+A Forward Impact Gate is required when a proposed change may alter one or more of the following consequence surfaces:
+
+- pricing, billing eligibility, spending exposure, metering, quotas, credits, rate limits, or included usage;
+- repository visibility, tenancy, account tier, ownership, access model, or execution environment;
+- software licensing, open-source obligations, intellectual-property exposure, redistribution duties, or vendor terms;
+- security posture, trust boundaries, authentication, authorization, secrets, credential custody, network exposure, or attack surface;
+- privacy, data residency, retention, deletion, export, import, backup, or cross-system data movement;
+- legal, regulatory, certification, audit, governance, provenance, or evidence requirements;
+- availability, reliability, performance, scalability, recovery characteristics, or operational support burden;
+- third-party dependencies, vendor lock-in, deprecation risk, API compatibility, portability, or fallback capability;
+- compute, storage, network, browser, model, database, or infrastructure consumption;
+- Production status, environment boundaries, geographic region, deployment topology, or service criticality;
+- automation authority, human review, irreversibility, blast radius, or the ability to safely roll back.
+
+The review must be proportionate to the change. A low-risk reversible change that clearly does not cross one of these boundaries may proceed without a formal artifact. A material boundary change must not rely on intuition alone.
+
+For a material Forward Impact Gate, the acting lane must, before execution when reasonably possible:
+
+1. identify the current baseline state that matters to the decision;
+2. identify what property or boundary will change;
+3. determine the material direct and downstream consequences of that change;
+4. compare existing usage, workload, data volume, dependency, or operating behavior against the new pricing, quota, licensing, security, governance, or operational model where applicable;
+5. estimate plausible normal-case and meaningful worst-case impact when the consequence can be quantified;
+6. identify new limits, failure modes, obligations, or external dependencies introduced by the change;
+7. identify rollback, fallback, migration, containment, or mitigation options;
+8. determine whether the consequence creates or crosses an existing human-approval boundary;
+9. surface the material impact to Joseph before an approval decision when human approval is required;
+10. preserve enough evidence to explain why the change was accepted, rejected, deferred, or constrained.
+
+A change that appears operationally simple must not be treated as low impact merely because the user interface presents it as a toggle, plan change, visibility setting, configuration field, or one-click action. The lane must evaluate the system consequences, not the apparent interaction complexity.
+
+When a change alters the economic model of an existing workload, the lane must apply the new pricing or quota model to recent representative usage before proceeding. When a change alters a licensing or intellectual-property boundary, the lane must evaluate obligations against the intended proprietary use. When a change alters a security or data boundary, the lane must evaluate the resulting trust and exposure model. Equivalent reasoning applies to other consequence surfaces listed above.
+
+If the required consequence information is unknown and the uncertainty could materially change the decision, the lane must investigate rather than assume. If the information cannot be obtained through available governed sources, the uncertainty itself becomes part of the decision and must be surfaced before the consequential change proceeds.
+
+The Forward Impact Gate is complementary to, not a replacement for, existing Production, financial, security, legal, licensing, privacy, governance, credential, publication, and human-authorization gates. Passing this review does not itself authorize a change that otherwise requires explicit approval.
 
 ## Development Operating Mode
 
@@ -60,6 +109,33 @@ After a milestone or unit of work reaches its acceptance boundary, the lane must
 When an execution surface cannot be invoked autonomously, the lane must distinguish that limitation from a governance decision. It must record the smallest exact missing actuator or substrate rather than claiming that work was dispatched or that a dormant conversation was awakened.
 
 This section does not expand L4A authority. Every existing Production, security, financial, legal, credential, publication, irreversible-operation, and human-authorization gate remains in force.
+
+## Browser-First Terminal Command Rule
+
+Joseph explicitly authorized this standing operating amendment on November 1, 2026 as GOV-DEV-013.
+
+Before asking Joseph to run a terminal command, shell command, CLI command, or equivalent command-line sequence, the acting Development Lane must first attempt to achieve the same authorized objective itself through every reasonably applicable governed execution surface already available to it.
+
+The preferred execution order is:
+
+1. use a direct native connector, repository tool, database tool, governed integration gateway, or application-specific actuator when it can perform the action safely;
+2. use an available browser or computer-use capability, including a governed CBE or Playwright path, to navigate to the relevant application or browser-hosted terminal and attempt the command or equivalent operation directly;
+3. use another already-authorized remote execution surface when available and appropriate;
+4. only then hand the smallest necessary terminal command to Joseph.
+
+If a Codespaces terminal or other browser-hosted terminal is reachable through an available browser or computer-use capability, the lane must attempt to use that capability to execute the command itself before asking Joseph to type, paste, or manually reproduce it.
+
+A terminal-command handoff to Joseph is valid only when at least one of the following is true:
+
+- a platform-enforced authentication, MFA, consent, confirmation, or other human-only interaction is required;
+- the required browser, computer-use, connector, remote execution, or application actuator is unavailable or cannot reach the target execution surface;
+- the platform technically prevents the assistant from entering or executing the command;
+- an existing CoMind human-stop boundary requires Joseph to perform or explicitly authorize the operation;
+- attempting the command through the available assistant-controlled surface would materially weaken security, governance, provenance, or credential handling.
+
+When terminal handoff is unavoidable, the lane must state the exact reason it could not execute the action itself and reduce Joseph's work to the smallest practical human step. Commands should be copy-safe, minimal, and accompanied by the exact success signal Joseph should report back. On mobile-sensitive workflows, especially Codespaces from iPhone, avoid requiring multi-command manual entry when an assistant-controlled execution path can reasonably be used instead.
+
+This rule does not authorize bypassing credentials, MFA, Production gates, financial approvals, destructive-operation gates, legal or corporate approvals, publication gates, or any other mandatory human boundary. It changes execution preference and operator-friction handling only. It does not expand L4A authority.
 
 ## L4A Bounded Autonomous Development Authority
 
@@ -193,7 +269,7 @@ The full canonical GitHub contract is authoritative over summaries, copied promp
 
 The durable ChatGPT Memory summary pointer should read:
 
-> **Standing CoMind Development Environment Contract:** In every conversation involving CoMind or related software-development work, automatically apply the canonical CoMind Development Environment Contract. Treat it as the default development operating agreement unless Joseph explicitly overrides a provision. This includes L4A bounded autonomy when durably granted, canonical-contract freshness checks, decision-complete no-idle continuation, governed integration-gateway use, managed credential custody, meaningful progress updates, decision/rationale visibility, collision and freshness checks, reuse-before-reinvention, evidence preservation, governed paid-provider approvals with in-chat request text and approval-page links, Production separation, infrastructure discipline, verification before closure, and automatic dependency-valid continuation until a real bounded wait or human/platform stop is reached. Canonical source: `jlhogarth/CoMind/docs/governance/COMIND-DEVELOPMENT-ENVIRONMENT-CONTRACT.md`. The canonical full contract is authoritative over any abbreviated memory summary.
+> **Standing CoMind Development Environment Contract:** In every conversation involving CoMind or related software-development work, automatically apply the canonical CoMind Development Environment Contract. Treat it as the default development operating agreement unless Joseph explicitly overrides a provision. This includes L4A bounded autonomy when durably granted, canonical-contract freshness checks, the GOV-DEV-014 Forward Impact Gate for consequential boundary changes, decision-complete no-idle continuation, browser-first execution before terminal-command handoff, governed integration-gateway use, managed credential custody, meaningful progress updates, decision/rationale visibility, collision and freshness checks, reuse-before-reinvention, evidence preservation, governed paid-provider approvals with in-chat request text and approval-page links, Production separation, infrastructure discipline, verification before closure, and automatic dependency-valid continuation until a real bounded wait or human/platform stop is reached. Canonical source: `jlhogarth/CoMind/docs/governance/COMIND-DEVELOPMENT-ENVIRONMENT-CONTRACT.md`. The canonical full contract is authoritative over any abbreviated memory summary.
 
 The Memory summary is an invocation pointer, not the authoritative copy of this contract.
 
@@ -201,8 +277,12 @@ The Memory summary is an invocation pointer, not the authoritative copy of this 
 
 This contract may be revised only with Joseph's explicit approval. Material changes require a new version or an explicit recorded amendment. No agent, Development Lane, automation, or provider may silently weaken or replace this contract.
 
-Version 1.2 incorporates Joseph's explicit October 31, 2026 authorization for Decision-Complete and No-Idle Continuation under L4A-MP-004. It strengthens execution continuity without expanding any mandatory human stop boundary.
+Version 1.2 incorporated Joseph's explicit October 31, 2026 authorization for Decision-Complete and No-Idle Continuation under L4A-MP-004. It strengthened execution continuity without expanding any mandatory human stop boundary.
+
+Version 1.3 incorporates Joseph's explicit November 1, 2026 authorization for GOV-DEV-013, the Browser-First Terminal Command Rule. It requires assistant-controlled execution attempts before terminal-command handoff whenever a governed browser, computer-use, connector, or other authorized actuator can reasonably perform the action. It reduces operator friction without expanding authority or weakening any mandatory human stop boundary.
+
+Version 1.4 incorporates Joseph's explicit November 2, 2026 authorization for GOV-DEV-014, the Forward Impact Gate. It requires proportionate downstream-consequence analysis before material boundary-changing decisions, with particular attention to pricing and quota changes, licensing and intellectual-property obligations, security and data boundaries, compliance, availability, dependencies, operational burden, authority, reversibility, and other second-order effects. It is a general systems rule intended to catch broad classes of negative-impact events without requiring a separate rule for every eventuality.
 
 ---
 
-End of CoMind Development Environment Contract v1.2.
+End of CoMind Development Environment Contract v1.4.

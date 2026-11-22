@@ -1,0 +1,68 @@
+name: OpenAI API Key Readiness
+
+on:
+  pull_request:
+    paths:
+      - 'server/lib/openai-api-key-readiness.js'
+      - 'server/scripts/openai-api-key-readiness.mjs'
+      - 'server/test/openai-api-key-readiness.test.mjs'
+      - '.github/workflows/openai-api-key-readiness.yml'
+      - 'docs/provenance/2026-11-02-api-key-001-openai-readiness.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: openai-api-key-readiness-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - name: Install committed server dependencies
+        working-directory: server
+        run: npm ci
+      - name: Build server regression
+        working-directory: server
+        run: npm run build
+      - name: Verify credential readiness contract
+        working-directory: server
+        run: node --test test/openai-api-key-readiness.test.mjs
+
+  live-readiness:
+    if: github.event_name == 'workflow_dispatch'
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_REQUIRED_MODEL: gpt-6-luna
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify GitHub secret is present
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${OPENAI_API_KEY:-}" || { echo 'OPENAI_API_KEY is not configured.' >&2; exit 1; }
+          echo 'OPENAI_API_KEY is configured; secret value remains masked.'
+      - name: Verify OpenAI authentication and required model visibility
+        working-directory: server
+        run: node scripts/openai-api-key-readiness.mjs
+      - name: Record bounded readiness summary
+        if: success()
+        run: |
+          echo 'OpenAI API credential readiness passed.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Probe: GET /v1/models only. No prompt, model generation, token-count call, tool call, or billable inference request.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Required model: gpt-6-luna.' >> "$GITHUB_STEP_SUMMARY"

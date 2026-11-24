@@ -1,0 +1,12 @@
+FROM node:24-bookworm-slim
+WORKDIR /app
+COPY server/package.json server/package-lock.json ./server/
+RUN cd server && npm ci --ignore-scripts
+COPY server ./server
+COPY db/migrations/20261122_001_aed_crp_outbox.sql ./db/migrations/20261122_001_aed_crp_outbox.sql
+COPY db/migrations/20261009_009_foundry_work_lease_kernel.sql ./db/migrations/20261009_009_foundry_work_lease_kernel.sql
+COPY db/migrations/20261101_007_cbe_004_exact_return_lease.sql ./db/migrations/20261101_007_cbe_004_exact_return_lease.sql
+COPY db/test/aed_crp_railway_canonical_lease_prerequisites.sql ./db/test/aed_crp_railway_canonical_lease_prerequisites.sql
+RUN cd server && npm run build && npm prune --omit=dev
+ENV NODE_ENV=production
+CMD ["node", "server/dist/return-protocol/hosted-test-host.js"]

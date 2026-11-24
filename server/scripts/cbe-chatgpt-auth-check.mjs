@@ -28,3 +28,29 @@ export async function bootstrapProfile({ chromium, profileDir, confirm, report }
     await context.close();
   }
 }
+
+// Give a restored profile a bounded chance to hydrate before asking for human sign-in.
+export async function detectExistingChatgptSession({ context, page, verify = verifyChatgptAuthentication }) {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    for (const candidate of context.pages()) {
+      if (await verify(candidate)) return true;
+    }
+    if (attempt < 9) await page.waitForTimeout(500);
+  }
+  return false;
+}
+
+// Only offer sign-in when the destination loaded and a login control is visible.
+export async function classifyChatgptAuthHandoff({ page, response }) {
+  const httpStatus = response?.status() ?? null;
+  if (httpStatus === null || httpStatus >= 400) {
+    return { status: 'destination_unavailable', httpStatus };
+  }
+  const loginButton = page.getByRole('button', { name: /^(log in|sign in)$/i }).first();
+  const loginLink = page.getByRole('link', { name: /^(log in|sign in)$/i }).first();
+  const visible = async locator => await locator.isVisible().catch(() => false);
+  if (await visible(loginButton) || await visible(loginLink)) {
+    return { status: 'ready_for_human_authentication', httpStatus };
+  }
+  return { status: 'authentication_state_unverified', httpStatus };
+}

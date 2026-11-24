@@ -137,21 +137,35 @@ test('isolated PostgreSQL 17 reader privilege and HTTP proof',{skip:!raw},async(
   assert.deepEqual(cliReceipt.evaluation.retention.dispositions, ['blocked_missing_retention_evidence']);
   const cliStatus = JSON.parse((await command('status', ...cliArgs)).stdout);
   assert.deepEqual(cliStatus, { status: 'current', receipt: cliReceipt });
-  for (const file of ['20261110_001_drb_004_live_runbook.sql', 'verify_20261110_001_drb_004_live_runbook.sql']) {
+  for (const file of [
+    '20261110_001_drb_004_live_runbook.sql', 'verify_20261110_001_drb_004_live_runbook.sql',
+    '20261112_001_drb_004_hosted_roles.sql', 'verify_20261112_001_drb_004_hosted_roles.sql',
+  ]) {
     await admin.query(await readFile(new URL('../../db/migrations/' + file, import.meta.url), 'utf8'));
   }
   const due = (await admin.query('SELECT public.comind_runbook_lifecycle_due_at(now()) AS due')).rows[0].due.toISOString();
   const monitored = { volumeId: 'isolated-scheduled-doc', scheduledFor: due };
-  const scheduledLedger = createLifecycleLedger(admin, 'scheduled');
-  const evaluateScheduled = () => runLifecycleCheck(monitored, scheduledLedger, async () => ({
-    snapshot: { documentId: monitored.volumeId, tabs: [{ tabId: 't.0', body: { content: [{ endIndex: 338885 }] } }] },
-  }));
-  const [scheduled, scheduledReplay] = await Promise.all([evaluateScheduled(), evaluateScheduled()]);
-  assert.deepEqual(scheduled, scheduledReplay);
+  await admin.query('INSERT INTO comind_drb_test.runbook_binding(volume_id) VALUES ($1)', [monitored.volumeId]);
+  const schedulerPool = new Pool({
+    connectionString: raw, options: '-c role=comind_runbook_scheduler_login',
+  });
+  let scheduled, scheduledReplay;
+  try {
+    const scheduledLedger = createLifecycleLedger(schedulerPool, 'scheduled');
+    const evaluateScheduled = () => runLifecycleCheck(monitored, scheduledLedger, async () => ({
+      snapshot: { documentId: monitored.volumeId, tabs: [{ tabId: 't.0', body: { content: [{ endIndex: 338885 }] } }] },
+    }));
+    [scheduled, scheduledReplay] = await Promise.all([evaluateScheduled(), evaluateScheduled()]);
+    assert.deepEqual(scheduled, scheduledReplay);
+    await assert.rejects(scheduledLedger.record({ ...scheduled.evaluation, volumeId: 'wrong-volume' }),
+      error => error.code === '22023');
+  } finally {
+    await schedulerPool.end();
+  }
   const operatorClient = await admin.connect();
   try {
-    await operatorClient.query('SET ROLE service_role');
-    const result = await operatorClient.query('SELECT public.comind_runbook_lifecycle_status($1) AS status', [monitored.volumeId]);
+    await operatorClient.query('SET ROLE comind_runbook_console_login');
+    const result = await operatorClient.query('SELECT comind_drb_test.console_status() AS status');
     const lifecycle = result.rows[0].status;
     assert.equal(lifecycle.scheduled_receipt_id, scheduled.eventId);
     assert.equal(lifecycle.latest.trigger, 'scheduled');

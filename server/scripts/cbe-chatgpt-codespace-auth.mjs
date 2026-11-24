@@ -2,7 +2,7 @@ import { mkdir } from 'node:fs/promises';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
-import { detectExistingChatgptSession, verifyChatgptAuthentication } from './cbe-chatgpt-auth-check.mjs';
+import { classifyChatgptAuthHandoff, detectExistingChatgptSession, verifyChatgptAuthentication } from './cbe-chatgpt-auth-check.mjs';
 import { acquireChatgptProfileLock } from '../dist/browser-executor/chatgpt-profile-lock.js';
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
@@ -32,7 +32,7 @@ try {
     viewport: { width: 1440, height: 900 },
   });
   const page = context.pages()[0] ?? await context.newPage();
-  await page.goto('https://chatgpt.com/', {
+  const response = await page.goto('https://chatgpt.com/', {
     waitUntil: 'domcontentloaded',
     timeout: 60_000,
   });
@@ -41,11 +41,15 @@ try {
   const reusedExistingSession = authenticated;
 
   if (!authenticated) {
+    const handoff = await classifyChatgptAuthHandoff({ page, response });
     console.log(JSON.stringify({
-      status: 'ready_for_human_authentication',
+      ...handoff,
       host: 'chatgpt.com',
       authenticationMaterialRecorded: false,
     }));
+    if (handoff.status !== 'ready_for_human_authentication') {
+      throw new Error('ChatGPT destination or authentication state could not be verified');
+    }
 
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {

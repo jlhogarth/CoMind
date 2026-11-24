@@ -28,3 +28,14 @@ export async function bootstrapProfile({ chromium, profileDir, confirm, report }
     await context.close();
   }
 }
+
+// Give a restored profile a bounded chance to hydrate before asking for human sign-in.
+export async function detectExistingChatgptSession({ context, page, verify = verifyChatgptAuthentication }) {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    for (const candidate of context.pages()) {
+      if (await verify(candidate)) return true;
+    }
+    if (attempt < 9) await page.waitForTimeout(500);
+  }
+  return false;
+}

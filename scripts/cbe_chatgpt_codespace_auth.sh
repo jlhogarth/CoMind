@@ -66,7 +66,7 @@ websockify_pid=$!
 
 printf '\nCBE ChatGPT authentication browser is starting on private forwarded port %s.\n' "${novnc_port}"
 printf 'In the Codespace Ports panel, open port %s and keep its visibility Private.\n' "${novnc_port}"
-printf 'Complete normal ChatGPT sign-in and MFA only inside that visible browser.\n'
+printf 'The saved profile is checked first; sign in only if the process reports ready_for_human_authentication.\n'\nprintf 'If needed, complete normal ChatGPT sign-in and MFA only inside that visible browser.\n'
 printf 'Do not paste passwords, MFA values, cookies, or tokens into the terminal.\n'
 printf 'Successful sign-in is detected automatically.\n\n'
 

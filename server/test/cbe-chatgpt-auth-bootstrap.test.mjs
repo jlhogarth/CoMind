@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { bootstrapProfile, verifyChatgptAuthentication } from '../scripts/cbe-chatgpt-auth-check.mjs';
+import { bootstrapProfile, detectExistingChatgptSession, verifyChatgptAuthentication } from '../scripts/cbe-chatgpt-auth-check.mjs';
 
 function fixture({ composer = true, profile = true, login = false, navigationFails = false, url = 'https://chatgpt.com/' } = {}) {
   let closed = 0;
@@ -45,4 +45,28 @@ test('confirmed signed-in UI reports once and closes context', async () => {
   await bootstrapProfile({ ...f, confirm: async () => {}, report() { reports++; } });
   assert.equal(reports, 1);
   assert.equal(f.closed(), 1);
+});
+
+test('restored profile is detected without a human handoff', async () => {
+  let waits = 0;
+  const page = { async waitForTimeout() { waits++; } };
+  const context = { pages: () => [page] };
+  const detected = await detectExistingChatgptSession({
+    context, page, verify: async () => waits >= 2,
+  });
+  assert.equal(detected, true);
+  assert.equal(waits, 2);
+});
+
+test('missing saved session is reported only after bounded verification', async () => {
+  let checks = 0;
+  let waits = 0;
+  const page = { async waitForTimeout() { waits++; } };
+  const context = { pages: () => [page] };
+  const detected = await detectExistingChatgptSession({
+    context, page, verify: async () => { checks++; return false; },
+  });
+  assert.equal(detected, false);
+  assert.equal(checks, 10);
+  assert.equal(waits, 9);
 });

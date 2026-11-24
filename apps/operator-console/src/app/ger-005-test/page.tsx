@@ -110,17 +110,21 @@ export default function Ger005TestConsentPage() {
       <button type="button" disabled={busy} onClick={() => void decide("allow")}>Allow fictional Test eligibility</button>{" "}
       <button type="button" disabled={busy} onClick={() => void decide("deny")}>Deny or revoke</button>
     </> : <>
+      <h2>Sign in to the Test account</h2>
       <label htmlFor="ger005-email">Existing Test account email</label>{" "}
       <input id="ger005-email" type="email" autoComplete="username" value={email} onChange={event => setEmail(event.target.value)} />{" "}
       <label htmlFor="ger005-password">Test account password</label>{" "}
       <input id="ger005-password" type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} />{" "}
       <button type="button" disabled={busy || !email.trim() || !password} onClick={() => void signInWithPassword()}>Sign in with password</button>
-      <p>If you do not know this account's password, use one fresh email link after the mail limit resets.</p>
-      <button type="button" disabled={busy || !email.trim()} onClick={() => void signIn()}>Send sign-in link</button>
-      <p>On a phone, copy the full link from the email instead of opening it. Paste it below to verify the one-time token directly. The link is cleared from this field before verification.</p>
-      <label htmlFor="ger005-verification">Latest Test sign-in link</label>{" "}
-      <input id="ger005-verification" type="password" autoComplete="off" value={verificationLink} onChange={event => setVerificationLink(event.target.value)} />{" "}
-      <button type="button" disabled={busy || !verificationLink.trim()} onClick={() => void completeSignIn()}>Complete sign-in</button>
+      <details>
+        <summary>Need an email link instead?</summary>
+        <p>Request one link, then open the newest email once on this device. Older links cannot be reused. The Test email sender allows only two messages per hour across the project.</p>
+        <button type="button" disabled={busy || !email.trim()} onClick={() => void signIn()}>Send one sign-in link</button>
+        <p>If an unopened link still points to localhost, copy the full link from the email and paste it here without opening it first.</p>
+        <label htmlFor="ger005-verification">Unopened Test sign-in link</label>{" "}
+        <input id="ger005-verification" type="password" autoComplete="off" value={verificationLink} onChange={event => setVerificationLink(event.target.value)} />{" "}
+        <button type="button" disabled={busy || !verificationLink.trim()} onClick={() => void completeSignIn()}>Verify unopened link</button>
+      </details>
     </>}
     {message && <p role="status">{message}</p>}
   </main>;

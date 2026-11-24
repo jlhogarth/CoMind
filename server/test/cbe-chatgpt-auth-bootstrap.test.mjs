@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { bootstrapProfile, detectExistingChatgptSession, verifyChatgptAuthentication } from '../scripts/cbe-chatgpt-auth-check.mjs';
+import { bootstrapProfile, classifyChatgptAuthHandoff, detectExistingChatgptSession, verifyChatgptAuthentication } from '../scripts/cbe-chatgpt-auth-check.mjs';
 
 function fixture({ composer = true, profile = true, login = false, navigationFails = false, url = 'https://chatgpt.com/' } = {}) {
   let closed = 0;
@@ -69,4 +69,17 @@ test('missing saved session is reported only after bounded verification', async 
   assert.equal(detected, false);
   assert.equal(checks, 10);
   assert.equal(waits, 9);
+});
+
+test('HTTP 403 never triggers a human sign-in handoff', async () => {
+  const state = await classifyChatgptAuthHandoff({ page: fixture({ login: true }).page, response: { status: () => 403 } });
+  assert.deepEqual(state, { status: 'destination_unavailable', httpStatus: 403 });
+});
+test('loaded anonymous login UI allows human sign-in', async () => {
+  const state = await classifyChatgptAuthHandoff({ page: fixture({ login: true }).page, response: { status: () => 200 } });
+  assert.deepEqual(state, { status: 'ready_for_human_authentication', httpStatus: 200 });
+});
+test('loaded ambiguous UI remains unverified', async () => {
+  const state = await classifyChatgptAuthHandoff({ page: fixture({ login: false }).page, response: { status: () => 200 } });
+  assert.deepEqual(state, { status: 'authentication_state_unverified', httpStatus: 200 });
 });

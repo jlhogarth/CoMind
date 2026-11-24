@@ -12,6 +12,7 @@ type Decision = { event_id: string; decision: "allow" | "deny"; decided_at: stri
 export default function Ger005TestConsentPage() {
   const [signedIn, setSignedIn] = useState(false);
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [verificationLink, setVerificationLink] = useState("");
   const [current, setCurrent] = useState<Decision | null>(null);
   const [message, setMessage] = useState("");
@@ -23,11 +24,11 @@ export default function Ger005TestConsentPage() {
     const client = getBrowserSupabaseClient();
     async function refresh() {
       const { data: { user }, error } = await client.auth.getUser();
-      setSignedIn(Boolean(user) && !error);
-      if (!user || error) { setCurrent(null); return; }
+      if (!user || error) { setSignedIn(false); setCurrent(null); return; }
       const result = await client.rpc("cm_ger005_test_consent_current");
-      if (result.error) { setMessage(result.error.message); return; }
+      if (result.error) { setSignedIn(false); setCurrent(null); setMessage(result.error.message); return; }
       setCurrent((result.data as Decision[])[0] ?? null);
+      setSignedIn(true);
     }
     void refresh();
     const { data } = client.auth.onAuthStateChange(() => { void refresh(); });
@@ -44,6 +45,24 @@ export default function Ger005TestConsentPage() {
         },
       });
       setMessage(result.error?.message ?? "Check your email for the sign-in link, then return here.");
+    } finally { setBusy(false); }
+  }
+
+  async function signInWithPassword() {
+    setBusy(true); setMessage("");
+    const secret = password;
+    setPassword("");
+    try {
+      const client = getBrowserSupabaseClient();
+      const result = await client.auth.signInWithPassword({ email: email.trim(), password: secret });
+      if (result.error) { setMessage("Test sign-in failed. Check the account and password."); return; }
+      const { data: { user }, error } = await client.auth.getUser();
+      if (!user || error) { setMessage("Test sign-in could not be verified."); return; }
+      const readback = await client.rpc("cm_ger005_test_consent_current");
+      if (readback.error) { setMessage(readback.error.message); return; }
+      setCurrent((readback.data as Decision[])[0] ?? null);
+      setSignedIn(true);
+      setMessage("Signed Test account verified. Choose a decision below.");
     } finally { setBusy(false); }
   }
 
@@ -92,7 +111,11 @@ export default function Ger005TestConsentPage() {
       <button type="button" disabled={busy} onClick={() => void decide("deny")}>Deny or revoke</button>
     </> : <>
       <label htmlFor="ger005-email">Existing Test account email</label>{" "}
-      <input id="ger005-email" type="email" autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} />{" "}
+      <input id="ger005-email" type="email" autoComplete="username" value={email} onChange={event => setEmail(event.target.value)} />{" "}
+      <label htmlFor="ger005-password">Test account password</label>{" "}
+      <input id="ger005-password" type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} />{" "}
+      <button type="button" disabled={busy || !email.trim() || !password} onClick={() => void signInWithPassword()}>Sign in with password</button>
+      <p>If you do not know this account's password, use one fresh email link after the mail limit resets.</p>
       <button type="button" disabled={busy || !email.trim()} onClick={() => void signIn()}>Send sign-in link</button>
       <p>On a phone, copy the full link from the email instead of opening it. Paste it below to verify the one-time token directly. The link is cleared from this field before verification.</p>
       <label htmlFor="ger005-verification">Latest Test sign-in link</label>{" "}

@@ -45,6 +45,7 @@ export function assessTwinPromotion(candidate: TwinPromotionCandidate, context: 
     || !['candidate', 'contradicted', 'superseded', 'restricted'].includes(candidate.status)) {
     reasons.push('Unknown provenance or assertion status.');
   }
+  if (typeof candidate.sensitive !== 'boolean') reasons.push('Explicit sensitivity classification is required.');
   if (candidate.sourceClass === 'simulated') reasons.push('Simulated output cannot be promoted as person history.');
   if (candidate.status !== 'candidate') reasons.push('Non-current, contradicted or restricted assertion cannot be promoted.');
   if (!context.identity.verified || !filled(context.identity.actorRef) || !filled(context.identity.evidenceRef)
@@ -60,7 +61,7 @@ export function assessTwinPromotion(candidate: TwinPromotionCandidate, context: 
     if (!filled(candidate.inferenceMethodVersion) || !filled(candidate.uncertaintyBasis)
       || !filled(candidate.reopeningCondition)) reasons.push('Inferred claim requires method, uncertainty and reopening condition.');
   }
-  if (candidate.sourceClass === 'inferred' || candidate.sensitive) {
+  if (candidate.sourceClass !== 'explicit_user' || candidate.sensitive) {
     if (!context.approval.approved || !filled(context.approval.actorRef)
       || !filled(context.approval.authorityRef)
       || context.approval.actorRef !== context.identity.actorRef) {

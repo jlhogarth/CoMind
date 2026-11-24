@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getBrowserSupabaseClient } from "../../lib/supabase/browser";
+import { tokenFromTestMagicLink } from "../../lib/ger-005-test/verification-link";
 
 const TEST_PROJECT_URL = "https://sbgfuanxiqepcoboxzcl.supabase.co";
 const PURPOSE = "digital-twin-synthetic-test";
@@ -11,6 +12,7 @@ type Decision = { event_id: string; decision: "allow" | "deny"; decided_at: stri
 export default function Ger005TestConsentPage() {
   const [signedIn, setSignedIn] = useState(false);
   const [email, setEmail] = useState("");
+  const [verificationLink, setVerificationLink] = useState("");
   const [current, setCurrent] = useState<Decision | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -42,6 +44,26 @@ export default function Ger005TestConsentPage() {
     } finally { setBusy(false); }
   }
 
+  async function completeSignIn() {
+    setBusy(true); setMessage("");
+    const link = verificationLink;
+    setVerificationLink("");
+    try {
+      const token_hash = tokenFromTestMagicLink(link);
+      const client = getBrowserSupabaseClient();
+      const result = await client.auth.verifyOtp({ token_hash, type: "magiclink" });
+      if (result.error) { setMessage("The Test link was rejected or expired. Request a fresh link."); return; }
+      const { data: { user }, error } = await client.auth.getUser();
+      if (!user || error) { setMessage("Sign-in could not be verified. Request a fresh link."); return; }
+      setSignedIn(true);
+      const readback = await client.rpc("cm_ger005_test_consent_current");
+      if (readback.error) { setMessage(readback.error.message); return; }
+      setCurrent((readback.data as Decision[])[0] ?? null);
+      setMessage("Signed Test account verified. Choose a decision below.");
+    } catch { setMessage("Use the latest CoMind Test magic link from this sign-in request."); }
+    finally { setBusy(false); }
+  }
+
   async function decide(decision: "allow" | "deny") {
     setBusy(true); setMessage("");
     try {
@@ -69,6 +91,10 @@ export default function Ger005TestConsentPage() {
       <label htmlFor="ger005-email">Existing Test account email</label>{" "}
       <input id="ger005-email" type="email" autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} />{" "}
       <button type="button" disabled={busy || !email.trim()} onClick={() => void signIn()}>Send sign-in link</button>
+      <p>On a phone, copy the full link from the email instead of opening it. Paste it below to verify the one-time token directly. The link is cleared from this field before verification.</p>
+      <label htmlFor="ger005-verification">Latest Test sign-in link</label>{" "}
+      <input id="ger005-verification" type="password" autoComplete="off" value={verificationLink} onChange={event => setVerificationLink(event.target.value)} />{" "}
+      <button type="button" disabled={busy || !verificationLink.trim()} onClick={() => void completeSignIn()}>Complete sign-in</button>
     </>}
     {message && <p role="status">{message}</p>}
   </main>;

@@ -38,7 +38,10 @@ export default function Ger005TestConsentPage() {
     setBusy(true); setMessage("");
     try {
       const result = await getBrowserSupabaseClient().auth.signInWithOtp({
-        email: email.trim(), options: { shouldCreateUser: false, emailRedirectTo: window.location.href },
+        email: email.trim(), options: {
+          shouldCreateUser: false,
+          emailRedirectTo: new URL("/ger-005-test", window.location.origin).href,
+        },
       });
       setMessage(result.error?.message ?? "Check your email for the sign-in link, then return here.");
     } finally { setBusy(false); }

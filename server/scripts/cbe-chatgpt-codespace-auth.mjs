@@ -2,7 +2,7 @@ import { mkdir } from 'node:fs/promises';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
-import { verifyChatgptAuthentication } from './cbe-chatgpt-auth-check.mjs';
+import { detectExistingChatgptSession, verifyChatgptAuthentication } from './cbe-chatgpt-auth-check.mjs';
 import { acquireChatgptProfileLock } from '../dist/browser-executor/chatgpt-profile-lock.js';
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
@@ -37,23 +37,27 @@ try {
     timeout: 60_000,
   });
 
-  console.log(JSON.stringify({
-    status: 'ready_for_human_authentication',
-    host: 'chatgpt.com',
-    authenticationMaterialRecorded: false,
-  }));
+  let authenticated = await detectExistingChatgptSession({ context, page });
+  const reusedExistingSession = authenticated;
 
-  const deadline = Date.now() + timeoutMs;
-  let authenticated = false;
-  while (Date.now() < deadline) {
-    for (const candidate of context.pages()) {
-      if (await verifyChatgptAuthentication(candidate)) {
-        authenticated = true;
-        break;
+  if (!authenticated) {
+    console.log(JSON.stringify({
+      status: 'ready_for_human_authentication',
+      host: 'chatgpt.com',
+      authenticationMaterialRecorded: false,
+    }));
+
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      for (const candidate of context.pages()) {
+        if (await verifyChatgptAuthentication(candidate)) {
+          authenticated = true;
+          break;
+        }
       }
+      if (authenticated) break;
+      await page.waitForTimeout(1000);
     }
-    if (authenticated) break;
-    await page.waitForTimeout(1000);
   }
 
   if (!authenticated) {
@@ -64,6 +68,7 @@ try {
     status: 'authenticated',
     host: 'chatgpt.com',
     externalProfilePreserved: true,
+    reusedExistingSession,
     authenticationMaterialRecorded: false,
     liveReturnVerified: false,
   }));

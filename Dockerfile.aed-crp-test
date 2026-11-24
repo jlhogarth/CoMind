@@ -1,0 +1,9 @@
+FROM node:24-bookworm-slim
+WORKDIR /app
+COPY server/package.json server/package-lock.json ./server/
+RUN cd server && npm ci --ignore-scripts
+COPY server ./server
+COPY db/migrations/20261122_001_aed_crp_outbox.sql ./db/migrations/20261122_001_aed_crp_outbox.sql
+RUN cd server && npm run build && npm prune --omit=dev
+ENV NODE_ENV=production
+CMD ["node", "server/dist/return-protocol/hosted-test-host.js"]

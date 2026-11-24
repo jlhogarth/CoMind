@@ -46,6 +46,9 @@ test('inference needs source lineage, method, uncertainty, reopening and bound h
 
 test('sensitive claims require human approval even when explicitly sourced', () => {
   assert.equal(assess({ ...candidate, sensitive: true }).readyForDurablePromotion, false);
+  assert.equal(assess({ ...candidate, sensitive: undefined }).readyForDurablePromotion, false);
+  assert.equal(assess({ ...candidate, sourceClass: 'observed' }).readyForDurablePromotion, false);
+  assert.equal(assess({ ...candidate, sourceClass: 'imported' }).readyForDurablePromotion, false);
 });
 
 test('missing data and unknown provenance cannot be normalized to permission', () => {

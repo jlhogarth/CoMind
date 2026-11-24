@@ -1,0 +1,12 @@
+{
+  "name": "comind-rse-001-sandbox-proof",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "dependencies": {
+    "railway": "^3.17.0"
+  },
+  "scripts": {
+    "proof": "node proof.mjs"
+  }
+}

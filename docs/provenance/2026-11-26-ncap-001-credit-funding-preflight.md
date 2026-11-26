@@ -24,7 +24,7 @@ This does not reserve grant funds, validate account or project identity, prove a
 
 ## Verification and continuation
 
-`npm run build` and the focused tests in `openai-funding-preflight.test.mjs`, `governed-openai-assistant.test.mjs`, `configured-assistant-rulebook.test.mjs`, and `governed-provider-execution.test.mjs` passed locally (22/22). Two new tests prove response and streaming wrapper denial before count/reserve/dispatch. Existing integration tests were updated only with explicitly synthetic preflight fixtures; their database-dependent runs were not claimed here.
+`npm run build` and the focused tests in `openai-funding-preflight.test.mjs`, `governed-openai-assistant.test.mjs`, `configured-assistant-rulebook.test.mjs`, and `governed-provider-execution.test.mjs` passed locally (28/28). The response and streaming wrappers deny before count/reserve/dispatch in each root, draft, verifier and repair role. Existing integration tests were updated only with explicitly synthetic preflight fixtures; their database-dependent runs were not claimed here.
 
 Next in this same issue: reconcile FinOps #550's active branch and the canonical grant source; implement and test shared organization grant reservation with project scope, expiry, concurrent attempts, cash authority and receipt settlement. Audit direct/streaming adapters and multi-role execution before claiming comprehensive coverage. Keep the PR draft until the availability impact is resolved. No inference or paid provider call occurred.
 

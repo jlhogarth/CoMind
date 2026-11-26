@@ -55,6 +55,12 @@ export interface GovernedProviderBudgetAuthority {
   ): Promise<GovernedProviderReservation>;
 }
 
+// The funding source must be checked before even the provider token-count API is used.
+// This preflight is not a grant reservation; the later FinOps reservation remains mandatory.
+export interface GovernedProviderFundingPreflight {
+  checkFunding(envelope: ProviderExecutionEnvelope<object>): Promise<void>;
+}
+
 export interface GovernedPaidExecutionAdmission {
   readonly execution_id: string;
   readonly execution_status: string;
@@ -137,6 +143,7 @@ export interface GovernedProviderExecutionInput<
   readonly inputTokenCounter: ProviderInputTokenCounter<TRequest>;
   readonly exposureQuoter: ProviderExposureQuoter<TRequest, TQuote>;
   readonly budgetAuthority: GovernedProviderBudgetAuthority;
+  readonly fundingPreflight?: GovernedProviderFundingPreflight;
   readonly paidExecutionLedger?: GovernedPaidExecutionLedger;
   readonly requestedToolCalls?: number;
   readonly operationName: string;
@@ -306,6 +313,9 @@ export async function executeGovernedProviderExecution<
   }
 
   await runRequiredRulebookExecutionPreflight(input.rulebook);
+  assertProviderExecutionEnvelopeIntegrity(envelope);
+
+  await input.fundingPreflight?.checkFunding(envelope);
   assertProviderExecutionEnvelopeIntegrity(envelope);
 
   const preflight = await preflightProviderInputTokens(envelope, input.inputTokenCounter);

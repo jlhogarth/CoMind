@@ -9,6 +9,7 @@ import { QueryFunction } from '../db.js';
 import {
   GovernedPaidExecutionLedger,
   GovernedProviderBudgetAuthority,
+  GovernedProviderFundingPreflight,
 } from './governed-provider-execution.js';
 import {
   resolveConversationExecutionGovernance,
@@ -36,6 +37,7 @@ export interface GovernedOpenAIAssistantProviderDependencies {
   readonly responses: OpenAIResponseCreateClient<OpenAIResponseLike>;
   readonly inputTokenCounter: ProviderInputTokenCounter<OpenAIResponseCreateRequest>;
   readonly budgetAuthority: GovernedProviderBudgetAuthority;
+  readonly fundingPreflight?: GovernedProviderFundingPreflight;
   readonly paidExecutionLedger?: GovernedPaidExecutionLedger;
   readonly governanceProjectKey?: string;
   readonly destinationKey?: string;
@@ -92,7 +94,8 @@ export class GovernedOpenAIAssistantProvider implements AssistantProvider {
       {
         evaluator: createDatabaseRulebookExecutionPreflight(this.dependencies.queryFn),
         governance,
-      }
+      },
+      this.dependencies.fundingPreflight
     );
 
     const content = result.response.output_text?.trim();

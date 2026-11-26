@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.0.0",
+  "document_id": "comind.public.platform-overview",
+  "family": "CoMind Platform Overview",
+  "sources": [
+    {
+      "id": "github:CoMind/README.md",
+      "path": "README.md",
+      "revision": "9c7e759b2db342a56d6eccb3ac238c8cddcf409b",
+      "sha256": "db8dd4641fbd018fe0973b4f8595d6c4ad79c8b5b71ea6e263322a3004b0fa87",
+      "classification": "public",
+      "approved_excerpt": "CoMind is a memory-augmented AI platform for persistent cognition, governed reasoning, conversation history, provenance, and human-centered digital twin development."
+    }
+  ],
+  "audiences": [
+    "strategic",
+    "technical",
+    "public"
+  ],
+  "classification": "public",
+  "disclosure": {
+    "public_safe_only": true,
+    "provider_transmission": "disabled"
+  },
+  "structure": [
+    "title",
+    "approved excerpt",
+    "optional source inspection"
+  ],
+  "style_version": "CoMind Recursive Elegance v1.0.2",
+  "template_version": "living-documents-L1-v1",
+  "policy_version": "GAM-001-v1",
+  "renderers": [
+    "L0",
+    "L1"
+  ],
+  "cache_policy": {
+    "scope": "per reader and authority revision",
+    "max_age_seconds": 0
+  },
+  "freshness_policy": {
+    "source_digest_required_on_each_read": true
+  },
+  "approval": {
+    "status": "test_only",
+    "public_publication": false
+  },
+  "verification": {
+    "mode": "exact_approved_excerpt"
+  },
+  "snapshot_policy": {
+    "explicit_only": true,
+    "exact_bytes_readback": true
+  }
+}

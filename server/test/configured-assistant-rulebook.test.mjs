@@ -158,6 +158,7 @@ function configuredGovernedProvider(queryFn, counters, budgetApproved = false) {
       new GovernedOpenAIAssistantProvider(
         {
           queryFn: governedQuery,
+          fundingPreflight: { async checkFunding() {} }, // synthetic route proof only
           responses: {
             async create() {
               counters.provider += 1;

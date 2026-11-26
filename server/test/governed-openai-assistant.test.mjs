@@ -98,6 +98,26 @@ function request(content) {
   };
 }
 
+const syntheticFundingPreflight = {
+  async checkFunding() {},
+};
+
+test('unbound credit funding stops before token count, budget reservation and provider dispatch', async () => {
+  let counted = 0;
+  let reserved = 0;
+  let dispatched = 0;
+  const provider = new GovernedOpenAIAssistantProvider({
+    queryFn: queryFor(true),
+    inputTokenCounter: { name: 'synthetic-counter', async countInputTokens() { counted += 1; return 20; } },
+    budgetAuthority: { async reserveProviderExecution() { reserved += 1; throw new Error('must not reserve'); } },
+    responses: { async create() { dispatched += 1; throw new Error('must not dispatch'); } },
+  }, options());
+
+  await assert.rejects(provider.generateResponse(request('Summarize the project.')),
+    /CREDIT_FUNDING_AUTHORITY_UNBOUND/);
+  assert.deepEqual([counted, reserved, dispatched], [0, 0, 0]);
+});
+
 test('secret request is denied by C11 before token count, budget, or provider execution', async () => {
   let tokenCountCalls = 0;
   let budgetCalls = 0;
@@ -173,6 +193,7 @@ test('approved benign canary reaches deliberate Test budget denial but never pro
   const observedContexts = [];
   const provider = new GovernedOpenAIAssistantProvider({
     queryFn: queryFor(true, observedContexts),
+    fundingPreflight: syntheticFundingPreflight,
     inputTokenCounter: { name: 'local-test-counter', async countInputTokens() { tokenCountCalls += 1; return 20; } },
     budgetAuthority: {
       async reserveProviderExecution() {
@@ -205,6 +226,7 @@ test('fully approved fake broker execution reaches fake provider and returns gov
   let providerCalls = 0;
   const provider = new GovernedOpenAIAssistantProvider({
     queryFn: queryFor(true),
+    fundingPreflight: syntheticFundingPreflight,
     inputTokenCounter: { name: 'fake-counter', async countInputTokens() { return 20; } },
     budgetAuthority: {
       async reserveProviderExecution() {

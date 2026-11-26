@@ -31,7 +31,8 @@ function executeGovernedOpenAIProviderExecutionEnvelope(
     counter,
     budgetAuthority,
     paidExecutionLedger,
-    openAIRulebookInput()
+    openAIRulebookInput(),
+    { async checkFunding() {} } // isolated synthetic fixture; not a live grant claim
   );
 }
 

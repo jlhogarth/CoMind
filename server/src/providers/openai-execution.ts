@@ -2,6 +2,7 @@ import { AssistantResponseRequest, ConversationMessage } from '../assistant.js';
 import {
   GovernedPaidExecutionLedger,
   GovernedProviderBudgetAuthority,
+  GovernedProviderFundingPreflight,
   GovernedProviderExecutionResult,
   executeGovernedProviderExecution,
 } from './governed-provider-execution.js';
@@ -182,13 +183,22 @@ function openAIRulebookBinding(action: string) {
   });
 }
 
+const unboundOpenAIFundingPreflight: GovernedProviderFundingPreflight = Object.freeze({
+  async checkFunding() {
+    throw new Error(
+      'CREDIT_FUNDING_AUTHORITY_UNBOUND: OpenAI execution requires verified funding scope and paid-fallback protection'
+    );
+  },
+});
+
 export function executeGovernedOpenAIProviderExecutionEnvelope<TResponse>(
   responses: OpenAIResponseCreateClient<TResponse>,
   envelope: OpenAIProviderExecutionEnvelope,
   inputTokenCounter: ProviderInputTokenCounter<OpenAIResponseCreateRequest>,
   budgetAuthority: GovernedProviderBudgetAuthority,
   paidExecutionLedger: GovernedPaidExecutionLedger | undefined,
-  rulebook: OpenAIRulebookExecutionPreflight
+  rulebook: OpenAIRulebookExecutionPreflight,
+  fundingPreflight?: GovernedProviderFundingPreflight
 ): Promise<GovernedProviderExecutionResult<TResponse, OpenAIProviderExposureQuote>> {
   return executeGovernedProviderExecution({
     envelope,
@@ -202,6 +212,7 @@ export function executeGovernedOpenAIProviderExecutionEnvelope<TResponse>(
       quoteExposure: quoteOpenAIExecutionEnvelopeExposure,
     },
     budgetAuthority,
+    fundingPreflight: fundingPreflight ?? unboundOpenAIFundingPreflight,
     paidExecutionLedger,
     requestedToolCalls: 0,
     operationName: 'responses.create',
@@ -216,7 +227,8 @@ export function executeGovernedOpenAIProviderStreamingEnvelope<TStream>(
   inputTokenCounter: ProviderInputTokenCounter<OpenAIResponseCreateRequest>,
   budgetAuthority: GovernedProviderBudgetAuthority,
   paidExecutionLedger: GovernedPaidExecutionLedger | undefined,
-  rulebook: OpenAIRulebookExecutionPreflight
+  rulebook: OpenAIRulebookExecutionPreflight,
+  fundingPreflight?: GovernedProviderFundingPreflight
 ): Promise<GovernedProviderExecutionResult<TStream, OpenAIProviderExposureQuote>> {
   return executeGovernedProviderExecution({
     envelope,
@@ -230,6 +242,7 @@ export function executeGovernedOpenAIProviderStreamingEnvelope<TStream>(
       quoteExposure: quoteOpenAIExecutionEnvelopeExposure,
     },
     budgetAuthority,
+    fundingPreflight: fundingPreflight ?? unboundOpenAIFundingPreflight,
     paidExecutionLedger,
     requestedToolCalls: 0,
     operationName: 'responses.create',

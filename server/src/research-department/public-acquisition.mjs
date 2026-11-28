@@ -50,7 +50,7 @@ function normalizeWork(item) {
     lifecycle_status: 'candidate',
     // Rights unknown: retain bibliographic metadata only, never abstract/full text.
     metadata: { rights: 'unknown_metadata_only', provider: 'crossref', inspection_depth: 'metadata',
-      provider_reference: typeof item.URL === 'string' ? item.URL : null },
+      provider_reference: `https://api.crossref.org/works/${encodeURIComponent(doi)}` },
   };
 }
 

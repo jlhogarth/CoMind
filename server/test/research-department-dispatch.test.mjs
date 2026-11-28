@@ -38,6 +38,7 @@ test('public metadata enters canonical reference once, with independent readback
       const row = { ref_id: 'f23b70cb-4b58-45d1-8848-997438dd4425', title: params[0], document_identifier: params[2] };
       rows.push(row);
       assert.equal(JSON.parse(params[7]).rights, 'unknown_metadata_only');
+      assert.equal(JSON.parse(params[7]).provider_reference, 'https://api.crossref.org/works/10.1000%2Ftest');
       return { rows: [row] };
     }
     if (statement.includes('WHERE ref_id=')) return { rows: rows.filter(r => r.ref_id === params[0]) };
@@ -46,7 +47,7 @@ test('public metadata enters canonical reference once, with independent readback
   const fetchFn = async url => {
     assert.equal(url.hostname, 'api.crossref.org');
     assert.equal(url.searchParams.get('query'), PUBLIC_QUESTION);
-    return { ok: true, json: async () => ({ message: { items: [{ DOI: '10.1000/test', title: ['Public title'], publisher: 'Publisher' }] } }) };
+    return { ok: true, json: async () => ({ message: { items: [{ DOI: '10.1000/test', title: ['Public title'], publisher: 'Publisher', URL: 'https://api.crossref.org/other' }] } }) };
   };
   const first = await acquirePublicMetadata({ request, provider, fetchFn, queryFn: sql, now });
   const second = await acquirePublicMetadata({ request, provider, fetchFn, queryFn: sql, now });
